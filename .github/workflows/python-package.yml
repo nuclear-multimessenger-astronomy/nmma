@@ -1,0 +1,88 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Unit Test nmma_db
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.8, 3.9]
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: nmma
+          POSTGRES_PASSWORD: anything
+        ports:
+          - 5432:5432
+        # needed because the postgres container does not provide a
+        # healthcheck
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout branch being tested
+      uses: actions/checkout@v2
+    - name: clone submodule
+      run: |
+        git config submodule.nmma.url https://${{ secrets.BITBUCKET_APP_USERNAME }}:${{ secrets.BITBUCKET_APP_PASSWORD }}@bitbucket.org/petertsunhopang/nmma.git
+        git submodule init
+        git submodule update
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Get pip cache dir
+      id: pip-cache
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        echo "::set-output name=dir::$(pip cache dir)"
+    - name: pip cache
+      uses: actions/cache@v2
+      with:
+        path: ${{ steps.pip-cache.outputs.dir }}
+        key: ${{ runner.os }}-pip-2-${{ hashFiles('**/setup.py', '**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-2-
+    - name: Install dependencies
+      run: |
+        # sudo apt-get install gfortran swig libhdf5-serial-dev libmpich-dev
+        sudo apt install -y openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
+        python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT pathlib joblib
+        python -m pip install .[doc]
+        cd nmma && python -m pip install . && cd ..
+        git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && cmake .. && make && cd ../..
+        ls /home/runner/work/nmma_db/nmma_db/MultiNest/lib
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude docs
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude docs,versioneer.py,nmma_db/_version.py,nmma_db/tests,nmma_db/*/__init__.py
+    - name: Write SkyPortal configs
+      run: |
+        cp config.test.yaml config.yaml
+    - name: Initialize database
+      run: |
+        echo "localhost:5432:*:nmma:anything" > ~/.pgpass
+        chmod 600 ~/.pgpass
+        psql -U nmma -h localhost -c "GRANT ALL PRIVILEGES ON DATABASE nmma TO nmma;" nmma
+    - name: Test with pytest
+      run: |
+        python nmma_db/models.py --init_db
+        pytest --cov=./nmma_db --cov-report=xml
+        cd docs && make html; cd ../
+      env:
+        LD_LIBRARY_PATH: .:/home/runner/work/nmma_db/nmma_db/MultiNest/lib # for Linux
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1

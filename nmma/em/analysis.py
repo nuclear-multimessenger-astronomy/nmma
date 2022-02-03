@@ -19,7 +19,7 @@ from .model import SupernovaGRBLightCurveModel, KilonovaGRBLightCurveModel
 from .model import ShockCoolingLightCurveModel, SupernovaShockCoolingLightCurveModel
 from .model import SimpleKilonovaLightCurveModel
 from .model import GenericCombineLightCurveModel
-from .model import model_parameters_dict 
+from .model import model_parameters_dict
 from .utils import loadEvent, getFilteredMag
 from .injection import create_light_curve_data
 from .likelihood import OpticalLightCurve
@@ -277,7 +277,7 @@ def main():
         import matplotlib.pyplot as plt
         from matplotlib.pyplot import cm
 
-        posterior_file = os.path.join(args.outdir, 'injection_' + args.model + '_posterior_samples.dat')
+        posterior_file = os.path.join(args.outdir, 'injection_posterior_samples.dat')
 
         ##########################
         # Fetch bestfit parameters
@@ -298,7 +298,7 @@ def main():
 
         colors = cm.Spectral(np.linspace(0, 1, len(filters)))[::-1]
 
-        plotName = os.path.join(args.outdir, 'injection_' + args.model + '_lightcurves.png')
+        plotName = os.path.join(args.outdir, 'injection_lightcurves.png')
         plt.figure(figsize=(20, 16))
 
         color2 = 'coral'
@@ -350,7 +350,7 @@ def main():
             plt.ylabel('%s' % filt, fontsize=48, rotation=0, labelpad=40)
 
             plt.xlim([0.0, 10.0])
-            plt.ylim([26.0, 14.0])
+            plt.ylim([26.0, 18.0])
             plt.grid()
 
             if cnt == 1:

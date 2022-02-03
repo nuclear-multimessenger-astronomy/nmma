@@ -534,7 +534,7 @@ def metzger_lc(t_day, param_dict):
 
     if len(np.where(t == 0)[0]) > 0:
         raise ValueError('For Me2017, start later than t=0')
- 
+
     # define constants
     c     = astropy.constants.c.cgs.value
     h     = astropy.constants.h.cgs.value
@@ -733,6 +733,10 @@ def metzger_lc(t_day, param_dict):
     Ltot = Ltotm
     lbol = Ltotm * 1e40
     Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto**2 * sigSB))**(0.25)
+
+    ii = np.where(~np.isnan(Tobs) & (Tobs > 0))[0]
+    f = interp.interp1d(t_day[ii], Tobs[ii], fill_value='extrapolate')
+    Tobs = f(t_day)
 
     Tobs[Tobs == 0.] = np.nan
     one_over_T = 1. / Tobs
