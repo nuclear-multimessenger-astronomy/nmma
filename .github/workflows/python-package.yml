@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Unit Test nmma_db
+name: Unit Test nmma
 
 on: [push]
 
@@ -33,11 +33,6 @@ jobs:
     steps:
     - name: Checkout branch being tested
       uses: actions/checkout@v2
-    - name: clone submodule
-      run: |
-        git config submodule.nmma.url https://${{ secrets.BITBUCKET_APP_USERNAME }}:${{ secrets.BITBUCKET_APP_PASSWORD }}@bitbucket.org/petertsunhopang/nmma.git
-        git submodule init
-        git submodule update
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -62,13 +57,13 @@ jobs:
         python -m pip install .[doc]
         cd nmma && python -m pip install . && cd ..
         git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && cmake .. && make && cd ../..
-        ls /home/runner/work/nmma_db/nmma_db/MultiNest/lib
+        ls /home/runner/work/nmma/nmma/MultiNest/lib
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude docs
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude docs,versioneer.py,nmma_db/_version.py,nmma_db/tests,nmma_db/*/__init__.py
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude docs,versioneer.py,nmma/_version.py,nmma/tests,nmma/*/__init__.py
     - name: Write SkyPortal configs
       run: |
         cp config.test.yaml config.yaml
@@ -79,10 +74,9 @@ jobs:
         psql -U nmma -h localhost -c "GRANT ALL PRIVILEGES ON DATABASE nmma TO nmma;" nmma
     - name: Test with pytest
       run: |
-        python nmma_db/models.py --init_db
-        pytest --cov=./nmma_db --cov-report=xml
+        pytest --cov=./nmma --cov-report=xml
         cd docs && make html; cd ../
       env:
-        LD_LIBRARY_PATH: .:/home/runner/work/nmma_db/nmma_db/MultiNest/lib # for Linux
+        LD_LIBRARY_PATH: .:/home/runner/work/nmma/nmma/MultiNest/lib # for Linux
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1

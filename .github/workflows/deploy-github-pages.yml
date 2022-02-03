@@ -41,14 +41,14 @@ jobs:
 
     - name: Make dependencies
       run: |
-        cd docs && make html; cd ../
-        touch docs/_build/html/.nojekyll
+        cd doc && make html; cd ../
+        touch doc/_build/html/.nojekyll
 
     - name: Deploy to GitHub Pages
       if: success()
       uses: crazy-max/ghaction-github-pages@v2
       with:
         target_branch: gh-pages
-        build_dir: docs/_build/html/
+        build_dir: doc/_build/html/
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
