@@ -1,7 +1,7 @@
 future
 bilby>=1.0.4
 bilby_pipe>=1.0.2
-parallel_bilby>=1.0.0
+importlib_resources
 numpy>=1.9
 matplotlib>=2.0
 scipy>=1.7.1
@@ -9,9 +9,18 @@ pandas>=1.3.4
 astropy==4.3.1
 afterglowpy>=0.7.3
 scikit-learn>=0.23.1
-mpi4py
 pymultinest
 sncosmo
 dust_extinction
 wrapt_timeout_decorator
 arviz
+### for mpi ###
+"parallel_bilby>=1.0.0",
+"mpi4py",
+### for docs ###
+sphinx==4.4.0
+recommonmark
+numpydoc
+sphinx-rtd-theme
+notedown
+jsx-lexer
