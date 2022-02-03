@@ -70,6 +70,8 @@ jobs:
         psql -U nmma -h localhost -c "GRANT ALL PRIVILEGES ON DATABASE nmma TO nmma;" nmma
     - name: Test with pytest
       run: |
+        pwd
+        ls
         py.test nmma/tests/*
       env:
         LD_LIBRARY_PATH: .:/home/runner/work/nmma/nmma/MultiNest/lib # for Linux
