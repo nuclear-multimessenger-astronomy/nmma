@@ -92,6 +92,7 @@ requirements = [
     "mpi4py",
     # for docs
     "sphinx==4.4.0",
+    "sphinx_math_dollar",
     "recommonmark",
     "numpydoc",
     "sphinx-rtd-theme",
