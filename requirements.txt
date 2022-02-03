@@ -22,5 +22,6 @@ sphinx==4.4.0
 recommonmark
 numpydoc
 sphinx-rtd-theme
+sphinx_math_dollar
 notedown
 jsx-lexer
