@@ -99,14 +99,6 @@ requirements = [
     "jsx-lexer",
 ]
 
-extras_require = {
-    "mpi": [
-        "parallel_bilby>=1.0.0",
-        "mpi4py",
-    ],
-    "doc": ["sphinxdocs"],
-}
-
 VERSION = "0.0.1"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
@@ -133,7 +125,6 @@ setup(
     package_data={"nmma": [version_file], "nmma.em.data": ["*.pkl", "*.joblib"]},
     python_requires=">=3.6",
     install_requires=requirements,
-    extras_require=extras_require,
     entry_points={
         "console_scripts": [
             "nmma_analysis=nmma.pbilby.analysis:main",
