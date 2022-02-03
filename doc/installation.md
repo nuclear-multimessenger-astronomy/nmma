@@ -9,7 +9,7 @@ First of all, we suggest you install [anaconda](https://docs.anaconda.com/anacon
 
 ### Cloning nmma
 
-Then, you should go ahead and git clone the repository. Note that we link below to the main branch, but suggest making changes on your own fork (Please also se our [contributing guide](./contributing.html).
+Then, you should go ahead and git clone the repository. Note that we link below to the main branch, but suggest making changes on your own fork (please also see our [contributing guide](./contributing.html)).
 
 	git clone git@github.com:nuclear-multimessenger-astronomy/nmma.git
 
