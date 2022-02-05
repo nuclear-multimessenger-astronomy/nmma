@@ -70,3 +70,22 @@ and that should do it. If everything went well, importing nmma and its submodule
 	import nmma.eos.create_injection
 
 should work and you should be good to go.
+
+### Dependency conflicts
+
+Unfortunately, due to the web of package requirements that NMMA depends on, running setup.py does not typically finish without errors the first time through. Experience has shown that in the vast majority of cases, simply pinning versions such as:
+
+	pip install astropy==4.3.1
+
+and then trying again is sufficient for completion of the installation. However, please open issues on GitHub if there appear to be unresolvable conflicts.
+
+### Installation on expanse and other cluster resources
+
+When installation on cluster resources, it is common that all modules required for installing NMMA out of the box are not available. However, most will make it possible to import the required modules (most commonly, these are software like gfortran or mpi).
+
+For example, on XSEDE's Expanse cluster, one can start a terminal session with:
+
+	module load sdsc
+	module load openmpi
+
+and follow the instructions above.
