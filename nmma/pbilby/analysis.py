@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 import mpi4py
 import nestcheck.data_processing
 import numpy as np
-import pandas as pd
 from bilby.gw import conversion
 from dynesty import NestedSampler
 from pandas import DataFrame
@@ -27,7 +26,6 @@ from pandas import DataFrame
 from .parser import create_nmma_analysis_parser
 from parallel_bilby.schwimmbad_fast import MPIPoolFast as MPIPool
 from parallel_bilby.utils import (
-    fill_sample,
     get_cli_args,
     get_initial_points_from_prior,
     safe_file_dump,
@@ -36,6 +34,7 @@ from parallel_bilby.utils import (
 
 from ..joint.likelihood import MultiMessengerLikelihood
 from .._version import __version__
+
 __prog__ = "nmma_analysis"
 
 mpi4py.rc.threads = False
@@ -75,7 +74,9 @@ def roq_likelihood_kwargs(args):
     )
 
 
-def setup_likelihood_priors(interferometers, waveform_generator, light_curve_data, priors, args):
+def setup_likelihood_priors(
+    interferometers, waveform_generator, light_curve_data, priors, args
+):
     """Takes the kwargs and sets up and returns an EM-GW likelihood.
 
     Parameters
@@ -100,7 +101,7 @@ def setup_likelihood_priors(interferometers, waveform_generator, light_curve_dat
 
     if args.with_eos:
 
-        logger.info('Sampling over EOSs')
+        logger.info("Sampling over EOSs")
 
         likelihood_kwargs = dict(
             interferometers=interferometers,
@@ -127,12 +128,12 @@ def setup_likelihood_priors(interferometers, waveform_generator, light_curve_dat
             Neos=args.Neos,
             eos_weight_path=args.eos_weight,
             binary_type=args.binary_type,
-            gw_likelihood_type=args.likelihood_type
+            gw_likelihood_type=args.likelihood_type,
         )
 
     else:
 
-        logger.info('Sampling over Lambdas')
+        logger.info("Sampling over Lambdas")
 
         likelihood_kwargs = dict(
             interferometers=interferometers,
@@ -160,7 +161,7 @@ def setup_likelihood_priors(interferometers, waveform_generator, light_curve_dat
             eos_weight_path=None,
             with_eos=False,
             binary_type=args.binary_type,
-            gw_likelihood_type=args.likelihood_type
+            gw_likelihood_type=args.likelihood_type,
         )
 
     Likelihood = MultiMessengerLikelihood
@@ -702,15 +703,15 @@ with MPIPool(
 
         posterior = conversion.fill_from_fixed_priors(posterior, priors)
 
-# DEBUG required
-#        logger.info(
-#            "Generating posterior from marginalized parameters for"
-#            f" nsamples={len(posterior)}, POOL={pool.size}"
-#        )
+        # DEBUG required
+        #        logger.info(
+        #            "Generating posterior from marginalized parameters for"
+        #            f" nsamples={len(posterior)}, POOL={pool.size}"
+        #        )
 
-#        fill_args = [(ii, row, likelihood) for ii, row in posterior.iterrows()]
-#        samples = pool.map(fill_sample, fill_args)
-#        result.posterior = pd.DataFrame(samples)
+        #        fill_args = [(ii, row, likelihood) for ii, row in posterior.iterrows()]
+        #        samples = pool.map(fill_sample, fill_args)
+        #        result.posterior = pd.DataFrame(samples)
 
         posterior, _ = likelihood.parameter_conversion(
             posterior,
@@ -739,7 +740,9 @@ with MPIPool(
 
         logger.info(f"Saving result to {outdir}/{label}_result.json")
         result.save_to_file(extension="json")
-        logger.info(f"Saving posterior samples to {outdir}/{label}_posterior_samples.dat")
+        logger.info(
+            f"Saving posterior samples to {outdir}/{label}_posterior_samples.dat"
+        )
         result.save_posterior_samples()
         print(
             "Sampling time = {}s".format(
