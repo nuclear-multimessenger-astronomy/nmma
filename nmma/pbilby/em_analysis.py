@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 import mpi4py
 import nestcheck.data_processing
 import numpy as np
-import pandas as pd
 from bilby.gw import conversion
 from dynesty import NestedSampler
 from pandas import DataFrame
@@ -27,7 +26,6 @@ from pandas import DataFrame
 from .parser import create_nmma_analysis_parser
 from parallel_bilby.schwimmbad_fast import MPIPoolFast as MPIPool
 from parallel_bilby.utils import (
-    fill_sample,
     get_cli_args,
     get_initial_points_from_prior,
     safe_file_dump,
@@ -38,6 +36,7 @@ from ..em.model import SVDLightCurveModel, GRBLightCurveModel
 from ..em.model import SupernovaGRBLightCurveModel, KilonovaGRBLightCurveModel
 from ..em.likelihood import OpticalLightCurve
 from .._version import __version__
+
 __prog__ = "parallel_em_analysis"
 
 mpi4py.rc.threads = False
@@ -69,40 +68,59 @@ def setup_likelihood(light_curve_data, args):
     filters = light_curve_data.keys()
 
     # initialize light curve model
-    sample_times = np.arange(args.kilonova_tmin, args.kilonova_tmax + args.kilonova_tstep, args.kilonova_tstep)
+    sample_times = np.arange(
+        args.kilonova_tmin,
+        args.kilonova_tmax + args.kilonova_tstep,
+        args.kilonova_tstep,
+    )
 
     if args.with_grb:
 
-        assert args.kilonova_model != 'TrPi2018', "TrPi2018 is not a kilonova / supernova model"
+        assert (
+            args.kilonova_model != "TrPi2018"
+        ), "TrPi2018 is not a kilonova / supernova model"
 
-        if args.kilonova_model != 'nugent-hyper':
+        if args.kilonova_model != "nugent-hyper":
 
-            kilonova_kwargs = dict(model=args.kilonova_model, svd_path=args.kilonova_model_svd,
-                                   mag_ncoeff=args.svd_mag_ncoeff,
-                                   lbol_ncoeff=args.svd_lbol_ncoeff,
-                                   parameter_conversion=None)
+            kilonova_kwargs = dict(
+                model=args.kilonova_model,
+                svd_path=args.kilonova_model_svd,
+                mag_ncoeff=args.svd_mag_ncoeff,
+                lbol_ncoeff=args.svd_lbol_ncoeff,
+                parameter_conversion=None,
+            )
 
-            light_curve_model = KilonovaGRBLightCurveModel(sample_times=sample_times,
-                                                           kilonova_kwargs=kilonova_kwargs,
-                                                           GRB_resolution=args.grb_resolution,
-                                                           jetType=args.grb_jettype)
+            light_curve_model = KilonovaGRBLightCurveModel(
+                sample_times=sample_times,
+                kilonova_kwargs=kilonova_kwargs,
+                GRB_resolution=args.grb_resolution,
+                jetType=args.grb_jettype,
+            )
 
         else:
 
-            light_curve_model = SupernovaGRBLightCurveModel(sample_times=sample_times,
-                                                            GRB_resolution=args.grb_resolution,
-                                                            jetType=args.grb_jettype)
+            light_curve_model = SupernovaGRBLightCurveModel(
+                sample_times=sample_times,
+                GRB_resolution=args.grb_resolution,
+                jetType=args.grb_jettype,
+            )
 
     else:
-        if args.kilonova_model == 'TrPi2018':
-            light_curve_model = GRBLightCurveModel(sample_times=sample_times,
-                                                   resolution=args.grb_resolution,
-                                                   jetType=args.grb_jettype)
+        if args.kilonova_model == "TrPi2018":
+            light_curve_model = GRBLightCurveModel(
+                sample_times=sample_times,
+                resolution=args.grb_resolution,
+                jetType=args.grb_jettype,
+            )
 
         else:
-            light_curve_kwargs = dict(model=args.kilonova_model, sample_times=sample_times,
-                                      svd_path=args.kilonova_model_svd, mag_ncoeff=args.svd_mag_ncoeff,
-                                      lbol_ncoeff=args.svd_lbol_ncoeff)
+            light_curve_kwargs = dict(
+                model=args.kilonova_model,
+                sample_times=sample_times,
+                svd_path=args.kilonova_model_svd,
+                mag_ncoeff=args.svd_mag_ncoeff,
+                lbol_ncoeff=args.svd_lbol_ncoeff,
+            )
             light_curve_model = SVDLightCurveModel(**light_curve_kwargs)
 
     likelihood_kwargs = dict(
@@ -112,7 +130,7 @@ def setup_likelihood(light_curve_data, args):
         trigger_time=args.kilonova_trigger_time,
         error_budget=args.kilonova_error,
         tmin=args.kilonova_tmin,
-        tmax=args.kilonova_tmax
+        tmax=args.kilonova_tmax,
     )
 
     Likelihood = OpticalLightCurve
@@ -630,15 +648,15 @@ with MPIPool(
 
         posterior = conversion.fill_from_fixed_priors(posterior, priors)
 
-# DEBUG required
-#        logger.info(
-#            "Generating posterior from marginalized parameters for"
-#            f" nsamples={len(posterior)}, POOL={pool.size}"
-#        )
+        # DEBUG required
+        #        logger.info(
+        #            "Generating posterior from marginalized parameters for"
+        #            f" nsamples={len(posterior)}, POOL={pool.size}"
+        #        )
 
-#        fill_args = [(ii, row, likelihood) for ii, row in posterior.iterrows()]
-#        samples = pool.map(fill_sample, fill_args)
-#        result.posterior = pd.DataFrame(samples)
+        #        fill_args = [(ii, row, likelihood) for ii, row in posterior.iterrows()]
+        #        samples = pool.map(fill_sample, fill_args)
+        #        result.posterior = pd.DataFrame(samples)
 
         posterior, _ = likelihood.parameter_conversion(
             posterior,
@@ -646,17 +664,19 @@ with MPIPool(
 
         result.posterior = posterior
 
-#        result.posterior = conversion._generate_all_cbc_parameters(
-#            posterior,
-#            likelihood.GWLikelihood.waveform_generator.waveform_arguments,
-#            conversion.convert_to_lal_binary_neutron_star_parameters,
-#        )
+        #        result.posterior = conversion._generate_all_cbc_parameters(
+        #            posterior,
+        #            likelihood.GWLikelihood.waveform_generator.waveform_arguments,
+        #            conversion.convert_to_lal_binary_neutron_star_parameters,
+        #        )
 
         result.priors = priors
 
         logger.info(f"Saving result to {outdir}/{label}_result.json")
         result.save_to_file(extension="json")
-        logger.info(f"Saving posterior samples to {outdir}/{label}_posterior_samples.dat")
+        logger.info(
+            f"Saving posterior samples to {outdir}/{label}_posterior_samples.dat"
+        )
         result.save_posterior_samples()
         print(
             "Sampling time = {}s".format(
