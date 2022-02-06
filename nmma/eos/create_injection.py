@@ -8,6 +8,7 @@ import scipy.interpolate
 
 import lalsimulation as lalsim
 from gwpy.table import Table
+
 try:
     import ligo.lw  # noqa F401
 except ImportError:
@@ -60,11 +61,11 @@ def xml_to_dataframe(prior_file, reference_frequency, aligned_spin=False):
                 float(arg)
                 for arg in [
                     row["inclination"],
-                    0.,
-                    0.,
+                    0.0,
+                    0.0,
                     row["spin1z"],
-                    0.,
-                    0.,
+                    0.0,
+                    0.0,
                     row["spin2z"],
                     row["mass1"],
                     row["mass2"],
@@ -121,31 +122,27 @@ def main():
         "--prior-file",
         type=str,
         required=True,
-        help="The prior file from which to generate injections"
+        help="The prior file from which to generate injections",
     )
     parser.add_argument(
         "--injection-file",
         type=str,
         required=False,
-        help="The xml injection file or bilby injection json file to be used (optional)"
+        help="The xml injection file or bilby injection json file to be used (optional)",
     )
     parser.add_argument(
         "--reference-frequency",
         type=str,
         required=False,
         default=20,
-        help="The reference frequency in the provided injection file (default: 20)"
+        help="The reference frequency in the provided injection file (default: 20)",
     )
     parser.add_argument(
         "--aligned-spin",
-        action='store_true',
-        help="Whether the spin is aligned in the provide injection file"
+        action="store_true",
+        help="Whether the spin is aligned in the provide injection file",
     )
-    parser.add(
-        "-f", "--filename",
-        type=str,
-        default="injection"
-    )
+    parser.add("-f", "--filename", type=str, default="injection")
     parser.add_arg(
         "-e",
         "--extension",
@@ -223,48 +220,41 @@ def main():
         "--grb-resolution",
         type=float,
         default=5,
-        help="Upper bound on the ratio between thetaWing and thetaCore (default: 5)"
+        help="Upper bound on the ratio between thetaWing and thetaCore (default: 5)",
     )
     parser.add_argument(
         "--eos-file",
         type=str,
         required=True,
-        help="EOS file in (radius [km], mass [solar mass], lambda)"
+        help="EOS file in (radius [km], mass [solar mass], lambda)",
     )
     parser.add_argument(
-        "--binary-type",
-        type=str,
-        required=True,
-        help="Either BNS or NSBH"
+        "--binary-type", type=str, required=True, help="Either BNS or NSBH"
     )
     parser.add_argument(
         "--eject",
-        action='store_true',
-        help="Whether to create injection files with eject properties"
+        action="store_true",
+        help="Whether to create injection files with eject properties",
     )
-    parser.add_argument(
-        "-d", "--detections-file",
-        type=str
-    )
-    parser.add_argument(
-        "-i", "--indices-file",
-        type=str
-    )
+    parser.add_argument("-d", "--detections-file", type=str)
+    parser.add_argument("-i", "--indices-file", type=str)
     parser.add_argument(
         "--original-parameters",
-        action='store_true',
-        help="Whether to only sample prior parameters in injection file"
+        action="store_true",
+        help="Whether to only sample prior parameters in injection file",
     )
     args = parser.parse_args()
 
     # check the binary type
-    assert (args.binary_type in ['BNS', 'NSBH']), "Unknown binary type"
+    assert args.binary_type in ["BNS", "NSBH"], "Unknown binary type"
 
     # check injection file format
     if args.injection_file:
-        assert (args.injection_file.endswith('.json') or
-                args.injection_file.endswith('.xml') or
-                args.injection_file.endswith('.xml.gz')), "Unknown injection file format"
+        assert (
+            args.injection_file.endswith(".json")
+            or args.injection_file.endswith(".xml")
+            or args.injection_file.endswith(".xml.gz")
+        ), "Unknown injection file format"
 
     # load the EOS
     radii, masses, lambdas = np.loadtxt(args.eos_file, usecols=[0, 1, 2], unpack=True)
@@ -273,20 +263,24 @@ def main():
 
     # load the injection json file
     if args.injection_file:
-        if args.injection_file.endswith('.json'):
-            with open(args.injection_file, 'rb') as f:
+        if args.injection_file.endswith(".json"):
+            with open(args.injection_file, "rb") as f:
                 injection_data = json.load(f)
-                datadict = injection_data['injections']['content']
+                datadict = injection_data["injections"]["content"]
                 dataframe_from_inj = pd.DataFrame.from_dict(datadict)
-        elif args.injection_file.endswith('.xml') or args.injection_file.endswith('.xml.gz'):
-            dataframe_from_inj = xml_to_dataframe(args.injection_file,
-                                                  args.reference_frequency,
-                                                  args.aligned_spin)
+        elif args.injection_file.endswith(".xml") or args.injection_file.endswith(
+            ".xml.gz"
+        ):
+            dataframe_from_inj = xml_to_dataframe(
+                args.injection_file, args.reference_frequency, args.aligned_spin
+            )
 
     else:
         dataframe_from_inj = pd.DataFrame()
-        print("No injection files provided, "
-              "will generate injection based on the prior file provided only")
+        print(
+            "No injection files provided, "
+            "will generate injection based on the prior file provided only"
+        )
 
     if len(dataframe_from_inj) > 0:
         args.n_injection = len(dataframe_from_inj)
@@ -308,9 +302,11 @@ def main():
 
     # combine the dataframes
     dataframe = pd.DataFrame.merge(
-        dataframe_from_inj, dataframe_from_prior,
-        how='outer',
-        left_index=True, right_index=True
+        dataframe_from_inj,
+        dataframe_from_prior,
+        how="outer",
+        left_index=True,
+        right_index=True,
     )
 
     if args.detections_file is not None:
@@ -320,7 +316,9 @@ def main():
 
     if args.original_parameters:
         # dump the whole thing back into a json injection file
-        injection_creator.write_injection_dataframe(dataframe, args.filename, args.extension)
+        injection_creator.write_injection_dataframe(
+            dataframe, args.filename, args.extension
+        )
         sys.exit(0)
 
     # convert to all necessary parameters
@@ -337,9 +335,12 @@ def main():
     radius_2 = []
 
     for injIdx in range(0, Ninj):
-        mMax, rMax, lam1, lam2, r1, r2 = EOS2Parameters(interp_mass_radius, interp_mass_lambda,
-                                                        dataframe['mass_1_source'][injIdx],
-                                                        dataframe['mass_2_source'][injIdx])
+        mMax, rMax, lam1, lam2, r1, r2 = EOS2Parameters(
+            interp_mass_radius,
+            interp_mass_lambda,
+            dataframe["mass_1_source"][injIdx],
+            dataframe["mass_2_source"][injIdx],
+        )
 
         TOV_mass.append(mMax)
         TOV_radius.append(rMax)
@@ -348,20 +349,20 @@ def main():
         radius_1.append(r1.item())
         radius_2.append(r2.item())
 
-    dataframe['TOV_mass'] = np.array(TOV_mass)
-    dataframe['TOV_radius'] = np.array(TOV_radius)
-    dataframe['lambda_1'] = np.array(lambda_1)
-    dataframe['lambda_2'] = np.array(lambda_2)
-    dataframe['radius_1'] = np.array(radius_1)
-    dataframe['radius_2'] = np.array(radius_2)
-    dataframe['R_16'] = np.ones(len(dataframe)) * interp_mass_radius(1.6)
-    dataframe['R_14'] = np.ones(len(dataframe)) * interp_mass_radius(1.4)
+    dataframe["TOV_mass"] = np.array(TOV_mass)
+    dataframe["TOV_radius"] = np.array(TOV_radius)
+    dataframe["lambda_1"] = np.array(lambda_1)
+    dataframe["lambda_2"] = np.array(lambda_2)
+    dataframe["radius_1"] = np.array(radius_1)
+    dataframe["radius_2"] = np.array(radius_2)
+    dataframe["R_16"] = np.ones(len(dataframe)) * interp_mass_radius(1.6)
+    dataframe["R_14"] = np.ones(len(dataframe)) * interp_mass_radius(1.4)
 
     if args.eject:
-        if args.binary_type == 'BNS':
+        if args.binary_type == "BNS":
             ejectaFitting = BNSEjectaFitting()
 
-        elif args.binary_type == 'NSBH':
+        elif args.binary_type == "NSBH":
             ejectaFitting = NSBHEjectaFitting()
 
         else:
@@ -369,21 +370,25 @@ def main():
             sys.exit()
 
         dataframe, _ = ejectaFitting.ejecta_parameter_conversion(dataframe, [])
-        theta_jn = dataframe['theta_jn']
-        dataframe['inclination_EM'] = np.minimum(theta_jn, np.pi - theta_jn)
-        dataframe['KNtheta'] = 180. / np.pi * dataframe['inclination_EM']
+        theta_jn = dataframe["theta_jn"]
+        dataframe["inclination_EM"] = np.minimum(theta_jn, np.pi - theta_jn)
+        dataframe["KNtheta"] = 180.0 / np.pi * dataframe["inclination_EM"]
 
-        log10_mej_dyn = dataframe['log10_mej_dyn']
-        log10_mej_wind = dataframe['log10_mej_wind']
+        log10_mej_dyn = dataframe["log10_mej_dyn"]
+        log10_mej_wind = dataframe["log10_mej_wind"]
 
-        if 'thetaWing' in dataframe and 'thetaCore' in dataframe:
+        if "thetaWing" in dataframe and "thetaCore" in dataframe:
             print("Checking GRB resolution")
-            grb_res = dataframe['thetaWing'] / dataframe['thetaCore']
-            index_taken = np.where(np.isfinite(log10_mej_dyn) *
-                                   np.isfinite(log10_mej_wind) *
-                                   (grb_res < args.grb_resolution))[0]
+            grb_res = dataframe["thetaWing"] / dataframe["thetaCore"]
+            index_taken = np.where(
+                np.isfinite(log10_mej_dyn)
+                * np.isfinite(log10_mej_wind)
+                * (grb_res < args.grb_resolution)
+            )[0]
         else:
-            index_taken = np.where(np.isfinite(log10_mej_dyn) * np.isfinite(log10_mej_wind))[0]
+            index_taken = np.where(
+                np.isfinite(log10_mej_dyn) * np.isfinite(log10_mej_wind)
+            )[0]
 
         dataframe = dataframe.take(index_taken)
 
@@ -394,7 +399,9 @@ def main():
             idxs = dets[index_taken]
         else:
             idxs = index_taken
-        np.savetxt(args.indices_file, idxs, fmt='%d')
+        np.savetxt(args.indices_file, idxs, fmt="%d")
 
     # dump the whole thing back into a json injection file
-    injection_creator.write_injection_dataframe(dataframe, args.filename, args.extension)
+    injection_creator.write_injection_dataframe(
+        dataframe, args.filename, args.extension
+    )
