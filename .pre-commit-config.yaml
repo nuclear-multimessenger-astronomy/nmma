@@ -10,10 +10,10 @@ repos:
     hooks:
       - id: black
         pass_filenames: true
-        exclude: nmma|nb|.ipynb_checkpoints|data|dev|letsencrypt|logs|dask-worker-space
+        exclude: nb|.ipynb_checkpoints|data|dev|letsencrypt|logs|dask-worker-space
   - repo: https://gitlab.com/pycqa/flake8
     rev: 3.8.4
     hooks:
       - id: flake8
         pass_filenames: true
-        exclude: nmma|nb|.ipynb_checkpoints|data|dev|letsencrypt|logs|dask-worker-space|__init__.py
+        exclude: nb|.ipynb_checkpoints|data|dev|letsencrypt|logs|dask-worker-space|__init__.py
