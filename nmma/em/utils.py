@@ -18,6 +18,7 @@ import astropy.constants
 
 from wrapt_timeout_decorator import timeout
 
+
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
     # Return the extinction factor (e ^ -0.4 * Ax) for the
@@ -41,12 +42,31 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
     # coefficients from Pei 1992
     extModel = dustShp.P92(
-        BKG_amp=185.0 * abav,  BKG_lambda=0.042,   BKG_b=90.0,     BKG_n=2.0,
-        FUV_amp=27 * abav,     FUV_lambda=0.08,    FUV_b=5.5,      FUV_n=4.0,
-        NUV_amp=0.005 * abav,  NUV_lambda=0.22,    NUV_b=-1.95,    NUV_n=2.0,
-        SIL1_amp=0.010 * abav, SIL1_lambda=9.7,    SIL1_b=-1.95,   SIL1_n=2.0,
-        SIL2_amp=0.012 * abav, SIL2_lambda=18.0,   SIL2_b=-1.80,   SIL2_n=2.0,
-        FIR_amp=0.030 * abav,  FIR_lambda=25.0,    FIR_b=0.0,      FIR_n=2.0)
+        BKG_amp=185.0 * abav,
+        BKG_lambda=0.042,
+        BKG_b=90.0,
+        BKG_n=2.0,
+        FUV_amp=27 * abav,
+        FUV_lambda=0.08,
+        FUV_b=5.5,
+        FUV_n=4.0,
+        NUV_amp=0.005 * abav,
+        NUV_lambda=0.22,
+        NUV_b=-1.95,
+        NUV_n=2.0,
+        SIL1_amp=0.010 * abav,
+        SIL1_lambda=9.7,
+        SIL1_b=-1.95,
+        SIL1_n=2.0,
+        SIL2_amp=0.012 * abav,
+        SIL2_lambda=18.0,
+        SIL2_b=-1.80,
+        SIL2_n=2.0,
+        FIR_amp=0.030 * abav,
+        FIR_lambda=25.0,
+        FIR_b=0.0,
+        FIR_n=2.0,
+    )
 
     Ax_o_Av = extModel(lam_host)
     Av = 2.93 * Ebv  # Rv = 2.93
@@ -59,35 +79,54 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
 def getRedShift(parameters):
 
-    if 'redshift' in parameters:
-        z = parameters['redshift']
+    if "redshift" in parameters:
+        z = parameters["redshift"]
     else:
-        z = z_at_value(Planck15.luminosity_distance,
-                       parameters['luminosity_distance'] * astropy.units.Mpc,
-                       zmin=0., zmax=2.)
+        z = z_at_value(
+            Planck15.luminosity_distance,
+            parameters["luminosity_distance"] * astropy.units.Mpc,
+            zmin=0.0,
+            zmax=2.0,
+        )
     return z
 
 
 def getFilteredMag(mag, filt):
-    unprocessed_filt = ['u', 'g', 'r', 'i', 'z', 'y', 'J', 'H', 'K', 'X-ray-1keV', 'X-ray-5keV', 'radio-5.5GHz', 'radio-1.25GHz', 'radio-6GHz', 'radio-3GHz']
+    unprocessed_filt = [
+        "u",
+        "g",
+        "r",
+        "i",
+        "z",
+        "y",
+        "J",
+        "H",
+        "K",
+        "X-ray-1keV",
+        "X-ray-5keV",
+        "radio-5.5GHz",
+        "radio-1.25GHz",
+        "radio-6GHz",
+        "radio-3GHz",
+    ]
     if filt in unprocessed_filt:
         return mag[filt]
     elif filt == "w":
-        return (mag['g'] + mag['r'] + mag['i']) / 3.
+        return (mag["g"] + mag["r"] + mag["i"]) / 3.0
     elif filt in ["U", "UVW2", "UVW1", "UVM2"]:
-        return mag['u']
+        return mag["u"]
     elif filt == "B":
-        return mag['g']
+        return mag["g"]
     elif filt in ["c", "V", "F606W"]:
-        return (mag['g'] + mag['r']) / 2.
+        return (mag["g"] + mag["r"]) / 2.0
     elif filt == "o":
-        return (mag['r'] + mag['i']) / 2.
+        return (mag["r"] + mag["i"]) / 2.0
     elif filt == "R":
-        return mag['z']
+        return mag["z"]
     elif filt in ["I", "F814W"]:
-        return (mag['z'] + mag['y']) / 2.
+        return (mag["z"] + mag["y"]) / 2.0
     elif filt == "F160W":
-        return mag['H']
+        return mag["H"]
     else:
         print("Unknown filter\n")
         return 0
@@ -112,14 +151,14 @@ def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
 
 
 def loadEvent(filename):
-    lines = [line.rstrip('\n') for line in open(filename)]
+    lines = [line.rstrip("\n") for line in open(filename)]
     lines = filter(None, lines)
 
     data = {}
     for line in lines:
         lineSplit = line.split(" ")
         lineSplit = list(filter(None, lineSplit))
-        mjd = Time(lineSplit[0], format='isot').mjd
+        mjd = Time(lineSplit[0], format="isot").mjd
         filt = lineSplit[1]
         mag = float(lineSplit[2])
         dmag = float(lineSplit[3])
@@ -147,7 +186,15 @@ def loadEventSpec(filename):
     return spec
 
 
-def calc_lc(tt, param_list, svd_mag_model=None, svd_lbol_model=None, mag_ncoeff=None, lbol_ncoeff=None, gptype="sklearn"):
+def calc_lc(
+    tt,
+    param_list,
+    svd_mag_model=None,
+    svd_lbol_model=None,
+    mag_ncoeff=None,
+    lbol_ncoeff=None,
+    gptype="sklearn",
+):
 
     filters = ["u", "g", "r", "i", "z", "y", "J", "H", "K"]
     mAB = {}
@@ -168,18 +215,22 @@ def calc_lc(tt, param_list, svd_mag_model=None, svd_lbol_model=None, mag_ncoeff=
 
         param_list_postprocess = np.array(param_list)
         for i in range(len(param_mins)):
-            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (param_maxs[i] - param_mins[i])
+            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
+                param_maxs[i] - param_mins[i]
+            )
 
         if gptype == "tensorflow":
             model = svd_mag_model[filt]["model"]
             cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
             cAstd = np.ones((n_coeff,))
         else:
-            cAproj = np.zeros((n_coeff, ))
-            cAstd = np.zeros((n_coeff, ))
+            cAproj = np.zeros((n_coeff,))
+            cAstd = np.zeros((n_coeff,))
             for i in range(n_coeff):
                 gp = gps[i]
-                y_pred, sigma2_pred = gp.predict(np.atleast_2d(param_list_postprocess), return_std=True)
+                y_pred, sigma2_pred = gp.predict(
+                    np.atleast_2d(param_list_postprocess), return_std=True
+                )
                 cAproj[i] = y_pred
                 cAstd[i] = sigma2_pred
 
@@ -190,11 +241,11 @@ def calc_lc(tt, param_list, svd_mag_model=None, svd_lbol_model=None, mag_ncoeff=
         mag_back = mag_back * (maxs - mins) + mins
         # mag_back = scipy.signal.medfilt(mag_back, kernel_size=3)
 
-        ii = np.where((~np.isnan(mag_back)) * (tt_interp < 20.))[0]
+        ii = np.where((~np.isnan(mag_back)) * (tt_interp < 20.0))[0]
         if len(ii) < 2:
             maginterp = np.nan * np.ones(tt.shape)
         else:
-            f = interp.interp1d(tt_interp[ii], mag_back[ii], fill_value='extrapolate')
+            f = interp.interp1d(tt_interp[ii], mag_back[ii], fill_value="extrapolate")
             maginterp = f(tt)
         mAB[filt] = maginterp
 
@@ -214,17 +265,21 @@ def calc_lc(tt, param_list, svd_mag_model=None, svd_lbol_model=None, mag_ncoeff=
 
     param_list_postprocess = np.array(param_list)
     for i in range(len(param_mins)):
-        param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (param_maxs[i] - param_mins[i])
+        param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
+            param_maxs[i] - param_mins[i]
+        )
 
     if gptype == "tensorflow":
         model = svd_lbol_model["model"]
         cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
         cAstd = np.ones((n_coeff,))
     else:
-        cAproj = np.zeros((n_coeff, ))
+        cAproj = np.zeros((n_coeff,))
         for i in range(n_coeff):
             gp = gps[i]
-            y_pred, sigma2_pred = gp.predict(np.atleast_2d(param_list_postprocess), return_std=True)
+            y_pred, sigma2_pred = gp.predict(
+                np.atleast_2d(param_list_postprocess), return_std=True
+            )
             cAproj[i] = y_pred
 
     lbol_back = np.dot(VA[:, :n_coeff], cAproj)
@@ -235,17 +290,17 @@ def calc_lc(tt, param_list, svd_mag_model=None, svd_lbol_model=None, mag_ncoeff=
     if len(ii) < 2:
         lbolinterp = np.nan * np.ones(tt.shape)
     else:
-        f = interp.interp1d(tt_interp[ii], lbol_back[ii], fill_value='extrapolate')
-        lbolinterp = 10**f(tt)
+        f = interp.interp1d(tt_interp[ii], lbol_back[ii], fill_value="extrapolate")
+        lbolinterp = 10 ** f(tt)
     lbol = lbolinterp
 
     # fill radio and X-ray with null light curves
-    mAB['radio-5.5GHz'] = np.inf * np.ones(len(tt))
-    mAB['radio-1.25GHz'] = np.inf * np.ones(len(tt))
-    mAB['radio-3GHz'] = np.inf * np.ones(len(tt))
-    mAB['radio-6GHz'] = np.inf * np.ones(len(tt))
-    mAB['X-ray-1keV'] = np.inf * np.ones(len(tt))
-    mAB['X-ray-5keV'] = np.inf * np.ones(len(tt))
+    mAB["radio-5.5GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-1.25GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-3GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-6GHz"] = np.inf * np.ones(len(tt))
+    mAB["X-ray-1keV"] = np.inf * np.ones(len(tt))
+    mAB["X-ray-5keV"] = np.inf * np.ones(len(tt))
 
     return np.squeeze(tt), np.squeeze(lbol), mAB
 
@@ -271,12 +326,16 @@ def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=N
 
         param_list_postprocess = np.array(param_list)
         for i in range(len(param_mins)):
-            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (param_maxs[i] - param_mins[i])
+            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
+                param_maxs[i] - param_mins[i]
+            )
 
-        cAproj = np.zeros((n_coeff, ))
+        cAproj = np.zeros((n_coeff,))
         for i in range(n_coeff):
             gp = gps[i]
-            y_pred, sigma2_pred = gp.predict(np.atleast_2d(param_list_postprocess), return_std=True)
+            y_pred, sigma2_pred = gp.predict(
+                np.atleast_2d(param_list_postprocess), return_std=True
+            )
             cAproj[i] = y_pred
 
         spectra_back = np.dot(VA[:, :n_coeff], cAproj)
@@ -285,15 +344,17 @@ def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=N
 
         N = 3  # Filter order
         Wn = 0.1  # Cutoff frequency
-        B, A = scipy.signal.butter(N, Wn, output='ba')
+        B, A = scipy.signal.butter(N, Wn, output="ba")
         # spectra_back = scipy.signal.filtfilt(B, A, spectra_back)
 
         ii = np.where(~np.isnan(spectra_back))[0]
         if len(ii) < 2:
             specinterp = np.nan * np.ones(tt.shape)
         else:
-            f = interp.interp1d(tt_interp[ii], spectra_back[ii], fill_value='extrapolate')
-            specinterp = 10**f(tt)
+            f = interp.interp1d(
+                tt_interp[ii], spectra_back[ii], fill_value="extrapolate"
+            )
+            specinterp = 10 ** f(tt)
         spec[jj, :] = specinterp
 
     for jj, t in enumerate(tt):
@@ -307,8 +368,8 @@ def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=N
         if len(ii) < 2:
             specinterp = np.nan * np.ones(lambdas.shape)
         else:
-            f = interp.interp1d(lambdas[ii], spectra_back[ii], fill_value='extrapolate')
-            specinterp = 10**f(lambdas)
+            f = interp.interp1d(lambdas[ii], spectra_back[ii], fill_value="extrapolate")
+            specinterp = 10 ** f(lambdas)
         spec[:, jj] = specinterp
 
     return np.squeeze(tt), np.squeeze(lambdas), spec
@@ -328,19 +389,37 @@ def grb_lc(t_day, Ebv, param_dict):
     tnode = min(len(t_day), 201)
     default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
 
-    filts = ["u", "g", "r", "i", "z", "y", "J", "H", "K", "radio-3GHz", "radio-1.25GHz", "radio-5.5GHz", "radio-6GHz", "X-ray-1keV", "X-ray-5keV"]
-    lambdas_optical = 1e-10 * np.array([3561.8, 4866.46, 6214.6,
-                                        7687.0, 7127.0, 7544.6,
-                                        8679.5, 9633.3, 12350.0])
+    filts = [
+        "u",
+        "g",
+        "r",
+        "i",
+        "z",
+        "y",
+        "J",
+        "H",
+        "K",
+        "radio-3GHz",
+        "radio-1.25GHz",
+        "radio-5.5GHz",
+        "radio-6GHz",
+        "X-ray-1keV",
+        "X-ray-5keV",
+    ]
+    lambdas_optical = 1e-10 * np.array(
+        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
+    )
     lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h)
+    lambdas_Xray = scipy.constants.c / (
+        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
+    )
 
     lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
 
     nu_0s = scipy.constants.c / lambdas
 
-    if Ebv != 0.:
-        ext = extinctionFactorP92SMC(nu_0s, Ebv, param_dict['z'])
+    if Ebv != 0.0:
+        ext = extinctionFactorP92SMC(nu_0s, Ebv, param_dict["z"])
     else:
         ext = np.ones(len(nu_0s))
 
@@ -359,7 +438,7 @@ def grb_lc(t_day, Ebv, param_dict):
 
     Jys = 1e-3 * mJys
 
-    if np.any(Jys <= 0.):
+    if np.any(Jys <= 0.0):
         return t_day, np.zeros(t_day.shape), {}
 
     mag = {}
@@ -374,7 +453,9 @@ def grb_lc(t_day, Ebv, param_dict):
 
         ii = np.where(np.isfinite(mag_d))[0]
         if len(ii) >= 2:
-            f = interp.interp1d(default_time[ii] / day, mag_d[ii], fill_value='extrapolate')
+            f = interp.interp1d(
+                default_time[ii] / day, mag_d[ii], fill_value="extrapolate"
+            )
             maginterp = f(t_day)
         else:
             maginterp = np.nan * np.ones(t_day.shape)
@@ -385,15 +466,43 @@ def grb_lc(t_day, Ebv, param_dict):
     return t_day, lbol, mag
 
 
-def sn_lc(tt, z, Ebv, abs_mag=-19., regularize_band='sdssu', model_name='nugent-hyper', parameters={}):
+def sn_lc(
+    tt,
+    z,
+    Ebv,
+    abs_mag=-19.0,
+    regularize_band="sdssu",
+    model_name="nugent-hyper",
+    parameters={},
+):
 
-    filts = ["u", "g", "r", "i", "z", "y", "J", "H", "K", "radio-1.25GHz", "radio-5.5GHz", "radio-6GHz", "radio-3GHz", "X-ray-1keV", "X-ray-5keV"]
+    filts = [
+        "u",
+        "g",
+        "r",
+        "i",
+        "z",
+        "y",
+        "J",
+        "H",
+        "K",
+        "radio-1.25GHz",
+        "radio-5.5GHz",
+        "radio-6GHz",
+        "radio-3GHz",
+        "X-ray-1keV",
+        "X-ray-5keV",
+    ]
     # wavelength in Angstrom
-    lambdas_optical = np.array([3561.8, 4866.46, 6214.6,
-                               6389.4, 7127.0, 7544.6,
-                               8679.5, 9633.3, 12350.0])
+    lambdas_optical = np.array(
+        [3561.8, 4866.46, 6214.6, 6389.4, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
+    )
     lambdas_radio = scipy.constants.c / np.array([1.25e9, 5.5e9, 6e9, 3e9]) / 1e-10
-    lambdas_Xray = scipy.constants.c / (np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h) / 1e-10
+    lambdas_Xray = (
+        scipy.constants.c
+        / (np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h)
+        / 1e-10
+    )
 
     lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
 
@@ -403,13 +512,19 @@ def sn_lc(tt, z, Ebv, abs_mag=-19., regularize_band='sdssu', model_name='nugent-
     if model_name == "nugent-hyper":
         model.set(z=z)
     elif model_name == "salt2":
-        model.set(z=z, t0=parameters["t0"], x0=parameters["x0"],x1=parameters["x1"],c=parameters["c"])
+        model.set(
+            z=z,
+            t0=parameters["t0"],
+            x0=parameters["x0"],
+            x1=parameters["x1"],
+            c=parameters["c"],
+        )
 
     # regularize the absolute magnitude
     abs_mag -= Planck15.distmod(z).value
-    model.set_source_peakabsmag(abs_mag, regularize_band, 'ab', cosmo=Planck15)
+    model.set_source_peakabsmag(abs_mag, regularize_band, "ab", cosmo=Planck15)
 
-    if Ebv != 0.:
+    if Ebv != 0.0:
         ext = extinctionFactorP92SMC(nus, Ebv, z)
     else:
         ext = np.ones(len(nus))
@@ -427,11 +542,11 @@ def sn_lc(tt, z, Ebv, abs_mag=-19., regularize_band='sdssu', model_name='nugent-
                 # the output is in ergs / s / cm^2 / Angstrom
                 flux = model.flux(tt, lambda_A) * ext[filt_idx]
                 # see https://en.wikipedia.org/wiki/AB_magnitude
-                flux_jy = 3.34e4 * np.power(lambda_A, 2.) * flux
+                flux_jy = 3.34e4 * np.power(lambda_A, 2.0) * flux
                 mag_per_filt = -2.5 * np.log10(flux_jy) + 8.9
                 mag[filt] = mag_per_filt[:, 0]
 
-            except:
+            except Exception:
                 lbol = np.zeros(tt.shape)
 
     return tt, lbol, mag
@@ -439,24 +554,40 @@ def sn_lc(tt, z, Ebv, abs_mag=-19., regularize_band='sdssu', model_name='nugent-
 
 def sc_lc(t_day, param_dict):
 
-    day = 86400.  # in seconds
+    day = 86400.0  # in seconds
     t = t_day * day
 
     # fetch parameter values
-    Me = 10**param_dict['log10_Menv'] * astropy.constants.M_sun.cgs.value
-    Renv = 10**param_dict['log10_Renv']
-    Ee = 10**param_dict['log10_Ee']
-    Ebv = param_dict['Ebv']
-    z = param_dict['z']
+    Me = 10 ** param_dict["log10_Menv"] * astropy.constants.M_sun.cgs.value
+    Renv = 10 ** param_dict["log10_Renv"]
+    Ee = 10 ** param_dict["log10_Ee"]
+    Ebv = param_dict["Ebv"]
+    z = param_dict["z"]
 
-    filts = ["u", "g", "r", "i", "z", "y", "J", "H", "K",
-             "radio-3GHz", "radio-1.25GHz", "radio-5.5GHz", "radio-6GHz",
-             "X-ray-1keV", "X-ray-5keV"]
-    lambdas_optical = 1e-10 * np.array([3561.8, 4866.46, 6214.6,
-                                        7687.0, 7127.0, 7544.6,
-                                        8679.5, 9633.3, 12350.0])
+    filts = [
+        "u",
+        "g",
+        "r",
+        "i",
+        "z",
+        "y",
+        "J",
+        "H",
+        "K",
+        "radio-3GHz",
+        "radio-1.25GHz",
+        "radio-5.5GHz",
+        "radio-6GHz",
+        "X-ray-1keV",
+        "X-ray-5keV",
+    ]
+    lambdas_optical = 1e-10 * np.array(
+        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
+    )
     lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h)
+    lambdas_Xray = scipy.constants.c / (
+        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
+    )
 
     lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
 
@@ -464,8 +595,8 @@ def sc_lc(t_day, param_dict):
     nu_host = nu_obs * (1 + z)
     t /= 1 + z
 
-    if Ebv != 0.:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict['z'])
+    if Ebv != 0.0:
+        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
     else:
         ext = np.ones(len(nu_obs))
 
@@ -494,15 +625,19 @@ def sc_lc(t_day, param_dict):
     # evalute the mAB per filter
     tph = np.sqrt(3 * kappa * K * Me / (2 * (n - 1) * vt * vt))
     R_early = np.power(tph / t, 2 / (n - 1)) * vt * t
-    R_late = np.power((delta - 1) / (n - 1) * ((t / td)**2 - 1) + 1, -1 / (delta + 1)) * vt * t
+    R_late = (
+        np.power((delta - 1) / (n - 1) * ((t / td) ** 2 - 1) + 1, -1 / (delta + 1))
+        * vt
+        * t
+    )
     Rs = np.zeros(len(t))
     Rs[t < td] = R_early[t < td]
     Rs[t >= td] = R_late[t >= td]
 
     sigmaT4 = lbol / (4 * np.pi * Rs * Rs)
     T = np.power(sigmaT4 / sb, 0.25)
-    T[T == 0.] = np.nan
-    one_over_T = 1. / T
+    T[T == 0.0] = np.nan
+    one_over_T = 1.0 / T
     one_over_T[~np.isfinite(one_over_T)] = np.inf
 
     mag = {}
@@ -510,7 +645,15 @@ def sc_lc(t_day, param_dict):
         nu_of_filt = nu_host[idx]
         ext_per_filt = ext[idx]
         exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F = (2. * (h * nu_of_filt) * (nu_of_filt / c)**2) * exp / (1 - exp) * Rs * Rs / D / D
+        F = (
+            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
+            * exp
+            / (1 - exp)
+            * Rs
+            * Rs
+            / D
+            / D
+        )
         F *= ext_per_filt
         F *= 1 + z
         mAB = np.ones(len(F))
@@ -528,30 +671,29 @@ def sc_lc(t_day, param_dict):
 def metzger_lc(t_day, param_dict):
 
     # convert time from day to second
-    day = 86400.  # in seconds
+    day = 86400.0  # in seconds
     t = t_day * day
     tprec = len(t)
 
     if len(np.where(t == 0)[0]) > 0:
-        raise ValueError('For Me2017, start later than t=0')
+        raise ValueError("For Me2017, start later than t=0")
 
     # define constants
-    c     = astropy.constants.c.cgs.value
-    h     = astropy.constants.h.cgs.value
-    kb    = astropy.constants.k_B.cgs.value
-    mp    = astropy.constants.m_p.cgs.value
-    Msun  = astropy.constants.M_sun.cgs.value
+    c = astropy.constants.c.cgs.value
+    h = astropy.constants.h.cgs.value
+    kb = astropy.constants.k_B.cgs.value
+    Msun = astropy.constants.M_sun.cgs.value
     sigSB = astropy.constants.sigma_sb.cgs.value
-    arad  = 4 * sigSB / c
-    Mpc   = astropy.constants.pc.cgs.value * 1e6
+    arad = 4 * sigSB / c
+    Mpc = astropy.constants.pc.cgs.value * 1e6
 
     # fetch parameters
-    M0 = 10**param_dict["log10_Mej"] * Msun  # total ejecta mass
-    v0 = 10**param_dict["log10_vej"] * c  # minimum escape velocity
+    M0 = 10 ** param_dict["log10_Mej"] * Msun  # total ejecta mass
+    v0 = 10 ** param_dict["log10_vej"] * c  # minimum escape velocity
     beta = param_dict["beta"]
-    kappa_r = 10**param_dict["log10_kappa_r"]
+    kappa_r = 10 ** param_dict["log10_kappa_r"]
     z = param_dict["z"]
-    Ebv = param_dict['Ebv']
+    Ebv = param_dict["Ebv"]
     D = 1e-5 * Mpc  # 10pc
 
     # define additional parameters
@@ -559,9 +701,6 @@ def metzger_lc(t_day, param_dict):
     Mn = 1e-8 * Msun  # mass cut for free neutrons
     Ye = 0.1  # electron fraction
     Xn0max = 1 - 2 * Ye  # initial neutron mass fraction in outermost layers
-    P = 7e-4  # magnetar period (in seconds)
-    B = 1e15  # magnetic field in Gauss
-    tcollapse = 1e7  # magnetar collapse time (in units of initial spin-down times)
 
     # define mass / velocity array of the outer ejecta, comprised half of the mass
     mmin = np.log(1e-8)
@@ -570,7 +709,7 @@ def metzger_lc(t_day, param_dict):
     m = np.arange(mprec) * (mmax - mmin) / (mprec - 1) + mmin
     m = np.exp(m)
 
-    vm = v0 * np.power(m * Msun / M0, -1. / beta)
+    vm = v0 * np.power(m * Msun / M0, -1.0 / beta)
     vm[vm > c] = c
 
     # define thermalization efficiency rom Barnes+16
@@ -585,26 +724,48 @@ def metzger_lc(t_day, param_dict):
     ca = 0.56
     cb = 0.17
     cd = 0.74
-    eth = np.exp(-ca * t_day) + np.log(1. + 2 * cb * (t_day**(cd))) / (2 * cb * t_day**(cd))
+    eth = np.exp(-ca * t_day) + np.log(1.0 + 2 * cb * (t_day ** (cd))) / (
+        2 * cb * t_day ** (cd)
+    )
     eth *= 0.36
-    eth2 = np.exp(-ca2 * t_day) + np.log(1. + 2 * cb2 * (t_day**(cd2))) / (2 * cb2 * t_day**(cd2))
+    eth2 = np.exp(-ca2 * t_day) + np.log(1.0 + 2 * cb2 * (t_day ** (cd2))) / (
+        2 * cb2 * t_day ** (cd2)
+    )
     eth2 *= 0.36
-    eth3 = np.exp(-ca3 * t_day) + np.log(1. + 2 * cb3 * (t_day**(cd3))) / (2 * cb3 * t_day**(cd3))
+    eth3 = np.exp(-ca3 * t_day) + np.log(1.0 + 2 * cb3 * (t_day ** (cd3))) / (
+        2 * cb3 * t_day ** (cd3)
+    )
     eth3 *= 0.36
 
     # define radioactive heating rates
     Xn0 = Xn0max * 2 * np.arctan(Mn / m / Msun) / np.pi  # neutron mass fraction
-    Xr = 1. - Xn0  # r-process fraction
+    Xr = 1.0 - Xn0  # r-process fraction
 
     # setting up wavelength and filters
-    filts = ["u", "g", "r", "i", "z", "y", "J", "H", "K",
-             "radio-3GHz", "radio-1.25GHz", "radio-5.5GHz", "radio-6GHz",
-             "X-ray-1keV", "X-ray-5keV"]
-    lambdas_optical = 1e-10 * np.array([3561.8, 4866.46, 6214.6,
-                                        7687.0, 7127.0, 7544.6,
-                                        8679.5, 9633.3, 12350.0])
+    filts = [
+        "u",
+        "g",
+        "r",
+        "i",
+        "z",
+        "y",
+        "J",
+        "H",
+        "K",
+        "radio-3GHz",
+        "radio-1.25GHz",
+        "radio-5.5GHz",
+        "radio-6GHz",
+        "X-ray-1keV",
+        "X-ray-5keV",
+    ]
+    lambdas_optical = 1e-10 * np.array(
+        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
+    )
     lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h)
+    lambdas_Xray = scipy.constants.c / (
+        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
+    )
 
     lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
 
@@ -612,8 +773,8 @@ def metzger_lc(t_day, param_dict):
     nu_host = nu_obs * (1 + z)
     t /= 1 + z
 
-    if Ebv != 0.:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict['z'])
+    if Ebv != 0.0:
+        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
     else:
         ext = np.ones(len(nu_obs))
 
@@ -634,25 +795,28 @@ def metzger_lc(t_day, param_dict):
     Xn0array = np.tile(Xn0, (tprec, 1)).T
     Xrarray = np.tile(Xr, (tprec, 1)).T
     etharray = np.tile(eth, (mprec, 1))
-    Xn = Xn0array * np.exp(-tarray / 900.)
+    Xn = Xn0array * np.exp(-tarray / 900.0)
     edotn = 3.2e14 * Xn
-    edotr = 4.0e18 * Xrarray * (0.5 - (1. / np.pi) * np.arctan((tarray - t0) / sig))**(1.3) * etharray
-    edotr = 2.1e10 * etharray * ((tarray / day)**(-1.3))
+    edotr = (
+        4.0e18
+        * Xrarray
+        * (0.5 - (1.0 / np.pi) * np.arctan((tarray - t0) / sig)) ** (1.3)
+        * etharray
+    )
+    edotr = 2.1e10 * etharray * ((tarray / day) ** (-1.3))
     edot = edotn + edotr
-    kappan = 0.4 * (1. - Xn - Xrarray)
+    kappan = 0.4 * (1.0 - Xn - Xrarray)
     kappar = kappa_r * Xrarray
     kappa = kappan + kappar
 
     # define total r-process heating of inner layer
-    Lr = M0 * 4e18 * (0.5 - (1. / np.pi) * np.arctan((t - t0) / sig))**(1.3) * eth
+    Lr = M0 * 4e18 * (0.5 - (1.0 / np.pi) * np.arctan((t - t0) / sig)) ** (1.3) * eth
     Lr = Lr / 1e20
     Lr = Lr / 1e20
 
     # *** define arrays by mass layer/time arrays ***
     ene = np.zeros((mprec, tprec))
     lum = np.zeros((mprec, tprec))
-    lumpdv = np.zeros((mprec, tprec))
-    lumedot = np.zeros((mprec, tprec))
     tdiff = np.zeros((mprec, tprec))
     tau = np.zeros((mprec, tprec))
     # properties of photosphere
@@ -683,16 +847,14 @@ def metzger_lc(t_day, param_dict):
 
     dt = t[1:] - t[:-1]
     dm = m[1:] - m[:-1]
-    marray = np.tile(m, (tprec, 1)).T
-    dmarray = np.tile(dm, (tprec, 1)).T
 
     for j in range(tprec - 1):
         # one zone calculation
-        temp[j] = 1e10 * (3 * E[j] / (arad * 4 * np.pi * R[j]**(3)))**(0.25)
-        if (temp[j] > 4000.):
+        temp[j] = 1e10 * (3 * E[j] / (arad * 4 * np.pi * R[j] ** (3))) ** (0.25)
+        if temp[j] > 4000.0:
             kappaoz = kappa_r
-        if (temp[j] < 4000.):
-            kappaoz = kappa_r * (temp[j]/4000.)**(5.5)
+        if temp[j] < 4000.0:
+            kappaoz = kappa_r * (temp[j] / 4000.0) ** (5.5)
         kappaoz = kappa_r
         LPdV = E[j] * v[j] / R[j]
         tdiff0 = 3 * kappaoz * M0 / (4 * np.pi * c * v[j] * t[j])
@@ -700,26 +862,41 @@ def metzger_lc(t_day, param_dict):
         tdiff0 = tdiff0 + tlc0
         Lrad[j] = E[j] / tdiff0
         Ek[j + 1] = Ek[j] + LPdV * dt[j]
-        v[j + 1] = 1e20 * (2 * Ek[j] / M0)**(0.5)
+        v[j + 1] = 1e20 * (2 * Ek[j] / M0) ** (0.5)
         E[j + 1] = (Lr[j] + Lsd[j] - LPdV - Lrad[j]) * dt[j] + E[j]
         R[j + 1] = v[j + 1] * dt[j] + R[j]
-        taues[j + 1] = M0 * 0.4 / (4 * R[j + 1]**2)
+        taues[j + 1] = M0 * 0.4 / (4 * R[j + 1] ** 2)
 
-        templayer = (3 * ene[:-1, j] * dm * Msun / (arad * 4 * np.pi * (t[j] * vm[:-1])**3))**(0.25)
+        templayer = (
+            3 * ene[:-1, j] * dm * Msun / (arad * 4 * np.pi * (t[j] * vm[:-1]) ** 3)
+        ) ** (0.25)
         kappa_correction = np.ones(templayer.shape)
-        kappa_correction[templayer > 4000.] = 1.
-        kappa_correction[templayer < 4000.] = templayer[templayer < 4000.]/4000.**(5.5)
+        kappa_correction[templayer > 4000.0] = 1.0
+        kappa_correction[templayer < 4000.0] = templayer[
+            templayer < 4000.0
+        ] / 4000.0 ** (5.5)
         kappa_correction[:] = 1
 
-        tdiff[:-1,j] = 0.08 * kappa[:-1, j] * m[:-1] * Msun * 3 * kappa_correction / (vm[:-1] * c * t[j] * beta)
-        tau[:-1, j] = m[:-1] * Msun * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1])**2)
+        tdiff[:-1, j] = (
+            0.08
+            * kappa[:-1, j]
+            * m[:-1]
+            * Msun
+            * 3
+            * kappa_correction
+            / (vm[:-1] * c * t[j] * beta)
+        )
+        tau[:-1, j] = (
+            m[:-1] * Msun * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
+        )
         lum[:-1, j] = ene[:-1, j] / (tdiff[:-1, j] + t[j] * (vm[:-1] / c))
-        ene[:-1, j + 1] = (edot[:-1, j] - (ene[:-1, j] / t[j]) - lum[:-1, j]) * dt[j] + ene[:-1, j]
+        ene[:-1, j + 1] = (edot[:-1, j] - (ene[:-1, j] / t[j]) - lum[:-1, j]) * dt[
+            j
+        ] + ene[:-1, j]
         lum[:-1, j] = lum[:-1, j] * dm * Msun
 
         tau[mprec - 1, j] = tau[mprec - 2, j]
         # photosphere
-        pig1 = np.argmin(np.abs(tdiff[:, j] - t[j]))
         pig = np.argmin(np.abs(tau[:, j] - 1))
         vphoto[j] = vm[pig]
         Rphoto[j] = vphoto[j] * t[j]
@@ -732,14 +909,14 @@ def metzger_lc(t_day, param_dict):
 
     Ltot = Ltotm
     lbol = Ltotm * 1e40
-    Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto**2 * sigSB))**(0.25)
+    Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto ** 2 * sigSB)) ** (0.25)
 
     ii = np.where(~np.isnan(Tobs) & (Tobs > 0))[0]
-    f = interp.interp1d(t_day[ii], Tobs[ii], fill_value='extrapolate')
+    f = interp.interp1d(t_day[ii], Tobs[ii], fill_value="extrapolate")
     Tobs = f(t_day)
 
-    Tobs[Tobs == 0.] = np.nan
-    one_over_T = 1. / Tobs
+    Tobs[Tobs == 0.0] = np.nan
+    one_over_T = 1.0 / Tobs
     one_over_T[~np.isfinite(one_over_T)] = np.inf
 
     mag = {}
@@ -747,7 +924,15 @@ def metzger_lc(t_day, param_dict):
         nu_of_filt = nu_host[idx]
         ext_per_filt = ext[idx]
         exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F = (2. * (h * nu_of_filt) * (nu_of_filt / c)**2) * exp / (1 - exp) * Rphoto * Rphoto / D / D
+        F = (
+            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
+            * exp
+            / (1 - exp)
+            * Rphoto
+            * Rphoto
+            / D
+            / D
+        )
         F *= ext_per_filt
         F *= 1 + z
         mAB = np.ones(len(F))
@@ -757,15 +942,16 @@ def metzger_lc(t_day, param_dict):
 
     return t_day, lbol, mag
 
+
 def estimate_mag_err(uncer_params, df):
-  df['mag_err']=df.apply(
-                lambda x: (uncer_params['band']==x['passband']) &
-                          (pd.arrays.IntervalArray(
-                            uncer_params['interval']).contains(x['mag'])),
-                          axis=1).apply(
-                lambda x: scipy.stats.skewnorm.rvs(
-                            uncer_params[x]['a'],
-                            uncer_params[x]['loc'],
-                            uncer_params[x]['scale']
-                                            ), axis=1)
-  return df
+    df["mag_err"] = df.apply(
+        lambda x: (uncer_params["band"] == x["passband"])
+        & (pd.arrays.IntervalArray(uncer_params["interval"]).contains(x["mag"])),
+        axis=1,
+    ).apply(
+        lambda x: scipy.stats.skewnorm.rvs(
+            uncer_params[x]["a"], uncer_params[x]["loc"], uncer_params[x]["scale"]
+        ),
+        axis=1,
+    )
+    return df

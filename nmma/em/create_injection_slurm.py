@@ -3,48 +3,40 @@ import argparse
 import json
 import pandas as pd
 
-import numpy as np
-
 import bilby
 from bilby_pipe.create_injections import InjectionCreator
 
 
 def main():
 
-    parser = argparse.ArgumentParser(
-        description="Slurm files from nmma injection file"
-    )
+    parser = argparse.ArgumentParser(description="Slurm files from nmma injection file")
     parser.add_argument(
         "--prior-file",
         type=str,
         required=True,
-        help="The prior file from which to generate injections"
+        help="The prior file from which to generate injections",
     )
     parser.add_argument(
         "--injection-file",
         type=str,
         required=True,
-        help="The bilby injection json file to be used"
+        help="The bilby injection json file to be used",
     )
     parser.add_argument(
         "--analysis-file",
         type=str,
         required=True,
-        help="The analysis bash script to be replicated"
+        help="The analysis bash script to be replicated",
     )
-    parser.add_argument(
-        "-o", "--outdir",
-        type=str,
-        default="outdir"
-    )
+    parser.add_argument("-o", "--outdir", type=str, default="outdir")
     args = parser.parse_args()
 
     # load the injection json file
     if args.injection_file:
-        if args.injection_file.endswith('.json'):
-            with open(args.injection_file, 'rb') as f:
+        if args.injection_file.endswith(".json"):
+            with open(args.injection_file, "rb") as f:
                 injection_data = json.load(f)
-                datadict = injection_data['injections']['content']
+                datadict = injection_data["injections"]["content"]
                 dataframe_from_inj = pd.DataFrame.from_dict(datadict)
         else:
             print("Only json supported.")
@@ -67,13 +59,15 @@ def main():
 
     # combine the dataframes
     dataframe = pd.DataFrame.merge(
-        dataframe_from_inj, dataframe_from_prior,
-        how='outer',
-        left_index=True, right_index=True
+        dataframe_from_inj,
+        dataframe_from_prior,
+        how="outer",
+        left_index=True,
+        right_index=True,
     )
 
     for index, row in dataframe.iterrows():
-        with open(args.analysis_file, 'r') as file:
+        with open(args.analysis_file, "r") as file:
             analysis = file.read()
 
         outdir = os.path.join(args.outdir, str(index))
