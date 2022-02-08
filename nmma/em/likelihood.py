@@ -18,7 +18,7 @@ def truncated_gaussian(m_det, m_err, m_est, lim):
 
 
 class OpticalLightCurve(Likelihood):
-    """ A optical kilonova / GRB / kilonova-GRB afterglow likelihood object
+    """A optical kilonova / GRB / kilonova-GRB afterglow likelihood object
     see line 1221 gwemlightcurves/sampler/loglike.py
 
     Parameters
@@ -49,10 +49,18 @@ class OpticalLightCurve(Likelihood):
 
     """
 
-    def __init__(self, light_curve_model, filters, light_curve_data,
-                 trigger_time, detection_limit=None,
-                 error_budget=1., tmin=0., tmax=14.,
-                 verbose=False):
+    def __init__(
+        self,
+        light_curve_model,
+        filters,
+        light_curve_data,
+        trigger_time,
+        detection_limit=None,
+        error_budget=1.0,
+        tmin=0.0,
+        tmax=14.0,
+        verbose=False,
+    ):
         self.light_curve_model = light_curve_model
         super(OpticalLightCurve, self).__init__(dict())
         self.filters = filters
@@ -60,7 +68,9 @@ class OpticalLightCurve(Likelihood):
         self.tmin = tmin
         self.tmax = tmax
         self.error_budget = error_budget
-        processedData = utils.dataProcess(light_curve_data, self.filters, self.trigger_time, self.tmin, self.tmax)
+        processedData = utils.dataProcess(
+            light_curve_data, self.filters, self.trigger_time, self.tmin, self.tmax
+        )
         self.light_curve_data = processedData
 
         self.detection_limit = {}
@@ -78,35 +88,45 @@ class OpticalLightCurve(Likelihood):
         self.verbose = verbose
 
     def __repr__(self):
-        return self.__class__.__name__ + '(light_curve_model={},\n\tfilters={}'.format(self.light_curve_model,
-                                                                                       self.filters)
+        return self.__class__.__name__ + "(light_curve_model={},\n\tfilters={}".format(
+            self.light_curve_model, self.filters
+        )
 
     def noise_log_likelihood(self):
-        return 0.
+        return 0.0
 
     def log_likelihood(self):
-        lbol, mag_abs = self.light_curve_model.generate_lightcurve(self.sample_times, self.parameters)
+        lbol, mag_abs = self.light_curve_model.generate_lightcurve(
+            self.sample_times, self.parameters
+        )
+
         # sanity checking
         if len(np.isfinite(lbol)) == 0:
             return np.nan_to_num(-np.inf)
-        if np.sum(lbol) == 0.:
+        if np.sum(lbol) == 0.0:
             return np.nan_to_num(-np.inf)
 
         # create light curve templates
         mag_app_interp = {}
         for filt in self.filters:
             mag_abs_filt = utils.getFilteredMag(mag_abs, filt)
-            mag_app_filt = mag_abs_filt + 5. * np.log10(self.parameters['luminosity_distance'] * 1e6 / 10.)
+            mag_app_filt = mag_abs_filt + 5.0 * np.log10(
+                self.parameters["luminosity_distance"] * 1e6 / 10.0
+            )
             usedIdx = np.where(np.isfinite(mag_app_filt))[0]
             sample_times_used = self.sample_times[usedIdx]
             mag_app_used = mag_app_filt[usedIdx]
-            t0 = self.parameters['KNtimeshift']
-            mag_app_interp[filt] = interp1d(sample_times_used + t0, mag_app_used,
-                                            fill_value='extrapolate', bounds_error=False)
+            t0 = self.parameters["KNtimeshift"]
+            mag_app_interp[filt] = interp1d(
+                sample_times_used + t0,
+                mag_app_used,
+                fill_value="extrapolate",
+                bounds_error=False,
+            )
 
         # compare the estimated light curve and the measured data
-        minus_chisquare_total = 0.
-        gaussprob_total = 0.
+        minus_chisquare_total = 0.0
+        gaussprob_total = 0.0
         for filt in self.filters:
             # decompose the data
             data_time = self.light_curve_data[filt][:, 0]
@@ -114,7 +134,7 @@ class OpticalLightCurve(Likelihood):
             data_sigma = self.light_curve_data[filt][:, 2]
 
             # include the error budget into calculation
-            data_sigma = np.sqrt(data_sigma**2 + self.error_budget**2)
+            data_sigma = np.sqrt(data_sigma ** 2 + self.error_budget ** 2)
 
             # evaluate the light curve magnitude at the data points
             mag_est = mag_app_interp[filt](data_time)
@@ -125,10 +145,16 @@ class OpticalLightCurve(Likelihood):
 
             # evaluate the chisuquare
             if len(finiteIdx) >= 1:
-                minus_chisquare = np.sum(truncated_gaussian(data_mag[finiteIdx], data_sigma[finiteIdx],
-                                                            mag_est[finiteIdx], self.detection_limit[filt]))
+                minus_chisquare = np.sum(
+                    truncated_gaussian(
+                        data_mag[finiteIdx],
+                        data_sigma[finiteIdx],
+                        mag_est[finiteIdx],
+                        self.detection_limit[filt],
+                    )
+                )
             else:
-                minus_chisquare = 0.
+                minus_chisquare = 0.0
 
             if np.isnan(minus_chisquare):
                 return np.nan_to_num(-np.inf)
@@ -137,7 +163,9 @@ class OpticalLightCurve(Likelihood):
 
             # evaluate the data with infinite error
             if len(infIdx) > 0:
-                gausslogsf = scipy.stats.norm.logsf(data_mag[infIdx], mag_est[infIdx], self.error_budget)
+                gausslogsf = scipy.stats.norm.logsf(
+                    data_mag[infIdx], mag_est[infIdx], self.error_budget
+                )
                 gaussprob_total += np.sum(gausslogsf)
 
         log_prob = minus_chisquare_total + gaussprob_total

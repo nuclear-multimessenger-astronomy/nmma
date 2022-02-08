@@ -549,30 +549,37 @@ def main():
             )
         mag["bestfit_sample_times"] = sample_times
 
-        colors = cm.Spectral(np.linspace(0, 1, len(filters)))[::-1]
+        filters_plot = []
+        for filt in filters:
+            if filt not in data:
+                continue
+            samples = data[filt]
+            t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
+            idx = np.where(~np.isnan(y))[0]
+            t, y, sigma_y = t[idx], y[idx], sigma_y[idx]
+            if len(t) == 0:
+                continue
+            filters_plot.append(filt)
 
-        plotName = os.path.join(args.outdir, "injection_lightcurves.png")
+        colors = cm.Spectral(np.linspace(0, 1, len(filters_plot)))[::-1]
+
+        plotName = os.path.join(args.outdir, "lightcurves.png")
         plt.figure(figsize=(20, 16))
-
         color2 = "coral"
 
         cnt = 0
-        for filt, color in zip(filters, colors):
+        for filt, color in zip(filters_plot, colors):
             cnt = cnt + 1
             if cnt == 1:
-                ax1 = plt.subplot(len(filters), 1, cnt)
+                ax1 = plt.subplot(len(filters_plot), 1, cnt)
             else:
-                ax2 = plt.subplot(len(filters), 1, cnt, sharex=ax1, sharey=ax1)
+                ax2 = plt.subplot(len(filters_plot), 1, cnt, sharex=ax1, sharey=ax1)
 
-            if filt not in data:
-                continue
             samples = data[filt]
             t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
             t -= trigger_time
             idx = np.where(~np.isnan(y))[0]
             t, y, sigma_y = t[idx], y[idx], sigma_y[idx]
-            if len(t) == 0:
-                continue
 
             idx = np.where(np.isfinite(sigma_y))[0]
             plt.errorbar(
