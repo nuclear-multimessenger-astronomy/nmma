@@ -1,0 +1,2 @@
+alpha = Gaussian(mu=0., sigma=4e-4, name='alpha',latex_label='$\\alpha$')
+zeta = Uniform(minimum=0., maximum=1.0, name='zeta',latex_label='$\\zeta$')
