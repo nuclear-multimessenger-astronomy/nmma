@@ -17,14 +17,14 @@ def reweight_to_flat_mass_prior(df):
 
 
 # user specify input
-pdet_Mmax_path = './example_files/eos/pdet_of_Mmax.dat'
-EOS_prior_path = './example_files/eos/EOS_sorted_weight.dat'
-EOSset_path = './example_files/eos/eos_sorted'
-GWEMdata_path =  './output/GW_EMdata'
+pdet_Mmax_path = '../../example_files/eos/pdet_of_Mmax.dat'
+EOS_prior_path = '../../example_files/eos/EOS_sorted_weight.dat'
+EOSset_path = '../../example_files/eos/eos_sorted'
+GWEMdata_path =  '../../output/GW_EMdata'
 label = 'ZTF'
 Neos = 5000
 # load the detectable events
-detectable = np.loadtxt('./example_files/csv_lightcurve/detectable.txt').astype(int)
+detectable = np.loadtxt('../../example_files/csv_lightcurve/detectable.txt').astype(int)
 # load the EOS prior
 prior = np.loadtxt(EOS_prior_path)
 prior = prior[:-1]  # to remove the duplicate at the last line added for it to work with pbilby
@@ -116,4 +116,4 @@ df_dict = dict(R14_med=R14_med,
                R14_uperr=R14_uplim - R14_med,
                R14_lowerr=R14_med - R14_lowlim)
 df = pd.DataFrame.from_dict(df_dict)
-df.to_csv('./output/Figures/GW_EM_R14trend_{0}.dat'.format(label), index=False, sep=' ')
+df.to_csv('../../output/Figures/GW_EM_R14trend_{0}.dat'.format(label), index=False, sep=' ')

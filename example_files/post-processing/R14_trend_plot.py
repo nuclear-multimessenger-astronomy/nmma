@@ -26,9 +26,9 @@ matplotlib.rcParams.update(params)
 R14_true = 11.55
 label = 'ZTF'
 
-data_GWEM = pd.read_csv('./output/Figures/GW_EM_R14trend_{0}.dat'.format(label), header=0, delimiter=' ')
+data_GWEM = pd.read_csv('../../output/Figures/GW_EM_R14trend_{0}.dat'.format(label), header=0, delimiter=' ')
 
-data_GW = pd.read_csv('./example_files/GW_R14trend.dat', header=0, delimiter=' ')
+data_GW = pd.read_csv('../../example_files/GW_R14trend.dat', header=0, delimiter=' ')
 
 fig = plt.figure()
 fig.suptitle("Constrain EoS using EM + GW ", fontname="Times New Roman Bold")
@@ -59,4 +59,4 @@ ax2.axhline(1, color='grey' ,linestyle='--', alpha=0.5)
 
 fig.tight_layout()
 fig.subplots_adjust(hspace=0.1)
-plt.savefig('./output/Figures/R14_trend_GW_EM_{0}.pdf'.format(label), bbox_inches='tight')
+plt.savefig('../../output/Figures/R14_trend_GW_EM_{0}.pdf'.format(label), bbox_inches='tight')
