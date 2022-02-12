@@ -47,7 +47,7 @@ A GW_EMdata files includind the combination of  GW and EM EoS data can be get at
 
 ### After all that plot EOS
 
-There are two pythons files (R14_trend_generate.py, R14_trend_plot.py)  on ./post-processing , which can use to visualize the EOS data.
+There are two pythons files (R14_trend_generate.py, R14_trend_plot.py)  on ./examples_files/post-processing , which can use to visualize the EOS data.
 
 First of all create a foder to put the final data about EoS:
 
