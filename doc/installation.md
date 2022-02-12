@@ -63,6 +63,7 @@ For reasons that are not totally clearly, some modules like afterglowpy and dust
 
 	pip install afterglowpy
 
+
 and that should do it. If everything went well, importing nmma and its submodules:
 
 	import nmma
@@ -70,6 +71,19 @@ and that should do it. If everything went well, importing nmma and its submodule
 	import nmma.eos.create_injection
 
 should work and you should be good to go.
+
+### Bold label font 
+Note : Sometimes nmma code use "Times New Roman" as label font.
+When you use linux system or macos ... to running plot, this erreur could be return "findfont: Font family ['Times New Roman'] not found. Falling back to DejaVu Sans", but no worry this cannot break the process, it means Times New Roman cannot be used with matplotlib.
+So you can install msttcorefonts by using :
+	
+	sudo apt install msttcorefonts -qq
+
+Move the cursor to the position you want to select with Tab and press Enter.
+Then remove matplotlib on the cache.
+
+	rm ~/.cache/matplotlib -rf
+
 
 ### Dependency conflicts
 
