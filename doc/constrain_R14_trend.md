@@ -29,6 +29,39 @@ The next command line provide some EM posteriors in this example we have a simul
 	  
 
 
+### Upload GW posteriors
+
+The gravitational wave samples can be can be downloaded at https://zenodo.org/record/6045029#.YgZzwITMKV5.
+This only  concern  the PhenDNRTv2 files on this link. That we can directly filter by using this command line:
+
+Create an outdir directory to put GW data that you will upload.
+	
+	mkdir -p ./output/GWdata/outdir
+
+Go at GWdata directory
+
+	cd ./output/GWdata/outdir
+
+Running the next command line:
+
+	xargs -n 1 curl -# -O < ../../../example_files/url_to_upload_gw_posteriors.txt
+
+or use this one :
+
+	for url in `cat ../../../example_files/url_to_upload_gw_posteriors.txt`
+	do
+	  curl -#  -O $url
+	done 
+	
+
+The url_to_upload_gw_posteriors.txt contains is a list of all links in the PhenDNRTv2 files.
+
+### Come back on nmma folder
+As you know to upload GWdata you are go at ./output/GWdata/outdir so you can cancel by :
+
+	cd ../../..
+	
+
 ### EoS from GW + EM 
 
 This allows to generate the EoS by combining the data of the events (EMdata) and those coming from the gravitational (GWdata).The 26 detectable events are {0,  3,  5,  7,  8, 10, 12, 13, 14, 15, 17, 19, 21, 22, 23, 24, 26, 27, 28, 31, 32,34, 36, 37, 38, 39}.
