@@ -1,7 +1,7 @@
 
-## Light curve model training
+## Training
 
-It is common to have light curves on "grids", for which you have a discrete set of parameters for which the lightcurves were simulated. (Eg: we may know the lightcurves to expect for $$m_{\textrm ej} = m_1$$ and $$m_{\textrm ej} = m_2$$, but not for any masses between $$m_1$$ and $$m_2$$.)
+It is common to have light curves on "grids", for which you have a discrete set of parameters for which the lightcurves were simulated. For example, we may know the lightcurves to expect for specific masses m_1 and m_2, but not for any masses between the two.
 
 We rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks). The PCA serves to represent each light curve by a small number of "eigenvalues", rather than the full lightcurve. After performing PCA, you will have a discrete grid of models that relate merger parameters to a few **lightcurve eigenvalues** rather than the whole lightcurve.
 
