@@ -52,6 +52,7 @@ User Guide
    :maxdepth: 1
 
    installation
+   training
    fitting
    models
    contributing
