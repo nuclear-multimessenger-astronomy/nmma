@@ -186,6 +186,28 @@ def loadEventSpec(filename):
     return spec
 
 
+def read_files(files):
+
+    data = {}
+    for filename in files:
+        name = filename.replace(".txt", "").replace(".dat", "").split("/")[-1]
+        mag_d = np.loadtxt(filename)
+
+        data[name] = {}
+        data[name]["t"] = mag_d[:, 0]
+        data[name]["u"] = mag_d[:, 1]
+        data[name]["g"] = mag_d[:, 2]
+        data[name]["r"] = mag_d[:, 3]
+        data[name]["i"] = mag_d[:, 4]
+        data[name]["z"] = mag_d[:, 5]
+        data[name]["y"] = mag_d[:, 6]
+        data[name]["J"] = mag_d[:, 7]
+        data[name]["H"] = mag_d[:, 8]
+        data[name]["K"] = mag_d[:, 9]
+
+    return data
+
+
 def calc_lc(
     tt,
     param_list,
