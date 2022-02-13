@@ -1,14 +1,5 @@
-import pandas as pd
 import os
-import sys
-import glob
 import numpy as np
-from scipy.interpolate import interpolate as interp
-import scipy as sp
-import matplotlib.pyplot as plt
-from matplotlib.pyplot import cm
-import seaborn as sns
-import sklearn as sk
 import pickle
 
 
@@ -36,7 +27,16 @@ class SVDTrainingModel(object):
         type of interpolation
     """
 
-    def __init__(self, model, data, sample_times, filters, svd_path=None, n_coeff=10, interpolation_type="sklearn_gp"):
+    def __init__(
+        self,
+        model,
+        data,
+        sample_times,
+        filters,
+        svd_path=None,
+        n_coeff=10,
+        interpolation_type="sklearn_gp",
+    ):
         self.model = model
         self.data = data
         self.sample_times = sample_times
@@ -55,47 +55,55 @@ class SVDTrainingModel(object):
         self.load_model()
 
     def generate_svd_model(self):
-    
+
         model_keys = list(self.data.keys())
         if len(model_keys) == 0:
-            raise ValueError('Need at least one set of data to train')
-    
+            raise ValueError("Need at least one set of data to train")
+
         # check self.data for model parameters
         for ii, key in enumerate(model_keys):
             if ii == 0:
-                model_parameters = list(set(self.data[key].keys() - {'data'}))
+                model_parameters = list(set(self.data[key].keys() - {"data"}))
             else:
-                tmp_parameters = list(set(self.data[key].keys() - {'data'}))
+                tmp_parameters = list(set(self.data[key].keys() - {"data"}))
                 if not set(model_parameters) == set(tmp_parameters):
                     parameters_diff = tmp_parameters - model_parameters
-                    raise ValueError(f'{parameters_diff} also in model {key}')
+                    raise ValueError(f"{parameters_diff} also in model {key}")
 
         # Place the relevant parameters into an array
         param_array = []
         for key in model_keys:
             param_array.append([self.data[key][param] for param in model_parameters])
         param_array_postprocess = np.array(param_array)
-       
-        # normalize parameters 
-        param_mins, param_maxs = np.min(param_array_postprocess,axis=0),np.max(param_array_postprocess,axis=0)
+
+        # normalize parameters
+        param_mins, param_maxs = np.min(param_array_postprocess, axis=0), np.max(
+            param_array_postprocess, axis=0
+        )
         for i in range(len(param_mins)):
-            param_array_postprocess[:,i] = (param_array_postprocess[:,i]-param_mins[i])/(param_maxs[i]-param_mins[i])
-    
+            param_array_postprocess[:, i] = (
+                param_array_postprocess[:, i] - param_mins[i]
+            ) / (param_maxs[i] - param_mins[i])
+
         # Place the relevant parameters into an array
         svd_model = {}
         # Loop through filters
-        for jj,filt in enumerate(self.filters):
-            print('Normalizing mag filter %s...' % filt)
+        for jj, filt in enumerate(self.filters):
+            print("Normalizing mag filter %s..." % filt)
             data_array = []
             for key in model_keys:
-                data_array.append(self.data[key]["data"][:,jj])
-        
+                data_array.append(self.data[key]["data"][:, jj])
+
             data_array_postprocess = np.array(data_array)
-            mins,maxs = np.min(data_array_postprocess,axis=0),np.max(data_array_postprocess,axis=0)
+            mins, maxs = np.min(data_array_postprocess, axis=0), np.max(
+                data_array_postprocess, axis=0
+            )
             for i in range(len(mins)):
-                data_array_postprocess[:,i] = (data_array_postprocess[:,i]-mins[i])/(maxs[i]-mins[i])
-            data_array_postprocess[np.isnan(data_array_postprocess)]=0.0
-            
+                data_array_postprocess[:, i] = (
+                    data_array_postprocess[:, i] - mins[i]
+                ) / (maxs[i] - mins[i])
+            data_array_postprocess[np.isnan(data_array_postprocess)] = 0.0
+
             svd_model[filt] = {}
             svd_model[filt]["param_array_postprocess"] = param_array_postprocess
             svd_model[filt]["param_mins"] = param_mins
@@ -104,114 +112,134 @@ class SVDTrainingModel(object):
             svd_model[filt]["maxs"] = maxs
             svd_model[filt]["tt"] = self.sample_times
             svd_model[filt]["data_postprocess"] = data_array_postprocess
-    
+
             UA, sA, VA = np.linalg.svd(data_array_postprocess, full_matrices=True)
             VA = VA.T
-    
+
             n, n = UA.shape
             m, m = VA.shape
-    
-            cAmat = np.zeros((self.n_coeff,n))
-            cAvar = np.zeros((self.n_coeff,n))
+
+            cAmat = np.zeros((self.n_coeff, n))
+            cAvar = np.zeros((self.n_coeff, n))
             for i in range(n):
                 ErrorLevel = 1.0
-                cAmat[:,i] = np.dot(data_array_postprocess[i,:],VA[:,:self.n_coeff])
-                errors = ErrorLevel*np.ones_like(data_array_postprocess[i,:])
-                cAvar[:,i] = np.diag(np.dot(VA[:,:self.n_coeff].T,np.dot(np.diag(np.power(errors,2.)),VA[:,:self.n_coeff])))
+                cAmat[:, i] = np.dot(
+                    data_array_postprocess[i, :], VA[:, : self.n_coeff]
+                )
+                errors = ErrorLevel * np.ones_like(data_array_postprocess[i, :])
+                cAvar[:, i] = np.diag(
+                    np.dot(
+                        VA[:, : self.n_coeff].T,
+                        np.dot(np.diag(np.power(errors, 2.0)), VA[:, : self.n_coeff]),
+                    )
+                )
             cAstd = np.sqrt(cAvar)
-    
+
             svd_model[filt]["n_coeff"] = self.n_coeff
             svd_model[filt]["cAmat"] = cAmat
             svd_model[filt]["cAstd"] = cAstd
-            svd_model[filt]["VA"] = VA  
-    
+            svd_model[filt]["VA"] = VA
+
         return svd_model
-    
+
     def train_model(self):
         if self.interpolation_type == "sklearn_gp":
             self.train_sklearn_gp_model()
         elif self.interpolation_type == "tensorflow":
             self.train_tensorflow_model()
         else:
-            raise(f'{self.interpolation_type} unknown interpolation type')
+            raise (f"{self.interpolation_type} unknown interpolation type")
 
     def train_sklearn_gp_model(self):
-   
+
         try:
             from sklearn.gaussian_process import GaussianProcessRegressor
-            from sklearn.gaussian_process.kernels import RBF, Matern, DotProduct, ConstantKernel, RationalQuadratic
+            from sklearn.gaussian_process.kernels import (
+                RationalQuadratic,
+            )
         except ImportError:
-            print('Install scikit-learn if you want to use it...')
+            print("Install scikit-learn if you want to use it...")
             return
 
         # Loop through filters
         for jj, filt in enumerate(self.filters):
-            print('Computing GP for filter %s...' % filt)
-        
+            print("Computing GP for filter %s..." % filt)
+
             param_array_postprocess = self.svd_model[filt]["param_array_postprocess"]
             cAmat = self.svd_model[filt]["cAmat"]
-            cAstd = self.svd_model[filt]["cAstd"]
-            VA = self.svd_model[filt]["VA"]
-            
+
             nsvds, nparams = param_array_postprocess.shape
-            
+
             # Set of Gaussian Process
             kernel = 1.0 * RationalQuadratic(length_scale=1.0, alpha=0.1)
             gps = []
             for i in range(self.n_coeff):
-                if np.mod(i,1) == 0:
-                    print('Coefficient %d/%d...' % (i+1, self.n_coeff))
-                gp = GaussianProcessRegressor(kernel=kernel,
-                                              n_restarts_optimizer=0)
-                gp.fit(param_array_postprocess, cAmat[i,:])
+                if np.mod(i, 1) == 0:
+                    print("Coefficient %d/%d..." % (i + 1, self.n_coeff))
+                gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=0)
+                gp.fit(param_array_postprocess, cAmat[i, :])
                 gps.append(gp)
-                
+
             self.svd_model[filt]["gps"] = gps
 
     def train_tensorflow_model(self):
 
         try:
             import tensorflow as tf
-            tf.get_logger().setLevel('ERROR')
+
+            tf.get_logger().setLevel("ERROR")
             from tensorflow.keras import Sequential
             from tensorflow.keras.layers import Dense
             from sklearn.model_selection import train_test_split
         except ImportError:
-            print('Install tensorflow if you want to use it...')
+            print("Install tensorflow if you want to use it...")
             return
 
         # Loop through filters
         for jj, filt in enumerate(self.filters):
-            print('Computing NN for filter %s...' % filt)
+            print("Computing NN for filter %s..." % filt)
 
             param_array_postprocess = self.svd_model[filt]["param_array_postprocess"]
             cAmat = self.svd_model[filt]["cAmat"]
-            cAstd = self.svd_model[filt]["cAstd"]
-            VA = self.svd_model[filt]["VA"]
 
-            train_X, val_X, train_y, val_y = train_test_split(param_array_postprocess, cAmat.T, shuffle=True, test_size=0.1, random_state=8581)
+            train_X, val_X, train_y, val_y = train_test_split(
+                param_array_postprocess,
+                cAmat.T,
+                shuffle=True,
+                test_size=0.1,
+                random_state=8581,
+            )
 
             np.random.RandomState(42)
             model = Sequential()
-            model.add(Dense(train_X.shape[1], activation='relu', kernel_initializer='he_normal', input_shape=(train_X.shape[1],)))
-            model.add(Dense(64, activation='relu', kernel_initializer='he_normal'))
-            model.add(Dense(128, activation='relu', kernel_initializer='he_normal'))
-            model.add(Dense(128, activation='relu', kernel_initializer='he_normal'))
+            model.add(
+                Dense(
+                    train_X.shape[1],
+                    activation="relu",
+                    kernel_initializer="he_normal",
+                    input_shape=(train_X.shape[1],),
+                )
+            )
+            model.add(Dense(64, activation="relu", kernel_initializer="he_normal"))
+            model.add(Dense(128, activation="relu", kernel_initializer="he_normal"))
+            model.add(Dense(128, activation="relu", kernel_initializer="he_normal"))
             model.add(Dense(self.n_coeff))
 
             # compile the model
-            model.compile(optimizer='adam', loss='mse')
+            model.compile(optimizer="adam", loss="mse")
 
             # fit the model
-            train_history = model.fit(train_X,
-                                      train_y, epochs=15,
-                                      batch_size=32,
-                                      validation_data=(val_X, val_y),
-                                      verbose=True)
+            model.fit(
+                train_X,
+                train_y,
+                epochs=15,
+                batch_size=32,
+                validation_data=(val_X, val_y),
+                verbose=True,
+            )
 
             # evaluate the model
-            error = model.evaluate(param_array_postprocess,
-                                   cAmat.T, verbose=0)
+            error = model.evaluate(param_array_postprocess, cAmat.T, verbose=0)
             print(f"{filt} MSE:", error)
 
             self.svd_model[filt]["model"] = model
@@ -219,33 +247,33 @@ class SVDTrainingModel(object):
     def save_model(self):
 
         if self.interpolation_type == "sklearn_gp":
-            modelfile = os.path.join(self.svd_path, f'{self.model}.pkl')
+            modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
         elif self.interpolation_type == "tensorflow":
-            modelfile = os.path.join(self.svd_path, f'{self.model}_tf.pkl')
-            outdir = modelfile.replace(".pkl","")
+            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
+            outdir = modelfile.replace(".pkl", "")
             if not os.path.isdir(outdir):
                 os.makedirs(outdir)
             for filt in self.svd_model.keys():
-                outfile = os.path.join(outdir, f'{filt}.h5')
-                self.svd_model[filt]['model'].save(outfile)
-                del self.svd_model[filt]['model']
+                outfile = os.path.join(outdir, f"{filt}.h5")
+                self.svd_model[filt]["model"].save(outfile)
+                del self.svd_model[filt]["model"]
 
-        with open(modelfile, 'wb') as handle:
+        with open(modelfile, "wb") as handle:
             pickle.dump(self.svd_model, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_model(self):
 
         if self.interpolation_type == "sklearn_gp":
-            modelfile = os.path.join(self.svd_path, f'{self.model}.pkl')
+            modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
         elif self.interpolation_type == "tensorflow":
             try:
                 from tensorflow.keras.models import load_model as load_tf_model
             except ImportError:
-                print('Install tensorflow if you want to use it...')
+                print("Install tensorflow if you want to use it...")
                 return
 
-            modelfile = os.path.join(self.svd_path, f'{self.model}_tf.pkl')
-            outdir = modelfile.replace(".pkl","")
+            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
+            outdir = modelfile.replace(".pkl", "")
             for filt in self.svd_model.keys():
-                outfile = os.path.join(outdir, f'{filt}.h5')
-                self.svd_model[filt]['model'] = load_tf_model(outfile)
+                outfile = os.path.join(outdir, f"{filt}.h5")
+                self.svd_model[filt]["model"] = load_tf_model(outfile)
