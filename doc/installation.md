@@ -89,3 +89,15 @@ For example, on XSEDE's Expanse cluster, one can start a terminal session with:
 	module load openmpi
 
 and follow the instructions above.
+
+### Matplotlib fonts
+
+On new Linux installations, we sometimes come across the warning: "findfont: Font family ['Times New Roman'] not found. Falling back to DejaVu Sans". If you do prefer to use 'Times New Roman' for all of your plotting needs, you can install msttcorefonts with:
+
+	sudo apt install msttcorefonts -qq
+
+After removing the matplotlib cache:
+
+	rm ~/.cache/matplotlib -rf
+
+Beautiful fonts should be yours.

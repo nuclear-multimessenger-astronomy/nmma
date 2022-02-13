@@ -10,7 +10,7 @@ from . import utils
 
 ln10 = np.log(10)
 
-# As different KN models have very differnet parameters,
+# As different KN models have very different parameters,
 # we need a dict to keep track for them. Remember, the order matters
 
 model_parameters_dict = {
@@ -74,8 +74,8 @@ class GenericCombineLightCurveModel(object):
 class SVDLightCurveModel(object):
     """A light curve model object
 
-    An object to evaluted the light curve across filters
-    with a set of parameters given based on prebuilt SVD
+    An object to evaluate the light curve across filters
+    with a set of parameters given based on a prebuilt SVD
 
     Parameters
     ----------
@@ -96,7 +96,7 @@ class SVDLightCurveModel(object):
     Returns
     -------
     LightCurveModel: `nmma.em.model.SVDLightCurveModel`
-        A light curve model onject, able to evaluted the light curve
+        A light curve model object, able to evalute the light curve
         give a set of parameters
     """
 
