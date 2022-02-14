@@ -138,6 +138,7 @@ setup(
             "light_curve_injection_slurm_setup=nmma.em.create_injection_slurm:main",
             "light_curve_injection_condor_setup=nmma.em.create_injection_condor:main",
             "lightcurve_marginalization=nmma.em.lightcurve_marginalization:main",
+            "combine_EOS=nmma.em.combine_EOS:main",
             "create_light_curve_slurm=nmma.em.create_lightcurves_slurm:main",
             "create_light_curve_condor=nmma.em.create_lightcurves_condor:main",
             "create_svdmodel=nmma.em.create_svdmodel:main",

@@ -55,6 +55,7 @@ User Guide
    training
    fitting
    models
+   combined_analysis
    contributing
 
 .. Indices and tables

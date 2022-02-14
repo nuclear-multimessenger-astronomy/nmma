@@ -136,12 +136,20 @@ class SVDLightCurveModel(object):
             self.svd_path = svd_path
 
         if self.interpolation_type == "sklearn_gp":
-            mag_modelfile = os.path.join(self.svd_path, "{0}_mag.pkl".format(model))
-            with open(mag_modelfile, "rb") as handle:
-                self.svd_mag_model = pickle.load(handle)
-            lbol_modelfile = os.path.join(self.svd_path, "{0}_lbol.pkl".format(model))
-            with open(lbol_modelfile, "rb") as handle:
-                self.svd_lbol_model = pickle.load(handle)
+            modelfile = os.path.join(self.svd_path, "{0}.pkl".format(model))
+            if os.path.isfile(modelfile):
+                with open(modelfile, "rb") as handle:
+                    self.svd_mag_model = pickle.load(handle)
+                self.svd_lbol_model = None
+            else:
+                mag_modelfile = os.path.join(self.svd_path, "{0}_mag.pkl".format(model))
+                with open(mag_modelfile, "rb") as handle:
+                    self.svd_mag_model = pickle.load(handle)
+                lbol_modelfile = os.path.join(
+                    self.svd_path, "{0}_lbol.pkl".format(model)
+                )
+                with open(lbol_modelfile, "rb") as handle:
+                    self.svd_lbol_model = pickle.load(handle)
         elif self.interpolation_type == "tensorflow":
             import tensorflow as tf
 

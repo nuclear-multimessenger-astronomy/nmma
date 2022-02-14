@@ -78,7 +78,6 @@ class SVDTrainingModel(object):
                 (len(self.sample_times), len(self.filters))
             )
             for jj, filt in enumerate(self.filters):
-                print(self.data[key])
                 ii = np.where(np.isfinite(self.data[key][filt]))[0]
                 f = interp.interp1d(
                     self.data[key]["t"][ii],

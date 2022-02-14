@@ -620,8 +620,12 @@ def main():
 
             plt.ylabel("%s" % filt, fontsize=48, rotation=0, labelpad=40)
 
-            plt.xlim([0.0, 10.0])
-            plt.ylim([26.0, 18.0])
+            if args.injection:
+                plt.xlim([0.0, 10.0])
+                plt.ylim([26.0, 18.0])
+            else:
+                plt.xlim([0.0, 14.0])
+                plt.ylim([26.0, 14.0])
             plt.grid()
 
             if cnt == 1:
