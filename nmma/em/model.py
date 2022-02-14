@@ -35,6 +35,7 @@ model_parameters_dict = {
     ],
     "Piro2021": ["log10_Menv", "log10_Renv", "log10_Ee"],
     "Me2017": ["log10_Mej", "log10_vej", "beta", "log10_kappa_r"],
+    "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
 }
 
 
@@ -108,56 +109,74 @@ class SVDLightCurveModel(object):
         parameter_conversion=None,
         mag_ncoeff=None,
         lbol_ncoeff=None,
-        gptype="sklearn",
+        interpolation_type="sklearn_gp",
+        model_parameters=None,
     ):
-        assert model in model_parameters_dict.keys(), (
-            "Unknown model," "please update model_parameters_dict at em/model.py"
-        )
+
+        if model_parameters is None:
+            assert model in model_parameters_dict.keys(), (
+                "Unknown model," "please update model_parameters_dict at em/model.py"
+            )
+            self.model_parameters = model_parameters_dict[model]
+        else:
+            self.model_parameters = model_parameters
+
         self.model = model
         self.sample_times = sample_times
-        self.model_parameters = model_parameters_dict[model]
         self.parameter_conversion = parameter_conversion
 
         self.mag_ncoeff = mag_ncoeff
         self.lbol_ncoeff = lbol_ncoeff
 
-        self.gptype = gptype
+        self.interpolation_type = interpolation_type
 
         if svd_path is None:
             self.svd_path = os.path.join(os.path.dirname(__file__), "svdmodels")
         else:
             self.svd_path = svd_path
 
-        if self.gptype == "sklearn":
+        if self.interpolation_type == "sklearn_gp":
             mag_modelfile = os.path.join(self.svd_path, "{0}_mag.pkl".format(model))
             with open(mag_modelfile, "rb") as handle:
                 self.svd_mag_model = pickle.load(handle)
             lbol_modelfile = os.path.join(self.svd_path, "{0}_lbol.pkl".format(model))
             with open(lbol_modelfile, "rb") as handle:
                 self.svd_lbol_model = pickle.load(handle)
-        elif self.gptype == "tensorflow":
+        elif self.interpolation_type == "tensorflow":
             import tensorflow as tf
 
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
 
-            mag_modelfile = os.path.join(self.svd_path, "{0}_mag_tf.pkl".format(model))
-            with open(mag_modelfile, "rb") as handle:
-                self.svd_mag_model = pickle.load(handle)
-            outdir = mag_modelfile.replace(".pkl", "")
-            for filt in self.svd_mag_model.keys():
-                outfile = os.path.join(outdir, f"{filt}.h5")
-                self.svd_mag_model[filt]["model"] = load_model(outfile)
+            modelfile = os.path.join(self.svd_path, "{0}_tf.pkl".format(model))
+            if os.path.isfile(modelfile):
+                with open(modelfile, "rb") as handle:
+                    self.svd_mag_model = pickle.load(handle)
+                outdir = modelfile.replace(".pkl", "")
+                for filt in self.svd_mag_model.keys():
+                    outfile = os.path.join(outdir, f"{filt}.h5")
+                    self.svd_mag_model[filt]["model"] = load_model(outfile)
+                self.svd_lbol_model = None
+            else:
+                mag_modelfile = os.path.join(
+                    self.svd_path, "{0}_mag_tf.pkl".format(model)
+                )
+                with open(mag_modelfile, "rb") as handle:
+                    self.svd_mag_model = pickle.load(handle)
+                outdir = mag_modelfile.replace(".pkl", "")
+                for filt in self.svd_mag_model.keys():
+                    outfile = os.path.join(outdir, f"{filt}.h5")
+                    self.svd_mag_model[filt]["model"] = load_model(outfile)
 
-            lbol_modelfile = os.path.join(
-                self.svd_path, "{0}_lbol_tf.pkl".format(model)
-            )
-            with open(lbol_modelfile, "rb") as handle:
-                self.svd_lbol_model = pickle.load(handle)
+                lbol_modelfile = os.path.join(
+                    self.svd_path, "{0}_lbol_tf.pkl".format(model)
+                )
+                with open(lbol_modelfile, "rb") as handle:
+                    self.svd_lbol_model = pickle.load(handle)
 
-            outdir = lbol_modelfile.replace(".pkl", "")
-            outfile = os.path.join(outdir, "model.h5")
-            self.svd_lbol_model["model"] = load_model(outfile)
+                outdir = lbol_modelfile.replace(".pkl", "")
+                outfile = os.path.join(outdir, "model.h5")
+                self.svd_lbol_model["model"] = load_model(outfile)
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0}, svd_path={1})".format(
@@ -166,7 +185,9 @@ class SVDLightCurveModel(object):
 
     def observation_angle_conversion(self, parameters):
 
-        parameters["KNtheta"] = parameters["inclination_EM"] * 180.0 / np.pi
+        print(parameters)
+        if "KNtheta" not in parameters:
+            parameters["KNtheta"] = parameters["inclination_EM"] * 180.0 / np.pi
 
         return parameters
 
@@ -192,7 +213,7 @@ class SVDLightCurveModel(object):
             svd_lbol_model=self.svd_lbol_model,
             mag_ncoeff=self.mag_ncoeff,
             lbol_ncoeff=self.lbol_ncoeff,
-            gptype=self.gptype,
+            interpolation_type=self.interpolation_type,
         )
         lbol *= 1.0 + z
         for filt in mag.keys():

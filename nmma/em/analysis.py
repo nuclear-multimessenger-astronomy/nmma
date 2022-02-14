@@ -34,7 +34,10 @@ def main():
         "--model", type=str, required=True, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
-        "--gptype", type=str, help="SVD interpolation scheme.", default="sklearn"
+        "--interpolation_type",
+        type=str,
+        help="SVD interpolation scheme.",
+        default="sklearn",
     )
     parser.add_argument(
         "--svd-path",
@@ -292,7 +295,7 @@ def main():
                 svd_path=args.svd_path,
                 mag_ncoeff=args.svd_mag_ncoeff,
                 lbol_ncoeff=args.svd_lbol_ncoeff,
-                gptype=args.gptype,
+                interpolation_type=args.interpolation_type,
             )
             lc_model = SVDLightCurveModel(**lc_kwargs)
 
@@ -528,7 +531,14 @@ def main():
         import matplotlib.pyplot as plt
         from matplotlib.pyplot import cm
 
-        posterior_file = os.path.join(args.outdir, "injection_posterior_samples.dat")
+        if args.injection:
+            posterior_file = os.path.join(
+                args.outdir, "injection_posterior_samples.dat"
+            )
+        else:
+            posterior_file = os.path.join(
+                args.outdir, f"{args.label}_posterior_samples.dat"
+            )
 
         ##########################
         # Fetch bestfit parameters

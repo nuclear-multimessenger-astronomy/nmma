@@ -186,7 +186,7 @@ def loadEventSpec(filename):
     return spec
 
 
-def read_files(files):
+def read_files(files, filters=None):
 
     data = {}
     for filename in files:
@@ -205,6 +205,11 @@ def read_files(files):
         data[name]["H"] = mag_d[:, 8]
         data[name]["K"] = mag_d[:, 9]
 
+        if filters is not None:
+            filters_to_remove = set(list(data[name].keys())) - set(filters + ["t"])
+            for filt in filters_to_remove:
+                del data[name][filt]
+
     return data
 
 
@@ -215,7 +220,7 @@ def calc_lc(
     svd_lbol_model=None,
     mag_ncoeff=None,
     lbol_ncoeff=None,
-    gptype="sklearn",
+    interpolation_type="sklearn_gp",
 ):
 
     filters = ["u", "g", "r", "i", "z", "y", "J", "H", "K"]
@@ -232,7 +237,6 @@ def calc_lc(
         param_maxs = svd_mag_model[filt]["param_maxs"]
         mins = svd_mag_model[filt]["mins"]
         maxs = svd_mag_model[filt]["maxs"]
-        gps = svd_mag_model[filt]["gps"]
         tt_interp = svd_mag_model[filt]["tt"]
 
         param_list_postprocess = np.array(param_list)
@@ -241,11 +245,13 @@ def calc_lc(
                 param_maxs[i] - param_mins[i]
             )
 
-        if gptype == "tensorflow":
+        if interpolation_type == "tensorflow":
             model = svd_mag_model[filt]["model"]
             cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
             cAstd = np.ones((n_coeff,))
+
         else:
+            gps = svd_mag_model[filt]["gps"]
             cAproj = np.zeros((n_coeff,))
             cAstd = np.zeros((n_coeff,))
             for i in range(n_coeff):
@@ -271,50 +277,53 @@ def calc_lc(
             maginterp = f(tt)
         mAB[filt] = maginterp
 
-    if lbol_ncoeff:
-        n_coeff = min(lbol_ncoeff, svd_lbol_model["n_coeff"])
-    else:
-        n_coeff = svd_lbol_model["n_coeff"]
-    # param_array = svd_lbol_model["param_array"]
-    # cAmat = svd_lbol_model["cAmat"]
-    VA = svd_lbol_model["VA"]
-    param_mins = svd_lbol_model["param_mins"]
-    param_maxs = svd_lbol_model["param_maxs"]
-    mins = svd_lbol_model["mins"]
-    maxs = svd_lbol_model["maxs"]
-    gps = svd_lbol_model["gps"]
-    tt_interp = svd_lbol_model["tt"]
+    if svd_lbol_model is not None:
+        if lbol_ncoeff:
+            n_coeff = min(lbol_ncoeff, svd_lbol_model["n_coeff"])
+        else:
+            n_coeff = svd_lbol_model["n_coeff"]
+        # param_array = svd_lbol_model["param_array"]
+        # cAmat = svd_lbol_model["cAmat"]
+        VA = svd_lbol_model["VA"]
+        param_mins = svd_lbol_model["param_mins"]
+        param_maxs = svd_lbol_model["param_maxs"]
+        mins = svd_lbol_model["mins"]
+        maxs = svd_lbol_model["maxs"]
+        gps = svd_lbol_model["gps"]
+        tt_interp = svd_lbol_model["tt"]
 
-    param_list_postprocess = np.array(param_list)
-    for i in range(len(param_mins)):
-        param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
-            param_maxs[i] - param_mins[i]
-        )
-
-    if gptype == "tensorflow":
-        model = svd_lbol_model["model"]
-        cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
-        cAstd = np.ones((n_coeff,))
-    else:
-        cAproj = np.zeros((n_coeff,))
-        for i in range(n_coeff):
-            gp = gps[i]
-            y_pred, sigma2_pred = gp.predict(
-                np.atleast_2d(param_list_postprocess), return_std=True
+        param_list_postprocess = np.array(param_list)
+        for i in range(len(param_mins)):
+            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
+                param_maxs[i] - param_mins[i]
             )
-            cAproj[i] = y_pred
 
-    lbol_back = np.dot(VA[:, :n_coeff], cAproj)
-    lbol_back = lbol_back * (maxs - mins) + mins
-    # lbol_back = scipy.signal.medfilt(lbol_back, kernel_size=3)
+        if interpolation_type == "tensorflow":
+            model = svd_lbol_model["model"]
+            cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
+            cAstd = np.ones((n_coeff,))
+        else:
+            cAproj = np.zeros((n_coeff,))
+            for i in range(n_coeff):
+                gp = gps[i]
+                y_pred, sigma2_pred = gp.predict(
+                    np.atleast_2d(param_list_postprocess), return_std=True
+                )
+                cAproj[i] = y_pred
 
-    ii = np.where(~np.isnan(lbol_back))[0]
-    if len(ii) < 2:
-        lbolinterp = np.nan * np.ones(tt.shape)
+        lbol_back = np.dot(VA[:, :n_coeff], cAproj)
+        lbol_back = lbol_back * (maxs - mins) + mins
+        # lbol_back = scipy.signal.medfilt(lbol_back, kernel_size=3)
+
+        ii = np.where(~np.isnan(lbol_back))[0]
+        if len(ii) < 2:
+            lbolinterp = np.nan * np.ones(tt.shape)
+        else:
+            f = interp.interp1d(tt_interp[ii], lbol_back[ii], fill_value="extrapolate")
+            lbolinterp = 10 ** f(tt)
+        lbol = lbolinterp
     else:
-        f = interp.interp1d(tt_interp[ii], lbol_back[ii], fill_value="extrapolate")
-        lbolinterp = 10 ** f(tt)
-    lbol = lbolinterp
+        lbol = np.inf * np.ones(len(tt))
 
     # fill radio and X-ray with null light curves
     mAB["radio-5.5GHz"] = np.inf * np.ones(len(tt))

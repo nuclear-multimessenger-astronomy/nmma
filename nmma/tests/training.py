@@ -1,51 +1,16 @@
 import os
+import copy
 import glob
 import numpy as np
-from scipy.interpolate import interpolate as interp
 
-from ..em import training, utils
-
-
-def parse_data(data, tt, filts):
-
-    data_out = {}
-
-    # Note, for this example, all phi's and theta's are the same
-    # so we remove them from the list
-
-    magkeys = data.keys()
-    for jj, key in enumerate(magkeys):
-        keySplit = key.split("_")
-
-        mejdyn = float(keySplit[2].replace("mejdyn", ""))
-        mejwind = float(keySplit[3].replace("mejwind", ""))
-        # phi0 = float(keySplit[4].replace("phi",""))
-        # theta = float(keySplit[5])
-
-        data_out[key] = {}
-        data_out[key]["log10_mej_dyn"] = np.log10(mejdyn)
-        data_out[key]["log10_mej_wind"] = np.log10(mejwind)
-        # data_out[key]["phi"] = phi0
-        # data_out[key]["theta"] = theta
-
-        # Interpolate data onto grid
-        data_out[key]["data"] = np.zeros((len(tt), len(filts)))
-        for jj, filt in enumerate(filts):
-            ii = np.where(np.isfinite(data[key][filt]))[0]
-            f = interp.interp1d(
-                data[key]["t"][ii], data[key][filt][ii], fill_value="extrapolate"
-            )
-            maginterp = f(tt)
-            data_out[key]["data"][:, jj] = maginterp
-
-    return data_out
+from ..em import training, utils, model_parameters
 
 
 def test_training():
 
     # The number of PCA components we'll use to represent each lightcurve
     n_coeff = 3
-    model_name = "test_model"
+    model_name = "Bu2019lm_sparse"
 
     # The array of times we'll use to examine each lightcurve
     tini, tmax, dt = 0.1, 5.0, 0.2
@@ -61,14 +26,14 @@ def test_training():
     ModelPath = "svdmodels"
     filenames = glob.glob("%s/*.dat" % dataDir)
 
-    data = utils.read_files(filenames)
+    data = utils.read_files(filenames, filters=filts)
     # Loads the model data
-    training_data = parse_data(data, tt, filts)
+    training_data = model_parameters.Bu2019lm_sparse(data)
 
     interpolation_type = "sklearn_gp"
     training.SVDTrainingModel(
         model_name,
-        training_data,
+        copy.deepcopy(training_data),
         tt,
         filts,
         n_coeff=n_coeff,
@@ -79,7 +44,7 @@ def test_training():
     interpolation_type = "tensorflow"
     training.SVDTrainingModel(
         model_name,
-        training_data,
+        copy.deepcopy(training_data),
         tt,
         filts,
         n_coeff=n_coeff,
