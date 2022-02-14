@@ -1,4 +1,5 @@
 import os
+import copy
 import numpy as np
 import argparse
 import glob
@@ -8,6 +9,21 @@ from .training import SVDTrainingModel
 from .model import SVDLightCurveModel
 from .utils import read_files
 from . import model_parameters
+
+
+def axial_symmetry(training_data):
+
+    modelkeys = list(training_data.keys())
+    if any(["KNtheta" not in training_data[key] for key in modelkeys]):
+        raise ValueError("unknown symmetry parameter")
+
+    for key in modelkeys:
+        training = training_data[key]
+        key_new = key + "_flipped"
+        training_data[key_new] = copy.deepcopy(training)
+        training_data[key_new]["KNtheta"] = -training_data[key_new]["KNtheta"]
+
+    return training_data
 
 
 def main():
@@ -71,6 +87,12 @@ def main():
         "--outdir", type=str, default="output", help="Path to the output directory"
     )
     parser.add_argument(
+        "--axial-symmetry",
+        action="store_true",
+        default=False,
+        help="add training samples based on the fact that there is axial symmetry",
+    )
+    parser.add_argument(
         "--plot", action="store_true", default=False, help="add best fit plot"
     )
     parser.add_argument(
@@ -97,6 +119,8 @@ def main():
     filenames = glob.glob(f"{args.data_path}/*.dat")
     data = read_files(filenames)
     training_data = model_function(data)
+    if args.axial_symmetry:
+        training_data = axial_symmetry(training_data)
 
     training_model = SVDTrainingModel(
         args.model,
