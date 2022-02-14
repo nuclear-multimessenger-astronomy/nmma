@@ -40,11 +40,11 @@ Go to the GWdata directory
 
 Running the next command line:
 
-	xargs -n 1 curl -# -O < ../../../example_files/gw_posteriors.txt
+	xargs -n 1 curl -# -O < ../../../example_files/zenodo/gw_posteriors.txt
 
 or use this one :
 
-	for url in `cat ../../../example_files/gw_posteriors.txt`
+	for url in `cat ../../../example_files/zenodo/gw_posteriors.txt`
 	do
 	  curl -#  -O $url
 	done
