@@ -22,6 +22,9 @@ def axial_symmetry(training_data):
         key_new = key + "_flipped"
         training_data[key_new] = copy.deepcopy(training)
         training_data[key_new]["KNtheta"] = -training_data[key_new]["KNtheta"]
+        key_new = key + "_flipped_180"
+        training_data[key_new] = copy.deepcopy(training)
+        training_data[key_new]["KNtheta"] = 180 - training_data[key_new]["KNtheta"]
 
     return training_data
 
