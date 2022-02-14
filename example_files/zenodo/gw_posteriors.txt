@@ -35,4 +35,4 @@ https://zenodo.org/record/6045029/files/PhenDNRTv2_posterior_samples_full_33.dat
 https://zenodo.org/record/6045029/files/PhenDNRTv2_posterior_samples_full_34.dat
 https://zenodo.org/record/6045029/files/PhenDNRTv2_posterior_samples_full_35.dat
 https://zenodo.org/record/6045029/files/PhenDNRTv2_posterior_samples_full_36.dat
-https://zenodo.org/record/6045029/files/PhenDNRTv2_posterior_samples_full_37.da
+https://zenodo.org/record/6045029/files/PhenDNRTv2_posterior_samples_full_37.dat
