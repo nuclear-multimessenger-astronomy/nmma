@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pickle
+from scipy.interpolate import interpolate as interp
 
 
 class SVDTrainingModel(object):
@@ -21,8 +22,10 @@ class SVDTrainingModel(object):
         List of filters to train
     svd_path: str
         Path to the svd directory
-    ncoeff: int
-        ncoeff highest eigenvalues to be taken for mag's SVD evaluation
+    n_coeff: int
+        number of eigenvalues to be taken for SVD evaluation
+    n_epochs: int
+        number of epochs for tensorflow training
     interpolation_type: str
         type of interpolation
     """
@@ -35,6 +38,7 @@ class SVDTrainingModel(object):
         filters,
         svd_path=None,
         n_coeff=10,
+        n_epochs=15,
         interpolation_type="sklearn_gp",
     ):
         self.model = model
@@ -42,6 +46,7 @@ class SVDTrainingModel(object):
         self.sample_times = sample_times
         self.filters = filters
         self.n_coeff = n_coeff
+        self.n_epochs = n_epochs
         self.interpolation_type = interpolation_type
 
         if svd_path is None:
@@ -49,12 +54,43 @@ class SVDTrainingModel(object):
         else:
             self.svd_path = svd_path
 
-        self.svd_model = self.generate_svd_model()
-        self.train_model()
-        self.save_model()
+        self.interpolate_data()
+        self.determine_model_parameters()
+
+        # Only want to train if we must, so check if the model exists
+        model_exists = self.check_model()
+        if not model_exists:
+            print("Training new model")
+            self.svd_model = self.generate_svd_model()
+            self.train_model()
+            self.save_model()
+        else:
+            print("Model exists... will load that model.")
+
         self.load_model()
 
-    def generate_svd_model(self):
+    def interpolate_data(self):
+
+        magkeys = self.data.keys()
+        for jj, key in enumerate(magkeys):
+            # Interpolate data onto grid
+            self.data[key]["data"] = np.zeros(
+                (len(self.sample_times), len(self.filters))
+            )
+            for jj, filt in enumerate(self.filters):
+                print(self.data[key])
+                ii = np.where(np.isfinite(self.data[key][filt]))[0]
+                f = interp.interp1d(
+                    self.data[key]["t"][ii],
+                    self.data[key][filt][ii],
+                    fill_value="extrapolate",
+                )
+                maginterp = f(self.sample_times)
+                self.data[key]["data"][:, jj] = maginterp
+                del self.data[key][filt]
+            del self.data[key]["t"]
+
+    def determine_model_parameters(self):
 
         model_keys = list(self.data.keys())
         if len(model_keys) == 0:
@@ -69,11 +105,18 @@ class SVDTrainingModel(object):
                 if not set(model_parameters) == set(tmp_parameters):
                     parameters_diff = tmp_parameters - model_parameters
                     raise ValueError(f"{parameters_diff} also in model {key}")
+        self.model_parameters = model_parameters
+
+    def generate_svd_model(self):
+
+        model_keys = list(self.data.keys())
 
         # Place the relevant parameters into an array
         param_array = []
         for key in model_keys:
-            param_array.append([self.data[key][param] for param in model_parameters])
+            param_array.append(
+                [self.data[key][param] for param in self.model_parameters]
+            )
         param_array_postprocess = np.array(param_array)
 
         # normalize parameters
@@ -232,7 +275,7 @@ class SVDTrainingModel(object):
             model.fit(
                 train_X,
                 train_y,
-                epochs=15,
+                epochs=self.n_epochs,
                 batch_size=32,
                 validation_data=(val_X, val_y),
                 verbose=True,
@@ -243,6 +286,27 @@ class SVDTrainingModel(object):
             print(f"{filt} MSE:", error)
 
             self.svd_model[filt]["model"] = model
+
+    def check_model(self):
+
+        model_exists = True
+
+        if self.interpolation_type == "sklearn_gp":
+            modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+            if not os.path.isfile(modelfile):
+                model_exists = False
+
+        elif self.interpolation_type == "tensorflow":
+            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
+            if not os.path.isfile(modelfile):
+                model_exists = False
+            outdir = modelfile.replace(".pkl", "")
+            for filt in self.filters:
+                outfile = os.path.join(outdir, f"{filt}.h5")
+                if not os.path.isfile(outfile):
+                    model_exists = False
+
+        return model_exists
 
     def save_model(self):
 
@@ -265,6 +329,8 @@ class SVDTrainingModel(object):
 
         if self.interpolation_type == "sklearn_gp":
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+            with open(modelfile, "rb") as handle:
+                self.svd_model = pickle.load(handle)
         elif self.interpolation_type == "tensorflow":
             try:
                 from tensorflow.keras.models import load_model as load_tf_model
@@ -273,6 +339,9 @@ class SVDTrainingModel(object):
                 return
 
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
+            with open(modelfile, "rb") as handle:
+                self.svd_model = pickle.load(handle)
+
             outdir = modelfile.replace(".pkl", "")
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.h5")
