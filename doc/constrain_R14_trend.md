@@ -84,19 +84,10 @@ First of all create a foder to put the final data about EoS:
 
 	mkdir -p ./output/Figures
 
-Then got to :
+Then run the last one command line 
 	
-	cd ./example_files/post-processing
+	 R14_trend_generate --outdir ./output/Figures --label ZTF --gwR14trend ./example_files/ --GWEMsamples ./output/GW_EMdata --detections-file ./example_files/csv_lightcurve/detectable.txt --EOS-prior ./example_files/eos/EOS_sorted_weight.dat --EOSpath ./example_files/eos/eos_sorted  --pdet ./example_files/eos/pdet_of_Mmax.dat --R14_true 11.55 --Neos 5000 --seed 42  --cred-interval 0.95
 	
-The first file to run is :
-
-	python R14_trend_generate.py
-
-Normally when everything is ok you should be at are actully ./example_files/post-processing.
-You should obtain  GW_EM_R14trend_ZTF.dat  at  ../../output/Figures.
-Then please stay at the same location, that is mean here : ./example_files/post-processing and run the plot 
-
-	python R14_trend_plot.py
-
 	
-This return a EoS plot, R14_trend_GW_EM_ZTF.pdf, at the ../../output/Figures 
+This should return a EoS plot, R14_trend_GW_EM_ZTF.pdf, and  GW_EM_R14trend_ZTF.dat  at  ./output/Figures.
+
