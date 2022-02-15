@@ -59,8 +59,8 @@ The gw_posteriors.txt contains a list of all links to the PhenDNRTv2 files. When
 All of the NMMA EOS simulation sets are kept in a separate github repository here:
 https://github.com/diettim/NMMA
 
-In particular, the following example uses the EOS set here:
-https://github.com/diettim/NMMA/tree/master/EOS/chiralEFT_MTOV_NICER_GW170817_AT2017gfo
+For this particular example, we have put the simulation set in Zenodo here:
+https://zenodo.org/record/6094691#.YgwA8YTMI5k
 
 ### EoS from GW + EM
 
