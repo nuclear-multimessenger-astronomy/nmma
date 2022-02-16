@@ -1,6 +1,6 @@
-#Instructions For NMMA Installation
+# Instructions For NMMA Installation
 
-##Preliminary Steps
+## Preliminary Steps
 
 The steps highlighted below are primarily for Linux systems and Windows users are advised to use WSL (preferrably Ubuntu 20.04) for smooth installation. 
 Ubuntu 20.04 is available for free download on Microsoft Store. 
