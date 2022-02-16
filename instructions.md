@@ -9,14 +9,12 @@ Ubuntu 20.04 is available for free download on Microsoft Store.
 
 On your Linux/WSL terminal, run the following commands to install anaconda (replace 5.3.1 by the latest version):
 
-'''
-$ wget https://repo.anaconda.com/archive/Anaconda3-5.3.1-Linux-x86_64.sh
 
-'''
+* $ wget https://repo.anaconda.com/archive/Anaconda3-5.3.1-Linux-x86_64.sh
 
-'''
-$ bash Anaconda3-5.3.1-Linux-x86_64.sh
-'''
+
+* $ bash Anaconda3-5.3.1-Linux-x86_64.sh
+
 
 (For 32-bit installation, skip the ‘_64’ in both commands)
 
@@ -25,116 +23,110 @@ versions of python installed in usr/lib/ directory as it can cause version confl
 
 Now do: 
 
-'''
-conda update --all
-'''
+
+* $ conda update --all
+
 
 **Cloning the NMMA repository**
 
-*Fork the NMMA repository given below:
+Fork the NMMA repository given below:
 
 
 (NMMA Github Repo)[https://github.com/nuclear-multimessenger-astronomy/nmma]
 
 
-*After forking, run the following command to clone the repository into your currently directory (by default, in your home directory):
+After forking, run the following command to clone the repository into your currently directory (by default, in your home directory):
 
-'''
-git clone https://github.com/ritwiksharma049/nmma   (replace ritwiksharma049 with your GitHub username)
-''' 
-*Change directory to the nmma folder:
 
-'''
-cd nmma
-'''
+* $ git clone https://github.com/ritwiksharma049/nmma   (replace ritwiksharma049 with your GitHub username)
 
-##Main Installation
+Change directory to the nmma folder:
 
-*Create a new environment using this command (environment name is nmma_env in this case):
 
-'''
-conda create --name nmma_env
-'''
+* $ cd nmma
 
-'''
-conda activate nmma_env
-'''
+
+## Main Installation
+
+Create a new environment using this command (environment name is nmma_env in this case):
+
+
+* $ conda create --name nmma_env
+
+
+* $ conda activate nmma_env
+
 
 NOTE: If this gives an error like: CommandNotFoundError: Your shell has not been properly configured to use 'conda activate', then run:
 
-'''
-source ~/anaconda3/etc/profile.d/conda.sh
-'''
+
+* $ source ~/anaconda3/etc/profile.d/conda.sh
+
 
 then proceed with conda activate nmma_env.
 
-*Check python and pip version like this:
+Check python and pip version like this:
 
-'''
-python --version
-pip --version
-'''
+
+* $ python --version
+* $ pip --version
+
 
 Python 3.7 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation. 
 
 
-*Install mpi4py 
+Install mpi4py:
 
-'''
-conda install mpi4py
-'''
+
+* $ conda install mpi4py
 
 OR 
 
-'''
-pip install mpi4py 
-'''
 
-*Install parallel-bilby
-
-'''
-conda install -c conda-forge bilby
-'''
-
-'''
-pip install parallel-bilby
-'''
+* $ pip install mpi4py 
 
 
-*Install pymultinest 
+Install parallel-bilby:
 
-'''
-conda install -c conda-forge pymultinest
-'''
 
-*Use the commands below to install the dependencies given in requirements.txt file which are necessary for NMMA: 
+* $ conda install -c conda-forge bilby
 
-'''
-python setup.py install
-'''
 
-*To make sure, install again the requirements with pip like this:
 
-'''
-pip install importlib_resources
-'''
+* $ pip install parallel-bilby
 
-'''
-pip install  extinction
-'''
-'''
-pip install dill
-'''
-'''
-pip install multiprocess
-'''
 
-'''
-pip install lalsuite
-'''
-'''
-pip install python-ligo-lw
-'''
+
+Install pymultinest 
+
+
+* $ conda install -c conda-forge pymultinest
+
+
+Use the commands below to install the dependencies given in requirements.txt file which are necessary for NMMA: 
+
+
+* $ python setup.py install
+
+To make sure, install again the requirements with pip like this:
+
+* $ pip install importlib_resources
+
+
+* $ pip install  extinction
+
+
+* $ pip install dill
+
+
+* $ pip install multiprocess
+
+
+* $ pip install lalsuite
+
+
+* $ pip install python-ligo-lw
+
 
 NOTE: If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies
 if not covered by python setup.py install.
@@ -142,7 +134,10 @@ if not covered by python setup.py install.
 
 
 **First Test for NMMA**
-try to
+
+Run the following commands:
+
+* $ ipython
 * import nmma
 * import nmma.em.analysis
 * import nmma.eos.create_injection
