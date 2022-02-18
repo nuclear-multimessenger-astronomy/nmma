@@ -35,11 +35,10 @@ Fork the NMMA repository given below:
 (NMMA Github Repo)[https://github.com/nuclear-multimessenger-astronomy/nmma]
 
 
-After forking, run the following command to clone the repository into your currently directory (by default, in your home directory):
+Note that we link above to the main branch, but suggest making changes on your own fork (please also see our [contributing guide](./contributing.html)). Now, after forking, run the following command to clone the repository into your currently directory (by default, in your home directory):
 
 
-* $ git clone https://github.com/ritwiksharma049/nmma   (replace ritwiksharma049 with your GitHub username)
-
+* $ git clone https://github.com/your_github_username/nmma  
 Change directory to the nmma folder:
 
 
@@ -174,15 +173,3 @@ After removing the matplotlib cache:
 	rm ~/.cache/matplotlib -rf
 
 Beautiful fonts should be yours.
-
-
-
-
-
- 
-
-
-
-
-
-
