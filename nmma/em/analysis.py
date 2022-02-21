@@ -625,7 +625,7 @@ def main():
                 plt.ylim([26.0, 18.0])
             else:
                 plt.xlim([0.0, 14.0])
-                plt.ylim([26.0, 14.0])
+                plt.ylim([20.0, 14.0])
             plt.grid()
 
             if cnt == 1:

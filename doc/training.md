@@ -41,7 +41,7 @@ Typically, the file parameter values are encoded in the file header name. Theref
 
 		data_out[key] = {param:rr[idx] for param,idx in zip(parameters, parameters_idx)}
 		data_out[key] = {**data_out[key], **data[key]}
-	    return data_out
+	    return data_out, parameters
 
 A new function will need to be added to nmma/em/model_parameters.py to each model grid that is desired. Once this is done, training can begin:
 

@@ -34,6 +34,7 @@ class SVDTrainingModel(object):
         self,
         model,
         data,
+        parameters,
         sample_times,
         filters,
         svd_path=None,
@@ -43,6 +44,7 @@ class SVDTrainingModel(object):
     ):
         self.model = model
         self.data = data
+        self.model_parameters = parameters
         self.sample_times = sample_times
         self.filters = filters
         self.n_coeff = n_coeff
@@ -55,7 +57,6 @@ class SVDTrainingModel(object):
             self.svd_path = svd_path
 
         self.interpolate_data()
-        self.determine_model_parameters()
 
         # Only want to train if we must, so check if the model exists
         model_exists = self.check_model()
@@ -88,23 +89,6 @@ class SVDTrainingModel(object):
                 self.data[key]["data"][:, jj] = maginterp
                 del self.data[key][filt]
             del self.data[key]["t"]
-
-    def determine_model_parameters(self):
-
-        model_keys = list(self.data.keys())
-        if len(model_keys) == 0:
-            raise ValueError("Need at least one set of data to train")
-
-        # check self.data for model parameters
-        for ii, key in enumerate(model_keys):
-            if ii == 0:
-                model_parameters = list(set(self.data[key].keys() - {"data"}))
-            else:
-                tmp_parameters = list(set(self.data[key].keys() - {"data"}))
-                if not set(model_parameters) == set(tmp_parameters):
-                    parameters_diff = tmp_parameters - model_parameters
-                    raise ValueError(f"{parameters_diff} also in model {key}")
-        self.model_parameters = model_parameters
 
     def generate_svd_model(self):
 
