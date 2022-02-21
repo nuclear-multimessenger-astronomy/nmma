@@ -85,7 +85,7 @@ requirements = [
     "pymultinest",
     "sncosmo",
     "dust_extinction",
-    "wrapt_timeout_decorator",
+    # "wrapt_timeout_decorator", # need to resolve pathlib dependency
     "arviz",
     # for mpi
     "parallel_bilby>=1.0.0",

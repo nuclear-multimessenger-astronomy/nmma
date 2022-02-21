@@ -121,13 +121,14 @@ def main():
 
     filenames = glob.glob(f"{args.data_path}/*.dat")
     data = read_files(filenames)
-    training_data = model_function(data)
+    training_data, parameters = model_function(data)
     if args.axial_symmetry:
         training_data = axial_symmetry(training_data)
 
     training_model = SVDTrainingModel(
         args.model,
         training_data,
+        parameters,
         sample_times,
         filts,
         n_coeff=args.svd_ncoeff,

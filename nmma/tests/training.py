@@ -28,12 +28,13 @@ def test_training():
 
     data = utils.read_files(filenames, filters=filts)
     # Loads the model data
-    training_data = model_parameters.Bu2019lm_sparse(data)
+    training_data, parameters = model_parameters.Bu2019lm_sparse(data)
 
     interpolation_type = "sklearn_gp"
     training.SVDTrainingModel(
         model_name,
         copy.deepcopy(training_data),
+        parameters,
         tt,
         filts,
         n_coeff=n_coeff,
@@ -45,6 +46,7 @@ def test_training():
     training.SVDTrainingModel(
         model_name,
         copy.deepcopy(training_data),
+        parameters,
         tt,
         filts,
         n_coeff=n_coeff,

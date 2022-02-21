@@ -26,7 +26,7 @@ def Bu2019lm_sparse(data):
         }
         data_out[key] = {**data_out[key], **data[key]}
 
-    return data_out
+    return data_out, parameters
 
 
 def Bu2019lm(data):
@@ -53,7 +53,7 @@ def Bu2019lm(data):
         }
         data_out[key] = {**data_out[key], **data[key]}
 
-    return data_out
+    return data_out, parameters
 
 
 def Bu2022mv(data):
@@ -80,4 +80,4 @@ def Bu2022mv(data):
         }
         data_out[key] = {**data_out[key], **data[key]}
 
-    return data_out
+    return data_out, parameters
