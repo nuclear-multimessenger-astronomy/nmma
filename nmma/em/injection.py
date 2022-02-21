@@ -2,7 +2,7 @@ import copy
 from joblib import load
 import numpy as np
 import pandas as pd
-from importlib_resources import files
+from importlib import resources
 from scipy.interpolate import interp1d
 
 from .model import SVDLightCurveModel, KilonovaGRBLightCurveModel
@@ -24,16 +24,27 @@ def create_light_curve_data(
     inv_bands = {v: k for k, v in bands.items()}
 
     if args.ztf_sampling:
-        ztfrevisitfile = files("nmma.em.data").joinpath("ZTF_revisit_kde_public.joblib")
-        ztfsamplingfile = files("nmma.em.data").joinpath("ZTF_sampling_public.pkl")
-        ztfrevisit = load(ztfrevisitfile)
-        ztfsampling = load(ztfsamplingfile)
-
-        ztfrevisitifile = files("nmma.em.data").joinpath("ZTF_revisit_kde_i.joblib")
-        ztfrevisit_i = load(ztfrevisitifile)
+        with resources.open_binary(
+            __package__ + ".data", "ZTF_revisit_kde_public.joblib"
+        ) as f:
+            ztfrevisit = load(f)
+        with resources.open_binary(
+            __package__ + ".data", "ZTF_sampling_public.pkl"
+        ) as f:
+            ztfsampling = load(f)
+        with resources.open_binary(
+            __package__ + ".data", "ZTF_revisit_kde_i.joblib"
+        ) as f:
+            ztfrevisit_i = load(f)
 
     if args.ztf_uncertainties:
-        ztfuncer = load(files("nmma.em.data").joinpath("ZTF_uncer_params.pkl"))
+        with resources.open_binary(__package__ + ".data", "ZTF_uncer_params.pkl") as f:
+            ztfuncer = load(f)
+    if args.ztf_ToO:
+        with resources.open_binary(
+            __package__ + ".data", "sampling_toO_" + args.ztf_ToO + ".pkl"
+        ) as f:
+            ztftoo = load(f)
 
     tc = injection_parameters["kilonova_trigger_time"]
     tmin = args.kilonova_tmin
@@ -148,12 +159,9 @@ def create_light_curve_data(
             t += float(ztfrevisit_i.sample())
         # toO
         if args.ztf_ToO:
-            ztftoofile = load(
-                files("nmma.em.data").joinpath("sampling_toO_" + args.ztf_ToO + ".pkl")
-            )
             start = np.random.uniform(tc, tc + 1)
             t = start
-            too_samps = ztftoofile.sample(np.random.choice([1, 2]))
+            too_samps = ztftoo.sample(np.random.choice([1, 2]))
             for i, too in too_samps.iterrows():
                 sim = pd.concat(
                     [sim, pd.DataFrame(np.array([t + too["t"], too["bands"]]).T)]
