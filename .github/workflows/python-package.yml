@@ -53,7 +53,7 @@ jobs:
       run: |
         # sudo apt-get install gfortran swig libhdf5-serial-dev libmpich-dev
         sudo apt install -y openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
-        python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT pathlib joblib tensorflow
+        python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib tensorflow
         python -m pip install .[doc]
         git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && cmake .. && make && cd ../..
         pwd

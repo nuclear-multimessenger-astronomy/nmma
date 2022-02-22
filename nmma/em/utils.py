@@ -16,11 +16,7 @@ from astropy.cosmology import Planck15, z_at_value
 import astropy.units
 import astropy.constants
 
-try:
-    from wrapt_timeout_decorator import timeout
-except ImportError:
-    print("Need to install wrapt_timeout_decorator if using afterglowpy...")
-    pass
+from wrapt_timeout_decorator import timeout
 
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
@@ -410,13 +406,10 @@ def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=N
     return np.squeeze(tt), np.squeeze(lambdas), spec
 
 
+@timeout(5)
 def fluxDensity(t, nu, **params):
-    @timeout
-    def return_fluxdensity(t, nu, **params):
-        mJy = afterglowpy.fluxDensity(t, nu, **params)
-        return mJy
-
-    return return_fluxdensity(t, nu, **params)
+    mJy = afterglowpy.fluxDensity(t, nu, **params)
+    return mJy
 
 
 def grb_lc(t_day, Ebv, param_dict):
