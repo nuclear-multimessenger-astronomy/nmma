@@ -16,7 +16,7 @@ from astropy.cosmology import Planck15, z_at_value
 import astropy.units
 import astropy.constants
 
-# from wrapt_timeout_decorator import timeout
+from wrapt_timeout_decorator import timeout
 
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
@@ -406,7 +406,7 @@ def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=N
     return np.squeeze(tt), np.squeeze(lambdas), spec
 
 
-# @timeout(5)
+@timeout(5)
 def fluxDensity(t, nu, **params):
     mJy = afterglowpy.fluxDensity(t, nu, **params)
     return mJy
