@@ -87,17 +87,6 @@ requirements = [
     "dust_extinction",
     "wrapt_timeout_decorator",
     "arviz",
-    # for mpi
-    "parallel_bilby>=1.0.0",
-    "mpi4py",
-    # for docs
-    "sphinx==4.4.0",
-    "sphinx_math_dollar",
-    "recommonmark",
-    "numpydoc",
-    "sphinx-rtd-theme",
-    "notedown",
-    "jsx-lexer",
 ]
 
 VERSION = "0.0.1"
@@ -155,4 +144,19 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+    extras_require={
+        "doc": [
+            "sphinx==4.4.0",
+            "sphinx_math_dollar",
+            "recommonmark",
+            "numpydoc",
+            "sphinx-rtd-theme",
+            "notedown",
+            "jsx-lexer",
+        ],
+        "production": [
+            "parallel_bilby>=1.0.0",
+            "mpi4py",
+        ],
+    },
 )
