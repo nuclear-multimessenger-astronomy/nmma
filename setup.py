@@ -85,7 +85,7 @@ requirements = [
     "pymultinest",
     "sncosmo",
     "dust_extinction",
-    "wrapt_timeout_decorator",
+    # "wrapt_timeout_decorator",
     "arviz",
 ]
 
