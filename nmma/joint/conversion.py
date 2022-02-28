@@ -467,10 +467,10 @@ class MultimessengerConversion(object):
 
                     TOV_radius_list.append(TOV_radius)
                     TOV_mass_list.append(TOV_mass)
-                    lambda_1_list.append(lambda_1)
-                    lambda_2_list.append(lambda_2)
-                    radius_1_list.append(radius_1)
-                    radius_2_list.append(radius_2)
+                    lambda_1_list.append(lambda_1[0])
+                    lambda_2_list.append(lambda_2[0])
+                    radius_1_list.append(radius_1[0])
+                    radius_2_list.append(radius_2[0])
                     R_14_list.append(interp_mass_radius(1.4))
                     R_16_list.append(interp_mass_radius(1.6))
 
