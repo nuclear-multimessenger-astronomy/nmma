@@ -52,15 +52,15 @@ def EOS2Parameters(
         lambda_1 = np.array([0.0])
         radius_1 = np.array([2.0 * mass_1_source * lal.MRSUN_SI / 1e3])
     else:
-        lambda_1 = interp_mass_lambda(mass_1_source)
-        radius_1 = interp_mass_radius(mass_1_source)
+        lambda_1 = np.array([interp_mass_lambda(mass_1_source)])
+        radius_1 = np.array([interp_mass_radius(mass_1_source)])
 
     if mass_2_source < minimum_mass or mass_2_source > TOV_mass:
         lambda_2 = np.array([0.0])
         radius_2 = np.array([2.0 * mass_2_source * lal.MRSUN_SI / 1e3])
     else:
-        lambda_2 = interp_mass_lambda(mass_2_source)
-        radius_2 = interp_mass_radius(mass_2_source)
+        lambda_2 = np.array([interp_mass_lambda(mass_2_source)])
+        radius_2 = np.array([interp_mass_radius(mass_2_source)])
 
     return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2
 
