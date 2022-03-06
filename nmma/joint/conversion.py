@@ -293,6 +293,11 @@ class BNSEjectaFitting(object):
 
     def ejecta_parameter_conversion(self, converted_parameters, added_keys):
 
+        # prevent the output message flooded by these warning messages
+        old = np.seterr()
+        np.seterr(invalid='ignore')
+        np.seterr(divide='ignore')
+
         mass_1_source = converted_parameters["mass_1_source"]
         mass_2_source = converted_parameters["mass_2_source"]
 
@@ -382,6 +387,8 @@ class BNSEjectaFitting(object):
                 converted_parameters["log10_E0"] = -np.inf
 
         added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind", "log10_E0"]
+
+        np.seterr(**old)
 
         return converted_parameters, added_keys
 
