@@ -281,7 +281,6 @@ class SVDTrainingModel(object):
 
             self.svd_model[filt]["model"] = model
 
-
     def check_model(self):
 
         model_exists = True
