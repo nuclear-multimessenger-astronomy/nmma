@@ -265,15 +265,19 @@ class SVDTrainingModel(object):
             )
 
             # plot the losses
-            loss = train_history.history['loss']
-            val_loss = train_history.history['val_loss']
+            outputdir = os.path.join(os.getcwd(), "out", "")
+            if not os.path.isdir(outputdir): 
+                os.mkdir(outputdir)
+
+            loss = train_history.history["loss"]
+            val_loss = train_history.history["val_loss"]
             plt.figure()
-            plt.plot(loss, label='training loss')
-            plt.plot(val_loss, label='validation loss')
+            plt.plot(loss, label="training loss")
+            plt.plot(val_loss, label="validation loss")
             plt.legend()
-            plt.xlabel('epoch number')
-            plt.ylabel('number of losses')
-            plt.savefig('train_history_loss.png')
+            plt.xlabel("epoch number")
+            plt.ylabel("number of losses")
+            plt.savefig(outputdir+"train_history_loss.png")
 
             # evaluate the model
             error = model.evaluate(param_array_postprocess, cAmat.T, verbose=0)
