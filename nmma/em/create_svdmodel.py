@@ -96,7 +96,7 @@ def main():
         help="add training samples based on the fact that there is axial symmetry",
     )
     parser.add_argument(
-        "--plot", action="store_true", default=False, help="add best fit plot"
+        "--plot", action="store_true", default=False, help="enable plotting"
     )
     parser.add_argument(
         "--verbose",
@@ -135,6 +135,8 @@ def main():
         n_epochs=args.tensorflow_nepochs,
         svd_path=args.svd_path,
         interpolation_type=args.interpolation_type,
+        plot=args.plot,
+        plotdir=args.outdir,
     )
 
     light_curve_model = SVDLightCurveModel(
