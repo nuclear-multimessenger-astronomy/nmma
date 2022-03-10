@@ -1,4 +1,5 @@
 import os
+import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 from scipy.interpolate import interpolate as interp
@@ -41,6 +42,8 @@ class SVDTrainingModel(object):
         n_coeff=10,
         n_epochs=15,
         interpolation_type="sklearn_gp",
+        plot=False,
+        plotdir=os.path.join(os.getcwd(), "plot"),
     ):
         self.model = model
         self.data = data
@@ -50,6 +53,12 @@ class SVDTrainingModel(object):
         self.n_coeff = n_coeff
         self.n_epochs = n_epochs
         self.interpolation_type = interpolation_type
+        self.plot = plot
+        self.plotdir = plotdir
+
+        if self.plot:
+            if not os.path.isdir(self.plotdir):
+                os.mkdir(self.plotdir)
 
         if svd_path is None:
             self.svd_path = os.path.join(os.path.dirname(__file__), "svdmodels")
@@ -255,7 +264,7 @@ class SVDTrainingModel(object):
             model.compile(optimizer="adam", loss="mse")
 
             # fit the model
-            model.fit(
+            training_history = model.fit(
                 train_X,
                 train_y,
                 epochs=self.n_epochs,
@@ -263,6 +272,20 @@ class SVDTrainingModel(object):
                 validation_data=(val_X, val_y),
                 verbose=True,
             )
+
+            if self.plot:
+                loss = training_history.history["loss"]
+                val_loss = training_history.history["val_loss"]
+                plt.figure()
+                plt.plot(loss, label="training loss")
+                plt.plot(val_loss, label="validation loss")
+                plt.legend()
+                plt.xlabel("epoch number")
+                plt.ylabel("number of losses")
+                plt.savefig(
+                    os.path.join(self.plotdir, f"train_history_loss_{filt}.pdf")
+                )
+                plt.close()
 
             # evaluate the model
             error = model.evaluate(param_array_postprocess, cAmat.T, verbose=0)
