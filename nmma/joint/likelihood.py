@@ -118,7 +118,7 @@ class MultiMessengerLikelihood(Likelihood):
                  light_curve_data, light_curve_model_name,
                  light_curve_SVD_path, em_trigger_time, mag_ncoeff, lbol_ncoeff,
                  eos_path, Neos, eos_weight_path, binary_type, gw_likelihood_type,
-                 priors, with_grb, grb_resolution, with_eos=True,
+                 priors, with_grb, grb_resolution, light_curve_interpolation_type, with_eos=True,
                  filters=None, error_budget=1., tmin=0., tmax=14.,
                  roq_weights=None, roq_params=None, roq_scale_factor=None,
                  time_marginalization=False, distance_marginalization=False,
@@ -170,7 +170,8 @@ class MultiMessengerLikelihood(Likelihood):
         light_curve_model_kwargs = dict(model=light_curve_model_name, sample_times=sample_times,
                                         svd_path=light_curve_SVD_path,
                                         parameter_conversion=parameter_conversion,
-                                        mag_ncoeff=mag_ncoeff, lbol_ncoeff=lbol_ncoeff)
+                                        mag_ncoeff=mag_ncoeff, lbol_ncoeff=lbol_ncoeff,
+                                        interpolation_type=light_curve_interpolation_type)
         if with_grb:
             light_curve_model = KilonovaGRBLightCurveModel(sample_times=sample_times,
                                                            kilonova_kwargs=light_curve_model_kwargs,

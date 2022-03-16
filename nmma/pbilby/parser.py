@@ -194,6 +194,11 @@ def _add_nmma_settings_to_parser(parser):
         "--kilonova-model-svd", type=str, help="Path to the kilonova model's SVD data"
     )
     em_input_parser.add(
+        "--kilonova-interpolation-type",
+        type=str,
+        help="Interpolation method to be used for KN model (sklearn_gp or tensorflow)"
+    )
+    em_input_parser.add(
         "--svd-mag-ncoeff",
         type=int,
         default=10,
