@@ -2,6 +2,8 @@
 """
 Module to run parallel bilby using MPI
 """
+import matplotlib
+matplotlib.use("agg")
 import datetime
 import inspect
 import json
@@ -740,12 +742,12 @@ with MPIPool(
             except Exception as e:
                 logger.warning(f"Unable to convert to the LALInference prior: {e}")
 
-        logger.info(f"Saving result to {outdir}/{label}_result.json")
-        result.save_to_file(extension="json")
         logger.info(
             f"Saving posterior samples to {outdir}/{label}_posterior_samples.dat"
         )
         result.save_posterior_samples()
+        logger.info(f"Saving result to {outdir}/{label}_result.json")
+        result.save_to_file(extension="json")
         print(
             "Sampling time = {}s".format(
                 datetime.timedelta(seconds=result.sampling_time)

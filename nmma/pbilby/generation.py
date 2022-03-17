@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import matplotlib
+matplotlib.use("agg")
 import subprocess
 import copy
 import logging
