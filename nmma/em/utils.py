@@ -18,6 +18,8 @@ import astropy.constants
 
 from wrapt_timeout_decorator import timeout
 
+import warnings
+warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
