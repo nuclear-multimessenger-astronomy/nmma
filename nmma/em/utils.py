@@ -408,7 +408,7 @@ def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=N
     return np.squeeze(tt), np.squeeze(lambdas), spec
 
 
-@timeout(5)
+@timeout(60)
 def fluxDensity(t, nu, **params):
     mJy = afterglowpy.fluxDensity(t, nu, **params)
     return mJy
