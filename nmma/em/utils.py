@@ -111,6 +111,11 @@ def getFilteredMag(mag, filt):
         "radio-6GHz",
         "radio-3GHz",
     ]
+    # These average between filters is equivalent to
+    # the geometric mean of the flux. These averages
+    # are kind of justifiable because the spectral
+    # commonly goes as F_\nu \propto \nu^\alpha,
+    # where \nu is the frequency.
     if filt in unprocessed_filt:
         return mag[filt]
     elif filt == "w":
