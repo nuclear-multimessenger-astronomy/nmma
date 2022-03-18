@@ -472,6 +472,7 @@ with MPIPool(
     parallel_comms=input_args.fast_mpi,
     time_mpi=input_args.mpi_timing,
     timing_interval=input_args.mpi_timing_interval,
+    use_dill=True,
 ) as pool:
     if pool.is_master():
         POOL_SIZE = pool.size
@@ -625,8 +626,15 @@ with MPIPool(
                 or it == input_args.max_its
                 or run_time > input_args.max_run_time
             ):
+                # dill does not work well with the MPI
+                # have these attributes removed before checkpointing
+                sampler.pool = None
+                sampler.M = None
                 write_current_state(sampler, resume_file, sampling_time)
                 write_sample_dump(sampler, samples_file, sampling_keys)
+                # add the MPI attributes back to the sampler
+                sampler.pool = pool
+                sampler.M = pool.map
                 if input_args.no_plot is False:
                     plot_current_state(sampler, sampling_keys, outdir, label)
 
