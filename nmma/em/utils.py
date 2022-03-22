@@ -21,6 +21,7 @@ from wrapt_timeout_decorator import timeout
 import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
+
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
     # Return the extinction factor (e ^ -0.4 * Ax) for the
@@ -1047,8 +1048,6 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
 
     mag = {}
     for idx, filt in enumerate(filts):
-        if 'X-ray' in filt:
-            import pdb; pdb.set_trace()
         nu_of_filt = nu_host[idx]
         ext_per_filt = ext[idx]
         exp = np.exp(-h * nu_of_filt * one_over_T / kb)
