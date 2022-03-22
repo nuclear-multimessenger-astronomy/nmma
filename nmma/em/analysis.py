@@ -285,8 +285,9 @@ def main():
         elif model_name == "Piro2021":
             lc_model = ShockCoolingLightCurveModel(sample_times=sample_times)
 
-        elif model_name == "Me2017":
-            lc_model = SimpleKilonovaLightCurveModel(sample_times=sample_times)
+        elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
+            lc_model = SimpleKilonovaLightCurveModel(sample_times=sample_times,
+                                                     model=model_name)
 
         else:
             lc_kwargs = dict(
