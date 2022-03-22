@@ -999,7 +999,7 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
     bb_luminosity = param_dict["bb_luminosity"]  # blackboady's total luminosity
     temperature = param_dict["temperature"]  # for the blackbody radiation
     beta = param_dict["beta"]  # for the power-law
-    powerlaw_prefactor = param_dict["powerlaw_prefactor"]
+    powerlaw_mag = param_dict["powerlaw_mag"]
     z = param_dict["z"]
     Ebv = param_dict["Ebv"]
     D = 1e-5 * Mpc  # 10pc
@@ -1007,6 +1007,10 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
     # parameter conversion
     one_over_T = 1. / temperature
     bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
+    # calculate the powerlaw prefactor (with filter 'g')
+    nu_g = scipy.constants.c / 1e-10 * 4866.46
+    powerlaw_prefactor = (np.power(nu_g, beta)
+                          * np.power(10, -0.4 * (powerlaw_mag + 48.6)))
 
     # setting up wavelength and filters
     filts = [
@@ -1051,15 +1055,13 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
         nu_of_filt = nu_host[idx]
         ext_per_filt = ext[idx]
         exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F_bb = (
-               (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-               * exp
-               / (1 - exp)
-               * bb_radius
-               * bb_radius
-               / D
-               / D
-        )
+        F_bb = ((2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
+                * exp
+                / (1 - exp)
+                * bb_radius
+                * bb_radius
+                / D
+                / D)
         F_pl = powerlaw_prefactor * np.power(nu_of_filt, -beta)
 
         F = F_bb + F_pl  # adding the two contributions
