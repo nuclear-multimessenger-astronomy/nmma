@@ -981,6 +981,101 @@ def metzger_lc(t_day, param_dict):
     return t_day, lbol, mag
 
 
+def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
+
+    # convert time from day to second
+    day = 86400.0  # in seconds
+    t = t_day * day
+
+    # define constants
+    c = astropy.constants.c.cgs.value
+    h = astropy.constants.h.cgs.value
+    kb = astropy.constants.k_B.cgs.value
+    sigSB = astropy.constants.sigma_sb.cgs.value
+    Mpc = astropy.constants.pc.cgs.value * 1e6
+
+    # fetch parameters
+    bb_luminosity = param_dict["bb_luminosity"]  # blackboady's total luminosity
+    temperature = param_dict["temperature"]  # for the blackbody radiation
+    beta = param_dict["beta"]  # for the power-law
+    powerlaw_prefactor = param_dict["powerlaw_prefactor"]
+    z = param_dict["z"]
+    Ebv = param_dict["Ebv"]
+    D = 1e-5 * Mpc  # 10pc
+
+    # parameter conversion
+    one_over_T = 1. / temperature
+    bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
+
+    # setting up wavelength and filters
+    filts = [
+        "u",
+        "g",
+        "r",
+        "i",
+        "z",
+        "y",
+        "J",
+        "H",
+        "K",
+        "radio-3GHz",
+        "radio-1.25GHz",
+        "radio-5.5GHz",
+        "radio-6GHz",
+        "X-ray-1keV",
+        "X-ray-5keV",
+    ]
+    # these lambdas are in meter
+    lambdas_optical = 1e-10 * np.array(
+        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
+    )
+    lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
+    lambdas_Xray = scipy.constants.c / (
+        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
+    )
+
+    lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
+
+    nu_obs = scipy.constants.c / lambdas
+    nu_host = nu_obs * (1 + z)
+    t /= 1 + z
+
+    if Ebv != 0.0:
+        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
+    else:
+        ext = np.ones(len(nu_obs))
+
+    mag = {}
+    for idx, filt in enumerate(filts):
+        if 'X-ray' in filt:
+            import pdb; pdb.set_trace()
+        nu_of_filt = nu_host[idx]
+        ext_per_filt = ext[idx]
+        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
+        F_bb = (
+               (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
+               * exp
+               / (1 - exp)
+               * bb_radius
+               * bb_radius
+               / D
+               / D
+        )
+        F_pl = powerlaw_prefactor * np.power(nu_of_filt, -beta)
+
+        F = F_bb + F_pl  # adding the two contributions
+
+        F *= ext_per_filt
+        F *= 1 + z
+        mAB = np.ones(len(t_day))
+        mAB *= -2.5 * np.log10(F) - 48.6
+        mag[filt] = mAB
+
+    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
+
+    return t_day, lbol, mag
+
+
 def estimate_mag_err(uncer_params, df):
     df["mag_err"] = df.apply(
         lambda x: (uncer_params["band"] == x["passband"])
