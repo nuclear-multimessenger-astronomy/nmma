@@ -455,6 +455,14 @@ def main():
     # setup the prior
     priors = bilby.gw.prior.PriorDict(args.prior)
 
+    if "powerlaw_filt_ref" not in priors and "PL_BB_fixedT" in model_names:
+        if 'g' in filters:
+            priors["powerlaw_filt_ref"] = "g"
+        else:
+            ref_filt = filters[0]
+            priors["powerlaw_filt_ref"] = ref_filt
+            print(f"Running filter {ref_filt} as reference frequency for powerlaw")
+
     # setup for Ebv
     if args.Ebv_max > 0.0:
         Ebv_c = 1.0 / (0.5 * args.Ebv_max)

@@ -36,7 +36,7 @@ model_parameters_dict = {
     "Piro2021": ["log10_Menv", "log10_Renv", "log10_Ee"],
     "Me2017": ["log10_Mej", "log10_vej", "beta", "log10_kappa_r"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
-    "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"]
+    "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag", "powerlaw_filt_ref"]
 }
 
 
