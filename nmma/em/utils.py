@@ -21,6 +21,38 @@ from wrapt_timeout_decorator import timeout
 import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
+filts = [
+    "u",
+    "g",
+    "r",
+    "i",
+    "z",
+    "y",
+    "J",
+    "H",
+    "K",
+    "radio-3GHz",
+    "radio-1.25GHz",
+    "radio-5.5GHz",
+    "radio-6GHz",
+    "X-ray-1keV",
+    "X-ray-5keV",
+]
+# these lambdas are in meter
+lambdas_optical = 1e-10 * np.array(
+    [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
+)
+lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
+lambdas_Xray = scipy.constants.c / (
+    np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
+)
+
+lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
+
+nu = scipy.constants.c / lambdas
+
+filt_to_nu_dict = dict(zip(filts, nu))
+
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
@@ -1000,6 +1032,7 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
     temperature = param_dict["temperature"]  # for the blackbody radiation
     beta = param_dict["beta"]  # for the power-law
     powerlaw_mag = param_dict["powerlaw_mag"]
+    powerlaw_filt_ref = param_dict["powerlaw_filt_ref"]
     z = param_dict["z"]
     Ebv = param_dict["Ebv"]
     D = 1e-5 * Mpc  # 10pc
@@ -1007,9 +1040,9 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
     # parameter conversion
     one_over_T = 1. / temperature
     bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
-    # calculate the powerlaw prefactor (with filter 'g')
-    nu_g = scipy.constants.c / 1e-10 * 4866.46
-    powerlaw_prefactor = (np.power(nu_g, beta)
+    # calculate the powerlaw prefactor (with the reference filter)
+    nu_ref = filt_to_nu_dict[powerlaw_filt_ref]
+    powerlaw_prefactor = (np.power(nu_ref, beta)
                           * np.power(10, -0.4 * (powerlaw_mag + 48.6)))
 
     # setting up wavelength and filters
