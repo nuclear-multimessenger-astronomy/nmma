@@ -665,9 +665,9 @@ class SimpleKilonovaLightCurveModel(object):
         param_dict["z"] = z
         param_dict["Ebv"] = Ebv
 
-        if model_name == 'Me2017':
+        if self.model == 'Me2017':
             _, lbol, mag = utils.metzger_lc(sample_times, param_dict)
-        elif model_name == 'PL_BB_fixedT':
+        elif self.model == 'PL_BB_fixedT':
             _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(sample_timesm,
                                                                             param_dict)
         return lbol, mag
