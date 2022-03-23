@@ -1016,6 +1016,11 @@ def metzger_lc(t_day, param_dict):
 
 def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
 
+    # prevent the output message flooded by these warning messages
+    old = np.seterr()
+    np.seterr(invalid='ignore')
+    np.seterr(divide='ignore')
+
     # convert time from day to second
     day = 86400.0  # in seconds
     t = t_day * day
@@ -1106,6 +1111,8 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
         mag[filt] = mAB
 
     lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
+
+    np.seterr(**old)
 
     return t_day, lbol, mag
 
