@@ -1037,7 +1037,7 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
     temperature = param_dict["temperature"]  # for the blackbody radiation
     beta = param_dict["beta"]  # for the power-law
     powerlaw_mag = param_dict["powerlaw_mag"]
-    powerlaw_filt_ref = param_dict["powerlaw_filt_ref"]
+    powerlaw_filt_ref = "g"
     z = param_dict["z"]
     Ebv = param_dict["Ebv"]
     D = 1e-5 * Mpc  # 10pc
