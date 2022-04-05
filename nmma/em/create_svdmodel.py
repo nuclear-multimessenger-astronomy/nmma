@@ -120,6 +120,9 @@ def main():
     model_function = MODEL_FUNCTIONS[args.model]
 
     filenames = glob.glob(f"{args.data_path}/*.dat")
+    if len(filenames) == 0:
+        raise ValueError("Need at least one file to interpolate.")
+
     data = read_files(filenames)
     training_data, parameters = model_function(data)
     if args.axial_symmetry:
