@@ -36,7 +36,7 @@ model_parameters_dict = {
     "Piro2021": ["log10_Menv", "log10_Renv", "log10_Ee"],
     "Me2017": ["log10_Mej", "log10_vej", "beta", "log10_kappa_r"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
-    "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"]
+    "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
 }
 
 
@@ -151,6 +151,19 @@ class SVDLightCurveModel(object):
                 )
                 with open(lbol_modelfile, "rb") as handle:
                     self.svd_lbol_model = pickle.load(handle)
+        elif self.interpolation_type == "api_gp":
+            from .training import load_api_gp_model
+
+            modelfile = os.path.join(self.svd_path, "{0}_api.pkl".format(model))
+            if os.path.isfile(modelfile):
+                with open(modelfile, "rb") as handle:
+                    self.svd_mag_model = pickle.load(handle)
+                for filt in self.svd_mag_model.keys():
+                    for ii in range(len(self.svd_mag_model[filt]["gps"])):
+                        self.svd_mag_model[filt]["gps"][ii] = load_api_gp_model(
+                            self.svd_mag_model[filt]["gps"][ii]
+                        )
+                self.svd_lbol_model = None
         elif self.interpolation_type == "tensorflow":
             import tensorflow as tf
 
@@ -665,9 +678,10 @@ class SimpleKilonovaLightCurveModel(object):
         param_dict["z"] = z
         param_dict["Ebv"] = Ebv
 
-        if self.model == 'Me2017':
+        if self.model == "Me2017":
             _, lbol, mag = utils.metzger_lc(sample_times, param_dict)
-        elif self.model == 'PL_BB_fixedT':
-            _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(sample_times,
-                                                                            param_dict)
+        elif self.model == "PL_BB_fixedT":
+            _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(
+                sample_times, param_dict
+            )
         return lbol, mag

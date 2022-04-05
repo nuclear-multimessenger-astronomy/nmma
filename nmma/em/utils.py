@@ -19,6 +19,7 @@ import astropy.constants
 from wrapt_timeout_decorator import timeout
 
 import warnings
+
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
 filts = [
@@ -289,7 +290,26 @@ def calc_lc(
             model = svd_mag_model[filt]["model"]
             cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
             cAstd = np.ones((n_coeff,))
+        elif interpolation_type == "api_gp":
+            seed = 32
+            random_state = np.random.RandomState(seed)
 
+            gps = svd_mag_model[filt]["gps"]
+            cAproj = np.zeros((n_coeff,))
+            cAstd = np.zeros((n_coeff,))
+            for i in range(n_coeff):
+                gp = gps[i]
+                y_pred = gp.mean(np.atleast_2d(param_list_postprocess))
+                y_samples_test = gp.rvs(
+                    100,
+                    np.atleast_2d(param_list_postprocess),
+                    random_state=random_state,
+                )
+                y_90_lo_test, y_90_hi_test = np.percentile(
+                    y_samples_test, [5, 95], axis=1
+                )
+                cAproj[i] = y_pred
+                cAstd[i] = y_90_hi_test - y_90_lo_test
         else:
             gps = svd_mag_model[filt]["gps"]
             cAproj = np.zeros((n_coeff,))
@@ -1018,8 +1038,8 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
 
     # prevent the output message flooded by these warning messages
     old = np.seterr()
-    np.seterr(invalid='ignore')
-    np.seterr(divide='ignore')
+    np.seterr(invalid="ignore")
+    np.seterr(divide="ignore")
 
     # convert time from day to second
     day = 86400.0  # in seconds
@@ -1043,12 +1063,13 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
     D = 1e-5 * Mpc  # 10pc
 
     # parameter conversion
-    one_over_T = 1. / temperature
+    one_over_T = 1.0 / temperature
     bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
     # calculate the powerlaw prefactor (with the reference filter)
     nu_ref = filt_to_nu_dict[powerlaw_filt_ref]
-    powerlaw_prefactor = (np.power(nu_ref, beta)
-                          * np.power(10, -0.4 * (powerlaw_mag + 48.6)))
+    powerlaw_prefactor = np.power(nu_ref, beta) * np.power(
+        10, -0.4 * (powerlaw_mag + 48.6)
+    )
 
     # setting up wavelength and filters
     filts = [
@@ -1093,13 +1114,15 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
         nu_of_filt = nu_host[idx]
         ext_per_filt = ext[idx]
         exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F_bb = ((2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-                * exp
-                / (1 - exp)
-                * bb_radius
-                * bb_radius
-                / D
-                / D)
+        F_bb = (
+            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
+            * exp
+            / (1 - exp)
+            * bb_radius
+            * bb_radius
+            / D
+            / D
+        )
         F_pl = powerlaw_prefactor * np.power(nu_of_filt, -beta)
 
         F = F_bb + F_pl  # adding the two contributions
