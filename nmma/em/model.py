@@ -36,7 +36,7 @@ model_parameters_dict = {
     "Piro2021": ["log10_Menv", "log10_Renv", "log10_Ee"],
     "Me2017": ["log10_Mej", "log10_vej", "beta", "log10_kappa_r"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
-    "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_prefactor"],
+    "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
 }
 
 
@@ -670,5 +670,10 @@ class SimpleKilonovaLightCurveModel(object):
         param_dict["z"] = z
         param_dict["Ebv"] = Ebv
 
-        _, lbol, mag = utils.metzger_lc(sample_times, param_dict)
+        if self.model == "Me2017":
+            _, lbol, mag = utils.metzger_lc(sample_times, param_dict)
+        elif self.model == "PL_BB_fixedT":
+            _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(
+                sample_times, param_dict
+            )
         return lbol, mag

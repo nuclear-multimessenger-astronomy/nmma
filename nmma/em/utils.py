@@ -21,6 +21,39 @@ from wrapt_timeout_decorator import timeout
 import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
+filts = [
+    "u",
+    "g",
+    "r",
+    "i",
+    "z",
+    "y",
+    "J",
+    "H",
+    "K",
+    "radio-3GHz",
+    "radio-1.25GHz",
+    "radio-5.5GHz",
+    "radio-6GHz",
+    "X-ray-1keV",
+    "X-ray-5keV",
+]
+# these lambdas are in meter
+lambdas_optical = 1e-10 * np.array(
+    [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
+)
+lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
+lambdas_Xray = scipy.constants.c / (
+    np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
+)
+
+lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
+
+nu = scipy.constants.c / lambdas
+
+filt_to_nu_dict = dict(zip(filts, nu))
+
+
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
     # Return the extinction factor (e ^ -0.4 * Ax) for the
@@ -983,6 +1016,11 @@ def metzger_lc(t_day, param_dict):
 
 def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
 
+    # prevent the output message flooded by these warning messages
+    old = np.seterr()
+    np.seterr(invalid='ignore')
+    np.seterr(divide='ignore')
+
     # convert time from day to second
     day = 86400.0  # in seconds
     t = t_day * day
@@ -998,7 +1036,8 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
     bb_luminosity = param_dict["bb_luminosity"]  # blackboady's total luminosity
     temperature = param_dict["temperature"]  # for the blackbody radiation
     beta = param_dict["beta"]  # for the power-law
-    powerlaw_prefactor = param_dict["powerlaw_prefactor"]
+    powerlaw_mag = param_dict["powerlaw_mag"]
+    powerlaw_filt_ref = "g"
     z = param_dict["z"]
     Ebv = param_dict["Ebv"]
     D = 1e-5 * Mpc  # 10pc
@@ -1006,6 +1045,10 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
     # parameter conversion
     one_over_T = 1. / temperature
     bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
+    # calculate the powerlaw prefactor (with the reference filter)
+    nu_ref = filt_to_nu_dict[powerlaw_filt_ref]
+    powerlaw_prefactor = (np.power(nu_ref, beta)
+                          * np.power(10, -0.4 * (powerlaw_mag + 48.6)))
 
     # setting up wavelength and filters
     filts = [
@@ -1047,20 +1090,16 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
 
     mag = {}
     for idx, filt in enumerate(filts):
-        if 'X-ray' in filt:
-            import pdb; pdb.set_trace()
         nu_of_filt = nu_host[idx]
         ext_per_filt = ext[idx]
         exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F_bb = (
-               (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-               * exp
-               / (1 - exp)
-               * bb_radius
-               * bb_radius
-               / D
-               / D
-        )
+        F_bb = ((2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
+                * exp
+                / (1 - exp)
+                * bb_radius
+                * bb_radius
+                / D
+                / D)
         F_pl = powerlaw_prefactor * np.power(nu_of_filt, -beta)
 
         F = F_bb + F_pl  # adding the two contributions
@@ -1072,6 +1111,8 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
         mag[filt] = mAB
 
     lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
+
+    np.seterr(**old)
 
     return t_day, lbol, mag
 
