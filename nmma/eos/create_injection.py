@@ -26,8 +26,16 @@ from ..joint.conversion import (
 )
 
 
-def xml_to_dataframe(prior_file, reference_frequency, aligned_spin=False):
-    table = Table.read(prior_file, format="ligolw", tablename="sim_inspiral")
+def file_to_dataframe(
+    injection_file, reference_frequency, aligned_spin=False, trigger_time=0.0
+):
+    if injection_file.endswith(".xml") or injection_file.endswith(".xml.gz"):
+        table = Table.read(injection_file, format="ligolw", tablename="sim_inspiral")
+    elif injection_file.endswith(".dat"):
+        table = Table.read(injection_file, format="csv", delimiter="\t")
+    else:
+        raise ValueError("Only understand xml and dat")
+
     injection_values = {
         "mass_1": [],
         "mass_2": [],
@@ -49,9 +57,24 @@ def xml_to_dataframe(prior_file, reference_frequency, aligned_spin=False):
         injection_values["mass_1"].append(max(float(row["mass1"]), float(row["mass2"])))
         injection_values["mass_2"].append(min(float(row["mass1"]), float(row["mass2"])))
         injection_values["luminosity_distance"].append(float(row["distance"]))
-        injection_values["psi"].append(float(row["polarization"]))
-        injection_values["phase"].append(float(row["coa_phase"]))
-        injection_values["geocent_time"].append(float(row["geocent_end_time"]))
+
+        if "polarization" in row:
+            injection_values["psi"].append(float(row["polarization"]))
+        else:
+            injection_values["psi"].append(0.0)
+
+        if "coa_phase" in row:
+            coa_phase = float(row["coa_phase"])
+            injection_values["phase"].append(float(row["coa_phase"]))
+        else:
+            coa_phase = 0.0
+            injection_values["phase"].append(0.0)
+
+        if "geocent_end_time" in row:
+            injection_values["geocent_time"].append(float(row["geocent_end_time"]))
+        else:
+            injection_values["geocent_time"].append(trigger_time)
+
         injection_values["ra"].append(float(row["longitude"]))
         injection_values["dec"].append(float(row["latitude"]))
 
@@ -70,7 +93,7 @@ def xml_to_dataframe(prior_file, reference_frequency, aligned_spin=False):
                     row["mass1"],
                     row["mass2"],
                     reference_frequency,
-                    row["coa_phase"],
+                    coa_phase,
                 ]
             ]
 
@@ -254,6 +277,7 @@ def main():
             args.injection_file.endswith(".json")
             or args.injection_file.endswith(".xml")
             or args.injection_file.endswith(".xml.gz")
+            or args.injection_file.endswith(".dat")
         ), "Unknown injection file format"
 
     # load the EOS
@@ -268,13 +292,17 @@ def main():
                 injection_data = json.load(f)
                 datadict = injection_data["injections"]["content"]
                 dataframe_from_inj = pd.DataFrame.from_dict(datadict)
-        elif args.injection_file.endswith(".xml") or args.injection_file.endswith(
-            ".xml.gz"
+        elif (
+            args.injection_file.endswith(".xml")
+            or args.injection_file.endswith(".xml.gz")
+            or args.injection_file.endswith(".dat")
         ):
-            dataframe_from_inj = xml_to_dataframe(
-                args.injection_file, args.reference_frequency, args.aligned_spin
+            dataframe_from_inj = file_to_dataframe(
+                args.injection_file,
+                args.reference_frequency,
+                aligned_spin=args.aligned_spin,
+                trigger_time=args.trigger_time,
             )
-
     else:
         dataframe_from_inj = pd.DataFrame()
         print(
@@ -299,6 +327,12 @@ def main():
         generation_seed=args.generation_seed,
     )
     dataframe_from_prior = injection_creator.get_injection_dataframe()
+
+    inj_columns = set(dataframe_from_inj.columns.tolist())
+    prior_columns = set(dataframe_from_prior.columns.tolist())
+
+    columns_to_remove = list(inj_columns.intersection(prior_columns))
+    dataframe_from_prior.drop(columns=columns_to_remove, inplace=True)
 
     # combine the dataframes
     dataframe = pd.DataFrame.merge(
