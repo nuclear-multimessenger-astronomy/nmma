@@ -274,7 +274,8 @@ def main():
             dataframe_from_inj = xml_to_dataframe(
                 args.injection_file, args.reference_frequency, args.aligned_spin
             )
-
+        elif args.injection_file.endswith(".dat"):
+            dataframe_from_inj = pd.read_csv(args.injection_file, delimiter='\t', skiprows=0)
     else:
         dataframe_from_inj = pd.DataFrame()
         print(
