@@ -171,6 +171,34 @@ def create_light_curve_data(
         sim = sim.rename(columns={0: "mjd", 1: "passband"}).sort_values(by=["mjd"])
         sim["passband"] = sim["passband"].map({1: "g", 2: "r", 3: "i"})
 
+    if args.rubin_ToO:
+        start = tmin + tc
+        if args.rubin_ToO_type == "BNS":
+            strategy = [
+                [1 / 24.0, ["u", "g", "r", "i", "z", "y"]],
+                [2 / 24.0, ["u", "g", "r", "i", "z", "y"]],
+                [4 / 24.0, ["u", "g", "r", "i", "z", "y"]],
+                [1.0, ["g", "z", "i"]],
+            ]
+        elif args.rubin_ToO_type == "NSBH":
+            strategy = [
+                [1 / 24.0, ["u", "g", "r", "i", "z", "y"]],
+                [4 / 24.0, ["u", "g", "r", "i", "z", "y"]],
+                [1.0, ["u", "g", "r", "i", "z", "y"]],
+                [2.0, ["g", "z", "i"]],
+            ]
+        else:
+            raise ValueError("args.rubin_ToO_type should be either BNS or NSBH")
+
+        mjds, passbands = [], []
+        sim = pd.DataFrame()
+        for (obstime, filts) in strategy:
+            for filt in filts:
+                mjds.append(tc + obstime)
+                passbands.append(filt)
+        sim = pd.DataFrame.from_dict({"mjd": mjds, "passband": passbands})
+
+    if args.ztf_sampling or args.rubin_ToO:
         for filt, group in sim.groupby("passband"):
             data_per_filt = copy.deepcopy(data_original[filt])
             lc = interp1d(

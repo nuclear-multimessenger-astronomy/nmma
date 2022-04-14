@@ -37,7 +37,7 @@ def main():
         "--interpolation_type",
         type=str,
         help="SVD interpolation scheme.",
-        default="sklearn",
+        default="sklearn_gp",
     )
     parser.add_argument(
         "--svd-path",
@@ -65,13 +65,13 @@ def main():
         "--tmin",
         type=float,
         default=0.0,
-        help="Days to be started analysing from the trigger time (default: 0)",
+        help="Days to start analysing from the trigger time (default: 0)",
     )
     parser.add_argument(
         "--tmax",
         type=float,
         default=14.0,
-        help="Days to be stoped analysing from the trigger time (default: 14)",
+        help="Days to stop analysing from the trigger time (default: 14)",
     )
     parser.add_argument(
         "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
@@ -199,9 +199,20 @@ def main():
     )
     parser.add_argument(
         "--ztf-ToO",
-        help="Adds realistic ToO obeservations during the first one or two days. Sampling depends on exposure time specified. Valid values are 180 (<1000sq deg) or 300 (>1000sq deg). Won't work w/o --ztf-sampling",
+        help="Adds realistic ToO observations during the first one or two days. Sampling depends on exposure time specified. Valid values are 180 (<1000sq deg) or 300 (>1000sq deg). Won't work w/o --ztf-sampling",
         type=str,
         choices=["180", "300"],
+    )
+    parser.add_argument(
+        "--rubin-ToO",
+        help="Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--rubin-ToO-type",
+        help="Type of ToO observation. Won't work w/o --rubin-ToO",
+        type=str,
+        choices=["BNS", "NSBH"],
     )
     parser.add_argument(
         "--generation-seed",
@@ -286,8 +297,9 @@ def main():
             lc_model = ShockCoolingLightCurveModel(sample_times=sample_times)
 
         elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
-            lc_model = SimpleKilonovaLightCurveModel(sample_times=sample_times,
-                                                     model=model_name)
+            lc_model = SimpleKilonovaLightCurveModel(
+                sample_times=sample_times, model=model_name
+            )
 
         else:
             lc_kwargs = dict(
