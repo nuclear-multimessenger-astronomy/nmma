@@ -204,26 +204,31 @@ def create_light_curve_data(
             )
             group["mag"] = lc(group["mjd"].tolist())
             for idx, row in group.iterrows():
-                if filt == "g" and row["ToO"] is False:
+                if filt == "g" and row["ToO"] == False:
                     if row["mag"] > ztflimg.sample():
                         group.drop(idx, inplace=True)
-                elif filt == "g" and row["ToO"] is True:
+                elif filt == "g" and row["ToO"] == True:
                     if row["mag"] > ztftoolimg.sample():
                         group.drop(idx, inplace=True)
-                elif filt == "r" and row["ToO"] is False:
+                elif filt == "r" and row["ToO"] == False:
                     if row["mag"] > ztflimr.sample():
                         group.drop(idx, inplace=True)
-                elif filt == "r" and row["ToO"] is True:
+                elif filt == "r" and row["ToO"] == True:
                     if row["mag"] > ztftoolimr.sample():
                         group.drop(idx, inplace=True)
                 else:
                     if row["mag"] > ztflimi.sample():
                         group.drop(idx, inplace=True)
-            df = estimate_mag_err(ztfuncer, group)
-            data_per_filt = np.vstack(
-                [group["mjd"].tolist(), group["mag"].tolist(), df["mag_err"].tolist()]
-            ).T
-            data[filt] = data_per_filt
+            if group.empty:
+                continue #del data[filt]# = np.vstack([[],[],[]])
+            else:
+                df=group.copy()
+                df["passband"]=df["passband"].map({"g":1, "r":2, "i":3}) #estimate_mag_err maps filter numbers
+                df = estimate_mag_err(ztfuncer, df)
+                data_per_filt = np.vstack(
+                    [group["mjd"].tolist(), group["mag"].tolist(), df["mag_err"].tolist()]
+                ).T
+                data[filt] = data_per_filt
 
     if args.rubin_ToO:
         start = tmin + tc
