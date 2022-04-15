@@ -544,14 +544,9 @@ def main():
         import matplotlib.pyplot as plt
         from matplotlib.pyplot import cm
 
-        if args.injection:
-            posterior_file = os.path.join(
-                args.outdir, "injection_posterior_samples.dat"
-            )
-        else:
-            posterior_file = os.path.join(
+        posterior_file = os.path.join(
                 args.outdir, f"{args.label}_posterior_samples.dat"
-            )
+        )
 
         ##########################
         # Fetch bestfit parameters
