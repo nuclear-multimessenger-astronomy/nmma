@@ -431,9 +431,12 @@ def main():
             lc.to_csv(args.injection_outfile)
 
         if args.remove_nondetections:
-            for filt in data.keys():
+            filters_to_check = list(data.keys())
+            for filt in filters_to_check:
                 idx = np.where(np.isfinite(data[filt][:, 2]))[0]
                 data[filt] = data[filt][idx, :]
+                if len(idx) == 0:
+                    del data[filt]
 
         # check for detections
         detection = False
@@ -460,8 +463,10 @@ def main():
             )
         else:
             filters = args.filters.split(",")
+
+        filters_to_analyze = list(set(filters).intersection(set(list(data.keys()))))
     else:
-        filters = list(data.keys())
+        filters_to_analyze = list(data.keys())
 
     print("Running with filters {0}".format(filters))
     # setup the prior
@@ -488,7 +493,7 @@ def main():
         args.detection_limit = literal_eval(args.detection_limit)
     likelihood_kwargs = dict(
         light_curve_model=light_curve_model,
-        filters=filters,
+        filters=filters_to_analyze,
         light_curve_data=data,
         trigger_time=trigger_time,
         tmin=args.tmin,
@@ -545,7 +550,7 @@ def main():
         from matplotlib.pyplot import cm
 
         posterior_file = os.path.join(
-                args.outdir, f"{args.label}_posterior_samples.dat"
+            args.outdir, f"{args.label}_posterior_samples.dat"
         )
 
         ##########################

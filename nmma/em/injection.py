@@ -205,38 +205,67 @@ def create_light_curve_data(
                 bounds_error=False,
                 assume_sorted=True,
             )
+            lc_err = interp1d(
+                data_per_filt[:, 0],
+                data_per_filt[:, 2],
+                fill_value=np.inf,
+                bounds_error=False,
+                assume_sorted=True,
+            )
             group["mag"] = lc(group["mjd"].tolist())
-            for idx, row in group.iterrows():
-                if filt == "g" and row["ToO"] is False:
-                    if row["mag"] > ztflimg.sample():
-                        group.drop(idx, inplace=True)
-                elif filt == "g" and row["ToO"] is True:
-                    if row["mag"] > ztftoolimg.sample():
-                        group.drop(idx, inplace=True)
-                elif filt == "r" and row["ToO"] is False:
-                    if row["mag"] > ztflimr.sample():
-                        group.drop(idx, inplace=True)
-                elif filt == "r" and row["ToO"] is True:
-                    if row["mag"] > ztftoolimr.sample():
-                        group.drop(idx, inplace=True)
-                else:
-                    if row["mag"] > ztflimi.sample():
-                        group.drop(idx, inplace=True)
-            if not group.empty:
-                df = group.copy()
-                df["passband"] = df["passband"].map(
-                    {"g": 1, "r": 2, "i": 3}
-                )  # estimate_mag_err maps filter numbers
-                df = estimate_mag_err(ztfuncer, df)
+            group["mag_err"] = lc_err(group["mjd"].tolist())
+
+            if args.ztf_uncertainties and filt in ["g", "r", "i"]:
+                mag_err = []
+                for idx, row in group.iterrows():
+                    upperlimit = False
+                    if filt == "g" and row["ToO"] is False:
+                        if row["mag"] > ztflimg.sample():
+                            upperlimit = True
+                    elif filt == "g" and row["ToO"] is True:
+                        if row["mag"] > ztftoolimg.sample():
+                            upperlimit = True
+                    elif filt == "r" and row["ToO"] is False:
+                        if row["mag"] > ztflimr.sample():
+                            upperlimit = True
+                    elif filt == "r" and row["ToO"] is True:
+                        if row["mag"] > ztftoolimr.sample():
+                            upperlimit = True
+                    else:
+                        if row["mag"] > ztflimi.sample():
+                            upperlimit = True
+                    if not np.isfinite(row["mag_err"]):
+                        upperlimit = True
+
+                    if upperlimit:
+                        mag_err.append(np.inf)
+                    else:
+                        df = pd.DataFrame.from_dict(
+                            {"passband": [filt], "mag": [row["mag"]]}
+                        )
+                        df["passband"] = df["passband"].map(
+                            {"g": 1, "r": 2, "i": 3}
+                        )  # estimate_mag_err maps filter numbers
+                        df = estimate_mag_err(ztfuncer, df)
+                        mag_err.append(df["mag_err"].tolist()[0])
+
                 data_per_filt = np.vstack(
                     [
                         group["mjd"].tolist(),
                         group["mag"].tolist(),
-                        df["mag_err"].tolist(),
+                        mag_err,
                     ]
                 ).T
-                data[filt] = data_per_filt
-                passbands_to_keep.append(filt)
+            else:
+                data_per_filt = np.vstack(
+                    [
+                        group["mjd"].tolist(),
+                        group["mag"].tolist(),
+                        group["mag_err"].tolist(),
+                    ]
+                ).T
+            data[filt] = data_per_filt
+            passbands_to_keep.append(filt)
 
     if args.rubin_ToO:
         start = tmin + tc
