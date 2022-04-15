@@ -197,8 +197,6 @@ class SVDLightCurveModel(object):
         )
 
     def observation_angle_conversion(self, parameters):
-
-        print(parameters)
         if "KNtheta" not in parameters:
             parameters["KNtheta"] = parameters["inclination_EM"] * 180.0 / np.pi
 
