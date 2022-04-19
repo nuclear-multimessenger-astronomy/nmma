@@ -12,7 +12,7 @@ from gwpy.table import Table
 try:
     import ligo.lw  # noqa F401
 except ImportError:
-    raise ImportError("You do not have ligo.lw install: $ pip install python-liw-lw")
+    raise ImportError("You do not have ligo.lw install: $ pip install python-ligo-lw")
 
 from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
 
