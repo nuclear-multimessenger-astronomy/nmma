@@ -128,7 +128,11 @@ To make sure, install again the requirements with pip like this:
 
 
 NOTE: If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies
-if not covered by python setup.py install.
+if not covered by python setup.py install. Also, if running python setup.py install shows something on the lines of "cannot cythonize without cython", do:
+
+* $ conda install -c anaconda cython==0.29.24
+
+and redo python setup.py install.
 
 
 
@@ -160,7 +164,14 @@ For example, on XSEDE's Expanse cluster, one can start a terminal session with:
 	module load sdsc
 	module load openmpi
 
-and follow the instructions above.
+and follow the instructions above. 
+
+NOTE: If "module load openmpi" does not execute directly and it asks for dependencies, one can proceed with:
+
+        module load sdsc
+        module load cpu/0.15.4
+        module load gcc/9.2.0
+        module load openmpi/4.1.1
 
 ## Matplotlib fonts
 
