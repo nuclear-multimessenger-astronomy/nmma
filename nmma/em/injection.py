@@ -116,9 +116,10 @@ def create_light_curve_data(
             det_lim = np.inf
 
         if not doAbsolute:
-            mag_per_filt += 5.0 * np.log10(
-                injection_parameters["luminosity_distance"] * 1e6 / 10.0
-            )
+            if injection_parameters["luminosity_distance"] > 0:
+                mag_per_filt += 5.0 * np.log10(
+                    injection_parameters["luminosity_distance"] * 1e6 / 10.0
+                )
         data_per_filt = np.zeros([Ntimes, 3])
         for tidx in range(0, Ntimes):
             if mag_per_filt[tidx] >= det_lim:

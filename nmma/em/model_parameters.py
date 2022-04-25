@@ -2,6 +2,20 @@ import re
 import numpy as np
 
 
+def CV(data):
+
+    data_out = {}
+
+    parameters = ["example_num"]
+    parameters_idx = [0]
+    magkeys = data.keys()
+    for jj, key in enumerate(magkeys):
+        data_out[key] = {param: jj for param, idx in zip(parameters, parameters_idx)}
+        data_out[key] = {**data_out[key], **data[key]}
+
+    return data_out, parameters
+
+
 def Bu2019lm_sparse(data):
 
     data_out = {}

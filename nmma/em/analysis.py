@@ -567,9 +567,10 @@ def main():
         #########################
         _, mag = light_curve_model.generate_lightcurve(sample_times, bestfit_params)
         for filt in mag.keys():
-            mag[filt] += 5.0 * np.log10(
-                bestfit_params["luminosity_distance"] * 1e6 / 10.0
-            )
+            if bestfit_params["luminosity_distance"] > 0:
+                mag[filt] += 5.0 * np.log10(
+                    bestfit_params["luminosity_distance"] * 1e6 / 10.0
+                )
         mag["bestfit_sample_times"] = sample_times
 
         filters_plot = []
