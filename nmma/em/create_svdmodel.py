@@ -119,8 +119,11 @@ def main():
         )
     model_function = MODEL_FUNCTIONS[args.model]
 
-    filenames = glob.glob(f"{args.data_path}/*.dat")
+    filenames = glob.glob(f"{args.data_path}/*.dat") + glob.glob(
+        f"{args.data_path}/*.csv"
+    )
     data = read_files(filenames)
+
     training_data, parameters = model_function(data)
     if args.axial_symmetry:
         training_data = axial_symmetry(training_data)
@@ -178,7 +181,11 @@ def main():
             plt.plot(sample_times, mag[filt], "b-", label="interpolated")
 
             ax.set_xlim([0, 14])
-            ax.set_ylim([-12, -18])
+            if args.model == "CV":
+                ax.set_ylim([28, 16])
+            else:
+                ax.set_ylim([-12, -18])
+
             ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
 
             if ii == 0:
@@ -188,7 +195,11 @@ def main():
                 ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
             else:
                 plt.setp(ax.get_xticklabels(), visible=False)
-            ax.set_yticks([-18, -16, -14, -12])
+
+            if args.model == "CV":
+                ax.set_yticks([28, 25, 22, 19, 16])
+            else:
+                ax.set_yticks([-18, -16, -14, -12])
             ax.tick_params(axis="x", labelsize=30)
             ax.tick_params(axis="y", labelsize=30)
             ax.grid(which="both", alpha=0.5)

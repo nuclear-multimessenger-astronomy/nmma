@@ -118,12 +118,15 @@ def getRedShift(parameters):
     if "redshift" in parameters:
         z = parameters["redshift"]
     else:
-        z = z_at_value(
-            Planck15.luminosity_distance,
-            parameters["luminosity_distance"] * astropy.units.Mpc,
-            zmin=0.0,
-            zmax=2.0,
-        )
+        if parameters["luminosity_distance"] > 0:
+            z = z_at_value(
+                Planck15.luminosity_distance,
+                parameters["luminosity_distance"] * astropy.units.Mpc,
+                zmin=0.0,
+                zmax=2.0,
+            )
+        else:
+            z = 0.0
     return z
 
 
@@ -229,24 +232,58 @@ def loadEventSpec(filename):
     return spec
 
 
-def read_files(files, filters=None):
+def read_files(files, filters=None, tt=np.linspace(0, 14, 100)):
 
     data = {}
     for filename in files:
-        name = filename.replace(".txt", "").replace(".dat", "").split("/")[-1]
-        mag_d = np.loadtxt(filename)
+        name = (
+            filename.replace(".csv", "")
+            .replace(".txt", "")
+            .replace(".dat", "")
+            .split("/")[-1]
+        )
 
-        data[name] = {}
-        data[name]["t"] = mag_d[:, 0]
-        data[name]["u"] = mag_d[:, 1]
-        data[name]["g"] = mag_d[:, 2]
-        data[name]["r"] = mag_d[:, 3]
-        data[name]["i"] = mag_d[:, 4]
-        data[name]["z"] = mag_d[:, 5]
-        data[name]["y"] = mag_d[:, 6]
-        data[name]["J"] = mag_d[:, 7]
-        data[name]["H"] = mag_d[:, 8]
-        data[name]["K"] = mag_d[:, 9]
+        # ZTF rest style file
+        if "forced.csv" in filename:
+            df = pd.read_csv(filename)
+            idx = np.where(df["mag_unc"] != 99.0)[0]
+            if len(idx) < 2:
+                print(f"{name} does not have enough detections to interpolate.")
+                continue
+
+            jd_min = df["jd"].iloc[idx[0]]
+
+            data[name] = {}
+            data[name]["t"] = tt
+            for filt in ["u", "g", "r", "i", "z", "y", "J", "H", "K"]:
+                data[name][filt] = np.nan * tt
+
+            for filt, group in df.groupby("filter"):
+                idx = np.where(group["mag_unc"] != 99.0)[0]
+                if len(idx) < 2:
+                    continue
+                lc = interp.interp1d(
+                    group["jd"].iloc[idx] - jd_min,
+                    group["mag"].iloc[idx],
+                    fill_value=np.nan,
+                    bounds_error=False,
+                    assume_sorted=True,
+                )
+                data[name][filt] = lc(tt)
+        else:
+            mag_d = np.loadtxt(filename)
+
+            data[name] = {}
+            data[name]["t"] = mag_d[:, 0]
+            data[name]["u"] = mag_d[:, 1]
+            data[name]["g"] = mag_d[:, 2]
+            data[name]["r"] = mag_d[:, 3]
+            data[name]["i"] = mag_d[:, 4]
+            data[name]["z"] = mag_d[:, 5]
+            data[name]["y"] = mag_d[:, 6]
+            data[name]["J"] = mag_d[:, 7]
+            data[name]["H"] = mag_d[:, 8]
+            data[name]["K"] = mag_d[:, 9]
 
         if filters is not None:
             filters_to_remove = set(list(data[name].keys())) - set(filters + ["t"])

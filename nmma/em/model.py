@@ -37,6 +37,7 @@ model_parameters_dict = {
     "Me2017": ["log10_Mej", "log10_vej", "beta", "log10_kappa_r"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
+    "CV": ["example_num"],
 }
 
 
@@ -198,8 +199,9 @@ class SVDLightCurveModel(object):
 
     def observation_angle_conversion(self, parameters):
         if "KNtheta" not in parameters:
-            parameters["KNtheta"] = parameters["inclination_EM"] * 180.0 / np.pi
-
+            parameters["KNtheta"] = (
+                parameters.get("inclination_EM", 0.0) * 180.0 / np.pi
+            )
         return parameters
 
     def generate_lightcurve(self, sample_times, parameters):
@@ -213,6 +215,7 @@ class SVDLightCurveModel(object):
 
         parameters_list = []
         for parameter_name in self.model_parameters:
+            print(self.model_parameters, new_parameters)
             parameters_list.append(new_parameters[parameter_name])
 
         z = utils.getRedShift(new_parameters)
