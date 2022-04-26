@@ -215,7 +215,6 @@ class SVDLightCurveModel(object):
 
         parameters_list = []
         for parameter_name in self.model_parameters:
-            print(self.model_parameters, new_parameters)
             parameters_list.append(new_parameters[parameter_name])
 
         z = utils.getRedShift(new_parameters)

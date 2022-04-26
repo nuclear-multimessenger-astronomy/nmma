@@ -215,6 +215,18 @@ def main():
         choices=["BNS", "NSBH"],
     )
     parser.add_argument(
+        "--xlim",
+        type=str,
+        default="0,14",
+        help="Start and end time for light curve plot (default: 0-14)",
+    )
+    parser.add_argument(
+        "--ylim",
+        type=str,
+        default="22,16",
+        help="Upper and lower magnitude limit for light curve plot (default: 22-16)",
+    )
+    parser.add_argument(
         "--generation-seed",
         metavar="seed",
         type=int,
@@ -430,28 +442,29 @@ def main():
             lc = lc.reset_index(drop=True)
             lc.to_csv(args.injection_outfile)
 
-        if args.remove_nondetections:
-            filters_to_check = list(data.keys())
-            for filt in filters_to_check:
-                idx = np.where(np.isfinite(data[filt][:, 2]))[0]
-                data[filt] = data[filt][idx, :]
-                if len(idx) == 0:
-                    del data[filt]
-
-        # check for detections
-        detection = False
-        for filt in data.keys():
-            idx = np.where(np.isfinite(data[filt][:, 2]))[0]
-            if len(idx) > 0:
-                detection = True
-                break
-        if not detection:
-            raise ValueError("Need at least one detection to do fitting.")
     else:
         # load the kilonova afterglow data
         data = loadEvent(args.data)
 
         trigger_time = args.trigger_time
+
+    if args.remove_nondetections:
+        filters_to_check = list(data.keys())
+        for filt in filters_to_check:
+            idx = np.where(np.isfinite(data[filt][:, 2]))[0]
+            data[filt] = data[filt][idx, :]
+            if len(idx) == 0:
+                del data[filt]
+
+    # check for detections
+    detection = False
+    for filt in data.keys():
+        idx = np.where(np.isfinite(data[filt][:, 2]))[0]
+        if len(idx) > 0:
+            detection = True
+            break
+    if not detection:
+        raise ValueError("Need at least one detection to do fitting.")
 
     if args.filters:
         if args.optimal_augmentation_filters:
@@ -634,12 +647,8 @@ def main():
 
             plt.ylabel("%s" % filt, fontsize=48, rotation=0, labelpad=40)
 
-            if args.injection:
-                plt.xlim([0.0, 10.0])
-                plt.ylim([26.0, 18.0])
-            else:
-                plt.xlim([0.0, 14.0])
-                plt.ylim([20.0, 14.0])
+            plt.xlim([float(x) for x in args.xlim.split(",")])
+            plt.ylim([float(x) for x in args.ylim.split(",")])
             plt.grid()
 
             if cnt == 1:
