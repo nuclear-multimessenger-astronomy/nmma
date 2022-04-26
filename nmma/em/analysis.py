@@ -481,7 +481,7 @@ def main():
     else:
         filters_to_analyze = list(data.keys())
 
-    print("Running with filters {0}".format(filters))
+    print("Running with filters {0}".format(filters_to_analyze))
     # setup the prior
     priors = bilby.gw.prior.PriorDict(args.prior)
 
