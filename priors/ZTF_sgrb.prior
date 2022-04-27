@@ -1,0 +1,16 @@
+luminosity_distance = Uniform(minimum=0, maximum=7000, name='luminosity_distance',latex_label='$D_L$')
+KNtimeshift = 0
+inclination_EM = Sine(name='inclination_EM', minimum=0., maximum=np.pi/2., latex_label='$\\iota$')
+log10_E0 =  Uniform(minimum=49, maximum=53, name='log10_E0',latex_label='$\\log_{10}E_0$')
+thetaCore = Uniform(name='theta_core', minimum=0, maximum=np.pi/6., latex_label='$\\theta_c$')
+thetaWing = Uniform(name='theta_wing', minimum=0, maximum=np.pi/2., latex_label='$\\theta_w$')
+log10_n0 = Uniform(name='log10_n0', minimum=-5, maximum=0, latex_label='$\\log_{10}n_0$')
+p = Uniform(name='p', minimum=2., maximum=3., latex_label='$p$')
+log10_epsilon_e = Uniform(name='log10_epsilon_e', minimum=-3, maximum=0.0, latex_label='$\\log_{10}\epsilon_e$')
+log10_epsilon_B = Uniform(name='log10_epsilon_B', minimum=-3, maximum=0.0, latex_label='$\\log_{10}\epsilon_B$')
+ksiN=1.0
+L0=0.0
+dL = 3.09e19
+b = 6
+q = 0.0
+ts = 0.0
