@@ -1,3 +1,4 @@
+import json
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,6 +46,12 @@ class SVDTrainingModel(object):
         plot=False,
         plotdir=os.path.join(os.getcwd(), "plot"),
     ):
+
+        if interpolation_type not in ["sklearn_gp", "tensorflow", "api_gp"]:
+            raise ValueError(
+                "interpolation_type must be sklearn_gp, api_gp or tensorflow"
+            )
+
         self.model = model
         self.data = data
         self.model_parameters = parameters
@@ -182,6 +189,8 @@ class SVDTrainingModel(object):
     def train_model(self):
         if self.interpolation_type == "sklearn_gp":
             self.train_sklearn_gp_model()
+        elif self.interpolation_type == "api_gp":
+            self.train_api_gp_model()
         elif self.interpolation_type == "tensorflow":
             self.train_tensorflow_model()
         else:
@@ -216,6 +225,74 @@ class SVDTrainingModel(object):
                 gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=0)
                 gp.fit(param_array_postprocess, cAmat[i, :])
                 gps.append(gp)
+
+            self.svd_model[filt]["gps"] = gps
+
+    def train_api_gp_model(self):
+
+        try:
+            from gp_api.gaussian_process import GaussianProcess
+            from gp_api.kernels import CompactKernel
+        except ImportError:
+            print("Install gaussian-process-api if you want to use it...")
+            return
+
+        # Loop through filters
+        for jj, filt in enumerate(self.filters):
+            print("Computing GP for filter %s..." % filt)
+
+            param_array_postprocess = self.svd_model[filt]["param_array_postprocess"]
+            cAmat = self.svd_model[filt]["cAmat"]
+
+            nsvds, nparams = param_array_postprocess.shape
+
+            nd = 1
+            # Construct hyperparamters
+            coeffs = [0.5] * nd
+
+            # Create the compact kernel
+            kernel = CompactKernel.fit(
+                param_array_postprocess, method="simple", coeffs=coeffs, sparse=True
+            )
+
+            gps = []
+            for i in range(self.n_coeff):
+                # Fit the training data
+                gp = GaussianProcess.fit(
+                    param_array_postprocess, cAmat[i, :], kernel=kernel, train_err=None
+                )
+
+                store = gp.store_options
+
+                gp_dict = {}
+                if gp.param_names is not None:
+                    gp_dict["param_names"] = ",".join(gp.param_names)
+                else:
+                    gp_dict["param_names"] = None
+
+                # Save the kernel
+                gp_dict["kernel"] = gp.kernel.to_json()
+
+                # Save basic attributes
+                gp_dict["sparse"] = gp.sparse
+                gp_dict["hypercube_rescale"] = gp.hypercube_rescale
+
+                # Save any extra metadata
+                gp_dict["metadata"] = json.dumps(gp.metadata)
+
+                # Save the training error
+                gp_dict["train_err"] = gp.train_err
+
+                for option in store:
+                    if option == "x":
+                        gp_dict["x"] = gp.x
+                        gp_dict["y"] = gp.y
+                    elif option == "predictor":
+                        gp_dict["predictor"] = gp.predictor
+                    else:
+                        raise ValueError("Option should just be x or predictor")
+
+                gps.append(gp_dict)
 
             self.svd_model[filt]["gps"] = gps
 
@@ -303,7 +380,6 @@ class SVDTrainingModel(object):
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
             if not os.path.isfile(modelfile):
                 model_exists = False
-
         elif self.interpolation_type == "tensorflow":
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             if not os.path.isfile(modelfile):
@@ -313,6 +389,10 @@ class SVDTrainingModel(object):
                 outfile = os.path.join(outdir, f"{filt}.h5")
                 if not os.path.isfile(outfile):
                     model_exists = False
+        elif self.interpolation_type == "api_gp":
+            modelfile = os.path.join(self.svd_path, f"{self.model}_api.pkl")
+            if not os.path.isfile(modelfile):
+                model_exists = False
 
         return model_exists
 
@@ -329,6 +409,8 @@ class SVDTrainingModel(object):
                 outfile = os.path.join(outdir, f"{filt}.h5")
                 self.svd_model[filt]["model"].save(outfile)
                 del self.svd_model[filt]["model"]
+        elif self.interpolation_type == "api_gp":
+            modelfile = os.path.join(self.svd_path, f"{self.model}_api.pkl")
 
         with open(modelfile, "wb") as handle:
             pickle.dump(self.svd_model, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -354,3 +436,65 @@ class SVDTrainingModel(object):
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.h5")
                 self.svd_model[filt]["model"] = load_tf_model(outfile)
+        elif self.interpolation_type == "api_gp":
+            modelfile = os.path.join(self.svd_path, f"{self.model}_api.pkl")
+            with open(modelfile, "rb") as handle:
+                self.svd_model = pickle.load(handle)
+            for filt in self.svd_model.keys():
+                for ii in range(len(self.svd_model[filt]["gps"])):
+                    self.svd_model[filt]["gps"][ii] = load_api_gp_model(
+                        self.svd_model[filt]["gps"][ii]
+                    )
+
+
+def load_api_gp_model(gp):
+
+    """Load a gaussian-process-api GaussianProcess model
+    Parameters
+    ----------
+    gp : dict
+        Dictionary representation of gaussian-process-api GaussianProcess model
+    Returns
+    -------
+    gp_api.gaussian_process.GaussianProcess
+    """
+
+    from gp_api.kernels import from_json as load_kernel
+    from gp_api.gaussian_process import GaussianProcess
+
+    param_names = gp.get("param_names", None)
+    if param_names is not None:
+        param_names = param_names.split(",")
+
+    sparse = gp["sparse"]
+    hypercube_rescale = gp["hypercube_rescale"]
+
+    metadata = json.loads(gp["metadata"])
+
+    # TODO: actually figure out what can be loaded and what has to
+    # be re-computed
+
+    x = gp["x"]
+    y = gp["y"]
+
+    train_err = gp["train_err"]
+
+    kernel = load_kernel(gp["kernel"])
+    if train_err is not None:
+        Kaa = kernel(x, x, train_err)
+    else:
+        Kaa = kernel(x, x)
+    LL = GaussianProcess._get_cholesky(Kaa, sparse=sparse)
+
+    predictor = gp["predictor"]
+
+    return GaussianProcess(
+        x,
+        y,
+        LL,
+        predictor,
+        kernel,
+        hypercube_rescale=hypercube_rescale,
+        param_names=param_names,
+        metadata=metadata,
+    )

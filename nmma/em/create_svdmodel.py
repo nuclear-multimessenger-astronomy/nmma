@@ -122,6 +122,9 @@ def main():
     filenames = glob.glob(f"{args.data_path}/*.dat") + glob.glob(
         f"{args.data_path}/*.csv"
     )
+    if len(filenames) == 0:
+        raise ValueError("Need at least one file to interpolate.")    
+    
     data = read_files(filenames)
 
     training_data, parameters = model_function(data)
