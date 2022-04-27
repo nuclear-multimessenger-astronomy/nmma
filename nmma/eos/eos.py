@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.interpolate import CubicSpline, interp1d
-from scipy.integrate import solve_ivp, cumtrapz
+from scipy.integrate import solve_ivp, cumulative_trapezoid
 from scipy.optimize import minimize_scalar
 from .tov import TOVSolver
 import lal
@@ -22,11 +22,38 @@ class EOS_with_CSE(object):
         seed: int, seed of random draw extension (default: 42)
     """
 
-    def __init__(self, low_density_eos, n_connect=0.16, n_lim=2., N_seg=5, cs2_limit=1., seed=42):
+    def __init__(self, low_density_eos, n_connect=0.16, n_lim=2., N_seg=5, cs2_limit=1., seed=42, extension_scheme='peter', low_density_eos_stiff=None):
 
-        self.n_low = low_density_eos['n']
-        self.p_low = low_density_eos['p']
-        self.e_low = low_density_eos['e']
+        self.seed = seed
+
+        if not low_density_eos_stiff:
+            self.n_low = low_density_eos['n']
+            self.p_low = low_density_eos['p']
+            self.e_low = low_density_eos['e']
+
+        else:
+            assert len(low_density_eos) == len(low_density_eos_stiff), ('This requires '
+                                                                        'interpolation. '
+                                                                        'Will be added '
+                                                                        'in the future.')
+            # fix the seed
+            np.random.seed(self.seed)
+            alpha = np.random.uniform()
+
+            self.n_low_soft = low_density_eos['n']
+            self.p_low_soft = low_density_eos['p']
+            self.e_low_soft = low_density_eos['e']
+
+            self.n_low_stiff = low_density_eos_stiff['n']
+            self.p_low_stiff = low_density_eos_stiff['p']
+            self.e_low_stiff = low_density_eos_stiff['e']
+
+            diff_e = self.e_low_stiff - self.e_low_soft
+            diff_p = self.p_low_stiff - self.p_low_soft
+
+            self.n_low = self.n_low_soft
+            self.e_low = self.e_low_soft + alpha * diff_e
+            self.p_low = self.p_low_soft + alpha * diff_p
 
         log_e_of_log_n_low = CubicSpline(np.log(self.n_low), np.log(self.e_low))
         log_p_of_log_n_low = CubicSpline(np.log(self.n_low), np.log(self.p_low))
@@ -42,9 +69,12 @@ class EOS_with_CSE(object):
         self.n_extend_range = n_lim - n_connect
         self.N_seg = N_seg
         self.cs2_limit = cs2_limit
-        self.seed = seed
 
-        self.__extend()
+        if extension_scheme == 'peter':
+            self.__extend()
+        elif extension_scheme == 'rahul':
+            self.__extend_v1()
+
         self.__calculate_pseudo_enthalpy()
         self.__construct_all_interpolation()
 
@@ -71,7 +101,8 @@ class EOS_with_CSE(object):
         cs2_draw[-1] = [self.n_lim, cs2_at_n_lim]
 
         # interpolation for cs2(n)
-        cs2_extent = interp1d(cs2_draw[:, 0], cs2_draw[:, 1], kind='linear', fill_value="extrapolate")
+        cs2_extent = interp1d(cs2_draw[:, 0], cs2_draw[:, 1], kind='linear',
+                              fill_value="extrapolate")
 
         # construct the extended EOS
         # do the integration in log-space for stability
@@ -110,10 +141,51 @@ class EOS_with_CSE(object):
         self.p_array = np.concatenate((self.p_low[n_low < self.n_connect], self.p_high))
         self.e_array = np.concatenate((self.e_low[n_low < self.n_connect], self.e_high))
 
+    def __extend_v1(self):
+
+        # fix the seed
+        np.random.seed(self.seed)
+
+        n_ext_grid = np.linspace(self.n_connect + 1e-4 * self.n_connect, self.n_lim,
+                                 num=self.N_seg + 1)
+        c2_ext_grid = [np.random.uniform(0, self.cs2_limit) for i in n_ext_grid]
+        c2_ext_grid[0] = self.cs2_at_n_connect
+
+        # Empty grid for the chemical potential corresponding to n_ext_grid
+        mu_ext_grid = np.zeros_like(n_ext_grid)
+        mu_ext_grid[0] = self.mu_at_n_connect
+
+        num = 50
+        n_high = [np.linspace(n_ext_grid[i], n_ext_grid[i + 1], endpoint=False, num=num)
+                  for i in range(n_ext_grid.size - 1)]
+        n_high = np.array(n_high)
+        c2_high = np.zeros_like(n_high)
+        mu_high = np.zeros_like(n_high)
+
+        # Integrates the sound speed to compute the chemical potential
+        # Fills in all elements of mu_ext
+        for i in range(n_ext_grid.size - 1):
+            slope = (c2_ext_grid[i + 1] - c2_ext_grid[i]) / (n_ext_grid[i + 1] - n_ext_grid[i])
+            c2_high[i, :] = slope * (n_high[i, :] - n_ext_grid[i]) + c2_ext_grid[i]
+            mu_ext_grid[i + 1] = mu_ext_grid[i] * np.exp(slope * (n_ext_grid[i + 1] - n_ext_grid[i] - n_ext_grid[i] * np.log(n_ext_grid[i + 1] / n_ext_grid[i])) + c2_ext_grid[i] * np.log(n_ext_grid[i + 1] / n_ext_grid[i]))
+            mu_high[i, :] = mu_ext_grid[i] * np.exp(slope * (n_high[i, :] - n_ext_grid[i] - n_ext_grid[i] * np.log(n_high[i, :] / n_ext_grid[i])) + c2_ext_grid[i] * np.log(n_high[i, :] / n_ext_grid[i]))
+
+        self.n_high = n_high.flatten()
+        self.c2_high = c2_high.flatten()
+        self.mu_high = mu_high.flatten()
+
+        self.e_high = cumulative_trapezoid(self.mu_high, self.n_high, initial=0) + self.e_at_n_connect
+        self.p_high = self.mu_high * self.n_high - self.e_high
+
+        n_low = self.n_low
+        self.n_array = np.concatenate((self.n_low[n_low < self.n_connect], self.n_high))
+        self.p_array = np.concatenate((self.p_low[n_low < self.n_connect], self.p_high))
+        self.e_array = np.concatenate((self.e_low[n_low < self.n_connect], self.e_high))
+
     def __calculate_pseudo_enthalpy(self):
 
         intergrand = self.p_array / (self.e_array + self.p_array)
-        self.h_array = cumtrapz(intergrand, np.log(self.p_array), initial=0) + intergrand[0]
+        self.h_array = cumulative_trapezoid(intergrand, np.log(self.p_array), initial=0) + intergrand[0]
 
     def __construct_all_interpolation(self):
 
