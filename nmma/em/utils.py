@@ -329,7 +329,26 @@ def calc_lc(
             model = svd_mag_model[filt]["model"]
             cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
             cAstd = np.ones((n_coeff,))
+        elif interpolation_type == "api_gp":
+            seed = 32
+            random_state = np.random.RandomState(seed)
 
+            gps = svd_mag_model[filt]["gps"]
+            cAproj = np.zeros((n_coeff,))
+            cAstd = np.zeros((n_coeff,))
+            for i in range(n_coeff):
+                gp = gps[i]
+                y_pred = gp.mean(np.atleast_2d(param_list_postprocess))
+                y_samples_test = gp.rvs(
+                    100,
+                    np.atleast_2d(param_list_postprocess),
+                    random_state=random_state,
+                )
+                y_90_lo_test, y_90_hi_test = np.percentile(
+                    y_samples_test, [5, 95], axis=1
+                )
+                cAproj[i] = y_pred
+                cAstd[i] = y_90_hi_test - y_90_lo_test
         else:
             gps = svd_mag_model[filt]["gps"]
             cAproj = np.zeros((n_coeff,))
