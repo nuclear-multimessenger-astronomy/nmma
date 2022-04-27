@@ -96,6 +96,8 @@ class SVDTrainingModel(object):
             )
             for jj, filt in enumerate(self.filters):
                 ii = np.where(np.isfinite(self.data[key][filt]))[0]
+                if len(ii) < 2:
+                    continue
                 f = interp.interp1d(
                     self.data[key]["t"][ii],
                     self.data[key][filt][ii],

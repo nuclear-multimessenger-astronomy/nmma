@@ -37,6 +37,7 @@ model_parameters_dict = {
     "Me2017": ["log10_Mej", "log10_vej", "beta", "log10_kappa_r"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
+    "CV": ["example_num"],
 }
 
 
@@ -199,6 +200,10 @@ class SVDLightCurveModel(object):
                 outdir = lbol_modelfile.replace(".pkl", "")
                 outfile = os.path.join(outdir, "model.h5")
                 self.svd_lbol_model["model"] = load_model(outfile)
+        else:
+            return ValueError(
+                "self.interpolation_type must be sklearn_gp or tensorflow"
+            )
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0}, svd_path={1})".format(
@@ -206,10 +211,10 @@ class SVDLightCurveModel(object):
         )
 
     def observation_angle_conversion(self, parameters):
-
         if "KNtheta" not in parameters:
-            parameters["KNtheta"] = parameters["inclination_EM"] * 180.0 / np.pi
-
+            parameters["KNtheta"] = (
+                parameters.get("inclination_EM", 0.0) * 180.0 / np.pi
+            )
         return parameters
 
     def generate_lightcurve(self, sample_times, parameters):

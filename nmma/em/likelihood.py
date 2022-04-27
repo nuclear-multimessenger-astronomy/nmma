@@ -110,9 +110,12 @@ class OpticalLightCurve(Likelihood):
         mag_app_interp = {}
         for filt in self.filters:
             mag_abs_filt = utils.getFilteredMag(mag_abs, filt)
-            mag_app_filt = mag_abs_filt + 5.0 * np.log10(
-                self.parameters["luminosity_distance"] * 1e6 / 10.0
-            )
+            if self.parameters["luminosity_distance"] > 0.0:
+                mag_app_filt = mag_abs_filt + 5.0 * np.log10(
+                    self.parameters["luminosity_distance"] * 1e6 / 10.0
+                )
+            else:
+                mag_app_filt = mag_abs_filt
             usedIdx = np.where(np.isfinite(mag_app_filt))[0]
             sample_times_used = self.sample_times[usedIdx]
             mag_app_used = mag_app_filt[usedIdx]

@@ -37,7 +37,7 @@ def main():
         "--interpolation_type",
         type=str,
         help="SVD interpolation scheme.",
-        default="sklearn",
+        default="sklearn_gp",
     )
     parser.add_argument(
         "--svd-path",
@@ -65,13 +65,13 @@ def main():
         "--tmin",
         type=float,
         default=0.0,
-        help="Days to be started analysing from the trigger time (default: 0)",
+        help="Days to start analysing from the trigger time (default: 0)",
     )
     parser.add_argument(
         "--tmax",
         type=float,
         default=14.0,
-        help="Days to be stoped analysing from the trigger time (default: 14)",
+        help="Days to stop analysing from the trigger time (default: 14)",
     )
     parser.add_argument(
         "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
@@ -199,9 +199,32 @@ def main():
     )
     parser.add_argument(
         "--ztf-ToO",
-        help="Adds realistic ToO obeservations during the first one or two days. Sampling depends on exposure time specified. Valid values are 180 (<1000sq deg) or 300 (>1000sq deg). Won't work w/o --ztf-sampling",
+        help="Adds realistic ToO observations during the first one or two days. Sampling depends on exposure time specified. Valid values are 180 (<1000sq deg) or 300 (>1000sq deg). Won't work w/o --ztf-sampling",
         type=str,
         choices=["180", "300"],
+    )
+    parser.add_argument(
+        "--rubin-ToO",
+        help="Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--rubin-ToO-type",
+        help="Type of ToO observation. Won't work w/o --rubin-ToO",
+        type=str,
+        choices=["BNS", "NSBH"],
+    )
+    parser.add_argument(
+        "--xlim",
+        type=str,
+        default="0,14",
+        help="Start and end time for light curve plot (default: 0-14)",
+    )
+    parser.add_argument(
+        "--ylim",
+        type=str,
+        default="22,16",
+        help="Upper and lower magnitude limit for light curve plot (default: 22-16)",
     )
     parser.add_argument(
         "--generation-seed",
@@ -286,8 +309,9 @@ def main():
             lc_model = ShockCoolingLightCurveModel(sample_times=sample_times)
 
         elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
-            lc_model = SimpleKilonovaLightCurveModel(sample_times=sample_times,
-                                                     model=model_name)
+            lc_model = SimpleKilonovaLightCurveModel(
+                sample_times=sample_times, model=model_name
+            )
 
         else:
             lc_kwargs = dict(
@@ -418,25 +442,29 @@ def main():
             lc = lc.reset_index(drop=True)
             lc.to_csv(args.injection_outfile)
 
-        if args.remove_nondetections:
-            for filt in data.keys():
-                idx = np.where(np.isfinite(data[filt][:, 2]))[0]
-                data[filt] = data[filt][idx, :]
-
-        # check for detections
-        detection = False
-        for filt in data.keys():
-            idx = np.where(np.isfinite(data[filt][:, 2]))[0]
-            if len(idx) > 0:
-                detection = True
-                break
-        if not detection:
-            raise ValueError("Need at least one detection to do fitting.")
     else:
         # load the kilonova afterglow data
         data = loadEvent(args.data)
 
         trigger_time = args.trigger_time
+
+    if args.remove_nondetections:
+        filters_to_check = list(data.keys())
+        for filt in filters_to_check:
+            idx = np.where(np.isfinite(data[filt][:, 2]))[0]
+            data[filt] = data[filt][idx, :]
+            if len(idx) == 0:
+                del data[filt]
+
+    # check for detections
+    detection = False
+    for filt in data.keys():
+        idx = np.where(np.isfinite(data[filt][:, 2]))[0]
+        if len(idx) > 0:
+            detection = True
+            break
+    if not detection:
+        raise ValueError("Need at least one detection to do fitting.")
 
     if args.filters:
         if args.optimal_augmentation_filters:
@@ -448,10 +476,12 @@ def main():
             )
         else:
             filters = args.filters.split(",")
-    else:
-        filters = list(data.keys())
 
-    print("Running with filters {0}".format(filters))
+        filters_to_analyze = list(set(filters).intersection(set(list(data.keys()))))
+    else:
+        filters_to_analyze = list(data.keys())
+
+    print("Running with filters {0}".format(filters_to_analyze))
     # setup the prior
     priors = bilby.gw.prior.PriorDict(args.prior)
 
@@ -476,7 +506,7 @@ def main():
         args.detection_limit = literal_eval(args.detection_limit)
     likelihood_kwargs = dict(
         light_curve_model=light_curve_model,
-        filters=filters,
+        filters=filters_to_analyze,
         light_curve_data=data,
         trigger_time=trigger_time,
         tmin=args.tmin,
@@ -532,14 +562,9 @@ def main():
         import matplotlib.pyplot as plt
         from matplotlib.pyplot import cm
 
-        if args.injection:
-            posterior_file = os.path.join(
-                args.outdir, "injection_posterior_samples.dat"
-            )
-        else:
-            posterior_file = os.path.join(
-                args.outdir, f"{args.label}_posterior_samples.dat"
-            )
+        posterior_file = os.path.join(
+            args.outdir, f"{args.label}_posterior_samples.dat"
+        )
 
         ##########################
         # Fetch bestfit parameters
@@ -555,9 +580,10 @@ def main():
         #########################
         _, mag = light_curve_model.generate_lightcurve(sample_times, bestfit_params)
         for filt in mag.keys():
-            mag[filt] += 5.0 * np.log10(
-                bestfit_params["luminosity_distance"] * 1e6 / 10.0
-            )
+            if bestfit_params["luminosity_distance"] > 0:
+                mag[filt] += 5.0 * np.log10(
+                    bestfit_params["luminosity_distance"] * 1e6 / 10.0
+                )
         mag["bestfit_sample_times"] = sample_times
 
         filters_plot = []
@@ -621,12 +647,8 @@ def main():
 
             plt.ylabel("%s" % filt, fontsize=48, rotation=0, labelpad=40)
 
-            if args.injection:
-                plt.xlim([0.0, 10.0])
-                plt.ylim([26.0, 18.0])
-            else:
-                plt.xlim([0.0, 14.0])
-                plt.ylim([20.0, 14.0])
+            plt.xlim([float(x) for x in args.xlim.split(",")])
+            plt.ylim([float(x) for x in args.ylim.split(",")])
             plt.grid()
 
             if cnt == 1:
