@@ -1,0 +1,31 @@
+Metadata-Version: 2.1
+Name: nmma
+Version: 0.0.1
+Summary: A nuclear physics multi-messenger Bayesian inference library
+Home-page: https://github.com/nuclear-multimessenger-astronomy/nmma
+Author: Peter Tsun Ho Pang, Michael Coughlin, Tim Dietrich, Ingo Tews
+Author-email: nuclear_multimessenger_astronomy@googlegroups.com
+License: MIT
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/x-rst
+Provides-Extra: doc
+Provides-Extra: production
+License-File: LICENSE.md
+
+NMMA
+====
+
+A pythonic library for probing nuclear physics and cosmology with multimessenger analysis
+
+
+Please check our official documentation here: https://nuclear-multimessenger-astronomy.github.io/nmma/
+
+
+How to contribute: https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html
+
+
