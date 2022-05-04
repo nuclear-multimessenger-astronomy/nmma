@@ -85,7 +85,7 @@ First of all create a foder to put the final data about EoS:
 
 Then run the last one command line
 
-	 combined_EOS --outdir ./output/Figures --label ZTF --gwR14trend ./example_files/eos/GW_R14trend.dat --GWEMsamples ./output/GW_EMdata --detections-file ./example_files/ztf_lightcurve_detectable/detectable.txt --EOS-prior ./example_files/eos/EOS_sorted_weight.dat --EOSpath ./example_files/eos/eos_sorted  --pdet ./example_files/eos/pdet_of_Mmax.dat --R14_true 11.55 --Neos 5000 --seed 42  --cred-interval 0.95
+	 combine_EOS --outdir ./output/Figures --label ZTF --gwR14trend ./example_files/eos/GW_R14trend.dat --GWEMsamples ./output/GW_EMdata --detections-file ./example_files/ztf_lightcurve_detectable/detectable.txt --EOS-prior ./example_files/eos/EOS_sorted_weight.dat --EOSpath ./example_files/eos/eos_sorted  --pdet ./example_files/eos/pdet_of_Mmax.dat --R14_true 11.55 --Neos 5000 --seed 42  --cred-interval 0.95
 
 
 This should return a EoS plot, R14_trend_GW_EM_ZTF.pdf, and  GW_EM_R14trend_ZTF.dat  at  ./output/Figures.
