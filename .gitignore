@@ -1,1 +1,10 @@
-svdmodels/
+/home/enlil/pouyans/codes/nmma/svdmodels
+svdmodels/Bu2019lm_tf/g.h5
+svdmodels/Bu2019lm_tf/H.h5
+svdmodels/Bu2019lm_tf/i.h5
+svdmodels/Bu2019lm_tf/J.h5
+svdmodels/Bu2019lm_tf/K.h5
+svdmodels/Bu2019lm_tf/r.h5
+svdmodels/Bu2019lm_tf/u.h5
+svdmodels/Bu2019lm_tf/y.h5
+svdmodels/Bu2019lm_tf/z.h5
