@@ -244,7 +244,7 @@ def read_files(files, filters=None, tt=np.linspace(0, 14, 100)):
         )
 
         # ZTF rest style file
-        if "forced.csv" in filename:
+        if "forced.csv" in filename or "alerts.csv" in filename:
             df = pd.read_csv(filename)
             idx = np.where(df["mag_unc"] != 99.0)[0]
             if len(idx) < 2:

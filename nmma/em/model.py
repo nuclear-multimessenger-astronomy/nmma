@@ -46,11 +46,12 @@ class GenericCombineLightCurveModel(object):
         self.models = models
         self.sample_times = sample_times
 
-    def generate_lightcurve(self, sample_times, parameters):
+    def generate_lightcurve(self, sample_times, parameters, return_all=False):
 
         total_lbol = np.zeros(len(sample_times))
         total_mag = {}
         mag_per_model = []
+        lbol_per_model = []
 
         for model in self.models:
             lbol, mag = model.generate_lightcurve(sample_times, parameters)
@@ -61,6 +62,7 @@ class GenericCombineLightCurveModel(object):
             else:
                 total_lbol += lbol
                 mag_per_model.append(mag)
+                lbol_per_model.append(lbol)
 
         filts = mag_per_model[0].keys()  # just get the first one
 
@@ -71,7 +73,10 @@ class GenericCombineLightCurveModel(object):
 
             total_mag[filt] = -5.0 / 2.0 * logsumexp(mAB_list, axis=0) / ln10
 
-        return total_lbol, total_mag
+        if return_all:
+            return lbol_per_model, mag_per_model
+        else:
+            return total_lbol, total_mag
 
 
 class SVDLightCurveModel(object):

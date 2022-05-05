@@ -586,6 +586,19 @@ def main():
                 )
         mag["bestfit_sample_times"] = sample_times
 
+        if len(models) > 1:
+            _, mag_all = light_curve_model.generate_lightcurve(
+                sample_times, bestfit_params, return_all=True
+            )
+
+            for ii in range(len(mag_all)):
+                for filt in mag_all[ii].keys():
+                    if bestfit_params["luminosity_distance"] > 0:
+                        mag_all[ii][filt] += 5.0 * np.log10(
+                            bestfit_params["luminosity_distance"] * 1e6 / 10.0
+                        )
+            model_colors = cm.Spectral(np.linspace(0, 1, len(models)))[::-1]
+
         filters_plot = []
         for filt in filters:
             if filt not in data:
@@ -626,7 +639,6 @@ def main():
                 fmt="o",
                 color="k",
                 markersize=16,
-                label="%s-band" % filt,
             )  # or color=color
 
             idx = np.where(~np.isfinite(sigma_y))[0]
@@ -637,13 +649,43 @@ def main():
             mag_plot = getFilteredMag(mag, filt)
 
             plt.plot(sample_times, mag_plot, color=color2, linewidth=3, linestyle="--")
-            plt.fill_between(
-                sample_times,
-                mag_plot + args.error_budget,
-                mag_plot - args.error_budget,
-                facecolor=color2,
-                alpha=0.2,
-            )
+
+            if len(models) > 1:
+                plt.fill_between(
+                    sample_times,
+                    mag_plot + args.error_budget,
+                    mag_plot - args.error_budget,
+                    facecolor=color2,
+                    alpha=0.2,
+                    label="Combined",
+                )
+            else:
+                plt.fill_between(
+                    sample_times,
+                    mag_plot + args.error_budget,
+                    mag_plot - args.error_budget,
+                    facecolor=color2,
+                    alpha=0.2,
+                )
+
+            if len(models) > 1:
+                for ii in range(len(mag_all)):
+                    mag_plot = getFilteredMag(mag_all[ii], filt)
+                    plt.plot(
+                        sample_times,
+                        mag_plot,
+                        color=color2,
+                        linewidth=3,
+                        linestyle="--",
+                    )
+                    plt.fill_between(
+                        sample_times,
+                        mag_plot + args.error_budget,
+                        mag_plot - args.error_budget,
+                        facecolor=model_colors[ii],
+                        alpha=0.2,
+                        label=models[ii].model,
+                    )
 
             plt.ylabel("%s" % filt, fontsize=48, rotation=0, labelpad=40)
 
@@ -654,7 +696,14 @@ def main():
             if cnt == 1:
                 ax1.set_yticks([26, 22, 18, 14])
                 plt.setp(ax1.get_xticklabels(), visible=False)
-                # l = plt.legend(loc="upper right",prop={'size':36},numpoints=1,shadow=True, fancybox=True)
+                if len(models) > 1:
+                    plt.legend(
+                        loc="upper right",
+                        prop={"size": 18},
+                        numpoints=1,
+                        shadow=True,
+                        fancybox=True,
+                    )
             elif not cnt == len(filters):
                 plt.setp(ax2.get_xticklabels(), visible=False)
             plt.xticks(fontsize=36)
