@@ -74,7 +74,7 @@ def readfile(filename):
 requirements = [
     "future",
     "bilby>=1.0.4",
-    "bilby_pipe>=1.0.2",
+    "bilby_pipe==1.0.5",
     "numpy>=1.9",
     "matplotlib>=2.0",
     "scipy>=1.7.1",
