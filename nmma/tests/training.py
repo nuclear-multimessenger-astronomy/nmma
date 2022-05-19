@@ -26,7 +26,7 @@ def test_training():
     ModelPath = "svdmodels"
     filenames = glob.glob("%s/*.dat" % dataDir)
 
-    data = utils.read_files(filenames, filters=filts)
+    data = utils.read_photometry_files(filenames, filters=filts)
     # Loads the model data
     training_data, parameters = model_parameters.Bu2019lm_sparse(data)
 
