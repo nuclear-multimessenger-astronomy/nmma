@@ -7,7 +7,7 @@ import inspect
 
 from .training import SVDTrainingModel
 from .model import SVDLightCurveModel
-from .utils import read_files
+from .utils import read_photometry_files, read_spectroscopy_files
 from . import model_parameters
 
 
@@ -54,6 +54,12 @@ def main():
         help="Type of interpolation to perform",
     )
     parser.add_argument(
+        "--data-type",
+        type=str,
+        default="photometry",
+        help="Data type for interpolation [photometry or spectroscopy]",
+    )
+    parser.add_argument(
         "--tmin",
         type=float,
         default=0.0,
@@ -67,6 +73,18 @@ def main():
     )
     parser.add_argument(
         "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
+    )
+    parser.add_argument(
+        "--lmin",
+        type=float,
+        default=0.0,
+        help="Minimum wavelength to analyze (default: 3000)",
+    )
+    parser.add_argument(
+        "--lmax",
+        type=float,
+        default=10000.0,
+        help="Maximum wavelength to analyze (default: 10000)",
     )
     parser.add_argument(
         "--svd-ncoeff",
@@ -123,9 +141,18 @@ def main():
         f"{args.data_path}/*.csv"
     )
     if len(filenames) == 0:
-        raise ValueError("Need at least one file to interpolate.")    
-    
-    data = read_files(filenames)
+        raise ValueError("Need at least one file to interpolate.")
+
+    if args.data_type == "photometry":
+        data = read_photometry_files(filenames)
+    elif args.data_type == "spectroscopy":
+        data = read_spectroscopy_files(
+            filenames, wavelength_min=args.lmin, wavelength_max=args.lmax, smooth=True
+        )
+        keys = list(data.keys())
+        filts = data[keys[0]]["lambda"]
+    else:
+        raise ValueError("data-type should be photometry or spectroscopy")
 
     training_data, parameters = model_function(data)
     if args.axial_symmetry:
@@ -141,6 +168,7 @@ def main():
         n_epochs=args.tensorflow_nepochs,
         svd_path=args.svd_path,
         interpolation_type=args.interpolation_type,
+        data_type=args.data_type,
         plot=args.plot,
         plotdir=args.outdir,
     )
@@ -162,60 +190,131 @@ def main():
         parameters = training_model.model_parameters
         data = {param: training[param] for param in parameters}
         data["redshift"] = 0
-        lbol, mag = light_curve_model.generate_lightcurve(sample_times, data)
+        if args.data_type == "photometry":
+            lbol, mag = light_curve_model.generate_lightcurve(sample_times, data)
+        elif args.data_type == "spectroscopy":
+            spec = light_curve_model.generate_spectra(
+                sample_times, training_model.filters, data
+            )
 
         import matplotlib.pyplot as plt
 
         plotName = os.path.join(
             args.outdir, "injection_" + args.model + "_lightcurves.png"
         )
-        fig = plt.figure(figsize=(16, 18))
 
-        ncols = 1
-        nrows = int(np.ceil(len(filts) / ncols))
-        gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
+        if args.data_type == "photometry":
 
-        for ii, filt in enumerate(filts):
-            loc_x, loc_y = np.divmod(ii, nrows)
-            loc_x, loc_y = int(loc_x), int(loc_y)
-            ax = fig.add_subplot(gs[loc_y, loc_x])
+            fig = plt.figure(figsize=(16, 18))
+            ncols = 1
+            nrows = int(np.ceil(len(filts) / ncols))
+            gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
 
-            plt.plot(sample_times, training["data"][:, ii], "k--", label="grid")
-            plt.plot(sample_times, mag[filt], "b-", label="interpolated")
+            for ii, filt in enumerate(filts):
+                loc_x, loc_y = np.divmod(ii, nrows)
+                loc_x, loc_y = int(loc_x), int(loc_y)
+                ax = fig.add_subplot(gs[loc_y, loc_x])
 
-            ax.set_xlim([0, 14])
-            if args.model == "CV":
-                ax.set_ylim([28, 16])
-            else:
-                ax.set_ylim([-12, -18])
+                plt.plot(sample_times, training["data"][:, ii], "k--", label="grid")
+                plt.plot(sample_times, mag[filt], "b-", label="interpolated")
+                ax.set_xlim([0, 14])
+                if args.model == "CV":
+                    ax.set_ylim([28, 16])
+                else:
+                    ax.set_ylim([-12, -18])
+                ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
 
-            ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
+                if ii == 0:
+                    ax.legend(fontsize=16)
 
-            if ii == 0:
-                ax.legend(fontsize=16)
+                if ii == len(filts) - 1:
+                    ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
+                else:
+                    plt.setp(ax.get_xticklabels(), visible=False)
 
-            if ii == len(filts) - 1:
-                ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
-            else:
-                plt.setp(ax.get_xticklabels(), visible=False)
+                if args.data_type == "photometry":
+                    if args.model == "CV":
+                        ax.set_yticks([28, 25, 22, 19, 16])
+                    else:
+                        ax.set_yticks([-18, -16, -14, -12])
 
-            if args.model == "CV":
-                ax.set_yticks([28, 25, 22, 19, 16])
-            else:
-                ax.set_yticks([-18, -16, -14, -12])
+                ax.tick_params(axis="x", labelsize=30)
+                ax.tick_params(axis="y", labelsize=30)
+                ax.grid(which="both", alpha=0.5)
+
+            fig.text(0.45, 0.05, "Time [days]", fontsize=30)
+            ylabel = "Absolute Magnitude"
+
+            fig.text(
+                0.01,
+                0.5,
+                ylabel,
+                va="center",
+                rotation="vertical",
+                fontsize=30,
+            )
+
+        elif args.data_type == "spectroscopy":
+
+            fig = plt.figure(figsize=(32, 14))
+            ncols = 3
+            nrows = 1
+            vmin = -10
+            vmax = -2
+            gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
+
+            XX, YY = np.meshgrid(sample_times, filts)
+            ZZ = np.log10(training["data"].T)
+
+            ax = fig.add_subplot(gs[0, 0])
+            plt.pcolor(XX, YY, ZZ, vmin=vmin, vmax=vmax)
+            ax.set_xlabel("Time [days]", fontsize=30)
+            ax.set_ylabel("Wavelength [AA]", fontsize=30)
+            ax.set_title("Original", fontsize=30)
             ax.tick_params(axis="x", labelsize=30)
             ax.tick_params(axis="y", labelsize=30)
             ax.grid(which="both", alpha=0.5)
+            cbar = plt.colorbar()
+            cbar.set_label("log10(Flux)", fontsize=30)
+            cbar.ax.tick_params(labelsize=30)
 
-        fig.text(0.45, 0.05, "Time [days]", fontsize=30)
-        fig.text(
-            0.01,
-            0.5,
-            "Absolute Magnitude",
-            va="center",
-            rotation="vertical",
-            fontsize=30,
-        )
+            spec_plot = np.array([spec[key] for key in filts]).T
+            ZZ = np.log10(spec_plot.T)
+
+            ax = fig.add_subplot(gs[0, 1])
+            plt.pcolor(XX, YY, ZZ, vmin=vmin, vmax=vmax)
+            ax.set_xlabel("Time [days]", fontsize=30)
+            ax.set_ylabel("Wavelength [AA]", fontsize=30)
+            ax.set_title("Interpolated", fontsize=30)
+            ax.tick_params(axis="x", labelsize=30)
+            ax.tick_params(axis="y", labelsize=30)
+            ax.grid(which="both", alpha=0.5)
+            cbar = plt.colorbar()
+            cbar.set_label("log10(Flux)", fontsize=30)
+            cbar.ax.tick_params(labelsize=30)
+
+            ZZ = np.log10(
+                np.abs(
+                    (
+                        (np.log10(spec_plot) - np.log10(training["data"]))
+                        / np.log10(training["data"])
+                    )
+                )
+            ).T
+
+            vmin = -3
+            vmax = 0
+            ax = fig.add_subplot(gs[0, 2])
+            plt.pcolor(XX, YY, ZZ, vmin=vmin, vmax=vmax)
+            ax.set_xlabel("Time [days]", fontsize=30)
+            ax.set_ylabel("Wavelength [AA]", fontsize=30)
+            ax.set_title("(Original - Interpolated) / Interpolated", fontsize=30)
+            ax.tick_params(axis="x", labelsize=30)
+            ax.tick_params(axis="y", labelsize=30)
+            ax.grid(which="both", alpha=0.5)
+            cbar = plt.colorbar()
+            cbar.set_label("Relative Difference", fontsize=30)
+            cbar.ax.tick_params(labelsize=30)
 
         plt.tight_layout()
         plt.savefig(plotName, bbox_inches="tight")

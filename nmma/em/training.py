@@ -30,6 +30,12 @@ class SVDTrainingModel(object):
         number of epochs for tensorflow training
     interpolation_type: str
         type of interpolation
+    data_type: str
+        Data type for interpolation [photometry or spectroscopy]
+    plot: boolean
+        Whether to show plots or not
+    plotdir: str
+        Directory for plotting
     """
 
     def __init__(
@@ -43,6 +49,7 @@ class SVDTrainingModel(object):
         n_coeff=10,
         n_epochs=15,
         interpolation_type="sklearn_gp",
+        data_type="photometry",
         plot=False,
         plotdir=os.path.join(os.getcwd(), "plot"),
     ):
@@ -60,6 +67,7 @@ class SVDTrainingModel(object):
         self.n_coeff = n_coeff
         self.n_epochs = n_epochs
         self.interpolation_type = interpolation_type
+        self.data_type = data_type
         self.plot = plot
         self.plotdir = plotdir
 
@@ -90,22 +98,42 @@ class SVDTrainingModel(object):
 
         magkeys = self.data.keys()
         for jj, key in enumerate(magkeys):
+
             # Interpolate data onto grid
-            self.data[key]["data"] = np.zeros(
-                (len(self.sample_times), len(self.filters))
-            )
-            for jj, filt in enumerate(self.filters):
-                ii = np.where(np.isfinite(self.data[key][filt]))[0]
-                if len(ii) < 2:
-                    continue
-                f = interp.interp1d(
-                    self.data[key]["t"][ii],
-                    self.data[key][filt][ii],
-                    fill_value="extrapolate",
+            if self.data_type == "photometry":
+                self.data[key]["data"] = np.zeros(
+                    (len(self.sample_times), len(self.filters))
                 )
-                maginterp = f(self.sample_times)
-                self.data[key]["data"][:, jj] = maginterp
-                del self.data[key][filt]
+                for jj, filt in enumerate(self.filters):
+                    ii = np.where(np.isfinite(self.data[key][filt]))[0]
+                    if len(ii) < 2:
+                        continue
+                    f = interp.interp1d(
+                        self.data[key]["t"][ii],
+                        self.data[key][filt][ii],
+                        fill_value="extrapolate",
+                    )
+                    maginterp = f(self.sample_times)
+                    self.data[key]["data"][:, jj] = maginterp
+                    del self.data[key][filt]
+            elif self.data_type == "spectroscopy":
+                self.data[key]["data"] = np.zeros(
+                    (len(self.sample_times), len(self.filters))
+                )
+                for jj, filt in enumerate(self.filters):
+                    ii = np.where(np.isfinite(np.log10(self.data[key]["fnu"][:, jj])))[
+                        0
+                    ]
+                    if len(ii) < 2:
+                        continue
+                    f = interp.interp1d(
+                        self.data[key]["t"][ii],
+                        np.log10(self.data[key]["fnu"][ii, jj]),
+                        fill_value="extrapolate",
+                    )
+                    maginterp = 10 ** f(self.sample_times)
+                    self.data[key]["data"][:, jj] = maginterp
+                del self.data[key]["fnu"]
             del self.data[key]["t"]
 
     def generate_svd_model(self):

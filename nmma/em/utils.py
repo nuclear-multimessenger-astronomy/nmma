@@ -232,7 +232,47 @@ def loadEventSpec(filename):
     return spec
 
 
-def read_files(files, filters=None, tt=np.linspace(0, 14, 100)):
+def read_spectroscopy_files(
+    files, wavelength_min=3000.0, wavelength_max=10000.0, smooth=False
+):
+
+    data = {}
+    for filename in files:
+        name = (
+            filename.replace("_spec", "")
+            .replace(".spec", "")
+            .replace(".txt", "")
+            .replace(".dat", "")
+            .split("/")[-1]
+        )
+        df = pd.read_csv(filename, names=["wavelength", "time", "fnu"])
+        df_group = df.groupby("time")
+
+        t_d = []
+        lambda_d = []
+        spec_d = []
+        for ii, (tt, group) in enumerate(df_group):
+            t_d.append(tt)
+            if ii == 0:
+                lambda_d = group["wavelength"].to_numpy()
+                jj = np.where(
+                    (lambda_d >= wavelength_min) & ((lambda_d <= wavelength_max))
+                )[0]
+                lambda_d = lambda_d[jj]
+            spec = group["fnu"].to_numpy()[jj]
+            if smooth:
+                spec = scipy.signal.medfilt(spec, kernel_size=9)
+            spec_d.append(spec)
+
+        data[name] = {}
+        data[name]["t"] = np.array(t_d)
+        data[name]["lambda"] = np.array(lambda_d)
+        data[name]["fnu"] = np.array(spec_d)
+
+    return data
+
+
+def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
 
     data = {}
     for filename in files:
@@ -301,9 +341,9 @@ def calc_lc(
     mag_ncoeff=None,
     lbol_ncoeff=None,
     interpolation_type="sklearn_gp",
+    filters=["u", "g", "r", "i", "z", "y", "J", "H", "K"],
 ):
 
-    filters = ["u", "g", "r", "i", "z", "y", "J", "H", "K"]
     mAB = {}
     for jj, filt in enumerate(filters):
         if mag_ncoeff:
