@@ -252,6 +252,34 @@ class SVDLightCurveModel(object):
 
         return lbol, mag
 
+    def generate_spectra(self, sample_times, wavelengths, parameters):
+        if self.parameter_conversion:
+            new_parameters = parameters.copy()
+            new_parameters, _ = self.parameter_conversion(new_parameters)
+        else:
+            new_parameters = parameters.copy()
+
+        new_parameters = self.observation_angle_conversion(new_parameters)
+
+        parameters_list = []
+        for parameter_name in self.model_parameters:
+            parameters_list.append(new_parameters[parameter_name])
+
+        z = utils.getRedShift(new_parameters)
+
+        _, _, spec = utils.calc_lc(
+            sample_times / (1.0 + z),
+            parameters_list,
+            svd_mag_model=self.svd_mag_model,
+            svd_lbol_model=self.svd_lbol_model,
+            mag_ncoeff=self.mag_ncoeff,
+            lbol_ncoeff=self.lbol_ncoeff,
+            interpolation_type=self.interpolation_type,
+            filters=wavelengths,
+        )
+
+        return spec
+
 
 class GRBLightCurveModel(object):
     def __init__(

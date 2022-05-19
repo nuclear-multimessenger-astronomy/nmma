@@ -76,3 +76,22 @@ and so on. The model files are then written to the path given by --svd-path. As 
 This model is then ready to use in an analysis.
 
 	light_curve_analysis --model Bu2022mv --interpolation_type tensorflow --svd-path svdmodels --outdir outdir --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2022mv.prior
+
+
+### Spectral grids
+
+Often, the simulations come on spectral grids rather than as light curves, and it could be useful to create surrogate models for these spectral grids instead. In this case, the software expects files of the form:
+
+    4900.000011931588,0.1,0.001246
+    5100.000012418592,0.1,0.00084008
+    5300.000012905595,0.1,0.00075228
+    ...
+    4900.000011931588,0.30000000000000004,0.003116
+    5100.000012418592,0.30000000000000004,0.0036693
+    5300.000012905595,0.30000000000000004,0.0028557
+
+with columns of wavelength, time in days, and flux.
+
+These can be trained in a similar form to the light curves with:
+
+    create_svdmodel --model Bu2019lm --data-type spectroscopy --svd-path svdmodels --interpolation_type tensorflow --tmin 0.0 --tmax 21.0 --dt 0.1 --data-path output/m3_spectra --plot --tensorflow-nepochs 20
