@@ -30,6 +30,29 @@ def AnBa2022(data):
     return data_out, parameters
 
 
+def AnBa2022_sparse(data):
+
+    data_out = {}
+
+    parameters = ["mrp", "xmix"]
+    parameters_idx = [3, 4]
+    magkeys = data.keys()
+    for jj, key in enumerate(magkeys):
+        rr = [
+            np.abs(float(x))
+            for x in re.findall(
+                r"[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", key
+            )
+        ]
+
+        data_out[key] = {
+            param: rr[idx] for param, idx in zip(parameters, parameters_idx)
+        }
+        data_out[key] = {**data_out[key], **data[key]}
+
+    return data_out, parameters
+
+
 def CV(data):
 
     data_out = {}
