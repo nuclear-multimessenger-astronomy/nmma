@@ -196,6 +196,8 @@ def create_light_curve_data(
             .reset_index(drop=True)
         )
         sim["passband"] = sim["passband"].map({1: "g", 2: "r", 3: "i"})
+        sim["mag"]=np.nan
+        sim["mag_err"]=np.nan
 
         for filt, group in sim.groupby("passband"):
             data_per_filt = copy.deepcopy(data_original[filt])
@@ -213,60 +215,72 @@ def create_light_curve_data(
                 bounds_error=False,
                 assume_sorted=True,
             )
-            group["mag"] = lc(group["mjd"].tolist())
-            group["mag_err"] = lc_err(group["mjd"].tolist())
+            sim.loc[group.index,"mag"] = lc(group["mjd"].tolist())
+            sim.loc[group.index,"mag_err"] = lc_err(group["mjd"].tolist())
 
+        for filt, group in sim.groupby("passband"):
             if args.ztf_uncertainties and filt in ["g", "r", "i"]:
                 mag_err = []
                 for idx, row in group.iterrows():
                     upperlimit = False
                     if filt == "g" and row["ToO"] is False:
-                        if row["mag"] > ztflimg.sample():
-                            upperlimit = True
+                        limg=float(ztflimg.sample())
+                        if row["mag"] > limg:
+                            sim.loc[row.name,'mag'] = limg
+                            sim.loc[row.name,'mag_err'] = np.inf
                     elif filt == "g" and row["ToO"] is True:
-                        if row["mag"] > ztftoolimg.sample():
-                            upperlimit = True
+                        toolimg=float(ztftoolimg.sample())
+                        if row["mag"] > toolimg:
+                            sim.loc[row.name,'mag'] = toolimg
+                            sim.loc[row.name,'mag_err'] = np.inf
                     elif filt == "r" and row["ToO"] is False:
-                        if row["mag"] > ztflimr.sample():
-                            upperlimit = True
+                        limr=float(ztflimr.sample())
+                        if row["mag"] > limr:
+                            sim.loc[row.name,'mag'] = limr
+                            sim.loc[row.name,'mag_err'] = np.inf
                     elif filt == "r" and row["ToO"] is True:
-                        if row["mag"] > ztftoolimr.sample():
-                            upperlimit = True
+                        toolimr=float(ztftoolimr.sample())
+                        if row["mag"] > toolimr:
+                            sim.loc[row.name,'mag'] = toolimr
+                            sim.loc[row.name,'mag_err'] = np.inf
                     else:
-                        if row["mag"] > ztflimi.sample():
-                            upperlimit = True
-                    if not np.isfinite(row["mag_err"]):
+                        limi=float(ztflimi.sample())
+                        if row["mag"] > limi:
+                            sim.loc[row.name,'mag'] = limi
+                            sim.loc[row.name,'mag_err'] = np.inf
+                    if not np.isfinite(sim.loc[row.name,"mag_err"]):
                         upperlimit = True
-
                     if upperlimit:
                         mag_err.append(np.inf)
                     else:
                         df = pd.DataFrame.from_dict(
-                            {"passband": [filt], "mag": [row["mag"]]}
+                            {"passband": [filt], "mag": [sim.loc[row.name,"mag"]]}
                         )
                         df["passband"] = df["passband"].map(
                             {"g": 1, "r": 2, "i": 3}
                         )  # estimate_mag_err maps filter numbers
                         df = estimate_mag_err(ztfuncer, df)
+                        sim.loc[row.name,'mag_err']=float(df["mag_err"])
                         mag_err.append(df["mag_err"].tolist()[0])
 
                 data_per_filt = np.vstack(
                     [
-                        group["mjd"].tolist(),
-                        group["mag"].tolist(),
+                        sim.loc[group.index,"mjd"].tolist(),
+                        sim.loc[group.index,"mag"].tolist(),
                         mag_err,
                     ]
                 ).T
             else:
                 data_per_filt = np.vstack(
                     [
-                        group["mjd"].tolist(),
-                        group["mag"].tolist(),
-                        group["mag_err"].tolist(),
+                        sim.loc[group.index,"mjd"].tolist(),
+                        sim.loc[group.index,"mag"].tolist(),
+                        sim.loc[group.index,"mag_err"].tolist(),
                     ]
                 ).T
             data[filt] = data_per_filt
             passbands_to_keep.append(filt)
+        sim.to_csv(args.outdir+'/too.csv')
 
     if args.rubin_ToO:
         start = tmin + tc
