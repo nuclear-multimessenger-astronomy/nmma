@@ -38,6 +38,7 @@ model_parameters_dict = {
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
     "CV": ["example_num"],
+    "AnBa2022_sparse": ["mrp", "xmix"],
 }
 
 

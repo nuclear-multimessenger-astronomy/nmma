@@ -1,0 +1,3 @@
+luminosity_distance = Uniform(minimum=0.0, maximum=200., name='luminosity_distance',latex_label='$D_L$')
+mrp = Uniform(name='mrp', minimum=0.0, maximum=0.03, latex_label='$m_{\\rm{rp}}$')
+xmix = Uniform(name='xmix', minimum=0.0, maximum=0.9, latex_label='$X_{\\rm{mix}}$')
