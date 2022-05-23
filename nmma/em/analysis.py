@@ -119,9 +119,9 @@ def main():
     )
     parser.add_argument(
         "--error-budget",
-        type=float,
-        default=1.0,
-        help="Additionaly statistical error (mag) to be introduced (default: 1)",
+        type=str,
+        default="1.0",
+        help="Additional systematic error (mag) to be introduced (default: 1)",
     )
     parser.add_argument(
         "--sampler",
@@ -466,6 +466,7 @@ def main():
     if not detection:
         raise ValueError("Need at least one detection to do fitting.")
 
+    error_budget = [float(x) for x in args.error_budget.split(",")]
     if args.filters:
         if args.optimal_augmentation_filters:
             filters = list(
@@ -478,8 +479,21 @@ def main():
             filters = args.filters.split(",")
 
         filters_to_analyze = list(set(filters).intersection(set(list(data.keys()))))
+
+        if len(error_budget) == 1:
+            error_budget = dict(
+                zip(filters_to_analyze, error_budget * len(filters_to_analyze))
+            )
+        elif len(args.filters.split(",")) == len(error_budget):
+            error_budget = dict(zip(args.filters.split(","), error_budget))
+        else:
+            raise ValueError("error_budget must be the same length as filters")
+
     else:
         filters_to_analyze = list(data.keys())
+        error_budget = dict(
+            zip(filters_to_analyze, error_budget * len(filters_to_analyze))
+        )
 
     print("Running with filters {0}".format(filters_to_analyze))
     # setup the prior
@@ -511,7 +525,7 @@ def main():
         trigger_time=trigger_time,
         tmin=args.tmin,
         tmax=args.tmax,
-        error_budget=args.error_budget,
+        error_budget=error_budget,
         verbose=args.verbose,
         detection_limit=args.detection_limit,
     )
@@ -653,8 +667,8 @@ def main():
             if len(models) > 1:
                 plt.fill_between(
                     sample_times,
-                    mag_plot + args.error_budget,
-                    mag_plot - args.error_budget,
+                    mag_plot + error_budget[filt],
+                    mag_plot - error_budget[filt],
                     facecolor=color2,
                     alpha=0.2,
                     label="Combined",
@@ -662,8 +676,8 @@ def main():
             else:
                 plt.fill_between(
                     sample_times,
-                    mag_plot + args.error_budget,
-                    mag_plot - args.error_budget,
+                    mag_plot + error_budget[filt],
+                    mag_plot - error_budget[filt],
                     facecolor=color2,
                     alpha=0.2,
                 )
@@ -680,8 +694,8 @@ def main():
                     )
                     plt.fill_between(
                         sample_times,
-                        mag_plot + args.error_budget,
-                        mag_plot - args.error_budget,
+                        mag_plot + error_budget[filt],
+                        mag_plot - error_budget[filt],
                         facecolor=model_colors[ii],
                         alpha=0.2,
                         label=models[ii].model,
