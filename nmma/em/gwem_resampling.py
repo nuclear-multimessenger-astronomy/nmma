@@ -12,12 +12,39 @@ def main():
         description="Inference on binary source parameters with kilonova ejecta posterior and GW source posterior given."
     )
     parser.add_argument("--outdir", metavar="PATH", type=str, required=True)
-    parser.add_argument("--GWsamples", metavar="PATH", type=str, required=True)
-    parser.add_argument("--EMsamples", metavar="PATH", type=str, required=True)
-    parser.add_argument("--EOSpath", metavar="PATH", type=str, required=True)
-    parser.add_argument("--Neos", metavar="Neos", type=int, required=True)
     parser.add_argument(
-        "--nlive", metavar="nlive", type=int, required=False, default=1024
+            "--GWsamples", 
+            metavar="PATH", 
+            type=str, 
+            required=True,
+            help="If no posterior files are available, use gwsamples_creation.py to generate dummy GWsamples."
+    )
+    parser.add_argument(
+            "--EMsamples", 
+            metavar="PATH", 
+            type=str, 
+            required=True,
+            help="posterior samples file from a previous Bayesian inference run on EM signals (e.g. Kilonova inference or Kilonova+GRB inference.")
+    parser.add_argument(
+            "--EOSpath", 
+            metavar="PATH", 
+            type=str, 
+            required=True,
+            help="Path of EOS folder, e.g. 15nsat_cse_uniform_R14 (located: https://zenodo.org/record/6106130#.YoysIHVBwUG)"
+    )
+    parser.add_argument(
+            "--Neos", 
+            metavar="Neos", 
+            type=int, 
+            required=True,
+            help="Number of EOS files used for the inference."
+    )
+    parser.add_argument(
+            "--nlive", 
+            metavar="nlive", 
+            type=int, 
+            required=False, 
+            default=1024
     )
     parser.add_argument(
         "--GWprior",
