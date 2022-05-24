@@ -1,0 +1,30 @@
+From 046c894d88dee071bd44b337d16b1ec74f0bf93a Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Tue, 29 Jun 2021 11:19:59 +0200
+Subject: [PATCH 06/10] fixing pbilby_generation
+
+---
+ parallel_bilby/generation.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/parallel_bilby/generation.py b/parallel_bilby/generation.py
+index 84b6cad..01493d8 100644
+--- a/parallel_bilby/generation.py
++++ b/parallel_bilby/generation.py
+@@ -71,12 +71,12 @@ def main():
+     inputs = bilby_pipe_datagen.DataGenerationInput(args, [])
+ 
+     # update the waveform generator and prior if running with eos
++    waveform_generator = inputs.waveform_generator
+     if args.eos:
+         logger.info("Running pbilby with eos")
+         function = eos_convert_function(path2data=args.path_to_eos_data,
+                                         Neos=args.Neos)
+         conv = function.convert_to_lal_binary_neutron_star_parameters_with_eos
+-        waveform_generator = inputs.waveform_generator
+         waveform_generator.parameter_conversion = conv
+         logger.info("Updated conversion function in WF generator")
+ 
+-- 
+2.26.2
+

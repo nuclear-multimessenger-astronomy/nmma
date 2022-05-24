@@ -1,0 +1,78 @@
+From bba40803cf830b696fc47a875b0bd7567505c449 Mon Sep 17 00:00:00 2001
+From: Peter Tsun Ho Pang <t.h.pang@nikhef.nl>
+Date: Fri, 25 Jun 2021 14:34:09 +0200
+Subject: [PATCH 3/6] Bugfix 2
+
+---
+ bilby/gw/conversion.py | 44 ++++++++++++++++++++++++++++++++----------
+ 1 file changed, 34 insertions(+), 10 deletions(-)
+
+diff --git a/bilby/gw/conversion.py b/bilby/gw/conversion.py
+index 78ff0500..98d00457 100644
+--- a/bilby/gw/conversion.py
++++ b/bilby/gw/conversion.py
+@@ -4,6 +4,7 @@ import multiprocessing
+ 
+ from tqdm import tqdm
+ import numpy as np
++import pandas as pd
+ from pandas import DataFrame
+ from scipy.interpolate import interp1d
+ 
+@@ -376,20 +377,43 @@ class eos_convert_function():
+         mass_1_source = converted_parameters['mass_1'] / (1. + converted_parameters['redshift'])
+         mass_2_source = converted_parameters['mass_2'] / (1. + converted_parameters['redshift'])
+ 
+-        EOSID = int(parameters['EOS']) + 1
+-        LambdaM = self.eos_interp_dict[EOSID][0]
++        if not isinstance(parameters['EOS'], (list, tuple, pd.core.series.Series, np.ndarray)):
+ 
+-        if (mass_1_source < LambdaM.x[0] or
+-            mass_1_source > LambdaM.x[-1] or
+-            mass_2_source < LambdaM.x[0] or
+-            mass_2_source > LambdaM.x[-1]):
++            EOSID = int(parameters['EOS']) + 1
++            LambdaM = self.eos_interp_dict[EOSID][0]
+ 
+-            lambda1 = -1.
+-            lambda2 = -1.
++            if (mass_1_source < LambdaM.x[0] or
++                mass_1_source > LambdaM.x[-1] or
++                mass_2_source < LambdaM.x[0] or
++                mass_2_source > LambdaM.x[-1]):
++
++                lambda1 = -1.
++                lambda2 = -1.
++
++            else:
++                lambda1 = LambdaM(mass_1_source)
++                lambda2 = LambdaM(mass_2_source)
+ 
+         else:
+-            lambda1 = LambdaM(mass_1_source)
+-            lambda2 = LambdaM(mass_2_source)
++            lambda1 = []
++            lambda2 = []
++            for i in range(len(parameters['EOS'])):
++                EOSID = int(parameters['EOS'][i]) + 1
++                LambdaM = self.eos_interp_dict[EOSID][0]
++                if (mass_1_source[i] < LambdaM.x[0] or
++                    mass_1_source[i] > LambdaM.x[-1] or
++                    mass_2_source[i] < LambdaM.x[0] or
++                    mass_2_source[i] > LambdaM.x[-1]):
++
++                    lambda1.append(-1)
++                    lambda2.append(-1)
++
++                else:
++                    lambda1.append(LambdaM(mass_1_source[i]))
++                    lambda2.append(LambdaM(mass_2_source[i]))
++
++            lambda1 = np.array(lambda1)
++            lambda2 = np.array(lambda2)
+ 
+         converted_parameters['lambda_1'] = lambda1
+         converted_parameters['lambda_2'] = lambda2
+-- 
+2.26.2
+

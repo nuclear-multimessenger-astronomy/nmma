@@ -1,0 +1,35 @@
+From 812d6e43b9d610412eec3dd82171364432ead557 Mon Sep 17 00:00:00 2001
+From: Peter Tsun Ho Pang <t.h.pang@nikhef.nl>
+Date: Fri, 25 Jun 2021 10:22:58 +0200
+Subject: [PATCH 2/6] Adding generate_all_bns_parameters_with_eos
+
+---
+ bilby/gw/conversion.py | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/bilby/gw/conversion.py b/bilby/gw/conversion.py
+index e2346653..78ff0500 100644
+--- a/bilby/gw/conversion.py
++++ b/bilby/gw/conversion.py
+@@ -399,6 +399,18 @@ class eos_convert_function():
+         return converted_parameters, added_keys
+ 
+ 
++def generate_all_bns_parameters_with_eos(sample, base_conversion=None, likelihood=None, priors=None):
++    waveform_defaults = {
++        'reference_frequency': 50.0, 'waveform_approximant': 'TaylorF2',
++        'minimum_frequency': 20.0}
++    output_sample = _generate_all_cbc_parameters(
++        sample, defaults=waveform_defaults,
++        base_conversion=base_conversion,
++        likelihood=likelihood, priors=priors)
++    output_sample = generate_tidal_parameters(output_sample)
++    return output_sample
++
++
+ def eos_family_physical_check(eos):
+     """
+     Function that determines if the EoS family contains
+-- 
+2.26.2
+

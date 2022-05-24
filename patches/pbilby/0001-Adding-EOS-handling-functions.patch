@@ -1,0 +1,127 @@
+From 2646799fb1d2e3f60ea37c575e8f085376074675 Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Wed, 23 Jun 2021 20:46:40 +0200
+Subject: [PATCH 01/10] Adding EOS handling functions
+
+---
+ parallel_bilby/generation.py | 46 ++++++++++++++++++++++++++++++++++++
+ parallel_bilby/parser.py     | 30 +++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
+
+diff --git a/parallel_bilby/generation.py b/parallel_bilby/generation.py
+index b4d28c1..4c26121 100644
+--- a/parallel_bilby/generation.py
++++ b/parallel_bilby/generation.py
+@@ -9,12 +9,15 @@ information on the run settings and data to be analysed.
+ import pickle
+ import shutil
+ import subprocess
++import numpy as np
+ 
+ import bilby
+ import bilby_pipe
+ import dynesty
+ from bilby_pipe import data_generation as bilby_pipe_datagen
+ from bilby_pipe.data_generation import parse_args
++from bilby.gw.conversion import eos_convert_function
++from bilby.core.prior import Constraint, Interped, Uniform
+ 
+ from . import __version__, slurm
+ from .parser import create_generation_parser
+@@ -66,6 +69,49 @@ def main():
+     args = generation_parser.parse_args(args=cli_args)
+     args = add_extra_args_from_bilby_pipe_namespace(args)
+     inputs = bilby_pipe_datagen.DataGenerationInput(args, [])
++
++    # update the waveform generator and prior if running with eos
++    if args.eos:
++        logger.info("Running pbilby with eos")
++        function = eos_convert_function(path2data=args.path_to_eos_data,
++                                        Neos=args.Neos)
++        conv = function.convert_to_lal_binary_neutron_star_parameters_with_eos
++        inputs.waveform_generator.parameter_conversion = conv
++        logger.info("Updated conversion function in WF generator")
++
++        if 'lambda_tilde' in inputs.priors.keys():
++            inputs.priors.pop('lambda_tilde')
++            logger.info("Removing prior on lambda_tilde")
++        if 'delta_lambda_tilde' in inputs.priors.keys():
++            inputs.priors.pop('delta_lambda_tilde')
++            logger.info("Removing prior on delta_lambda_tilde")
++        if not isinstance(inputs.priors['lambda_1'], Constraint):
++            inputs.priors['lambda_1'] = Constraint(name='lambda_1',
++                                                   minimum=0.,
++                                                   maximum=np.inf)
++            logger.info("Prior on lambda_1 is updated to a constraint")
++        if not isinstance(inputs.priors['lambda_2'], Constraint):
++            inputs.priors['lambda_2'] = Constraint(name='lambda_2',
++                                                   minimum=0.,
++                                                   maximum=np.inf)
++            logger.info("Prior on lambda_2 is updated to a constraint")
++        if 'EOS' not in inputs.priors.keys():
++            if args.path_to_eos_weight:
++                inputs.priors['EOS'] = Interped(name='EOS',
++                                                minimum=0,
++                                                maximum=args.Neos,
++                                                xx=np.linspace(0, args.Neos,
++                                                               num=args.Neos + 1),
++                                                yy=np.loadtxt(args.path_to_eos_weight)
++                                                )
++                logger.info("Setting EOS prior according to the weight file")
++            else:
++                inputs.priors['EOS'] = Uniform(name='EOS',
++                                               minimum=0,
++                                               maximum=args.Neos
++                                               )
++                logger.info("Setting EOS prior to be uniform")
++
+     if inputs.likelihood_type == "ROQGravitationalWaveTransient":
+         inputs.save_roq_weights()
+     inputs.log_directory = None
+diff --git a/parallel_bilby/parser.py b/parallel_bilby/parser.py
+index 76e1ea5..6b733cf 100644
+--- a/parallel_bilby/parser.py
++++ b/parallel_bilby/parser.py
+@@ -55,9 +55,39 @@ def _create_base_parser(sampler="dynesty"):
+     if sampler in ["all", "ptemcee"]:
+         base_parser = _add_ptemcee_settings_to_parser(base_parser)
+     base_parser = _add_misc_settings_to_parser(base_parser)
++    base_parser = _add_eos_settings_to_parser(base_parser)
+     return base_parser
+ 
+ 
++def _add_eos_settings_to_parser(parser):
++    eos_group = parser.add_argument_group(title="EOS Settings")
++    eos_group.add_argument(
++        "--eos",
++        default=False,
++        action="store_true",
++        help="Whether to run with eos",
++    )
++    eos_group.add_argument(
++        "--path-to-eos-data",
++        default=None,
++        type=str,
++        help="Path to eos data",
++    )
++    eos_group.add_argument(
++        "--path-to-eos-weight",
++        default=None,
++        type=str,
++        help="Path to eos weight",
++    )
++    eos_group.add_argument(
++        "--Neos",
++        default=None,
++        type=int,
++        help="Number of EOS in the provided EOS set",
++    )
++    return parser
++
++
+ def _add_dynesty_settings_to_parser(parser):
+     dynesty_group = parser.add_argument_group(title="Dynesty Settings")
+     dynesty_group.add_argument(
+-- 
+2.26.2
+

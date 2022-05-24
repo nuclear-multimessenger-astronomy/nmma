@@ -1,0 +1,45 @@
+From 909d331e053debc9c6d3d6ee5140a1972256e3c0 Mon Sep 17 00:00:00 2001
+From: Peter Tsun Ho Pang <t.h.pang@nikhef.nl>
+Date: Thu, 15 Jul 2021 18:43:59 +0200
+Subject: [PATCH 4/6] speed up the conversion
+
+---
+ bilby/gw/conversion.py | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/bilby/gw/conversion.py b/bilby/gw/conversion.py
+index 98d00457..094aad04 100644
+--- a/bilby/gw/conversion.py
++++ b/bilby/gw/conversion.py
+@@ -363,8 +363,8 @@ class eos_convert_function():
+         for EOSID in range(1, self.Neos + 1):
+             radius, mass, Lambda = np.loadtxt('{0}/{1}.dat'.format(self.path2data, EOSID),
+                                               unpack=True, usecols=[0, 1, 2])
+-            interp_mass_lambda = interp1d(mass, Lambda, kind='linear')
+-            interp_mass_radius = interp1d(mass, radius, kind='linear')
++            interp_mass_lambda = interp1d(mass, Lambda, kind='linear', assume_sorted=True)
++            interp_mass_radius = interp1d(mass, radius, kind='linear', assume_sorted=True)
+             self.eos_interp_dict[EOSID] = [interp_mass_lambda, interp_mass_radius]
+ 
+     def convert_to_lal_binary_neutron_star_parameters_with_eos(self, parameters):
+@@ -373,9 +373,14 @@ class eos_convert_function():
+         converted_parameters, added_keys =\
+             convert_to_lal_binary_black_hole_parameters(converted_parameters)
+ 
+-        converted_parameters['redshift'] = luminosity_distance_to_redshift(converted_parameters['luminosity_distance'])
+-        mass_1_source = converted_parameters['mass_1'] / (1. + converted_parameters['redshift'])
+-        mass_2_source = converted_parameters['mass_2'] / (1. + converted_parameters['redshift'])
++        if 'mass_1_source' in converted_parameters.keys() and 'mass_2_source' in converted_parameters.keys():
++            mass_1_source = converted_parameters['mass_1_source']
++            mass_2_source = converted_parameters['mass_2_source']
++        else:
++            if 'redshift' not in converted_parameters.keys():
++                converted_parameters['redshift'] = luminosity_distance_to_redshift(converted_parameters['luminosity_distance'])
++            mass_1_source = converted_parameters['mass_1'] / (1. + converted_parameters['redshift'])
++            mass_2_source = converted_parameters['mass_2'] / (1. + converted_parameters['redshift'])
+ 
+         if not isinstance(parameters['EOS'], (list, tuple, pd.core.series.Series, np.ndarray)):
+ 
+-- 
+2.26.2
+
