@@ -1,13 +1,6 @@
-mpiexec -np 14 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir outdir --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lm.prior
-
-mpiexec -np 14 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels -d-outdir outdir --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lm.prior
-
-mpiexec -np 15 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir output/01 --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lm.prior
+time mpiexec -np 14 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir output/POSSISnoSmooth --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lmGau.prior --Ebv-max 0 --tmin 0.5 --tmax 14 --dt 0.1
 
 
-mpiexec -np 14 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir output/POSSISnoSmooth --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lmGau.prior --Ebv-max 0 --tmin 0.5 --tmax 14 --dt 0.1
-
-
-time mpiexec -np 14 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir output/POSSISnoSmooth --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lm.prior --Ebv-max 0 --tmin 0.5 --tmax 14 --dt 0.1
+time mpiexec -np 14 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir output/GPTFUni --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lm.prior --Ebv-max 0 --tmin 0.5 --tmax 14 --dt 0.1
 
 time mpiexec -np 30 light_curve_analysis --model Bu2019lm --svd-path svdmodels --outdir output/GPnoTF --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lmGau.prior --Ebv-max 0 --tmin 0.5 --tmax 14 --dt 0.1
