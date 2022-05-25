@@ -176,7 +176,7 @@ class OpticalLightCurve(Likelihood):
             # evaluate the data with infinite error
             if len(infIdx) > 0:
                 gausslogsf = scipy.stats.norm.logsf(
-                    data_mag[infIdx], mag_est[infIdx], self.error_budget
+                    data_mag[infIdx], mag_est[infIdx], self.error_budget[filt]
                 )
                 gaussprob_total += np.sum(gausslogsf)
 
