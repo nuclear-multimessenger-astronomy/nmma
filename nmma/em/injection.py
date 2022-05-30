@@ -280,7 +280,9 @@ def create_light_curve_data(
                 ).T
             data[filt] = data_per_filt
             passbands_to_keep.append(filt)
-        sim.to_csv(args.outdir+'/too.csv')
+        if args.train_stats:    
+          sim['tc']=tc 
+          sim.to_csv(args.outdir+'/too.csv',index=False)
 
     if args.rubin_ToO:
         start = tmin + tc

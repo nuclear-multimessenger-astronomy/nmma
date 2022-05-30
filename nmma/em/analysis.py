@@ -204,6 +204,10 @@ def main():
         choices=["180", "300"],
     )
     parser.add_argument(
+        "--train-stats",
+        help="Creates a file too.csv to derive statistics",
+        action="store_true",)    
+    parser.add_argument(
         "--rubin-ToO",
         help="Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.",
         action="store_true",
