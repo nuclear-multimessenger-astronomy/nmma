@@ -98,8 +98,9 @@ Install parallel-bilby:
 
 Install pymultinest 
 
+For using the PyMultinest library, it is required to get and compile the Multinest library as well. Instructions for the same are given here:
 
-* $ conda install -c conda-forge pymultinest
+https://johannesbuchner.github.io/PyMultiNest/install.html
 
 
 Use the commands below to install the dependencies given in requirements.txt file which are necessary for NMMA: 
