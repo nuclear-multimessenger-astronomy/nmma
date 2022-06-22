@@ -14,8 +14,8 @@ dust_extinction
 wrapt_timeout_decorator
 arviz
 ### for mpi ###
-"parallel_bilby>=1.0.0",
-"mpi4py",
+parallel_bilby>=1.0.0
+mpi4py
 ### for docs ###
 sphinx==4.4.0
 recommonmark
