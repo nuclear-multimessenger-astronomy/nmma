@@ -367,7 +367,7 @@ def calc_lc(
 
         if interpolation_type == "tensorflow":
             model = svd_mag_model[filt]["model"]
-            cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
+            cAproj = model(np.atleast_2d(param_list_postprocess)).numpy().T.flatten()
             cAstd = np.ones((n_coeff,))
         elif interpolation_type == "api_gp":
             seed = 32
