@@ -618,7 +618,7 @@ def main():
             model_colors = cm.Spectral(np.linspace(0, 1, len(models)))[::-1]
 
         filters_plot = []
-        for filt in filters:
+        for filt in filters_to_analyze:
             if filt not in data:
                 continue
             samples = data[filt]
@@ -722,7 +722,7 @@ def main():
                         shadow=True,
                         fancybox=True,
                     )
-            elif not cnt == len(filters):
+            elif not cnt == len(filters_plot):
                 plt.setp(ax2.get_xticklabels(), visible=False)
             plt.xticks(fontsize=36)
             plt.yticks(fontsize=36)
