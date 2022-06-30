@@ -248,11 +248,11 @@ def main():
     parser.add_argument(
         "--eos-file",
         type=str,
-        required=True,
+        required=False,
         help="EOS file in (radius [km], mass [solar mass], lambda)",
     )
     parser.add_argument(
-        "--binary-type", type=str, required=True, help="Either BNS or NSBH"
+        "--binary-type", type=str, required=False, help="Either BNS or NSBH"
     )
     parser.add_argument(
         "--eject",
@@ -268,8 +268,9 @@ def main():
     )
     args = parser.parse_args()
 
-    # check the binary type
-    assert args.binary_type in ["BNS", "NSBH"], "Unknown binary type"
+    if not args.original_parameters:
+        # check the binary type
+        assert args.binary_type in ["BNS", "NSBH"], "Unknown binary type"
 
     # check injection file format
     if args.injection_file:
@@ -280,10 +281,13 @@ def main():
             or args.injection_file.endswith(".dat")
         ), "Unknown injection file format"
 
-    # load the EOS
-    radii, masses, lambdas = np.loadtxt(args.eos_file, usecols=[0, 1, 2], unpack=True)
-    interp_mass_radius = scipy.interpolate.interp1d(masses, radii)
-    interp_mass_lambda = scipy.interpolate.interp1d(masses, lambdas)
+    if not args.original_parameters:
+        # load the EOS
+        radii, masses, lambdas = np.loadtxt(
+            args.eos_file, usecols=[0, 1, 2], unpack=True
+        )
+        interp_mass_radius = scipy.interpolate.interp1d(masses, radii)
+        interp_mass_lambda = scipy.interpolate.interp1d(masses, lambdas)
 
     # load the injection json file
     if args.injection_file:
