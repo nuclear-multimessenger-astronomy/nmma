@@ -50,7 +50,7 @@ Change directory to the nmma folder:
 Create a new environment using this command (environment name is nmma_env in this case):
 
 
-* $ conda create --name nmma_env
+* $ conda create --name nmma_env python=3.8
 
 
 * $ conda activate nmma_env
@@ -64,15 +64,22 @@ NOTE: If this gives an error like: CommandNotFoundError: Your shell has not been
 
 then proceed with conda activate nmma_env.
 
+
+Get the latest pip version
+
+
+* $ pip install --upgrade pip
+
+
 Check python and pip version like this:
 
 
 * $ python --version
 * $ pip --version
 
+Python 3.8 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation. 
 
-Python 3.7 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation. 
-
+For the moment we advise Linux users to avoid using python3.9 and python3.10 in their nmma environment this can generate major problems for the operation. So use preferably python3.8.
 
 Install mpi4py:
 
@@ -145,8 +152,11 @@ Run the following commands:
 * import nmma.em.analysis
 * import nmma.eos.create_injection
 
+
 NOTE (Okay, last one!): if everything is ok, it's the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
 those with their given commands. In case modules like afterglowpy and dust_extinction are needed, don't hesitate to do it with pip (normally it shouldn't happen), but some modules may not install correctly in case of disturbance.
+
+Please pay special attention to the `import nmma.em.analysis` and make sure that it does not generate any errors. 
 
 Unfortunately, due to the web of package requirements that NMMA depends on, running setup.py does not typically finish without errors the first time through. Experience has shown that in the vast majority of cases, simply pinning versions such as:
 
