@@ -1,0 +1,75 @@
+From 2532c2cb96b3e0a97771a6f630ba0325ede8af0b Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Fri, 25 Jun 2021 10:16:49 +0200
+Subject: [PATCH 03/10] Bugfix
+
+---
+ parallel_bilby/analysis.py   |  3 +++
+ parallel_bilby/generation.py |  5 +++--
+ parallel_bilby/utils.py      | 13 ++++++++-----
+ 3 files changed, 14 insertions(+), 7 deletions(-)
+
+diff --git a/parallel_bilby/analysis.py b/parallel_bilby/analysis.py
+index e72d3cf..b8fe59c 100644
+--- a/parallel_bilby/analysis.py
++++ b/parallel_bilby/analysis.py
+@@ -349,6 +349,9 @@ if input_args.label is not None:
+ 
+ priors = bilby.gw.prior.PriorDict.from_json(data_dump["prior_file"])
+ 
++#make sure the parameter conversion is done correctly
++priors.conversion_function = waveform_generator.parameter_conversion
++
+ logger.setLevel(logging.WARNING)
+ likelihood = setup_likelihood(
+     interferometers=ifo_list,
+diff --git a/parallel_bilby/generation.py b/parallel_bilby/generation.py
+index 4c26121..84b6cad 100644
+--- a/parallel_bilby/generation.py
++++ b/parallel_bilby/generation.py
+@@ -76,7 +76,8 @@ def main():
+         function = eos_convert_function(path2data=args.path_to_eos_data,
+                                         Neos=args.Neos)
+         conv = function.convert_to_lal_binary_neutron_star_parameters_with_eos
+-        inputs.waveform_generator.parameter_conversion = conv
++        waveform_generator = inputs.waveform_generator
++        waveform_generator.parameter_conversion = conv
+         logger.info("Updated conversion function in WF generator")
+ 
+         if 'lambda_tilde' in inputs.priors.keys():
+@@ -153,7 +154,7 @@ def main():
+     logger.info("Initial meta_data = {}".format(meta_data))
+ 
+     data_dump = dict(
+-        waveform_generator=inputs.waveform_generator,
++        waveform_generator=waveform_generator,
+         ifo_list=ifo_list,
+         prior_file=prior_file,
+         args=args,
+diff --git a/parallel_bilby/utils.py b/parallel_bilby/utils.py
+index 8ba2fe1..dd17466 100644
+--- a/parallel_bilby/utils.py
++++ b/parallel_bilby/utils.py
+@@ -36,11 +36,14 @@ def fill_sample(args):
+     # Likelihood needs to have marg params to calculate correct SNR
+     likelihood.parameters.update(marg_params)
+     conversion.compute_snrs(sample, likelihood)
+-    sample = conversion._generate_all_cbc_parameters(
+-        sample,
+-        likelihood.waveform_generator.waveform_arguments,
+-        conversion.convert_to_lal_binary_black_hole_parameters,
+-    )
++    if likelihood.waveform_generator.parameter_conversion == conversion.convert_to_lal_binary_neutron_star_parameters:
++        sample = conversion.generate_all_bns_parameters(sample)
++    elif likelihood.waveform_generator.parameter_conversion == conversion.convert_to_lal_binary_black_hole_parameters:
++        sample = conversion.generate_all_bbh_parameters(sample)
++    else:
++        sample = conversion.generate_all_bns_parameters_with_eos(sample,
++                                                                 base_conversion=likelihood.waveform_generator.parameter_conversion)
++
+     return sample
+ 
+ 
+-- 
+2.26.2
+

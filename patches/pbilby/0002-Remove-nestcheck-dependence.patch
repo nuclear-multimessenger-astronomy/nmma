@@ -1,0 +1,64 @@
+From 2094c08d539c9a7821e9a8a3ab071cd467b04e99 Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Thu, 24 Jun 2021 12:57:32 +0200
+Subject: [PATCH 02/10] Remove nestcheck dependence
+
+---
+ parallel_bilby/analysis.py | 20 ++++++++++----------
+ setup.py                   |  2 +-
+ 2 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/parallel_bilby/analysis.py b/parallel_bilby/analysis.py
+index def3ea5..e72d3cf 100644
+--- a/parallel_bilby/analysis.py
++++ b/parallel_bilby/analysis.py
+@@ -18,7 +18,7 @@ import dynesty
+ import dynesty.plotting as dyplot
+ import matplotlib.pyplot as plt
+ import mpi4py
+-import nestcheck.data_processing
++#import nestcheck.data_processing
+ import numpy as np
+ import pandas as pd
+ from bilby.gw import conversion
+@@ -611,15 +611,15 @@ with MPIPool(
+ 
+         out = sampler.results
+ 
+-        if nestcheck_flag is True:
+-            logger.info("Creating nestcheck files")
+-            ns_run = nestcheck.data_processing.process_dynesty_run(out)
+-            nestcheck_path = os.path.join(outdir, "Nestcheck")
+-            bilby.core.utils.check_directory_exists_and_if_not_mkdir(nestcheck_path)
+-            nestcheck_result = "{}/{}_nestcheck.pickle".format(nestcheck_path, label)
+-
+-            with open(nestcheck_result, "wb") as file_nest:
+-                pickle.dump(ns_run, file_nest)
++#        if nestcheck_flag is True:
++#            logger.info("Creating nestcheck files")
++#            ns_run = nestcheck.data_processing.process_dynesty_run(out)
++#            nestcheck_path = os.path.join(outdir, "Nestcheck")
++#            bilby.core.utils.check_directory_exists_and_if_not_mkdir(nestcheck_path)
++#            nestcheck_result = "{}/{}_nestcheck.pickle".format(nestcheck_path, label)
++#
++#            with open(nestcheck_result, "wb") as file_nest:
++#                pickle.dump(ns_run, file_nest)
+ 
+         weights = np.exp(out["logwt"] - out["logz"][-1])
+         nested_samples = DataFrame(out.samples, columns=sampling_keys)
+diff --git a/setup.py b/setup.py
+index bcbeaaf..6c39dc7 100644
+--- a/setup.py
++++ b/setup.py
+@@ -98,7 +98,7 @@ setup(
+         "dynesty>=1.0.0",
+         "schwimmbad",
+         "pandas",
+-        "nestcheck",
++#        "nestcheck",
+     ],
+     entry_points={
+         "console_scripts": [
+-- 
+2.26.2
+

@@ -1,0 +1,26 @@
+From fa720fc8d52ff9dbd5c7ff7b5cf40b10f00551fc Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Sun, 27 Jun 2021 11:45:23 +0200
+Subject: [PATCH 05/10] Output posterior samples in prior to output to json
+ file
+
+---
+ parallel_bilby/analysis.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/parallel_bilby/analysis.py b/parallel_bilby/analysis.py
+index be81428..460ae61 100644
+--- a/parallel_bilby/analysis.py
++++ b/parallel_bilby/analysis.py
+@@ -689,6 +689,8 @@ with MPIPool(
+             except Exception as e:
+                 logger.warning(f"Unable to convert to the LALInference prior: {e}")
+ 
++        logger.info(f"Saving posterior samples to {outdir}/{label}_posterior_samples.dat")
++        result.save_posterior_samples()
+         logger.info(f"Saving result to {outdir}/{label}_result.json")
+         result.save_to_file(extension="json")
+         print(
+-- 
+2.26.2
+

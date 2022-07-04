@@ -1,0 +1,25 @@
+From 3d5a3e5f7a0053fa7d72f38b2015e1d0944148e8 Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Tue, 29 Jun 2021 15:05:55 +0200
+Subject: [PATCH 07/10] bugfix 3
+
+---
+ parallel_bilby/parser.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/parallel_bilby/parser.py b/parallel_bilby/parser.py
+index 6b733cf..ee8c78b 100644
+--- a/parallel_bilby/parser.py
++++ b/parallel_bilby/parser.py
+@@ -81,7 +81,7 @@ def _add_eos_settings_to_parser(parser):
+     )
+     eos_group.add_argument(
+         "--Neos",
+-        default=None,
++        default=5000,
+         type=int,
+         help="Number of EOS in the provided EOS set",
+     )
+-- 
+2.26.2
+

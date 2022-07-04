@@ -1,0 +1,25 @@
+From e2ac07478ea3e179a21330464f615af9e10e7d5e Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Wed, 7 Jul 2021 18:13:33 +0200
+Subject: [PATCH 08/10] Skip SNR calculation
+
+---
+ parallel_bilby/utils.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/parallel_bilby/utils.py b/parallel_bilby/utils.py
+index dd17466..105589f 100644
+--- a/parallel_bilby/utils.py
++++ b/parallel_bilby/utils.py
+@@ -35,7 +35,7 @@ def fill_sample(args):
+     sample = likelihood.generate_posterior_sample_from_marginalized_likelihood()
+     # Likelihood needs to have marg params to calculate correct SNR
+     likelihood.parameters.update(marg_params)
+-    conversion.compute_snrs(sample, likelihood)
++    #conversion.compute_snrs(sample, likelihood)
+     if likelihood.waveform_generator.parameter_conversion == conversion.convert_to_lal_binary_neutron_star_parameters:
+         sample = conversion.generate_all_bns_parameters(sample)
+     elif likelihood.waveform_generator.parameter_conversion == conversion.convert_to_lal_binary_black_hole_parameters:
+-- 
+2.26.2
+

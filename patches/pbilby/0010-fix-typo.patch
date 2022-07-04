@@ -1,0 +1,27 @@
+From 3578af65f00e38dd2971df6e5c257a54c2dc2dc4 Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Sat, 10 Jul 2021 14:17:48 +0200
+Subject: [PATCH 10/10] fix typo
+
+---
+ parallel_bilby/analysis.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/parallel_bilby/analysis.py b/parallel_bilby/analysis.py
+index f94ee15..5b6812b 100644
+--- a/parallel_bilby/analysis.py
++++ b/parallel_bilby/analysis.py
+@@ -683,8 +683,8 @@ with MPIPool(
+ #                priors[name] = likelihood.priors[name]
+ #        result.priors = priors
+ 
+-        results.posterior = posterior
+-        results.priors = priors
++        result.posterior = posterior
++        result.priors = priors
+ 
+         if args.convert_to_flat_in_component_mass:
+             try:
+-- 
+2.26.2
+

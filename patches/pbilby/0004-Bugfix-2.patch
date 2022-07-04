@@ -1,0 +1,35 @@
+From bd8da59ec7287828e54433c6b53c1d72773d2c84 Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Sat, 26 Jun 2021 13:02:54 +0200
+Subject: [PATCH 04/10] Bugfix 2
+
+---
+ parallel_bilby/analysis.py | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/parallel_bilby/analysis.py b/parallel_bilby/analysis.py
+index b8fe59c..be81428 100644
+--- a/parallel_bilby/analysis.py
++++ b/parallel_bilby/analysis.py
+@@ -349,9 +349,6 @@ if input_args.label is not None:
+ 
+ priors = bilby.gw.prior.PriorDict.from_json(data_dump["prior_file"])
+ 
+-#make sure the parameter conversion is done correctly
+-priors.conversion_function = waveform_generator.parameter_conversion
+-
+ logger.setLevel(logging.WARNING)
+ likelihood = setup_likelihood(
+     interferometers=ifo_list,
+@@ -370,6 +367,8 @@ def log_likelihood_function(v_array):
+     if input_args.bilby_zero_likelihood_mode:
+         return 0
+     parameters = {key: v for key, v in zip(sampling_keys, v_array)}
++    # make sure the parameter conversion is done correctly
++    parameters, _ = waveform_generator.parameter_conversion(parameters)
+     if priors.evaluate_constraints(parameters) > 0:
+         likelihood.parameters.update(parameters)
+         return likelihood.log_likelihood() - likelihood.noise_log_likelihood()
+-- 
+2.26.2
+

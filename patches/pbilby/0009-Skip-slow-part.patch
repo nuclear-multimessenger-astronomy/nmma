@@ -1,0 +1,50 @@
+From 19087b2b755324996586b8bc851c2f04b191f16e Mon Sep 17 00:00:00 2001
+From: Peter Pang <ppang@enlil.gw.physik.uni-potsdam.de>
+Date: Thu, 8 Jul 2021 20:28:19 +0200
+Subject: [PATCH 09/10] Skip slow part
+
+---
+ parallel_bilby/analysis.py | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
+
+diff --git a/parallel_bilby/analysis.py b/parallel_bilby/analysis.py
+index 460ae61..f94ee15 100644
+--- a/parallel_bilby/analysis.py
++++ b/parallel_bilby/analysis.py
+@@ -670,18 +670,21 @@ with MPIPool(
+             "Generating posterior from marginalized parameters for"
+             f" nsamples={len(posterior)}, POOL={pool.size}"
+         )
+-        fill_args = [(ii, row, likelihood) for ii, row in posterior.iterrows()]
+-        samples = pool.map(fill_sample, fill_args)
+-        result.posterior = pd.DataFrame(samples)
+-
+-        logger.debug("Updating prior to the actual prior")
+-        for par, name in zip(
+-            ["distance", "phase", "time"],
+-            ["luminosity_distance", "phase", "geocent_time"],
+-        ):
+-            if getattr(likelihood, "{}_marginalization".format(par), False):
+-                priors[name] = likelihood.priors[name]
+-        result.priors = priors
++#        fill_args = [(ii, row, likelihood) for ii, row in posterior.iterrows()]
++#        samples = pool.map(fill_sample, fill_args)
++#        result.posterior = pd.DataFrame(samples)
++#
++#        logger.debug("Updating prior to the actual prior")
++#        for par, name in zip(
++#            ["distance", "phase", "time"],
++#            ["luminosity_distance", "phase", "geocent_time"],
++#        ):
++#            if getattr(likelihood, "{}_marginalization".format(par), False):
++#                priors[name] = likelihood.priors[name]
++#        result.priors = priors
++
++        results.posterior = posterior
++        results.priors = priors
+ 
+         if args.convert_to_flat_in_component_mass:
+             try:
+-- 
+2.26.2
+
