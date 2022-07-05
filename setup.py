@@ -79,7 +79,7 @@ requirements = [
     "matplotlib>=2.0",
     "scipy>=1.7.1",
     "pandas>=1.3.4",
-    "astropy==4.3.1",
+    "astropy>=5.0.1",
     "afterglowpy>=0.7.3",
     "scikit-learn>=0.23.1",
     "pymultinest",
@@ -89,7 +89,7 @@ requirements = [
     "arviz",
 ]
 
-VERSION = "0.0.1"
+VERSION = "0.0.2"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
@@ -113,7 +113,7 @@ setup(
     ],
     package_dir={"nmma": "nmma"},
     package_data={"nmma": [version_file], "nmma.em.data": ["*.pkl", "*.joblib"]},
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     install_requires=requirements,
     entry_points={
         "console_scripts": [
