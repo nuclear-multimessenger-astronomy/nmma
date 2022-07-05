@@ -12,7 +12,7 @@ import sncosmo
 import dust_extinction.shapes as dustShp
 
 from astropy.time import Time
-from astropy.cosmology import Planck15, z_at_value
+from astropy.cosmology import Planck18, z_at_value
 import astropy.units
 import astropy.constants
 
@@ -120,11 +120,12 @@ def getRedShift(parameters):
     else:
         if parameters["luminosity_distance"] > 0:
             z = z_at_value(
-                Planck15.luminosity_distance,
+                Planck18.luminosity_distance,
                 parameters["luminosity_distance"] * astropy.units.Mpc,
                 zmin=0.0,
                 zmax=2.0,
             )
+            z = z.value
         else:
             z = 0.0
     return z
@@ -691,8 +692,8 @@ def sn_lc(
         )
 
     # regularize the absolute magnitude
-    abs_mag -= Planck15.distmod(z).value
-    model.set_source_peakabsmag(abs_mag, regularize_band, "ab", cosmo=Planck15)
+    abs_mag -= Planck18.distmod(z).value
+    model.set_source_peakabsmag(abs_mag, regularize_band, "ab", cosmo=Planck18)
 
     if Ebv != 0.0:
         ext = extinctionFactorP92SMC(nus, Ebv, z)

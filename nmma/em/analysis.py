@@ -25,7 +25,7 @@ from .likelihood import OpticalLightCurve
 matplotlib.use("agg")
 
 
-def main():
+def get_parser():
 
     parser = argparse.ArgumentParser(
         description="Inference on kilonova ejecta parameters."
@@ -43,11 +43,17 @@ def main():
         "--svd-path",
         type=str,
         help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
+        default="svdmodels",
     )
     parser.add_argument(
-        "--outdir", type=str, required=True, help="Path to the output directory"
+        "--outdir",
+        type=str,
+        help="Path to the output directory",
+        default="outdir",
     )
-    parser.add_argument("--label", type=str, required=True, help="Label for the run")
+    parser.add_argument(
+        "--label", type=str, help="Label for the run", default="injection"
+    )
     parser.add_argument(
         "--trigger-time",
         type=float,
@@ -206,7 +212,8 @@ def main():
     parser.add_argument(
         "--train-stats",
         help="Creates a file too.csv to derive statistics",
-        action="store_true",)    
+        action="store_true",
+    )
     parser.add_argument(
         "--rubin-ToO",
         help="Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.",
@@ -275,7 +282,15 @@ def main():
         default=False,
         help="print out log likelihoods",
     )
-    args = parser.parse_args()
+
+    return parser
+
+
+def main(args=None):
+
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
 
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
