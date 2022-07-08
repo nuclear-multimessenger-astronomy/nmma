@@ -160,7 +160,7 @@ Please pay special attention to the `import nmma.em.analysis` and make sure that
 
 Unfortunately, due to the web of package requirements that NMMA depends on, running setup.py does not typically finish without errors the first time through. Experience has shown that in the vast majority of cases, simply pinning versions such as:
 
-	pip install astropy==4.3.1
+	pip install astropy==5.1
 
 and then trying again is sufficient for completion of the installation. This instruction file will likely cover the issues you might face during your installation. However, please open issues on GitHub if there appear to be unresolvable conflicts. 
 
