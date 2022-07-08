@@ -50,7 +50,7 @@ Change directory to the nmma folder:
 Create a new environment using this command (environment name is nmma_env in this case):
 
 
-* $ conda create --name nmma_env
+* $ conda create --name nmma_env python=3.8
 
 
 * $ conda activate nmma_env
@@ -64,15 +64,22 @@ NOTE: If this gives an error like: CommandNotFoundError: Your shell has not been
 
 then proceed with conda activate nmma_env.
 
+
+Get the latest pip version
+
+
+* $ pip install --upgrade pip
+
+
 Check python and pip version like this:
 
 
 * $ python --version
 * $ pip --version
 
+Python 3.8 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation. 
 
-Python 3.7 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation. 
-
+For the moment we advise Linux users to avoid using python3.9 and python3.10 in their nmma environment this can generate major problems for the operation. So use preferably python3.8.
 
 Install mpi4py:
 
@@ -96,23 +103,10 @@ Install parallel-bilby:
 
 
 
-Install pymultinest
+Install pymultinest 
+
 
 * $ conda install -c conda-forge pymultinest
-
- 
-NOTE: In case if an error comes up during an NMMA analysis of the form:
-
-ERROR:   Could not load MultiNest library "libmultinest.so"
-ERROR:   You have to build it first,
-ERROR:   and point the LD_LIBRARY_PATH environment variable to it!
-
-Then, for using the PyMultinest library, it is required to get and compile the Multinest library separately. Instructions for the same are given here:
-
-https://johannesbuchner.github.io/PyMultiNest/install.html
-
-
-
 
 
 Use the commands below to install the dependencies given in requirements.txt file which are necessary for NMMA: 
@@ -158,12 +152,15 @@ Run the following commands:
 * import nmma.em.analysis
 * import nmma.eos.create_injection
 
+
 NOTE (Okay, last one!): if everything is ok, it's the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
 those with their given commands. In case modules like afterglowpy and dust_extinction are needed, don't hesitate to do it with pip (normally it shouldn't happen), but some modules may not install correctly in case of disturbance.
 
+Please pay special attention to the `import nmma.em.analysis` and make sure that it does not generate any errors. 
+
 Unfortunately, due to the web of package requirements that NMMA depends on, running setup.py does not typically finish without errors the first time through. Experience has shown that in the vast majority of cases, simply pinning versions such as:
 
-	pip install astropy==4.3.1
+	pip install astropy==5.1
 
 and then trying again is sufficient for completion of the installation. This instruction file will likely cover the issues you might face during your installation. However, please open issues on GitHub if there appear to be unresolvable conflicts. 
 
