@@ -79,7 +79,7 @@ requirements = [
     "matplotlib>=2.0",
     "scipy>=1.7.1",
     "pandas>=1.3.4",
-    "astropy>=5.0.1",
+    "astropy>=4.3.1",
     "afterglowpy>=0.7.3",
     "scikit-learn>=0.23.1",
     "pymultinest",
