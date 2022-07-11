@@ -39,6 +39,8 @@ model_parameters_dict = {
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
     "CV": ["example_num"],
     "AnBa2022_sparse": ["mrp", "xmix"],
+    "salt2": ["x0", "x1", "c"],
+    "nugent-hyper": ["supernova_mag_boost"],
 }
 
 
@@ -489,8 +491,10 @@ class SupernovaLightCurveModel(object):
         _, lbol, mag = utils.sn_lc(
             sample_times, z, Ebv, model_name=self.model, parameters=new_parameters
         )
-        for filt in mag.keys():
-            mag[filt] += parameters["supernova_mag_boost"]
+
+        if self.model == "nugent-hyper":
+            for filt in mag.keys():
+                mag[filt] += parameters["supernova_mag_boost"]
 
         return lbol, mag
 

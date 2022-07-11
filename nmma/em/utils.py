@@ -685,7 +685,7 @@ def sn_lc(
     elif model_name == "salt2":
         model.set(
             z=z,
-            t0=parameters["t0"],
+            t0=np.median(tt),
             x0=parameters["x0"],
             x1=parameters["x1"],
             c=parameters["c"],
@@ -711,13 +711,13 @@ def sn_lc(
         else:
             try:
                 # the output is in ergs / s / cm^2 / Angstrom
-                flux = model.flux(tt, lambda_A) * ext[filt_idx]
+                flux = model.flux(tt, [lambda_A]) * ext[filt_idx]
                 # see https://en.wikipedia.org/wiki/AB_magnitude
                 flux_jy = 3.34e4 * np.power(lambda_A, 2.0) * flux
                 mag_per_filt = -2.5 * np.log10(flux_jy) + 8.9
                 mag[filt] = mag_per_filt[:, 0]
-
             except Exception:
+                mag[filt] = np.ones(tt.shape) * np.nan
                 lbol = np.zeros(tt.shape)
 
     return tt, lbol, mag

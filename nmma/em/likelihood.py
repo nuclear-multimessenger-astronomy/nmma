@@ -129,12 +129,20 @@ class OpticalLightCurve(Likelihood):
             sample_times_used = self.sample_times[usedIdx]
             mag_app_used = mag_app_filt[usedIdx]
             t0 = self.parameters["KNtimeshift"]
-            mag_app_interp[filt] = interp1d(
-                sample_times_used + t0,
-                mag_app_used,
-                fill_value="extrapolate",
-                bounds_error=False,
-            )
+            if len(mag_app_used) > 0:
+                mag_app_interp[filt] = interp1d(
+                    sample_times_used + t0,
+                    mag_app_used,
+                    fill_value="extrapolate",
+                    bounds_error=False,
+                )
+            else:
+                mag_app_interp[filt] = interp1d(
+                    [-99.0, -99.9],
+                    [np.nan, np.nan],
+                    fill_value=np.nan,
+                    bounds_error=False,
+                )
 
         # compare the estimated light curve and the measured data
         minus_chisquare_total = 0.0
