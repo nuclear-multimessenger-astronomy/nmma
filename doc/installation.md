@@ -88,7 +88,7 @@ OR
 Install parallel-bilby:
 
 
-* $ conda install -c conda-forge bilby
+* $ conda install -c conda-forge parallel_bilby
 
 
 
