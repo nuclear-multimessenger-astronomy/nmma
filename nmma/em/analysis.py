@@ -277,6 +277,11 @@ def get_parser():
         help="A comma seperated list of filters to use for augmentation (e.g. g,r,i). If none is provided, will use all the filters available",
     )
     parser.add_argument(
+        "--optimal-augmentation-times",
+        type=str,
+        help="A comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         default=False,
@@ -569,24 +574,28 @@ def main(args=None):
     result.save_posterior_samples()
 
     if args.injection:
-        if args.model in ["Bu2019nsbh"]:
-            injlist = [
-                "luminosity_distance",
-                "inclination_EM",
-                "log10_mej_dyn",
-                "log10_mej_wind",
-            ]
-        elif args.model in ["Bu2019lm"]:
-            injlist = [
-                "luminosity_distance",
-                "inclination_EM",
-                "KNphi",
-                "log10_mej_dyn",
-                "log10_mej_wind",
-            ]
-        else:
-            injlist = ["luminosity_distance"] + model_parameters_dict[args.model]
-        injection = {key: injection_parameters[key] for key in injlist}
+        injlist_all = []
+        for model_name in model_names:
+            if model_name in ["Bu2019nsbh"]:
+                injlist = [
+                    "luminosity_distance",
+                    "inclination_EM",
+                    "log10_mej_dyn",
+                    "log10_mej_wind",
+                ]
+            elif model_name in ["Bu2019lm"]:
+                injlist = [
+                    "luminosity_distance",
+                    "inclination_EM",
+                    "KNphi",
+                    "log10_mej_dyn",
+                    "log10_mej_wind",
+                ]
+            else:
+                injlist = ["luminosity_distance"] + model_parameters_dict[model_name]
+
+            injlist_all = list(set(injlist_all + injlist))
+        injection = {key: injection_parameters[key] for key in injlist_all}
         result.plot_corner(parameters=injection)
     else:
         result.plot_corner()

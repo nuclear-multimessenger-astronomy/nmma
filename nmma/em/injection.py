@@ -196,8 +196,8 @@ def create_light_curve_data(
             .reset_index(drop=True)
         )
         sim["passband"] = sim["passband"].map({1: "g", 2: "r", 3: "i"})
-        sim["mag"]=np.nan
-        sim["mag_err"]=np.nan
+        sim["mag"] = np.nan
+        sim["mag_err"] = np.nan
 
         for filt, group in sim.groupby("passband"):
             data_per_filt = copy.deepcopy(data_original[filt])
@@ -215,8 +215,8 @@ def create_light_curve_data(
                 bounds_error=False,
                 assume_sorted=True,
             )
-            sim.loc[group.index,"mag"] = lc(group["mjd"].tolist())
-            sim.loc[group.index,"mag_err"] = lc_err(group["mjd"].tolist())
+            sim.loc[group.index, "mag"] = lc(group["mjd"].tolist())
+            sim.loc[group.index, "mag_err"] = lc_err(group["mjd"].tolist())
 
         for filt, group in sim.groupby("passband"):
             if args.ztf_uncertainties and filt in ["g", "r", "i"]:
@@ -224,65 +224,65 @@ def create_light_curve_data(
                 for idx, row in group.iterrows():
                     upperlimit = False
                     if filt == "g" and row["ToO"] is False:
-                        limg=float(ztflimg.sample())
+                        limg = float(ztflimg.sample())
                         if row["mag"] > limg:
-                            sim.loc[row.name,'mag'] = limg
-                            sim.loc[row.name,'mag_err'] = np.inf
+                            sim.loc[row.name, "mag"] = limg
+                            sim.loc[row.name, "mag_err"] = np.inf
                     elif filt == "g" and row["ToO"] is True:
-                        toolimg=float(ztftoolimg.sample())
+                        toolimg = float(ztftoolimg.sample())
                         if row["mag"] > toolimg:
-                            sim.loc[row.name,'mag'] = toolimg
-                            sim.loc[row.name,'mag_err'] = np.inf
+                            sim.loc[row.name, "mag"] = toolimg
+                            sim.loc[row.name, "mag_err"] = np.inf
                     elif filt == "r" and row["ToO"] is False:
-                        limr=float(ztflimr.sample())
+                        limr = float(ztflimr.sample())
                         if row["mag"] > limr:
-                            sim.loc[row.name,'mag'] = limr
-                            sim.loc[row.name,'mag_err'] = np.inf
+                            sim.loc[row.name, "mag"] = limr
+                            sim.loc[row.name, "mag_err"] = np.inf
                     elif filt == "r" and row["ToO"] is True:
-                        toolimr=float(ztftoolimr.sample())
+                        toolimr = float(ztftoolimr.sample())
                         if row["mag"] > toolimr:
-                            sim.loc[row.name,'mag'] = toolimr
-                            sim.loc[row.name,'mag_err'] = np.inf
+                            sim.loc[row.name, "mag"] = toolimr
+                            sim.loc[row.name, "mag_err"] = np.inf
                     else:
-                        limi=float(ztflimi.sample())
+                        limi = float(ztflimi.sample())
                         if row["mag"] > limi:
-                            sim.loc[row.name,'mag'] = limi
-                            sim.loc[row.name,'mag_err'] = np.inf
-                    if not np.isfinite(sim.loc[row.name,"mag_err"]):
+                            sim.loc[row.name, "mag"] = limi
+                            sim.loc[row.name, "mag_err"] = np.inf
+                    if not np.isfinite(sim.loc[row.name, "mag_err"]):
                         upperlimit = True
                     if upperlimit:
                         mag_err.append(np.inf)
                     else:
                         df = pd.DataFrame.from_dict(
-                            {"passband": [filt], "mag": [sim.loc[row.name,"mag"]]}
+                            {"passband": [filt], "mag": [sim.loc[row.name, "mag"]]}
                         )
                         df["passband"] = df["passband"].map(
                             {"g": 1, "r": 2, "i": 3}
                         )  # estimate_mag_err maps filter numbers
                         df = estimate_mag_err(ztfuncer, df)
-                        sim.loc[row.name,'mag_err']=float(df["mag_err"])
+                        sim.loc[row.name, "mag_err"] = float(df["mag_err"])
                         mag_err.append(df["mag_err"].tolist()[0])
 
                 data_per_filt = np.vstack(
                     [
-                        sim.loc[group.index,"mjd"].tolist(),
-                        sim.loc[group.index,"mag"].tolist(),
+                        sim.loc[group.index, "mjd"].tolist(),
+                        sim.loc[group.index, "mag"].tolist(),
                         mag_err,
                     ]
                 ).T
             else:
                 data_per_filt = np.vstack(
                     [
-                        sim.loc[group.index,"mjd"].tolist(),
-                        sim.loc[group.index,"mag"].tolist(),
-                        sim.loc[group.index,"mag_err"].tolist(),
+                        sim.loc[group.index, "mjd"].tolist(),
+                        sim.loc[group.index, "mag"].tolist(),
+                        sim.loc[group.index, "mag_err"].tolist(),
                     ]
                 ).T
             data[filt] = data_per_filt
             passbands_to_keep.append(filt)
-        if args.train_stats:    
-          sim['tc']=tc 
-          sim.to_csv(args.outdir+'/too.csv',index=False)
+        if args.train_stats:
+            sim["tc"] = tc
+            sim.to_csv(args.outdir + "/too.csv", index=False)
 
     if args.rubin_ToO:
         start = tmin + tc
@@ -339,14 +339,17 @@ def create_light_curve_data(
                 list(data.keys()), size=args.optimal_augmentation_N_points, replace=True
             )
         else:
-            filts = np.random.choice(
-                args.optimal_augmentation_filters.split(","),
-                size=args.optimal_augmentation_N_points,
-                replace=True,
+            filts = args.optimal_augmentation_filters.split(",")
+
+        if args.optimal_augmentation_times is None:
+            tt = np.random.uniform(
+                tmin + tc, tmax + tc, size=args.optimal_augmentation_N_points
             )
-        tt = np.random.uniform(
-            tmin + tc, tmax + tc, size=args.optimal_augmentation_N_points
-        )
+        else:
+            tt = tc + np.array(
+                [float(x) for x in args.optimal_augmentation_times.split(",")]
+            )
+
         for filt in list(set(filts)):
             data_per_filt = copy.deepcopy(data_original[filt])
             idx = np.where(filt == filts)[0]
