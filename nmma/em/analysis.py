@@ -254,30 +254,30 @@ def get_parser():
         help="enable prior run",
     )
     parser.add_argument(
-        "--optimal-augmentation",
+        "--photometry-augmentation",
         help="Augment photometry to improve parameter recovery",
         action="store_true",
     )
     parser.add_argument(
-        "--optimal-augmentation-seed",
+        "--photometry-augmentation-seed",
         metavar="seed",
         type=int,
         default=0,
         help="Optimal generation seed (default: 0)",
     )
     parser.add_argument(
-        "--optimal-augmentation-N-points",
+        "--photometry-augmentation-N-points",
         help="Number of augmented points to include",
         type=int,
         default=10,
     )
     parser.add_argument(
-        "--optimal-augmentation-filters",
+        "--photometry-augmentation-filters",
         type=str,
         help="A comma seperated list of filters to use for augmentation (e.g. g,r,i). If none is provided, will use all the filters available",
     )
     parser.add_argument(
-        "--optimal-augmentation-times",
+        "--photometry-augmentation-times",
         type=str,
         help="A comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax",
     )
@@ -416,11 +416,11 @@ def main(args=None):
             data_out = np.empty((0, 6))
             for filt in data.keys():
                 if args.filters:
-                    if args.optimal_augmentation_filters:
+                    if args.photometry_augmentation_filters:
                         filts = list(
                             set(
                                 args.filters.split(",")
-                                + args.optimal_augmentation_filters.split(",")
+                                + args.photometry_augmentation_filters.split(",")
                             )
                         )
                     else:
@@ -492,11 +492,11 @@ def main(args=None):
 
     error_budget = [float(x) for x in args.error_budget.split(",")]
     if args.filters:
-        if args.optimal_augmentation_filters:
+        if args.photometry_augmentation_filters:
             filters = list(
                 set(
                     args.filters.split(",")
-                    + args.optimal_augmentation_filters.split(",")
+                    + args.photometry_augmentation_filters.split(",")
                 )
             )
         else:

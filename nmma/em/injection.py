@@ -100,7 +100,7 @@ def create_light_curve_data(
 
     data = {}
 
-    if args.ztf_sampling or args.rubin_ToO or args.optimal_augmentation:
+    if args.ztf_sampling or args.rubin_ToO or args.photometry_augmentation:
         passbands_to_keep = []
 
     for filt in mag:
@@ -108,8 +108,8 @@ def create_light_curve_data(
         if filt in detection_limit:
             det_lim = detection_limit[filt]
         elif (
-            args.optimal_augmentation_filters is not None
-            and filt in args.optimal_augmentation_filters.split(",")
+            args.photometry_augmentation_filters is not None
+            and filt in args.photometry_augmentation_filters.split(",")
         ):
             det_lim = 30.0
         else:
@@ -332,22 +332,24 @@ def create_light_curve_data(
             data[filt] = data_per_filt
             passbands_to_keep.append(filt)
 
-    if args.optimal_augmentation:
-        np.random.seed(args.optimal_augmentation_seed)
-        if args.optimal_augmentation_filters is None:
+    if args.photometry_augmentation:
+        np.random.seed(args.photometry_augmentation_seed)
+        if args.photometry_augmentation_filters is None:
             filts = np.random.choice(
-                list(data.keys()), size=args.optimal_augmentation_N_points, replace=True
+                list(data.keys()),
+                size=args.photometry_augmentation_N_points,
+                replace=True,
             )
         else:
-            filts = args.optimal_augmentation_filters.split(",")
+            filts = args.photometry_augmentation_filters.split(",")
 
-        if args.optimal_augmentation_times is None:
+        if args.photometry_augmentation_times is None:
             tt = np.random.uniform(
-                tmin + tc, tmax + tc, size=args.optimal_augmentation_N_points
+                tmin + tc, tmax + tc, size=args.photometry_augmentation_N_points
             )
         else:
             tt = tc + np.array(
-                [float(x) for x in args.optimal_augmentation_times.split(",")]
+                [float(x) for x in args.photometry_augmentation_times.split(",")]
             )
 
         for filt in list(set(filts)):
@@ -380,7 +382,7 @@ def create_light_curve_data(
                 data[filt] = data[filt][data[filt][:, 0].argsort()]
             passbands_to_keep.append(filt)
 
-    if args.ztf_sampling or args.rubin_ToO or args.optimal_augmentation:
+    if args.ztf_sampling or args.rubin_ToO or args.photometry_augmentation:
         passbands_to_lose = set(list(data.keys())) - set(passbands_to_keep)
         for filt in passbands_to_lose:
             del data[filt]
