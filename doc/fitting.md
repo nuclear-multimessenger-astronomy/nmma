@@ -24,12 +24,27 @@ resulting in an injection.json file for use below.
 
 Following the quick start, we assume that an injection file has been made generated and made available. For example, there are a number of extra parameters available to modify the light curve sampling, including:
 
+If one is interested in realistic ZTF-like light curves, one should use:
 * --ztf-sampling: Uses a gaussian KDE to simulate ZTF pointing set for ZTF-II in g and r, and private/partnernship in i
 * --ztf-uncertainties: Simulates magnitude uncertainties using skew normal fits to forced photometry uncertainties in mag_bins=[12,18,20,21,23]
 * --ztf-ToO: Adds realistic ToO pointings during the first one or two days (1/2 randomly chosen) for specified exposure times: either 180s (valid for skymaps <1000sq deg) or 300s (skymaps >1000sq deg). Has no effect if --ztf-sampling is not turned on.
 
+If instead one is interested in potential Rubin-like ToO light curves, one should use:
 * --rubin-ToO: Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.
 * --rubin-ToO-type: Type of ToO observation. Has no effect if --rubin-ToO is not turned on.
+
+One may also be interested in a custom strategy. For this, one can use the flags:
+* --photometry-augmentation: A flag to augment photometry to improve parameter recovery
+* --photometry-augmentation-seed: Set a seed for the augmentation
+
+There are a few different forms this may take, for example, specifying:
+* --optimal-augmentation-filters: Provide a comma seperated list of filters to use for augmentation (e.g. g,r,i). If none is provided, will use all the filters available.
+with
+* --photometry-augmentation-N-points: Specify the number of augmented points to include taken randomly from --optimal-augmentation-filters
+
+However, if you specify:
+* --optimal-augmentation-times: Provide a comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax).
+You can choose the times to simulate for a given filter.
 
 We can use these flags as follows.
 
