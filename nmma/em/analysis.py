@@ -595,7 +595,18 @@ def main(args=None):
                 injlist = ["luminosity_distance"] + model_parameters_dict[model_name]
 
             injlist_all = list(set(injlist_all + injlist))
-        injection = {key: injection_parameters[key] for key in injlist_all}
+
+        constant_columns = []
+        for column in result.posterior:
+            if len(result.posterior[column].unique()) == 1:
+                constant_columns.append(column)
+
+        injlist_all = list(set(injlist_all) - set(constant_columns))
+        injection = {
+            key: injection_parameters[key]
+            for key in injlist_all
+            if key in injection_parameters
+        }
         result.plot_corner(parameters=injection)
     else:
         result.plot_corner()
