@@ -158,6 +158,7 @@ def main():
         )
     fid.write('requirements = OpSys == "LINUX"\n')
     fid.write("request_memory = 8192\n")
+    fid.write("request_disk = 500 MB\n")
     fid.write("request_cpus = 1\n")
     fid.write("accounting_group = ligo.dev.o2.burst.allsky.stamp\n")
     fid.write("notification = nevers\n")
