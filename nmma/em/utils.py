@@ -834,7 +834,7 @@ def sc_lc(t_day, param_dict):
 
         # make sure there are at least two valid data point for interpolation
         if len(np.where(np.isfinite(mAB))[0]) < 2:
-            return t_day, np.zeros(len(t_day)), dict()
+            mag[filt] = np.ones(t_day.shape) * np.nan
 
     return t_day, lbol, mag
 
