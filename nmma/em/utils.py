@@ -125,7 +125,8 @@ def getRedShift(parameters):
                 zmin=0.0,
                 zmax=2.0,
             )
-            z = z.value
+            if hasattr(z, "value"):
+                z = z.value
         else:
             z = 0.0
     return z
