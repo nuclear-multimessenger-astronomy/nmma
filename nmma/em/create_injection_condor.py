@@ -63,23 +63,23 @@ def main():
     )
     parser.add_argument("-o", "--outdir", type=str, default="outdir")
     parser.add_argument(
-        "--optimal-augmentation",
+        "--photometry-augmentation",
         help="Augment photometry to improve parameter recovery",
         action="store_true",
     )
     parser.add_argument(
-        "--optimal-augmentation-N-points",
+        "--photometry-augmentation-N-points",
         help="Number of augmented points to include",
         type=int,
         default=10,
     )
     parser.add_argument(
-        "--optimal-augmentation-filters",
+        "--photometry-augmentation-filters",
         type=str,
         help="A comma seperated list of filters to use for augmentation (e.g. g,r,i). If none is provided, will use all the filters available",
     )
     parser.add_argument(
-        "--optimal-augmentation-N-simulations",
+        "--photometry-augmentation-N-simulations",
         help="Number of augmented simulation runs to perform",
         type=int,
         default=10,
@@ -140,8 +140,8 @@ def main():
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
 
-        if args.optimal_augmentation:
-            for ii in range(args.optimal_augmentation_N_simulations):
+        if args.photometry_augmentation:
+            for ii in range(args.photometry_augmentation_N_simulations):
                 outdir = os.path.join(args.outdir, str(index), str(ii))
                 if not os.path.isdir(outdir):
                     os.makedirs(outdir)
@@ -169,23 +169,7 @@ def main():
                 job_number = job_number + 1
 
                 fid1.write(
-                    "%s --model %s --svd-path /home/%s/gwemlightcurves/output/svdmodels --outdir %s --label injection_%s --prior analysis.prior --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive %d --Ebv-max 0 --injection %s --injection-num %s --injection-detection-limit %s --injection-outfile %s --generation-seed 42 --filters %s --plot --remove-nondetections --optimal-augmentation --optimal-augmentation-N-points %d --optimal-augmentation-filters %s --optimal-augmentation-seed %d\n"
-                    % (
-                        lc_analysis,
-                        args.model,
-                        os.environ["USER"],
-                        outdir,
-                        args.model,
-                        args.nlive,
-                        args.injection_file,
-                        str(index),
-                        args.injection_detection_limit,
-                        injfile,
-                        args.filters,
-                        args.optimal_augmentation_N_points,
-                        args.optimal_augmentation_filters,
-                        ii,
-                    )
+                    f"{lc_analysis} --model {args.model} --svd-path ./svdmodels --outdir {outdir} --label injection_{args.model} --prior {args.prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive {args.nlive} --Ebv-max 0 --injection {args.injection_file} --injection-num {str(index)} --injection-detection-limit {args.injection_detection_limit} --injection-outfile {injfile} --generation-seed 42 --filters {args.filters} --plot --remove-nondetections --photometry-augmentation --photometry-augmentation-N-points {args.photometry_augmentation_N_points} --photometry-augmentation-filters {args.photometry_augmentation_filters} --photometry-augmentation-seed {ii}\n"
                 )
         else:
             priors = bilby.gw.prior.PriorDict(args.prior_file)
@@ -203,20 +187,7 @@ def main():
             job_number = job_number + 1
 
             fid1.write(
-                "%s --model %s --svd-path /home/%s/gwemlightcurves/output/svdmodels --outdir %s --label injection_%s --prior analysis.prior --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive %d --Ebv-max 0 --injection %s --injection-num %s --injection-detection-limit %s --injection-outfile %s --generation-seed 42 --filters %s --plot --remove-nondetections\n"
-                % (
-                    lc_analysis,
-                    args.model,
-                    os.environ["USER"],
-                    outdir,
-                    args.model,
-                    args.nlive,
-                    args.injection_file,
-                    str(index),
-                    args.injection_detection_limit,
-                    injfile,
-                    args.filters,
-                )
+                f"{lc_analysis} --model {args.model} --svd-path ./svdmodels --outdir %s --label injection_{args.model} --prior {args.prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive {args.nlive} --Ebv-max 0 --injection {args.injection_file} --injection-num {str(index)} --injection-detection-limit {args.injection_detection_limit} --injection-outfile {injfile} --generation-seed 42 --filters {args.filters} --plot --remove-nondetections\n"
             )
 
     fid.close()
@@ -226,36 +197,17 @@ def main():
     fid.write(f"output = {logdir}/out.$(jobNumber)\n")
     fid.write(f"error = {logdir}/err.$(jobNumber)\n")
 
-    if args.optimal_augmentation:
+    if args.photometry_augmentation:
         fid.write(
-            "arguments = --model %s --svd-path /home/%s/gwemlightcurves/output/svdmodels --outdir $(OUTDIR) --label injection_%s --prior analysis.prior --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive %d --Ebv-max 0 --injection %s --injection-num $(INJNUM) --injection-detection-limit %s --injection-outfile $(INJOUT) --generation-seed 42 --filters %s --plot --remove-nondetections --optimal-augmentation --optimal-augmentation-N-points %d --optimal-augmentation-filters %s --optimal-augmentation-seed $(SEED)\n"
-            % (
-                args.model,
-                os.environ["USER"],
-                args.model,
-                args.nlive,
-                args.injection_file,
-                args.injection_detection_limit,
-                args.filters,
-                args.optimal_augmentation_N_points,
-                args.optimal_augmentation_filters,
-            )
+            f"arguments = --model {args.model} --svd-path ./svdmodels --outdir $(OUTDIR) --label injection_{args.model} --prior {args.prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive {args.nlive} --Ebv-max 0 --injection {args.injection_file} --injection-num $(INJNUM) --injection-detection-limit {args.injection_detection_limit} --injection-outfile $(INJOUT) --generation-seed 42 --filters {args.filters} --plot --remove-nondetections --photometry-augmentation --photometry-augmentation-N-points {args.photometry_augmentation_N_points} --photometry-augmentation-filters {args.photometry_augmentation_filters} --photometry-augmentation-seed $(SEED)\n"
         )
     else:
         fid.write(
-            "arguments = --model %s --svd-path /home/%s/gwemlightcurves/output/svdmodels --outdir $(OUTDIR) --label injection_%s --prior analysis.prior --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive %d --Ebv-max 0 --injection %s --injection-num $(INJNUM) --injection-detection-limit %s --injection-outfile $(INJOUT) --generation-seed 42 --filters %s --plot --remove-nondetections\n"
-            % (
-                args.model,
-                os.environ["USER"],
-                args.model,
-                args.nlive,
-                args.injection_file,
-                args.injection_detection_limit,
-                args.filters,
-            )
+            f"arguments = --model {args.model} --svd-path ./svdmodels --outdir $(OUTDIR) --label injection_{args.model} --prior {args.prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive {args.nlive} --Ebv-max 0 --injection {args.injection_file} --injection-num $(INJNUM) --injection-detection-limit {args.injection_detection_limit} --injection-outfile $(INJOUT) --generation-seed 42 --filters {args.filters} --plot --remove-nondetections\n"
         )
     fid.write('requirements = OpSys == "LINUX"\n')
     fid.write("request_memory = 8192\n")
+    fid.write("request_disk = 500 MB\n")
     fid.write("request_cpus = 1\n")
     fid.write("accounting_group = ligo.dev.o2.burst.allsky.stamp\n")
     fid.write("notification = nevers\n")
