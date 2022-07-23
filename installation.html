@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instructions For NMMA Installation &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Training" href="training.html" />
+    <link rel="prev" title="The Nuclear Multimessenger Astronomy (NMMA) framework" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Instructions For NMMA Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#preliminary-steps">Preliminary Steps:</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#main-installation">Main Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installation-on-expanse-and-other-cluster-resources">Installation on expanse and other cluster resources</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#matplotlib-fonts">Matplotlib fonts</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Instructions For NMMA Installation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="instructions-for-nmma-installation">
+<h1>Instructions For NMMA Installation<a class="headerlink" href="#instructions-for-nmma-installation" title="Permalink to this headline"></a></h1>
+<section id="preliminary-steps">
+<h2>Preliminary Steps:<a class="headerlink" href="#preliminary-steps" title="Permalink to this headline"></a></h2>
+<p>The steps highlighted below are primarily for Linux systems and Windows users are advised to use WSL (preferrably Ubuntu 20.04) for smooth installation.
+Ubuntu 20.04 is available for free download on Microsoft Store.</p>
+<p><strong>Installing Anaconda3</strong></p>
+<p>On your Linux/WSL terminal, run the following commands to install anaconda (replace 5.3.1 by the latest version):</p>
+<ul class="simple">
+<li><p>$ wget https://repo.anaconda.com/archive/Anaconda3-5.3.1-Linux-x86_64.sh</p></li>
+<li><p>$ bash Anaconda3-5.3.1-Linux-x86_64.sh</p></li>
+</ul>
+<p>(For 32-bit installation, skip the ‘_64’ in both commands)</p>
+<p>NOTE: If you already have Anaconda3 installed, please make sure that it is updated to the latest version (conda update –all). Also check that you do not have multiple
+versions of python installed in usr/lib/ directory as it can cause version conflicts while installing dependencies.</p>
+<p>Now do:</p>
+<ul class="simple">
+<li><p>$ conda update –all</p></li>
+</ul>
+<p><strong>Cloning the NMMA repository</strong></p>
+<p>Fork the NMMA repository given below:</p>
+<p>(NMMA Github Repo)[https://github.com/nuclear-multimessenger-astronomy/nmma]</p>
+<p>Note that we link above to the main branch, but suggest making changes on your own fork (please also see our <a class="reference external" href="./contributing.html">contributing guide</a>). Now, after forking, run the following command to clone the repository into your currently directory (by default, in your home directory):</p>
+<ul class="simple">
+<li><p>$ git clone https://github.com/your_github_username/nmma<br />Change directory to the nmma folder:</p></li>
+<li><p>$ cd nmma</p></li>
+</ul>
+</section>
+<section id="main-installation">
+<h2>Main Installation<a class="headerlink" href="#main-installation" title="Permalink to this headline"></a></h2>
+<p>Create a new environment using this command (environment name is nmma_env in this case):</p>
+<ul class="simple">
+<li><p>$ conda create –name nmma_env python=3.8</p></li>
+<li><p>$ conda activate nmma_env</p></li>
+</ul>
+<p>NOTE: If this gives an error like: CommandNotFoundError: Your shell has not been properly configured to use ‘conda activate’, then run:</p>
+<ul class="simple">
+<li><p>$ source ~/anaconda3/etc/profile.d/conda.sh</p></li>
+</ul>
+<p>then proceed with conda activate nmma_env.</p>
+<p>Get the latest pip version</p>
+<ul class="simple">
+<li><p>$ pip install –upgrade pip</p></li>
+</ul>
+<p>Check python and pip version like this:</p>
+<ul class="simple">
+<li><p>$ python –version</p></li>
+<li><p>$ pip –version</p></li>
+</ul>
+<p>Python 3.8 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation.</p>
+<p>For the moment we advise Linux users to avoid using python3.9 and python3.10 in their nmma environment this can generate major problems for the operation. So use preferably python3.8.</p>
+<p>Install mpi4py:</p>
+<ul class="simple">
+<li><p>$ conda install mpi4py</p></li>
+</ul>
+<p>OR</p>
+<ul class="simple">
+<li><p>$ pip install mpi4py</p></li>
+</ul>
+<p>Install parallel-bilby:</p>
+<ul class="simple">
+<li><p>$ conda install -c conda-forge parallel-bilby</p></li>
+</ul>
+<p>OR</p>
+<ul class="simple">
+<li><p>$ pip install parallel-bilby</p></li>
+</ul>
+<p>Install pymultinest</p>
+<ul class="simple">
+<li><p>$ conda install -c conda-forge pymultinest</p></li>
+</ul>
+<p>NOTE: In case if an error comes up during an NMMA analysis of the form:</p>
+<p>ERROR:   Could not load MultiNest library “libmultinest.so”
+ERROR:   You have to build it first,
+ERROR:   and point the LD_LIBRARY_PATH environment variable to it!</p>
+<p>Then, for using the PyMultinest library, it is required to get and compile the Multinest library separately. Instructions for the same are given here:</p>
+<p>https://johannesbuchner.github.io/PyMultiNest/install.html</p>
+<p>Use the commands below to install the dependencies given in requirements.txt file which are necessary for NMMA:</p>
+<ul class="simple">
+<li><p>$ python setup.py install</p></li>
+</ul>
+<p>To make sure, install again the requirements with pip like this:</p>
+<ul class="simple">
+<li><p>$ pip install importlib_resources</p></li>
+<li><p>$ pip install  extinction</p></li>
+<li><p>$ pip install dill</p></li>
+<li><p>$ pip install multiprocess</p></li>
+<li><p>$ pip install lalsuite</p></li>
+<li><p>$ pip install python-ligo-lw</p></li>
+</ul>
+<p>NOTE: If everything has gone smoothly, all of these above mentioned “pip install something” commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies
+if not covered by python setup.py install. Also, if running python setup.py install shows something on the lines of “cannot cythonize without cython”, do:</p>
+<ul class="simple">
+<li><p>$ conda install -c anaconda cython==0.29.24</p></li>
+</ul>
+<p>and redo python setup.py install.</p>
+<p><strong>First Test for NMMA</strong></p>
+<p>Run the following commands:</p>
+<ul class="simple">
+<li><p>$ ipython</p></li>
+<li><p>import nmma</p></li>
+<li><p>import nmma.em.analysis</p></li>
+<li><p>import nmma.eos.create_injection</p></li>
+</ul>
+<p>NOTE (Okay, last one!): if everything is ok, it’s the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
+those with their given commands. In case modules like afterglowpy and dust_extinction are needed, don’t hesitate to do it with pip (normally it shouldn’t happen), but some modules may not install correctly in case of disturbance.</p>
+<p>Please pay special attention to the <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">nmma.em.analysis</span></code> and make sure that it does not generate any errors.</p>
+<p>Unfortunately, due to the web of package requirements that NMMA depends on, running setup.py does not typically finish without errors the first time through. Experience has shown that in the vast majority of cases, simply pinning versions such as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">astropy</span><span class="o">==</span><span class="mf">4.3.1</span>
+</pre></div>
+</div>
+<p>and then trying again is sufficient for completion of the installation. This instruction file will likely cover the issues you might face during your installation. However, please open issues on GitHub if there appear to be unresolvable conflicts.</p>
+</section>
+<section id="installation-on-expanse-and-other-cluster-resources">
+<h2>Installation on expanse and other cluster resources<a class="headerlink" href="#installation-on-expanse-and-other-cluster-resources" title="Permalink to this headline"></a></h2>
+<p>When installation on cluster resources, it is common that all modules required for installing NMMA out of the box are not available. However, most will make it possible to import the required modules (most commonly, these are software like gfortran or mpi).</p>
+<p>For example, on XSEDE’s Expanse cluster, one can start a terminal session with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">sdsc</span>
+<span class="n">module</span> <span class="n">load</span> <span class="n">openmpi</span>
+</pre></div>
+</div>
+<p>and follow the instructions above.</p>
+<p>NOTE: If “module load openmpi” does not execute directly and it asks for dependencies, one can proceed with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>    <span class="n">module</span> <span class="n">load</span> <span class="n">sdsc</span>
+    <span class="n">module</span> <span class="n">load</span> <span class="n">cpu</span><span class="o">/</span><span class="mf">0.15.4</span>
+    <span class="n">module</span> <span class="n">load</span> <span class="n">gcc</span><span class="o">/</span><span class="mf">9.2.0</span>
+    <span class="n">module</span> <span class="n">load</span> <span class="n">openmpi</span><span class="o">/</span><span class="mf">4.1.1</span>
+</pre></div>
+</div>
+</section>
+<section id="matplotlib-fonts">
+<h2>Matplotlib fonts<a class="headerlink" href="#matplotlib-fonts" title="Permalink to this headline"></a></h2>
+<p>On new Linux installations, we sometimes come across the warning: “findfont: Font family [’Times New Roman’] not found. Falling back to DejaVu Sans”. If you do prefer to use ‘Times New Roman’ for all of your plotting needs, you can install msttcorefonts with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">msttcorefonts</span> <span class="o">-</span><span class="n">qq</span>
+</pre></div>
+</div>
+<p>After removing the matplotlib cache:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">rm</span> <span class="o">~/.</span><span class="n">cache</span><span class="o">/</span><span class="n">matplotlib</span> <span class="o">-</span><span class="n">rf</span>
+</pre></div>
+</div>
+<p>Beautiful fonts should be yours.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="The Nuclear Multimessenger Astronomy (NMMA) framework" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="training.html" class="btn btn-neutral float-right" title="Training" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

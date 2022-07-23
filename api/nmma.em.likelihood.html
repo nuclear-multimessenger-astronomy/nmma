@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>&lt;no title&gt; &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>&lt;no title&gt;</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <span class="target" id="module-nmma.em.likelihood"></span><dl class="py class">
+<dt class="sig sig-object py" id="nmma.em.likelihood.OpticalLightCurve">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nmma.em.likelihood.</span></span><span class="sig-name descname"><span class="pre">OpticalLightCurve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">light_curve_model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">light_curve_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trigger_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detection_limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error_budget</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">14.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.likelihood.OpticalLightCurve" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">bilby.core.likelihood.Likelihood</span></code></p>
+<p>A optical kilonova / GRB / kilonova-GRB afterglow likelihood object
+see line 1221 gwemlightcurves/sampler/loglike.py</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>light_curve_model: `nmma.em.SVDLightCurveModel`</strong></dt><dd><p>And object which computes the light curve of a kilonova signal,
+given a set of parameters</p>
+</dd>
+<dt><strong>filters: list, str</strong></dt><dd><p>A list of filters to be taken for analysis
+E.g. “u”, “g”, “r”, “i”, “z”, “y”, “J”, “H”, “K”</p>
+</dd>
+<dt><strong>light_curve_data: dict</strong></dt><dd><p>Dictionary of light curve data returned from nmma.em.utils.loadEvent</p>
+</dd>
+<dt><strong>trigger_time: float</strong></dt><dd><p>Time of the kilonova trigger in Modified Julian Day</p>
+</dd>
+<dt><strong>error_budget: float (default:1)</strong></dt><dd><p>Additionally introduced statistical error on the light curve data,
+so as to keep the systematic error in control</p>
+</dd>
+<dt><strong>tmin: float (default:0)</strong></dt><dd><p>Days from trigger_time to be started analysing</p>
+</dd>
+<dt><strong>tmax: float (default:14)</strong></dt><dd><p>Days from trigger_time to be ended analysing</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><dl class="simple">
+<dt>Likelihood: <cite>bilby.core.likelihood.Likelihood</cite></dt><dd><p>A likelihood object, able to compute the likelihood of the data given
+a set of  model parameters</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-odd">Attributes</dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>marginalized_parameters</strong></dt><dd></dd>
+<dt><strong>meta_data</strong></dt><dd></dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nmma.em.likelihood.OpticalLightCurve.log_likelihood" title="nmma.em.likelihood.OpticalLightCurve.log_likelihood"><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_likelihood</span></code></a>()</p></td>
+<td><p><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_likelihood_ratio</span></code>()</p></td>
+<td><p>Difference between log likelihood and noise log likelihood</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nmma.em.likelihood.OpticalLightCurve.noise_log_likelihood" title="nmma.em.likelihood.OpticalLightCurve.noise_log_likelihood"><code class="xref py py-obj docutils literal notranslate"><span class="pre">noise_log_likelihood</span></code></a>()</p></td>
+<td><p><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.likelihood.OpticalLightCurve.log_likelihood">
+<span class="sig-name descname"><span class="pre">log_likelihood</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.likelihood.OpticalLightCurve.log_likelihood" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><dl class="simple">
+<dt>float</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.likelihood.OpticalLightCurve.noise_log_likelihood">
+<span class="sig-name descname"><span class="pre">noise_log_likelihood</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.likelihood.OpticalLightCurve.noise_log_likelihood" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><dl class="simple">
+<dt>float</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.likelihood.truncated_gaussian">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.likelihood.</span></span><span class="sig-name descname"><span class="pre">truncated_gaussian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">m_det</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">m_err</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">m_est</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lim</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.likelihood.truncated_gaussian" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

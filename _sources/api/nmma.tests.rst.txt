@@ -1,0 +1,19 @@
+nmma.tests package
+==================
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nmma.tests.models
+   nmma.tests.training
+
+Module contents
+---------------
+
+.. automodule:: nmma.tests
+   :members:
+   :undoc-members:
+   :show-inheritance:

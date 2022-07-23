@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>&lt;no title&gt; &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>&lt;no title&gt;</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <span class="target" id="module-nmma.em.utils"></span><dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.calc_lc">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">calc_lc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">svd_mag_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">svd_lbol_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mag_ncoeff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lbol_ncoeff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolation_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sklearn_gp'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['u',</span> <span class="pre">'g',</span> <span class="pre">'r',</span> <span class="pre">'i',</span> <span class="pre">'z',</span> <span class="pre">'y',</span> <span class="pre">'J',</span> <span class="pre">'H',</span> <span class="pre">'K']</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.calc_lc" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.calc_spectra">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">calc_spectra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lambdaini</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lambdamax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dlambda</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">svd_spec_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.calc_spectra" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.dataProcess">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">dataProcess</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">triggerTime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmax</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.dataProcess" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.estimate_mag_err">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">estimate_mag_err</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">uncer_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.estimate_mag_err" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.extinctionFactorP92SMC">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">extinctionFactorP92SMC</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ebv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff_hi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2e+16</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.extinctionFactorP92SMC" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.fluxDensity">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">fluxDensity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nu</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.fluxDensity" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.getFilteredMag">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">getFilteredMag</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filt</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.getFilteredMag" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.getRedShift">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">getRedShift</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.getRedShift" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.grb_lc">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">grb_lc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t_day</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ebv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.grb_lc" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.loadEvent">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">loadEvent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.loadEvent" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.loadEventSpec">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">loadEventSpec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.loadEventSpec" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.metzger_lc">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">metzger_lc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t_day</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.metzger_lc" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.powerlaw_blackbody_constant_temperature_lc">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">powerlaw_blackbody_constant_temperature_lc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t_day</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.powerlaw_blackbody_constant_temperature_lc" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.read_photometry_files">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">read_photometry_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">array([0.,</span> <span class="pre">0.14141414,</span> <span class="pre">0.28282828,</span> <span class="pre">0.42424242,</span> <span class="pre">0.56565657,</span> <span class="pre">0.70707071,</span> <span class="pre">0.84848485,</span> <span class="pre">0.98989899,</span> <span class="pre">1.13131313,</span> <span class="pre">1.27272727,</span> <span class="pre">1.41414141,</span> <span class="pre">1.55555556,</span> <span class="pre">1.6969697,</span> <span class="pre">1.83838384,</span> <span class="pre">1.97979798,</span> <span class="pre">2.12121212,</span> <span class="pre">2.26262626,</span> <span class="pre">2.4040404,</span> <span class="pre">2.54545455,</span> <span class="pre">2.68686869,</span> <span class="pre">2.82828283,</span> <span class="pre">2.96969697,</span> <span class="pre">3.11111111,</span> <span class="pre">3.25252525,</span> <span class="pre">3.39393939,</span> <span class="pre">3.53535354,</span> <span class="pre">3.67676768,</span> <span class="pre">3.81818182,</span> <span class="pre">3.95959596,</span> <span class="pre">4.1010101,</span> <span class="pre">4.24242424,</span> <span class="pre">4.38383838,</span> <span class="pre">4.52525253,</span> <span class="pre">4.66666667,</span> <span class="pre">4.80808081,</span> <span class="pre">4.94949495,</span> <span class="pre">5.09090909,</span> <span class="pre">5.23232323,</span> <span class="pre">5.37373737,</span> <span class="pre">5.51515152,</span> <span class="pre">5.65656566,</span> <span class="pre">5.7979798,</span> <span class="pre">5.93939394,</span> <span class="pre">6.08080808,</span> <span class="pre">6.22222222,</span> <span class="pre">6.36363636,</span> <span class="pre">6.50505051,</span> <span class="pre">6.64646465,</span> <span class="pre">6.78787879,</span> <span class="pre">6.92929293,</span> <span class="pre">7.07070707,</span> <span class="pre">7.21212121,</span> <span class="pre">7.35353535,</span> <span class="pre">7.49494949,</span> <span class="pre">7.63636364,</span> <span class="pre">7.77777778,</span> <span class="pre">7.91919192,</span> <span class="pre">8.06060606,</span> <span class="pre">8.2020202,</span> <span class="pre">8.34343434,</span> <span class="pre">8.48484848,</span> <span class="pre">8.62626263,</span> <span class="pre">8.76767677,</span> <span class="pre">8.90909091,</span> <span class="pre">9.05050505,</span> <span class="pre">9.19191919,</span> <span class="pre">9.33333333,</span> <span class="pre">9.47474747,</span> <span class="pre">9.61616162,</span> <span class="pre">9.75757576,</span> <span class="pre">9.8989899,</span> <span class="pre">10.04040404,</span> <span class="pre">10.18181818,</span> <span class="pre">10.32323232,</span> <span class="pre">10.46464646,</span> <span class="pre">10.60606061,</span> <span class="pre">10.74747475,</span> <span class="pre">10.88888889,</span> <span class="pre">11.03030303,</span> <span class="pre">11.17171717,</span> <span class="pre">11.31313131,</span> <span class="pre">11.45454545,</span> <span class="pre">11.5959596,</span> <span class="pre">11.73737374,</span> <span class="pre">11.87878788,</span> <span class="pre">12.02020202,</span> <span class="pre">12.16161616,</span> <span class="pre">12.3030303,</span> <span class="pre">12.44444444,</span> <span class="pre">12.58585859,</span> <span class="pre">12.72727273,</span> <span class="pre">12.86868687,</span> <span class="pre">13.01010101,</span> <span class="pre">13.15151515,</span> <span class="pre">13.29292929,</span> <span class="pre">13.43434343,</span> <span class="pre">13.57575758,</span> <span class="pre">13.71717172,</span> <span class="pre">13.85858586,</span> <span class="pre">14.])</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.read_photometry_files" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.read_spectroscopy_files">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">read_spectroscopy_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wavelength_min</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wavelength_max</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">smooth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.read_spectroscopy_files" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.sc_lc">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">sc_lc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t_day</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.sc_lc" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.utils.sn_lc">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.utils.</span></span><span class="sig-name descname"><span class="pre">sn_lc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ebv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">abs_mag</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-</span> <span class="pre">19.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regularize_band</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sdssu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'nugent-hyper'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.utils.sn_lc" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

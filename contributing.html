@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to Contribute &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Perform combined analyses" href="combined_analysis.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">How to Contribute</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#license">License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#including-your-changes">Including your changes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#bug-reports">Bug Reports</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#process-guidelines">Process guidelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#code-style">Code style</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#testing">Testing</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>How to Contribute</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="how-to-contribute">
+<h1>How to Contribute<a class="headerlink" href="#how-to-contribute" title="Permalink to this headline"></a></h1>
+<section id="license">
+<h2>License<a class="headerlink" href="#license" title="Permalink to this headline"></a></h2>
+<p>NMMA is released under the MIT license, which means that you are allowed to modify the code for your own purposes, as long as you retain our <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/master/LICENSE.txt">copyright notice</a>.</p>
+<p>However, we would love to grow the NMMA community, and integrate improvements directly into our <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma">code repository on GitHub</a>.</p>
+</section>
+<section id="including-your-changes">
+<h2>Including your changes<a class="headerlink" href="#including-your-changes" title="Permalink to this headline"></a></h2>
+<p>To make a code contribution to the project, follow these steps (which
+are outlined in more detail in <a class="reference external" href="https://guides.github.com/activities/forking/">this GitHub
+guide</a>):</p>
+<ol class="simple">
+<li><p>Make a fork of the <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma">NMMA repository</a></p></li>
+<li><p>Clone your fork, and add <code class="docutils literal notranslate"><span class="pre">upstream</span></code> (<code class="docutils literal notranslate"><span class="pre">git&#64;github.com:nuclear-multimessenger-astronomy/nmma</span></code>) as a remote</p></li>
+<li><p>Create a new branch and add your feature</p></li>
+<li><p>Submit a pull request (PR) on GitHub</p></li>
+</ol>
+<p>The other developers will provide feedback, and you may push updates
+into the same branch (which will also update your pull request), until
+the Continuous Integration tests pass and reviewers agree that it
+should be merged (see “Process Guidelines: Reviews” below).</p>
+<p>For a more detailed explanation of the open contribution process, see
+the <a class="reference external" href="http://scikit-image.org/docs/stable/contribute.html">scikit-image contributors’ guide</a>.
+We follow a very similar process; some guidance follows below.</p>
+</section>
+<section id="bug-reports">
+<h2>Bug Reports<a class="headerlink" href="#bug-reports" title="Permalink to this headline"></a></h2>
+<p>While we appreciate code changes, it is also very helpful simply to
+know when NMMA does not function correctly.  Please <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues">file any
+issues</a> you run across.</p>
+<p>If possible, provide:</p>
+<ol class="simple">
+<li><p>A full description of your environment, including operating system,
+and Python version.</p></li>
+<li><p>A minimal way to reproduce the problem you see; these can be either
+a set of instructions, or a script.</p></li>
+</ol>
+</section>
+<section id="process-guidelines">
+<h2>Process guidelines<a class="headerlink" href="#process-guidelines" title="Permalink to this headline"></a></h2>
+<p>Because many developers work on NMMA, and PRs sometimes come in
+at a rapid pace, we have guidelines to streamline review and
+development:</p>
+</section>
+<section id="code-style">
+<h2>Code style<a class="headerlink" href="#code-style" title="Permalink to this headline"></a></h2>
+<p>We don’t like arguing about code style, and likely you don’t
+either. Therefore, we use code formatters: black for Python.
+Code is an art, and opinions differ of what
+looks good: we choose to spend our time writing correct, elegant code.</p>
+</section>
+<section id="testing">
+<h2>Testing<a class="headerlink" href="#testing" title="Permalink to this headline"></a></h2>
+<p>All functionality should be accompanied by tests.  We use pytest and
+PRs can only be merged once tests have been added and pass.
+The continuous integration system indicates this
+with a green checkmark, hence you may see developers talking about “PR
+599 being green” ✅.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="combined_analysis.html" class="btn btn-neutral float-left" title="Perform combined analyses" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

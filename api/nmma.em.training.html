@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>&lt;no title&gt; &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>&lt;no title&gt;</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <span class="target" id="module-nmma.em.training"></span><dl class="py class">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nmma.em.training.</span></span><span class="sig-name descname"><span class="pre">SVDTrainingModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_times</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filters</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">svd_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_coeff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_epochs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">15</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolation_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sklearn_gp'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'photometry'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plotdir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'/home/runner/work/nmma/nmma/doc/plot'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A light curve training model object</p>
+<p>An object to train a light curve model across filters
+by computing a grid-based SVD</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>model: str</strong></dt><dd><p>Name of the model</p>
+</dd>
+<dt><strong>data: dict</strong></dt><dd><p>Data containing filter data with filters as columns</p>
+</dd>
+<dt><strong>sample_times: np.array</strong></dt><dd><p>An arry of time for the light curve to be evaluted on</p>
+</dd>
+<dt><strong>filters: list</strong></dt><dd><p>List of filters to train</p>
+</dd>
+<dt><strong>svd_path: str</strong></dt><dd><p>Path to the svd directory</p>
+</dd>
+<dt><strong>n_coeff: int</strong></dt><dd><p>number of eigenvalues to be taken for SVD evaluation</p>
+</dd>
+<dt><strong>n_epochs: int</strong></dt><dd><p>number of epochs for tensorflow training</p>
+</dd>
+<dt><strong>interpolation_type: str</strong></dt><dd><p>type of interpolation</p>
+</dd>
+<dt><strong>data_type: str</strong></dt><dd><p>Data type for interpolation [photometry or spectroscopy]</p>
+</dd>
+<dt><strong>plot: boolean</strong></dt><dd><p>Whether to show plots or not</p>
+</dd>
+<dt><strong>plotdir: str</strong></dt><dd><p>Directory for plotting</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 72%" />
+<col style="width: 28%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><strong>check_model</strong></p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><strong>generate_svd_model</strong></p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><strong>interpolate_data</strong></p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><strong>load_model</strong></p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><strong>save_model</strong></p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><strong>train_api_gp_model</strong></p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><strong>train_model</strong></p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p><strong>train_sklearn_gp_model</strong></p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p><strong>train_tensorflow_model</strong></p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.check_model">
+<span class="sig-name descname"><span class="pre">check_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.check_model" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.generate_svd_model">
+<span class="sig-name descname"><span class="pre">generate_svd_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.generate_svd_model" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.interpolate_data">
+<span class="sig-name descname"><span class="pre">interpolate_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.interpolate_data" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.load_model">
+<span class="sig-name descname"><span class="pre">load_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.load_model" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.save_model">
+<span class="sig-name descname"><span class="pre">save_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.save_model" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.train_api_gp_model">
+<span class="sig-name descname"><span class="pre">train_api_gp_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.train_api_gp_model" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.train_model">
+<span class="sig-name descname"><span class="pre">train_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.train_model" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.train_sklearn_gp_model">
+<span class="sig-name descname"><span class="pre">train_sklearn_gp_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.train_sklearn_gp_model" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.em.training.SVDTrainingModel.train_tensorflow_model">
+<span class="sig-name descname"><span class="pre">train_tensorflow_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.SVDTrainingModel.train_tensorflow_model" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nmma.em.training.load_api_gp_model">
+<span class="sig-prename descclassname"><span class="pre">nmma.em.training.</span></span><span class="sig-name descname"><span class="pre">load_api_gp_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.em.training.load_api_gp_model" title="Permalink to this definition"></a></dt>
+<dd><p>Load a gaussian-process-api GaussianProcess model
+Parameters
+———-
+gp : dict</p>
+<blockquote>
+<div><p>Dictionary representation of gaussian-process-api GaussianProcess model</p>
+</div></blockquote>
+<p>gp_api.gaussian_process.GaussianProcess</p>
+</dd></dl>
+
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

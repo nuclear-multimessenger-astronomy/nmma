@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perform combined analyses &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="How to Contribute" href="contributing.html" />
+    <link rel="prev" title="Models" href="models.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Perform combined analyses</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#generate-a-simulation-set">Generate a simulation set</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#lightcurve-posterior">lightcurve posterior</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#download-gw-posteriors">Download GW posteriors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#download-the-eos-repository">Download the EOS repository</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#eos-from-gw-em">EoS from GW + EM</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#a-combined-eos-analysis">A combined EOS analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Perform combined analyses</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="perform-combined-analyses">
+<h1>Perform combined analyses<a class="headerlink" href="#perform-combined-analyses" title="Permalink to this headline"></a></h1>
+<p>NMMA is capable of performing combined analyses to constrain the neutron star equation of state (EOS) and Hubble Constant. In the following, we will take as an example the EOS analysis.</p>
+<section id="generate-a-simulation-set">
+<h2>Generate a simulation set<a class="headerlink" href="#generate-a-simulation-set" title="Permalink to this headline"></a></h2>
+<p>First of all, you need to create an output directory, this output will host all the data that will be used to constrain the EOS.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="o">-</span><span class="n">p</span> <span class="o">./</span><span class="n">output</span>
+</pre></div>
+</div>
+<p>Running the following command line will generate a json file (injection.json)  with the BILBY processing of compact binary merging events. We take here binaries of type BNS, NSBH is also an option. This injection contents a simulation set of parameters : luminosity_distance, log10_mej_wind, KNphi, inclination_EM, KNtimeshift, geocent_time for the Bu2019lm model. This creates an injection.json file in the ./output directory.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">nmma_create_injection</span> <span class="o">--</span><span class="n">prior</span><span class="o">-</span><span class="n">file</span> <span class="o">./</span><span class="n">priors</span><span class="o">/</span><span class="n">Bu2019lm</span><span class="o">.</span><span class="n">prior</span> <span class="o">--</span><span class="n">eos</span><span class="o">-</span><span class="n">file</span> <span class="o">./</span><span class="n">example_files</span><span class="o">/</span><span class="n">eos</span><span class="o">/</span><span class="n">ALF2</span><span class="o">.</span><span class="n">dat</span> <span class="o">--</span><span class="n">binary</span><span class="o">-</span><span class="nb">type</span> <span class="n">BNS</span> <span class="o">-</span><span class="n">f</span> <span class="o">./</span><span class="n">output</span><span class="o">/</span><span class="n">injection</span> <span class="o">--</span><span class="n">n</span><span class="o">-</span><span class="n">injection</span> <span class="mi">100</span> <span class="o">--</span><span class="n">original</span><span class="o">-</span><span class="n">parameters</span> <span class="o">--</span><span class="n">extension</span> <span class="n">json</span>
+</pre></div>
+</div>
+</section>
+<section id="lightcurve-posterior">
+<h2>lightcurve posterior<a class="headerlink" href="#lightcurve-posterior" title="Permalink to this headline"></a></h2>
+<p>EMdata will house the posteriors of the electromagnetic data you will produce: in particular the lc.csv (./example_files/csv_lightcurve/outdir/macroeventID, where macroeventID in range(0, 100)) lightcurves. We now compute posteriors using NMMA on this simulated set of 100 events, of which we assume a fraction is detectable by ZTF. The result can be find at  ./output/EMdata</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>for macroeventID in {0..99}
+
+do
+  mkdir -p ./output/EMdata/outdir/$macroeventID/
+  light_curve_analysis --model Bu2019lm --svd-path ./svdmodels --gptype tensorflow --outdir ./output/EMdata/outdir/$macroeventID --label injection_Bu2019lm --prior ./priors/Bu2019lm.prior --tmin 0 --tmax 7 --dt 0.5 --error-budget 1.0 --nlive 256 --Ebv-max 0 --injection ./output/injection.json --injection-num $macroeventID --injection-detection-limit 22,22,22 --injection-outfile ./output/EMdata/outdir/$macroeventID/lc.csv --generation-seed 42 --filters g,r,i --ztf-sampling --ztf-uncertainties --plot --remove-nondetections --optimal-augmentation --optimal-augmentation-filters u,g,r,i,z,y,J,H,K --optimal-augmentation-N 100
+done
+</pre></div>
+</div>
+</section>
+<section id="download-gw-posteriors">
+<h2>Download GW posteriors<a class="headerlink" href="#download-gw-posteriors" title="Permalink to this headline"></a></h2>
+<p>The gravitational wave samples can be can be downloaded at https://zenodo.org/record/6045029#.YgZzwITMKV5. At this link there are simulated posteriors for a number of gravitational-wave waveform models, here, we take the PhenDNRTv2 files.
+This only  concern  the PhenDNRTv2 files on this link. These we can directly download by using this command line:</p>
+<p>Create an outdir directory to put GW data that you will upload.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="o">-</span><span class="n">p</span> <span class="o">./</span><span class="n">output</span><span class="o">/</span><span class="n">GWdata</span><span class="o">/</span><span class="n">outdir</span>
+</pre></div>
+</div>
+<p>Go to the GWdata directory</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="o">./</span><span class="n">output</span><span class="o">/</span><span class="n">GWdata</span><span class="o">/</span><span class="n">outdir</span>
+</pre></div>
+</div>
+<p>Running the next command line:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">xargs</span> <span class="o">-</span><span class="n">n</span> <span class="mi">1</span> <span class="n">curl</span> <span class="o">-</span><span class="c1"># -O &lt; ../../../example_files/zenodo/gw_posteriors.txt</span>
+</pre></div>
+</div>
+<p>or use this one :</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>for url in `cat ../../../example_files/zenodo/gw_posteriors.txt`
+do
+  curl -#  -O $url
+done
+</pre></div>
+</div>
+<p>The gw_posteriors.txt contains a list of all links to the PhenDNRTv2 files. When the download is complete, return to the main directory</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>    <span class="n">cd</span> <span class="o">../../..</span>
+</pre></div>
+</div>
+</section>
+<section id="download-the-eos-repository">
+<h2>Download the EOS repository<a class="headerlink" href="#download-the-eos-repository" title="Permalink to this headline"></a></h2>
+<p>All of the NMMA EOS simulation sets are kept in a separate github repository here:
+https://github.com/diettim/NMMA</p>
+<p>For this particular example, we have put the simulation set in Zenodo here:
+https://zenodo.org/record/6094691#.YgwA8YTMI5k</p>
+</section>
+<section id="eos-from-gw-em">
+<h2>EoS from GW + EM<a class="headerlink" href="#eos-from-gw-em" title="Permalink to this headline"></a></h2>
+<p>This command line combines the EOS measurements for each simulation. As stated above, we assume only a fraction is detectable by ZTF (based on simulations of the associated kilonova brightnesses). The indices of the 26 detectable events are {0,  3,  5,  7,  8, 10, 12, 13, 14, 15, 17, 19, 21, 22, 23, 24, 26, 27, 28, 31, 32,34, 36, 37, 38, 39}.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>for macroeventID in 0 3 5 7 8 10 12 13 14 15 17 19 21 22 23 24 26 27 28 31 32 34 36 37 38 39
+
+do
+  mkdir -p ./output/GW_EMdata/$macroeventID/
+  gwem_resampling --outdir ./output/GW_EMdata/$macroeventID --EMsamples ./output/EMdata/outdir/$macroeventID/injection_Bu2019lm_posterior_samples.dat --GWsamples  ./output/GWdata/outdir/inj_PhD_posterior_samples_$macroeventID.dat --EOS ./example_files/eos/eos_sorted --nlive 8192 --GWprior ./priors/aligned_spin.priors --EMprior ./priors/EM.prior --total-ejecta-mass --Neos 5000
+
+done
+</pre></div>
+</div>
+</section>
+<section id="a-combined-eos-analysis">
+<h2>A combined EOS analysis<a class="headerlink" href="#a-combined-eos-analysis" title="Permalink to this headline"></a></h2>
+<p>We provide a helper function to combine the EOS results.</p>
+<p>First of all create a foder to put the final data about EoS:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="o">-</span><span class="n">p</span> <span class="o">./</span><span class="n">output</span><span class="o">/</span><span class="n">Figures</span>
+</pre></div>
+</div>
+<p>Then run the last one command line</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">combined_EOS</span> <span class="o">--</span><span class="n">outdir</span> <span class="o">./</span><span class="n">output</span><span class="o">/</span><span class="n">Figures</span> <span class="o">--</span><span class="n">label</span> <span class="n">ZTF</span> <span class="o">--</span><span class="n">gwR14trend</span> <span class="o">./</span><span class="n">example_files</span><span class="o">/</span> <span class="o">--</span><span class="n">GWEMsamples</span> <span class="o">./</span><span class="n">output</span><span class="o">/</span><span class="n">GW_EMdata</span> <span class="o">--</span><span class="n">detections</span><span class="o">-</span><span class="n">file</span> <span class="o">./</span><span class="n">example_files</span><span class="o">/</span><span class="n">csv_lightcurve</span><span class="o">/</span><span class="n">detectable</span><span class="o">.</span><span class="n">txt</span> <span class="o">--</span><span class="n">EOS</span><span class="o">-</span><span class="n">prior</span> <span class="o">./</span><span class="n">example_files</span><span class="o">/</span><span class="n">eos</span><span class="o">/</span><span class="n">EOS_sorted_weight</span><span class="o">.</span><span class="n">dat</span> <span class="o">--</span><span class="n">EOSpath</span> <span class="o">./</span><span class="n">example_files</span><span class="o">/</span><span class="n">eos</span><span class="o">/</span><span class="n">eos_sorted</span>  <span class="o">--</span><span class="n">pdet</span> <span class="o">./</span><span class="n">example_files</span><span class="o">/</span><span class="n">eos</span><span class="o">/</span><span class="n">pdet_of_Mmax</span><span class="o">.</span><span class="n">dat</span> <span class="o">--</span><span class="n">R14_true</span> <span class="mf">11.55</span> <span class="o">--</span><span class="n">Neos</span> <span class="mi">5000</span> <span class="o">--</span><span class="n">seed</span> <span class="mi">42</span>  <span class="o">--</span><span class="n">cred</span><span class="o">-</span><span class="n">interval</span> <span class="mf">0.95</span>
+</pre></div>
+</div>
+<p>This should return a EoS plot, R14_trend_GW_EM_ZTF.pdf, and  GW_EM_R14trend_ZTF.dat  at  ./output/Figures.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="models.html" class="btn btn-neutral float-left" title="Models" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="contributing.html" class="btn btn-neutral float-right" title="How to Contribute" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>&lt;no title&gt; &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>&lt;no title&gt;</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <span class="target" id="module-nmma.joint.likelihood"></span><dl class="py class">
+<dt class="sig sig-object py" id="nmma.joint.likelihood.MultiMessengerLikelihood">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nmma.joint.likelihood.</span></span><span class="sig-name descname"><span class="pre">MultiMessengerLikelihood</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interferometers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">waveform_generator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">light_curve_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">light_curve_model_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">light_curve_SVD_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">em_trigger_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mag_ncoeff</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lbol_ncoeff</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eos_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Neos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eos_weight_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binary_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gw_likelihood_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">priors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_grb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grb_resolution</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">light_curve_interpolation_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_eos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error_budget</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">14.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">roq_weights</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">roq_params</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">roq_scale_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_marginalization</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distance_marginalization</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_marginalization</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distance_marginalization_lookup_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jitter_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_frame</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sky'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_reference</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'geocenter'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#nmma.joint.likelihood.MultiMessengerLikelihood" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">bilby.core.likelihood.Likelihood</span></code></p>
+<p>A multi-messenger likelihood object</p>
+<p>This likelihood combines the usual gravitational-wave transient
+likelihood and the kilonva afterglow light curve likelihood.</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><dl>
+<dt><strong>interferometers: list, bilby.gw.detector.InterferometerList</strong></dt><dd><p>A list of <cite>bilby.detector.Interferometer</cite> instances - contains the
+detector data and power spectral densities</p>
+</dd>
+<dt><strong>waveform_generator: `bilby.waveform_generator.WaveformGenerator`</strong></dt><dd><p>An object which computes the frequency-domain strain of the signal,
+given some set of parameters</p>
+</dd>
+<dt><strong>light_curve_data: dict</strong></dt><dd><p>The light curve data processed with nmma.em.utils.loadEvent</p>
+</dd>
+<dt><strong>light_curve_model_name: str</strong></dt><dd><p>Name of the kilonova model to be used</p>
+</dd>
+<dt><strong>light_curve_SVD_path: str</strong></dt><dd><p>Path to the SVD pickles for the light curve model</p>
+</dd>
+<dt><strong>em_trigger_time: float</strong></dt><dd><p>GPS time of the kilonova trigger in days</p>
+</dd>
+<dt><strong>mag_ncoeff: int</strong></dt><dd><p>mag_ncoeff highest eigenvalues to be taken for mag’s SVD evaluation</p>
+</dd>
+<dt><strong>lbol_ncoeff: int</strong></dt><dd><p>lbol_ncoeff highest eigenvalues to be taken for lbol’s SVD evaluation</p>
+</dd>
+<dt><strong>eos_path: str</strong></dt><dd><p>Path to the sorted EOS directory</p>
+</dd>
+<dt><strong>Neos: int</strong></dt><dd><p>Number of EOS to be considered</p>
+</dd>
+<dt><strong>eos_weight_path: str</strong></dt><dd><p>Path to the eos weighting file</p>
+</dd>
+<dt><strong>binary_type: str</strong></dt><dd><p>The binary to be analysed is “BNS” or “NSBH”</p>
+</dd>
+<dt><strong>gw_likelihood_type: str</strong></dt><dd><p>The gravitational-wave likelihood to be taken is
+“GravitationalWaveTransient” or “ROQGravitationalWaveTransient”</p>
+</dd>
+<dt><strong>priors: dict</strong></dt><dd><p>To be used in the distance and phase marginalization and
+having the corresponding eos prior appened to it</p>
+</dd>
+<dt><strong>filters: list, str</strong></dt><dd><p>List of filters to be analysed. By default, using all th filters
+in the light curve data given.</p>
+</dd>
+<dt><strong>error_budget: float (default:1)</strong></dt><dd><p>Additionally introduced statistical error on the light curve data,
+so as to keep the systematic error in control</p>
+</dd>
+<dt><strong>tmin: float (default:0)</strong></dt><dd><p>Days from trigger_time to be started analysing</p>
+</dd>
+<dt><strong>tmax: float (default:14)</strong></dt><dd><p>Days from trigger_time to be ended analysing</p>
+</dd>
+<dt><strong>roq_params: str, array_like</strong></dt><dd><p>Parameters describing the domain of validity of the ROQ basis.</p>
+</dd>
+<dt><strong>roq_params_check: bool</strong></dt><dd><p>If true, run tests using the roq_params to check the prior and data are
+valid for the ROQ</p>
+</dd>
+<dt><strong>roq_scale_factor: float</strong></dt><dd><p>The ROQ scale factor used.</p>
+</dd>
+<dt><strong>distance_marginalization: bool, optional</strong></dt><dd><p>If true, marginalize over distance in the likelihood.
+This uses a look up table calculated at run time.
+The distance prior is set to be a delta function at the minimum
+distance allowed in the prior being marginalised over.</p>
+</dd>
+<dt><strong>time_marginalization: bool, optional</strong></dt><dd><p>If true, marginalize over time in the likelihood.
+This uses a FFT to calculate the likelihood over a regularly spaced
+grid.
+In order to cover the whole space the prior is set to be uniform over
+the spacing of the array of times.
+If using time marginalisation and jitter_time is True a “jitter”
+parameter is added to the prior which modifies the position of the
+grid of times.</p>
+</dd>
+<dt><strong>phase_marginalization: bool, optional</strong></dt><dd><p>If true, marginalize over phase in the likelihood.
+This is done analytically using a Bessel function.
+The phase prior is set to be a delta function at phase=0.</p>
+</dd>
+<dt><strong>distance_marginalization_lookup_table: (dict, str), optional</strong></dt><dd><p>If a dict, dictionary containing the lookup_table, distance_array,
+(distance) prior_array, and reference_distance used to construct
+the table.
+If a string the name of a file containing these quantities.
+The lookup table is stored after construction in either the
+provided string or a default location:
+‘.distance_marginalization_lookup_dmin{}_dmax{}_n{}.npz’</p>
+</dd>
+<dt><strong>jitter_time: bool, optional</strong></dt><dd><p>Whether to introduce a <cite>time_jitter</cite> parameter. This avoids either
+missing the likelihood peak, or introducing biases in the
+reconstructed time posterior due to an insufficient sampling frequency.
+Default is False, however using this parameter is strongly encouraged.</p>
+</dd>
+<dt><strong>reference_frame: (str, bilby.gw.detector.InterferometerList, list), optional</strong></dt><dd><p>Definition of the reference frame for the sky location.
+- “sky”: sample in RA/dec, this is the default
+- e.g., “H1L1”, [“H1”, “L1”], InterferometerList([“H1”, “L1”]):</p>
+<blockquote>
+<div><p>sample in azimuth and zenith, <cite>azimuth</cite> and <cite>zenith</cite> defined in the
+frame where the z-axis is aligned the the vector connecting H1
+and L1.</p>
+</div></blockquote>
+</dd>
+<dt><strong>time_reference: str, optional</strong></dt><dd><p>Name of the reference for the sampled time parameter.
+- “geocent”/”geocenter”: sample in the time at the Earth’s center,</p>
+<blockquote>
+<div><p>this is the default</p>
+</div></blockquote>
+<ul class="simple">
+<li><p>e.g., “H1”: sample in the time of arrival at H1</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Attributes</dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>marginalized_parameters</strong></dt><dd></dd>
+<dt><strong>meta_data</strong></dt><dd></dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nmma.joint.likelihood.MultiMessengerLikelihood.log_likelihood" title="nmma.joint.likelihood.MultiMessengerLikelihood.log_likelihood"><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_likelihood</span></code></a>()</p></td>
+<td><p><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_likelihood_ratio</span></code>()</p></td>
+<td><p>Difference between log likelihood and noise log likelihood</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nmma.joint.likelihood.MultiMessengerLikelihood.noise_log_likelihood" title="nmma.joint.likelihood.MultiMessengerLikelihood.noise_log_likelihood"><code class="xref py py-obj docutils literal notranslate"><span class="pre">noise_log_likelihood</span></code></a>()</p></td>
+<td><p><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.joint.likelihood.MultiMessengerLikelihood.log_likelihood">
+<span class="sig-name descname"><span class="pre">log_likelihood</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.joint.likelihood.MultiMessengerLikelihood.log_likelihood" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><dl class="simple">
+<dt>float</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="nmma.joint.likelihood.MultiMessengerLikelihood.noise_log_likelihood">
+<span class="sig-name descname"><span class="pre">noise_log_likelihood</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nmma.joint.likelihood.MultiMessengerLikelihood.noise_log_likelihood" title="Permalink to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><dl class="simple">
+<dt>float</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

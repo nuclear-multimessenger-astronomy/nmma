@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Training &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Light curve fitting" href="fitting.html" />
+    <link rel="prev" title="Instructions For NMMA Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Training</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#nmma-training">NMMA training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#spectral-grids">Spectral grids</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Training</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="training">
+<h1>Training<a class="headerlink" href="#training" title="Permalink to this headline"></a></h1>
+<p>It is common to have light curves on “grids”, for which you have a discrete set of parameters for which the lightcurves were simulated. For example, we may know the lightcurves to expect for specific masses m_1 and m_2, but not for any masses between the two.</p>
+<p>We rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks). The PCA serves to represent each light curve by a small number of “eigenvalues”, rather than the full lightcurve. After performing PCA, you will have a discrete grid of models that relate merger parameters to a few <strong>lightcurve eigenvalues</strong> rather than the whole lightcurve.</p>
+<p>At this point, you can model this grid as either a Gaussian process or Neural Network. This will allow you to form a <strong>continuous map</strong> from merger parameters to lightcurve eigenvalues, which are then converted directly to the set of light curve parameters that most likely resulted in this lightcurve.</p>
+<section id="nmma-training">
+<h2>NMMA training<a class="headerlink" href="#nmma-training" title="Permalink to this headline"></a></h2>
+<p>There are helper functions within NMMA to support this. In particular, <code class="docutils literal notranslate"><span class="pre">nmma.em.training.SVDTrainingModel</span></code> is designed to take in a grid of models and return an interpolation class.</p>
+<p>There are two types of interpolations supported within NMMA currently: scikit-learn’s Gaussian Process (sklearn_gp) and tensorflow. In the following, we take tensorflow as our example, but these are interchangable. To start out with, you will need a grid of files in a mildly idiosyncratic format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># t[days] sdss::u sdss::g sdss::r sdss::i sdss::z swope2::y swope2::J swope2::H cspk</span>
+<span class="mf">0.103</span> <span class="o">-</span><span class="mf">13.939</span> <span class="o">-</span><span class="mf">13.680</span> <span class="o">-</span><span class="mf">13.929</span> <span class="o">-</span><span class="mf">14.843</span> <span class="o">-</span><span class="mf">14.631</span> <span class="o">-</span><span class="mf">14.398</span> <span class="o">-</span><span class="mf">11.944</span> <span class="o">-</span><span class="mf">10.784</span> <span class="o">-</span><span class="mf">3.702</span>
+<span class="mf">0.109</span> <span class="o">-</span><span class="mf">14.373</span> <span class="o">-</span><span class="mf">14.430</span> <span class="o">-</span><span class="mf">14.922</span> <span class="o">-</span><span class="mf">15.113</span> <span class="o">-</span><span class="mf">15.187</span> <span class="o">-</span><span class="mf">14.642</span> <span class="o">-</span><span class="mf">13.457</span> <span class="o">-</span><span class="mf">11.719</span> <span class="o">-</span><span class="mf">7.482</span>
+<span class="mf">0.116</span> <span class="o">-</span><span class="mf">14.727</span> <span class="o">-</span><span class="mf">15.018</span> <span class="o">-</span><span class="mf">15.670</span> <span class="o">-</span><span class="mf">15.338</span> <span class="o">-</span><span class="mf">15.589</span> <span class="o">-</span><span class="mf">14.870</span> <span class="o">-</span><span class="mf">14.624</span> <span class="o">-</span><span class="mf">12.553</span> <span class="o">-</span><span class="mf">10.453</span>
+<span class="mf">0.122</span> <span class="o">-</span><span class="mf">15.007</span> <span class="o">-</span><span class="mf">15.459</span> <span class="o">-</span><span class="mf">16.202</span> <span class="o">-</span><span class="mf">15.522</span> <span class="o">-</span><span class="mf">15.858</span> <span class="o">-</span><span class="mf">15.081</span> <span class="o">-</span><span class="mf">15.484</span> <span class="o">-</span><span class="mf">13.288</span> <span class="o">-</span><span class="mf">12.702</span>
+<span class="mf">0.130</span> <span class="o">-</span><span class="mf">15.222</span> <span class="o">-</span><span class="mf">15.773</span> <span class="o">-</span><span class="mf">16.545</span> <span class="o">-</span><span class="mf">15.669</span> <span class="o">-</span><span class="mf">16.014</span> <span class="o">-</span><span class="mf">15.275</span> <span class="o">-</span><span class="mf">16.079</span> <span class="o">-</span><span class="mf">13.930</span> <span class="o">-</span><span class="mf">14.321</span>
+<span class="mf">0.137</span> <span class="o">-</span><span class="mf">15.377</span> <span class="o">-</span><span class="mf">15.976</span> <span class="o">-</span><span class="mf">16.729</span> <span class="o">-</span><span class="mf">15.783</span> <span class="o">-</span><span class="mf">16.079</span> <span class="o">-</span><span class="mf">15.449</span> <span class="o">-</span><span class="mf">16.447</span> <span class="o">-</span><span class="mf">14.482</span> <span class="o">-</span><span class="mf">15.397</span>
+<span class="mf">0.145</span> <span class="o">-</span><span class="mf">15.481</span> <span class="o">-</span><span class="mf">16.086</span> <span class="o">-</span><span class="mf">16.782</span> <span class="o">-</span><span class="mf">15.869</span> <span class="o">-</span><span class="mf">16.072</span> <span class="o">-</span><span class="mf">15.605</span> <span class="o">-</span><span class="mf">16.630</span> <span class="o">-</span><span class="mf">14.947</span> <span class="o">-</span><span class="mf">16.021</span>
+<span class="mf">0.154</span> <span class="o">-</span><span class="mf">15.540</span> <span class="o">-</span><span class="mf">16.122</span> <span class="o">-</span><span class="mf">16.733</span> <span class="o">-</span><span class="mf">15.931</span> <span class="o">-</span><span class="mf">16.016</span> <span class="o">-</span><span class="mf">15.740</span> <span class="o">-</span><span class="mf">16.667</span> <span class="o">-</span><span class="mf">15.330</span> <span class="o">-</span><span class="mf">16.281</span>
+<span class="mf">0.163</span> <span class="o">-</span><span class="mf">15.561</span> <span class="o">-</span><span class="mf">16.099</span> <span class="o">-</span><span class="mf">16.610</span> <span class="o">-</span><span class="mf">15.972</span> <span class="o">-</span><span class="mf">15.931</span> <span class="o">-</span><span class="mf">15.853</span> <span class="o">-</span><span class="mf">16.599</span> <span class="o">-</span><span class="mf">15.633</span> <span class="o">-</span><span class="mf">16.268</span>
+</pre></div>
+</div>
+<p>Typically, the file parameter values are encoded in the file header name. Therefore, we have a helper set of functions defined here: nmma/em/model_parameters.py, one for each model, that translates the filenames into dictionaries with the parameters encoded. For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">Bu2022mv</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="n">data_out</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">parameters</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;log10_mej_dyn&quot;</span><span class="p">,</span> <span class="s2">&quot;vej_dyn&quot;</span><span class="p">,</span> <span class="s2">&quot;log10_mej_wind&quot;</span><span class="p">,</span> <span class="s2">&quot;vej_wind&quot;</span><span class="p">,</span> <span class="s2">&quot;KNtheta&quot;</span><span class="p">]</span>
+    <span class="n">parameters_idx</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span>
+    <span class="n">magkeys</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">jj</span><span class="p">,</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">magkeys</span><span class="p">):</span>
+        <span class="n">rr</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?&quot;</span><span class="p">,</span> <span class="n">key</span><span class="p">)]</span>
+
+	<span class="c1"># Best to interpolate mass in log10 space</span>
+	<span class="n">rr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">rr</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+	<span class="n">rr</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">rr</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+
+	<span class="n">data_out</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">param</span><span class="p">:</span><span class="n">rr</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="k">for</span> <span class="n">param</span><span class="p">,</span><span class="n">idx</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">parameters</span><span class="p">,</span> <span class="n">parameters_idx</span><span class="p">)}</span>
+	<span class="n">data_out</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">data_out</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="o">**</span><span class="n">data</span><span class="p">[</span><span class="n">key</span><span class="p">]}</span>
+    <span class="k">return</span> <span class="n">data_out</span><span class="p">,</span> <span class="n">parameters</span>
+</pre></div>
+</div>
+<p>A new function will need to be added to nmma/em/model_parameters.py to each model grid that is desired. Once this is done, training can begin:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">create_svdmodel</span> <span class="o">--</span><span class="n">model</span> <span class="n">Bu2022mv</span> <span class="o">--</span><span class="n">svd</span><span class="o">-</span><span class="n">path</span> <span class="n">svdmodels</span> <span class="o">--</span><span class="n">interpolation_type</span> <span class="n">tensorflow</span> <span class="o">--</span><span class="n">tmin</span> <span class="mf">0.0</span> <span class="o">--</span><span class="n">tmax</span> <span class="mf">21.0</span> <span class="o">--</span><span class="n">dt</span> <span class="mf">0.1</span> <span class="o">--</span><span class="n">data</span><span class="o">-</span><span class="n">path</span> <span class="n">output</span><span class="o">/</span><span class="n">bulla_2Comp_mv</span> <span class="o">--</span><span class="n">plot</span> <span class="o">--</span><span class="n">tensorflow</span><span class="o">-</span><span class="n">nepochs</span> <span class="mi">100</span>
+</pre></div>
+</div>
+<p>The output will look something like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Training</span> <span class="n">new</span> <span class="n">model</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">u</span><span class="o">...</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">g</span><span class="o">...</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">r</span><span class="o">...</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">i</span><span class="o">...</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">z</span><span class="o">...</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">y</span><span class="o">...</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">J</span><span class="o">...</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">H</span><span class="o">...</span>
+<span class="n">Normalizing</span> <span class="n">mag</span> <span class="nb">filter</span> <span class="n">K</span><span class="o">...</span>
+<span class="n">Computing</span> <span class="n">NN</span> <span class="k">for</span> <span class="nb">filter</span> <span class="n">u</span><span class="o">...</span>
+
+<span class="n">Epoch</span> <span class="mi">1</span><span class="o">/</span><span class="mi">50</span>
+<span class="mi">61</span><span class="o">/</span><span class="mi">61</span> <span class="p">[</span><span class="o">==============================</span><span class="p">]</span> <span class="o">-</span> <span class="mi">0</span><span class="n">s</span> <span class="mi">5</span><span class="n">ms</span><span class="o">/</span><span class="n">step</span> <span class="o">-</span> <span class="n">loss</span><span class="p">:</span> <span class="mf">2.6934</span> <span class="o">-</span> <span class="n">val_loss</span><span class="p">:</span> <span class="mf">0.7583</span>
+<span class="n">Epoch</span> <span class="mi">2</span><span class="o">/</span><span class="mi">50</span>
+<span class="mi">61</span><span class="o">/</span><span class="mi">61</span> <span class="p">[</span><span class="o">==============================</span><span class="p">]</span> <span class="o">-</span> <span class="mi">0</span><span class="n">s</span> <span class="mi">943</span><span class="n">us</span><span class="o">/</span><span class="n">step</span> <span class="o">-</span> <span class="n">loss</span><span class="p">:</span> <span class="mf">0.5029</span> <span class="o">-</span> <span class="n">val_loss</span><span class="p">:</span> <span class="mf">0.3023</span>
+<span class="n">Epoch</span> <span class="mi">3</span><span class="o">/</span><span class="mi">50</span>
+<span class="mi">61</span><span class="o">/</span><span class="mi">61</span> <span class="p">[</span><span class="o">==============================</span><span class="p">]</span> <span class="o">-</span> <span class="mi">0</span><span class="n">s</span> <span class="mi">896</span><span class="n">us</span><span class="o">/</span><span class="n">step</span> <span class="o">-</span> <span class="n">loss</span><span class="p">:</span> <span class="mf">0.2313</span> <span class="o">-</span> <span class="n">val_loss</span><span class="p">:</span> <span class="mf">0.1542</span>
+</pre></div>
+</div>
+<p>and so on. The model files are then written to the path given by –svd-path. As a crosscheck, an example interpolated model is plotted over one of the grid points automatically:</p>
+<p><img alt="Training light curve" src="_images/training_lightcurves.png" /></p>
+<p>This model is then ready to use in an analysis.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">light_curve_analysis</span> <span class="o">--</span><span class="n">model</span> <span class="n">Bu2022mv</span> <span class="o">--</span><span class="n">interpolation_type</span> <span class="n">tensorflow</span> <span class="o">--</span><span class="n">svd</span><span class="o">-</span><span class="n">path</span> <span class="n">svdmodels</span> <span class="o">--</span><span class="n">outdir</span> <span class="n">outdir</span> <span class="o">--</span><span class="n">label</span> <span class="n">AT2017gfo</span> <span class="o">--</span><span class="n">trigger</span><span class="o">-</span><span class="n">time</span> <span class="mf">57982.5285236896</span> <span class="o">--</span><span class="n">data</span> <span class="n">example_files</span><span class="o">/</span><span class="n">lightcurves</span><span class="o">/</span><span class="n">GW170817</span><span class="o">.</span><span class="n">dat</span> <span class="o">--</span><span class="n">prior</span> <span class="n">priors</span><span class="o">/</span><span class="n">Bu2022mv</span><span class="o">.</span><span class="n">prior</span>
+</pre></div>
+</div>
+</section>
+<section id="spectral-grids">
+<h2>Spectral grids<a class="headerlink" href="#spectral-grids" title="Permalink to this headline"></a></h2>
+<p>Often, the simulations come on spectral grids rather than as light curves, and it could be useful to create surrogate models for these spectral grids instead. In this case, the software expects files of the form:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mf">4900.000011931588</span><span class="p">,</span><span class="mf">0.1</span><span class="p">,</span><span class="mf">0.001246</span>
+<span class="mf">5100.000012418592</span><span class="p">,</span><span class="mf">0.1</span><span class="p">,</span><span class="mf">0.00084008</span>
+<span class="mf">5300.000012905595</span><span class="p">,</span><span class="mf">0.1</span><span class="p">,</span><span class="mf">0.00075228</span>
+<span class="o">...</span>
+<span class="mf">4900.000011931588</span><span class="p">,</span><span class="mf">0.30000000000000004</span><span class="p">,</span><span class="mf">0.003116</span>
+<span class="mf">5100.000012418592</span><span class="p">,</span><span class="mf">0.30000000000000004</span><span class="p">,</span><span class="mf">0.0036693</span>
+<span class="mf">5300.000012905595</span><span class="p">,</span><span class="mf">0.30000000000000004</span><span class="p">,</span><span class="mf">0.0028557</span>
+</pre></div>
+</div>
+<p>with columns of wavelength, time in days, and flux.</p>
+<p>These can be trained in a similar form to the light curves with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">create_svdmodel</span> <span class="o">--</span><span class="n">model</span> <span class="n">Bu2019lm</span> <span class="o">--</span><span class="n">data</span><span class="o">-</span><span class="nb">type</span> <span class="n">spectroscopy</span> <span class="o">--</span><span class="n">svd</span><span class="o">-</span><span class="n">path</span> <span class="n">svdmodels</span> <span class="o">--</span><span class="n">interpolation_type</span> <span class="n">tensorflow</span> <span class="o">--</span><span class="n">tmin</span> <span class="mf">0.0</span> <span class="o">--</span><span class="n">tmax</span> <span class="mf">21.0</span> <span class="o">--</span><span class="n">dt</span> <span class="mf">0.1</span> <span class="o">--</span><span class="n">data</span><span class="o">-</span><span class="n">path</span> <span class="n">output</span><span class="o">/</span><span class="n">m3_spectra</span> <span class="o">--</span><span class="n">plot</span> <span class="o">--</span><span class="n">tensorflow</span><span class="o">-</span><span class="n">nepochs</span> <span class="mi">20</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Instructions For NMMA Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="fitting.html" class="btn btn-neutral float-right" title="Light curve fitting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

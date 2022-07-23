@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Nuclear Multimessenger Astronomy (NMMA) framework &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Instructions For NMMA Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="#" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+      <li>The Nuclear Multimessenger Astronomy (NMMA) framework</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="the-nuclear-multimessenger-astronomy-nmma-framework">
+<h1>The Nuclear Multimessenger Astronomy (NMMA) framework<a class="headerlink" href="#the-nuclear-multimessenger-astronomy-nmma-framework" title="Permalink to this headline"></a></h1>
+<p>nmma is a fully featured, Bayesian multi-messenger pipeline targeting
+joint analyses of gravitational-wave and electromagnetic data (focusing
+on the optical). Using bilby as the back-end, the software is capable of
+sampling these data sets using a variety of samplers. It uses chiral
+effective field theory based neutron star equation of states when
+performing inference, and is also capable of estimating the Hubble Constant.</p>
+</section>
+<section id="quick-start">
+<h1>Quick Start<a class="headerlink" href="#quick-start" title="Permalink to this headline"></a></h1>
+<p>nmma provides a number of example models to compare to: kilonovae,
+gamma-ray burst afterglows, shock cooling supernovae, core-collapse
+supernovae, etc.</p>
+<p>We can demonstrate the functionality of the pipeline using a quick example. Taking the Metzger (2017) blue kilonova model as an example, we can generate a set of injections simply using the prior file (all are found in priors/).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>nmma_create_injection --prior-file priors/Me2017.prior --eos-file example_files/eos/ALF2.dat --binary-type BNS --n-injection <span class="m">100</span> --original-parameters --extension json
+</pre></div>
+</div>
+<p>This generates a file called injection.json that includes an injection file drawn from the prior file with a number of injections specified by –n-injection.</p>
+<p>It is this file that is used for the Bayesian inference analysis. An example analysis is as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>light_curve_analysis --model Me2017 --svd-path ./svdmodels --outdir outdir --label injection --prior priors/Me2017.prior --tmin <span class="m">0</span>.1 --tmax <span class="m">20</span> --dt <span class="m">0</span>.5 --error-budget <span class="m">1</span> --nlive <span class="m">512</span> --Ebv-max <span class="m">0</span> --injection ./injection.json --injection-num <span class="m">0</span> --injection-outfile outdir/lc.csv --generation-seed <span class="m">42</span> --filters u,g,r,i,z,y,J,H,K --plot --remove-nondetections
+</pre></div>
+</div>
+<p>Here, the time array is specified by a minimum, maximum, and delta t (in days) as specified by –tmin, –tmax, and –dt. The particular injection chosen is drawn from an index specified by –injection-num. The –filters available are specified with –filters u,g,r,i,z,y,J,H,K. Summary plots are available in outdir/.</p>
+<img alt="_images/injection_corner.png" src="_images/injection_corner.png" />
+<img alt="_images/injection_lightcurves.png" src="_images/injection_lightcurves.png" />
+</section>
+<section id="contributing">
+<h1>Contributing<a class="headerlink" href="#contributing" title="Permalink to this headline"></a></h1>
+<p>nmma is released under the MIT license.  We encourage you to
+modify it, reuse it, and contribute changes back for the benefit of
+others.  We follow standard open source development practices: changes
+are submitted as pull requests and, once they pass the test suite,
+reviewed by the team before inclusion.  Please also see
+<a class="reference external" href="./contributing.html">our contributing guide</a>.</p>
+</section>
+<section id="user-guide">
+<h1>User Guide<a class="headerlink" href="#user-guide" title="Permalink to this headline"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Light curve fitting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-right" title="Instructions For NMMA Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

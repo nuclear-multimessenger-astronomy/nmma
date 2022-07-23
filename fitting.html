@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Light curve fitting &mdash; nmma 0.0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/nmma-docs.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Models" href="models.html" />
+    <link rel="prev" title="Training" href="training.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> nmma
+          </a>
+              <div class="version">
+                0.0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Instructions For NMMA Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Light curve fitting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#models">Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-an-injection-file">Creating an injection file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-fit-to-simulated-data">Example fit to simulated data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#analysis-of-a-real-object">Analysis of a real object</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">nmma</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Light curve fitting</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="light-curve-fitting">
+<h1>Light curve fitting<a class="headerlink" href="#light-curve-fitting" title="Permalink to this headline"></a></h1>
+<p>Given a light curve from an optical survey telescope (and potential follow-up), the goal is to analyze the light curve to perform parameter inference. Within NMMA, there are a number of <a class="reference external" href="./models.html">models</a> available.</p>
+<section id="models">
+<h2>Models<a class="headerlink" href="#models" title="Permalink to this headline"></a></h2>
+<p>Some are analytic / semi-analytic models that can be sampled, others rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks).</p>
+<p>In many cases, the lightcurve predicted by each set of parameters is <strong>extremely high-dimensional</strong>, given the number of measurements made. Our goal for this example is to to determine the best-fit model parameters for an object based on its observed lightcurve.</p>
+</section>
+<section id="creating-an-injection-file">
+<h2>Creating an injection file<a class="headerlink" href="#creating-an-injection-file" title="Permalink to this headline"></a></h2>
+<p>There are other options for creating an injection file, such as a pre-computed simulation set. In this case a prior is still needed, but it will only be applied where it is necessary. Taking the Petrov et al. 2022 samples and the Bu2019lm prior as an example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">nmma_create_injection</span> <span class="o">--</span><span class="n">injection</span><span class="o">-</span><span class="n">file</span> <span class="n">example_files</span><span class="o">/</span><span class="n">sim_events</span><span class="o">/</span><span class="n">injections</span><span class="o">.</span><span class="n">dat</span> <span class="o">--</span><span class="n">prior</span><span class="o">-</span><span class="n">file</span> <span class="n">priors</span><span class="o">/</span><span class="n">Bu2019lm</span><span class="o">.</span><span class="n">prior</span> <span class="o">--</span><span class="n">eos</span><span class="o">-</span><span class="n">file</span> <span class="n">example_files</span><span class="o">/</span><span class="n">eos</span><span class="o">/</span><span class="n">ALF2</span><span class="o">.</span><span class="n">dat</span> <span class="o">--</span><span class="n">binary</span><span class="o">-</span><span class="nb">type</span> <span class="n">BNS</span> <span class="o">--</span><span class="n">n</span><span class="o">-</span><span class="n">injection</span> <span class="mi">100</span> <span class="o">--</span><span class="n">original</span><span class="o">-</span><span class="n">parameters</span> <span class="o">--</span><span class="n">extension</span> <span class="n">json</span> <span class="o">--</span><span class="n">aligned</span><span class="o">-</span><span class="n">spin</span>
+</pre></div>
+</div>
+<p>The injection file can also be created using only a prior, Bu2019lm in this case:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">nmma_create_injection</span> <span class="o">--</span><span class="n">prior</span><span class="o">-</span><span class="n">file</span> <span class="n">priors</span><span class="o">/</span><span class="n">Bu2019lm</span><span class="o">.</span><span class="n">prior</span> <span class="o">--</span><span class="n">eos</span><span class="o">-</span><span class="n">file</span> <span class="n">example_files</span><span class="o">/</span><span class="n">eos</span><span class="o">/</span><span class="n">ALF2</span><span class="o">.</span><span class="n">dat</span> <span class="o">--</span><span class="n">binary</span><span class="o">-</span><span class="nb">type</span> <span class="n">BNS</span> <span class="o">--</span><span class="n">n</span><span class="o">-</span><span class="n">injection</span> <span class="mi">100</span> <span class="o">--</span><span class="n">original</span><span class="o">-</span><span class="n">parameters</span> <span class="o">--</span><span class="n">extension</span> <span class="n">json</span> <span class="o">--</span><span class="n">aligned</span><span class="o">-</span><span class="n">spin</span>
+</pre></div>
+</div>
+<p>resulting in an injection.json file for use below.</p>
+</section>
+<section id="example-fit-to-simulated-data">
+<h2>Example fit to simulated data<a class="headerlink" href="#example-fit-to-simulated-data" title="Permalink to this headline"></a></h2>
+<p>Following the quick start, we assume that an injection file has been made generated and made available. For example, there are a number of extra parameters available to modify the light curve sampling, including:</p>
+<p>If one is interested in realistic ZTF-like light curves, one should use:</p>
+<ul class="simple">
+<li><p>–ztf-sampling: Uses a gaussian KDE to simulate ZTF pointing set for ZTF-II in g and r, and private/partnernship in i</p></li>
+<li><p>–ztf-uncertainties: Simulates magnitude uncertainties using skew normal fits to forced photometry uncertainties in mag_bins=[12,18,20,21,23]</p></li>
+<li><p>–ztf-ToO: Adds realistic ToO pointings during the first one or two days (1/2 randomly chosen) for specified exposure times: either 180s (valid for skymaps &lt;1000sq deg) or 300s (skymaps &gt;1000sq deg). Has no effect if –ztf-sampling is not turned on.</p></li>
+</ul>
+<p>If instead one is interested in potential Rubin-like ToO light curves, one should use:</p>
+<ul class="simple">
+<li><p>–rubin-ToO: Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.</p></li>
+<li><p>–rubin-ToO-type: Type of ToO observation. Has no effect if –rubin-ToO is not turned on.</p></li>
+</ul>
+<p>One may also be interested in a custom strategy. For this, one can use the flags:</p>
+<ul class="simple">
+<li><p>–photometry-augmentation: A flag to augment photometry to improve parameter recovery</p></li>
+<li><p>–photometry-augmentation-seed: Set a seed for the augmentation</p></li>
+</ul>
+<p>There are a few different forms this may take, for example, specifying:</p>
+<ul class="simple">
+<li><p>–optimal-augmentation-filters: Provide a comma seperated list of filters to use for augmentation (e.g. g,r,i). If none is provided, will use all the filters available.
+with</p></li>
+<li><p>–photometry-augmentation-N-points: Specify the number of augmented points to include taken randomly from –optimal-augmentation-filters</p></li>
+</ul>
+<p>However, if you specify:</p>
+<ul class="simple">
+<li><p>–optimal-augmentation-times: Provide a comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax).
+You can choose the times to simulate for a given filter.</p></li>
+</ul>
+<p>We can use these flags as follows.</p>
+<p>Taking ZTF as an example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>    <span class="n">light_curve_analysis</span> <span class="o">--</span><span class="n">model</span> <span class="n">Bu2019lm</span> <span class="o">--</span><span class="n">svd</span><span class="o">-</span><span class="n">path</span> <span class="o">./</span><span class="n">svdmodels</span> <span class="o">--</span><span class="n">outdir</span> <span class="n">outdir</span> <span class="o">--</span><span class="n">label</span> <span class="n">injection</span> <span class="o">--</span><span class="n">prior</span> <span class="n">priors</span><span class="o">/</span><span class="n">Bu2019lm</span><span class="o">.</span><span class="n">prior</span> <span class="o">--</span><span class="n">tmin</span> <span class="mf">0.1</span> <span class="o">--</span><span class="n">tmax</span> <span class="mi">20</span> <span class="o">--</span><span class="n">dt</span> <span class="mf">0.5</span> <span class="o">--</span><span class="n">error</span><span class="o">-</span><span class="n">budget</span> <span class="mi">1</span> <span class="o">--</span><span class="n">nlive</span> <span class="mi">512</span> <span class="o">--</span><span class="n">Ebv</span><span class="o">-</span><span class="nb">max</span> <span class="mi">0</span> <span class="o">--</span><span class="n">injection</span> <span class="o">./</span><span class="n">injection</span><span class="o">.</span><span class="n">json</span> <span class="o">--</span><span class="n">injection</span><span class="o">-</span><span class="n">num</span> <span class="mi">0</span> <span class="o">--</span><span class="n">injection</span><span class="o">-</span><span class="n">outfile</span> <span class="n">outdir</span><span class="o">/</span><span class="n">lc</span><span class="o">.</span><span class="n">csv</span> <span class="o">--</span><span class="n">generation</span><span class="o">-</span><span class="n">seed</span> <span class="mi">42</span> <span class="o">--</span><span class="n">filters</span> <span class="n">g</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="n">i</span> <span class="o">--</span><span class="n">plot</span> <span class="o">--</span><span class="n">remove</span><span class="o">-</span><span class="n">nondetections</span> <span class="o">--</span><span class="n">ztf</span><span class="o">-</span><span class="n">uncertainties</span> <span class="o">--</span><span class="n">ztf</span><span class="o">-</span><span class="n">sampling</span> <span class="o">--</span><span class="n">ztf</span><span class="o">-</span><span class="n">ToO</span> <span class="mi">180</span>
+</pre></div>
+</div>
+<p>This produces a light curve and parameter inference of the form:</p>
+<p><img alt="ZTF sampling corner plot" src="_images/ZTF_corner.png" />
+<img alt="ZTF sampling light curve fit" src="_images/ZTF_lightcurves.png" /></p>
+<p>Taking Rubin as an example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">light_curve_analysis</span> <span class="o">--</span><span class="n">model</span> <span class="n">Bu2019lm</span> <span class="o">--</span><span class="n">svd</span><span class="o">-</span><span class="n">path</span> <span class="o">./</span><span class="n">svdmodels</span> <span class="o">--</span><span class="n">outdir</span> <span class="n">outdir</span> <span class="o">--</span><span class="n">label</span> <span class="n">injection</span> <span class="o">--</span><span class="n">prior</span> <span class="n">priors</span><span class="o">/</span><span class="n">Bu2019lm</span><span class="o">.</span><span class="n">prior</span> <span class="o">--</span><span class="n">tmin</span> <span class="mf">0.05</span> <span class="o">--</span><span class="n">tmax</span> <span class="mi">20</span> <span class="o">--</span><span class="n">dt</span> <span class="mf">0.1</span> <span class="o">--</span><span class="n">error</span><span class="o">-</span><span class="n">budget</span> <span class="mi">1</span> <span class="o">--</span><span class="n">nlive</span> <span class="mi">512</span> <span class="o">--</span><span class="n">Ebv</span><span class="o">-</span><span class="nb">max</span> <span class="mi">0</span> <span class="o">--</span><span class="n">injection</span> <span class="o">./</span><span class="n">injection</span><span class="o">.</span><span class="n">json</span> <span class="o">--</span><span class="n">injection</span><span class="o">-</span><span class="n">num</span> <span class="mi">0</span> <span class="o">--</span><span class="n">injection</span><span class="o">-</span><span class="n">outfile</span> <span class="n">outdir</span><span class="o">/</span><span class="n">lc</span><span class="o">.</span><span class="n">csv</span> <span class="o">--</span><span class="n">generation</span><span class="o">-</span><span class="n">seed</span> <span class="mi">42</span> <span class="o">--</span><span class="n">filters</span> <span class="n">u</span><span class="p">,</span><span class="n">g</span><span class="p">,</span><span class="n">r</span><span class="p">,</span><span class="n">i</span><span class="p">,</span><span class="n">z</span><span class="p">,</span><span class="n">y</span> <span class="o">--</span><span class="n">plot</span> <span class="o">--</span><span class="n">remove</span><span class="o">-</span><span class="n">nondetections</span> <span class="o">--</span><span class="n">rubin</span><span class="o">-</span><span class="n">ToO</span> <span class="o">--</span><span class="n">rubin</span><span class="o">-</span><span class="n">ToO</span><span class="o">-</span><span class="nb">type</span> <span class="n">BNS</span> <span class="o">--</span><span class="n">injection</span><span class="o">-</span><span class="n">detection</span><span class="o">-</span><span class="n">limit</span> <span class="mf">23.9</span><span class="p">,</span><span class="mf">25.0</span><span class="p">,</span><span class="mf">24.7</span><span class="p">,</span><span class="mf">24.0</span><span class="p">,</span><span class="mf">23.3</span><span class="p">,</span><span class="mf">22.1</span>
+</pre></div>
+</div>
+</section>
+<section id="analysis-of-a-real-object">
+<h2>Analysis of a real object<a class="headerlink" href="#analysis-of-a-real-object" title="Permalink to this headline"></a></h2>
+<p>Of course, analysis of simulated objects are not the ultimate goal for the analysis. However, we can also analyze real light curves. We take as an example one of the files in example_files/candidate_data/ (ZTF21abjvfbc.dat) and run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">light_curve_analysis</span> <span class="o">--</span><span class="n">model</span> <span class="n">Bu2019lm</span> <span class="o">--</span><span class="n">svd</span><span class="o">-</span><span class="n">path</span> <span class="o">./</span><span class="n">svdmodels</span> <span class="o">--</span><span class="n">interpolation_type</span> <span class="n">tensorflow</span> <span class="o">--</span><span class="n">outdir</span> <span class="n">outdir</span> <span class="o">--</span><span class="n">label</span> <span class="n">injection</span> <span class="o">--</span><span class="n">prior</span> <span class="n">priors</span><span class="o">/</span><span class="n">Bu2019lm</span><span class="o">.</span><span class="n">prior</span> <span class="o">--</span><span class="n">tmin</span> <span class="mf">0.1</span> <span class="o">--</span><span class="n">tmax</span> <span class="mi">20</span> <span class="o">--</span><span class="n">dt</span> <span class="mf">0.5</span> <span class="o">--</span><span class="n">error</span><span class="o">-</span><span class="n">budget</span> <span class="mi">1</span> <span class="o">--</span><span class="n">nlive</span> <span class="mi">512</span> <span class="o">--</span><span class="n">Ebv</span><span class="o">-</span><span class="nb">max</span> <span class="mi">0</span> <span class="o">--</span><span class="n">trigger</span><span class="o">-</span><span class="n">time</span> <span class="mf">59397.28347219899</span> <span class="o">--</span><span class="n">data</span> <span class="n">example_files</span><span class="o">/</span><span class="n">candidate_data</span><span class="o">/</span><span class="n">ZTF21abjvfbc</span><span class="o">.</span><span class="n">dat</span> <span class="o">--</span><span class="n">plot</span>
+</pre></div>
+</div>
+<p>One might note that the –trigger-time is set specifically here in MJD, taken in this example to be the first detection of the object.</p>
+<p>This produces a light curve and parameter inference of the form:</p>
+<p><img alt="ZTF21abjvfbc corner plot" src="_images/ZTF21abjvfbc_corner.png" />
+<img alt="ZTF21abjvfbc light curve fit" src="_images/ZTF21abjvfbc_lightcurves.png" /></p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="training.html" class="btn btn-neutral float-left" title="Training" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="models.html" class="btn btn-neutral float-right" title="Models" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, The SkyPortal Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
