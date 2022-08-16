@@ -598,3 +598,64 @@
 14:02 INFO    : Using sampler Pymultinest with kwargs {'importance_nested_sampling': False, 'resume': True, 'verbose': True, 'sampling_efficiency': 'parameter', 'n_live_points': 2048, 'n_params': 6, 'n_clustering_params': None, 'wrapped_params': None, 'multimodal': True, 'const_efficiency_mode': False, 'evidence_tolerance': 0.5, 'n_iter_before_update': 100, 'null_log_evidence': -1e+90, 'max_modes': 100, 'mode_tolerance': -1e+90, 'seed': 42, 'context': 0, 'write_output': True, 'log_zero': -1e+100, 'max_iter': 0, 'init_MPI': False, 'dump_callback': <bound method Pymultinest._dump_callback of <bilby.core.sampler.pymultinest.Pymultinest object at 0x7f03e7c999d0>>}
 14:02 INFO    : Temporary directory incompatible with MPI, will run in original directory
 14:02 INFO    : Using output file GPout/GPnoTF2//pm_AT2017gfo/
+14:39 INFO    : Sampling time: 0:36:57.561423
+14:39 INFO    : Sampling time: 0:36:57.552194
+14:39 INFO    : Sampling time: 0:36:57.495273
+14:39 INFO    : Sampling time: 0:36:57.557833
+14:39 INFO    : Sampling time: 0:36:57.550507
+14:39 INFO    : Sampling time: 0:36:57.563566
+14:39 INFO    : Sampling time: 0:36:57.507302
+14:39 INFO    : Sampling time: 0:36:57.553915
+14:39 INFO    : Sampling time: 0:36:57.553343
+14:39 INFO    : Sampling time: 0:36:57.532042
+14:39 INFO    : Sampling time: 0:36:57.530383
+14:39 INFO    : Sampling time: 0:36:57.503661
+14:39 INFO    : Sampling time: 0:36:57.565007
+14:39 INFO    : Sampling time: 0:36:57.549016
+14:39 INFO    : Sampling time: 0:36:57.529636
+14:39 INFO    : Sampling time: 0:36:57.488168
+14:39 INFO    : Sampling time: 0:36:57.553706
+14:39 INFO    : Sampling time: 0:36:57.478466
+14:39 INFO    : Sampling time: 0:36:57.555707
+14:39 INFO    : Sampling time: 0:36:57.563918
+14:39 INFO    : Sampling time: 0:36:57.524413
+14:39 INFO    : Sampling time: 0:36:57.541255
+14:39 INFO    : Sampling time: 0:36:57.554741
+14:39 INFO    : Sampling time: 0:36:57.549186
+14:39 INFO    : Sampling time: 0:36:57.556354
+14:39 INFO    : Sampling time: 0:36:57.556185
+14:39 INFO    : Sampling time: 0:36:57.547738
+14:39 INFO    : Sampling time: 0:36:57.540594
+14:39 INFO    : Sampling time: 0:36:57.570722
+14:39 INFO    : Sampling time: 0:36:57.550454
+14:39 INFO    : Sampling time: 0:36:57.486991
+14:39 INFO    : Sampling time: 0:36:57.564951
+14:39 INFO    : Sampling time: 0:36:57.572109
+14:39 INFO    : Sampling time: 0:36:57.555384
+14:39 INFO    : Sampling time: 0:36:57.563918
+14:39 INFO    : Sampling time: 0:36:57.532695
+14:39 INFO    : Sampling time: 0:36:57.557458
+14:39 INFO    : Sampling time: 0:36:57.555494
+14:39 INFO    : Sampling time: 0:36:57.559998
+14:39 INFO    : Sampling time: 0:36:57.572932
+14:39 INFO    : Summary of results:
+nsamples: 9907
+ln_noise_evidence:  0.000
+ln_evidence: -132.994 +/-  0.058
+ln_bayes_factor: -132.994 +/-  0.058
+
+14:39 INFO    : Writing samples file to /home/enlil/pouyans/codes/nmma/GPout/GPnoTF2/AT2017gfo_posterior_samples.dat
+14:39 INFO    : Summary of results:
+nsamples: 9907
+ln_noise_evidence:  0.000
+ln_evidence: -132.994 +/-  0.058
+ln_bayes_factor: -132.994 +/-  0.058
+
+14:39 INFO    : Writing samples file to /home/enlil/pouyans/codes/nmma/GPout/GPnoTF2/AT2017gfo_posterior_samples.dat
+14:39 INFO    : Summary of results:
+nsamples: 9907
+ln_noise_evidence:  0.000
+ln_evidence: -132.994 +/-  0.058
+ln_bayes_factor: -132.994 +/-  0.058
+
+14:39 INFO    : Writing samples file to /home/enlil/pouyans/codes/nmma/GPout/GPnoTF2/AT2017gfo_posterior_samples.dat
