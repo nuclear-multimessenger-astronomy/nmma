@@ -1,5 +1,5 @@
 future
-bilby>=1.0.4
+bilby>=1.2.0
 bilby_pipe==1.0.5
 numpy>=1.9
 matplotlib>=2.0
