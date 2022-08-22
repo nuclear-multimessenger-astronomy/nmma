@@ -87,7 +87,7 @@ requirements = [
     "arviz",
 ]
 
-VERSION = "0.0.7"
+VERSION = "0.0.8"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
