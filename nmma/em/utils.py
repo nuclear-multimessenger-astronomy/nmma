@@ -7,7 +7,6 @@ import scipy.signal
 import scipy.constants
 import scipy.stats
 
-import afterglowpy
 import sncosmo
 import dust_extinction.shapes as dustShp
 
@@ -16,7 +15,25 @@ from astropy.cosmology import Planck18, z_at_value
 import astropy.units
 import astropy.constants
 
-from wrapt_timeout_decorator import timeout
+try:
+    import afterglowpy
+
+    AFTERGLOWPY_INSTALLED = True
+except ImportError:
+    print("Install afterglowpy if you want to simulate afterglows.")
+    AFTERGLOWPY_INSTALLED = False
+
+try:
+    from wrapt_timeout_decorator import timeout
+except ImportError:
+    print("Install afterglowpy if you want to timeout simulations.")
+
+    def timeout(*args, **kwargs):
+        def inner(func):
+            return func
+
+        return inner
+
 
 import warnings
 
@@ -549,7 +566,10 @@ def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=N
 
 @timeout(60)
 def fluxDensity(t, nu, **params):
-    mJy = afterglowpy.fluxDensity(t, nu, **params)
+    if AFTERGLOWPY_INSTALLED:
+        mJy = afterglowpy.fluxDensity(t, nu, **params)
+    else:
+        raise ValueError("afterglowpy required for GRB afterglow")
     return mJy
 
 
