@@ -3,4 +3,4 @@ time mpiexec -np 14 light_curve_analysis --model Bu2019lm --interpolation_type t
 
 time mpiexec -np 40 light_curve_analysis --model Bu2019lm --interpolation_type sklearn_gp --svd-path MySVDs/MichealSVD/ --outdir output/michSVD --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lm.prior --Ebv-max 0 --tmin 0.5 --tmax 14 --dt 0.1
 
-time mpiexec -np 30 light_curve_analysis --model Bu2019lm --svd-path svdmodels --outdir output/GPnoTF2 --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lmGau.prior --Ebv-max 0 --tmin 0.5 --tmax 14 --dt 0.1
+time mpiexec -np 30 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir output/test --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lm.prior --Ebv-max 0 --tmin 0.5 --tmax 14 --dt 0.1
