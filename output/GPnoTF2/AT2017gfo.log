@@ -898,3 +898,182 @@
 10:30 INFO    : Using sampler Pymultinest with kwargs {'importance_nested_sampling': False, 'resume': True, 'verbose': True, 'sampling_efficiency': 'parameter', 'n_live_points': 2048, 'n_params': 6, 'n_clustering_params': None, 'wrapped_params': None, 'multimodal': True, 'const_efficiency_mode': False, 'evidence_tolerance': 0.5, 'n_iter_before_update': 100, 'null_log_evidence': -1e+90, 'max_modes': 100, 'mode_tolerance': -1e+90, 'seed': 42, 'context': 0, 'write_output': True, 'log_zero': -1e+100, 'max_iter': 0, 'init_MPI': False, 'dump_callback': <bound method Pymultinest._dump_callback of <bilby.core.sampler.pymultinest.Pymultinest object at 0x7fb57df54d30>>}
 10:30 INFO    : Temporary directory incompatible with MPI, will run in original directory
 10:30 INFO    : Using output file output/GPnoTF2/pm_AT2017gfo/
+11:20 INFO    : Sampling time: 0:49:47.641559
+11:20 INFO    : Sampling time: 0:49:47.627479
+11:20 INFO    : Sampling time: 0:49:47.447512
+11:20 INFO    : Sampling time: 0:49:47.598353
+11:20 INFO    : Sampling time: 0:49:47.676851
+11:20 INFO    : Sampling time: 0:49:47.733986
+11:20 INFO    : Sampling time: 0:49:47.453478
+11:20 INFO    : Sampling time: 0:49:47.459072
+11:20 INFO    : Sampling time: 0:49:47.733867
+11:20 INFO    : Sampling time: 0:49:47.685025
+11:20 INFO    : Sampling time: 0:49:47.516726
+11:20 INFO    : Sampling time: 0:49:47.737041
+11:20 INFO    : Sampling time: 0:49:47.738962
+11:20 INFO    : Sampling time: 0:49:47.728577
+11:20 INFO    : Sampling time: 0:49:47.474210
+11:20 INFO    : Sampling time: 0:49:47.643873
+11:20 INFO    : Sampling time: 0:49:47.611774
+11:20 INFO    : Sampling time: 0:49:47.740431
+11:20 INFO    : Sampling time: 0:49:47.741131
+11:20 INFO    : Sampling time: 0:49:47.738253
+11:20 INFO    : Sampling time: 0:49:47.748163
+11:20 INFO    : Sampling time: 0:49:47.757839
+11:20 INFO    : Sampling time: 0:49:47.761371
+11:20 INFO    : Sampling time: 0:49:47.756049
+11:20 INFO    : Sampling time: 0:49:47.762058
+11:20 INFO    : Sampling time: 0:49:47.758327
+11:20 INFO    : Sampling time: 0:49:47.759338
+11:20 INFO    : Sampling time: 0:49:47.753623
+11:20 INFO    : Sampling time: 0:49:47.757196
+11:20 INFO    : Sampling time: 0:49:47.759868
+11:20 INFO    : Sampling time: 0:49:47.674578
+11:20 INFO    : Sampling time: 0:49:47.492393
+11:20 INFO    : Sampling time: 0:49:47.463213
+11:20 INFO    : Sampling time: 0:49:47.734402
+11:20 INFO    : Sampling time: 0:49:47.737359
+11:20 INFO    : Sampling time: 0:49:47.435613
+11:20 INFO    : Sampling time: 0:49:47.608346
+11:20 INFO    : Sampling time: 0:49:47.736635
+11:20 INFO    : Sampling time: 0:49:47.718953
+11:20 INFO    : Sampling time: 0:49:47.789742
+11:20 INFO    : Sampling time: 0:49:47.579132
+11:20 INFO    : Sampling time: 0:49:47.673694
+11:20 INFO    : Sampling time: 0:49:47.732563
+11:20 INFO    : Sampling time: 0:49:47.782003
+11:20 INFO    : Sampling time: 0:49:47.794650
+11:20 INFO    : Sampling time: 0:49:47.884334
+11:20 INFO    : Sampling time: 0:49:47.818213
+11:20 INFO    : Sampling time: 0:49:48.111567
+11:20 INFO    : Sampling time: 0:49:47.885507
+11:20 INFO    : Sampling time: 0:49:48.004731
+11:20 INFO    : Sampling time: 0:49:47.782423
+11:20 INFO    : Sampling time: 0:49:48.063631
+11:20 INFO    : Sampling time: 0:49:48.111470
+11:20 INFO    : Sampling time: 0:49:48.104068
+11:20 INFO    : Sampling time: 0:49:48.131355
+11:20 INFO    : Sampling time: 0:49:48.109185
+11:20 INFO    : Sampling time: 0:49:47.969145
+11:20 INFO    : Sampling time: 0:49:48.110246
+11:20 INFO    : Sampling time: 0:49:48.112273
+11:20 INFO    : Sampling time: 0:49:48.127330
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
+11:20 INFO    : Summary of results:
+nsamples: 10028
+ln_noise_evidence:  0.000
+ln_evidence: -132.759 +/-  0.056
+ln_bayes_factor: -132.759 +/-  0.056
+
+11:20 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/GPnoTF2/AT2017gfo_posterior_samples.dat
