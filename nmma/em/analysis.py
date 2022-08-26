@@ -482,12 +482,17 @@ def main(args=None):
 
     # check for detections
     detection = False
+    notallnan = False
     for filt in data.keys():
         idx = np.where(np.isfinite(data[filt][:, 2]))[0]
         if len(idx) > 0:
             detection = True
+        idx = np.where(np.isfinite(data[filt][:, 1]))[0]
+        if len(idx) > 0:
+            notallnan = True
+        if detection and notallnan:
             break
-    if not detection:
+    if (not detection) or (not notallnan):
         raise ValueError("Need at least one detection to do fitting.")
 
     error_budget = [float(x) for x in args.error_budget.split(",")]
