@@ -278,3 +278,227 @@ ln_bayes_factor: -140.317 +/-  0.054
 
 12:12 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/possisNoROQ_tf/AT2017gfo_posterior_samples.dat
 12:12 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/possisNoROQ_tf/AT2017gfo_posterior_samples.dat
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/possisNoROQ_tf'
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    : Search parameters:
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 INFO    : Search parameters:
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    : Search parameters:
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   Ebv = 0.0
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Search parameters:
+14:06 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+14:06 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+14:06 INFO    :   luminosity_distance = 40.0
+14:06 INFO    :   KNtimeshift = 0.0
+14:06 INFO    :   Ebv = 0.0
+14:06 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+14:06 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 INFO    : Temporary directory incompatible with MPI, will run in original directory
+14:06 WARNING : Using cached result
+14:06 WARNING : Using cached result
+14:06 WARNING : Using cached result
+14:06 WARNING : Using cached result
+14:06 WARNING : Using cached result
+14:06 WARNING : Using cached result
+14:06 INFO    : Summary of results:
+nsamples: 11573
+ln_noise_evidence:  0.000
+ln_evidence: -140.317 +/-  0.054
+ln_bayes_factor: -140.317 +/-  0.054
+
+14:06 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/possisNoROQ_tf/AT2017gfo_posterior_samples.dat
+14:06 INFO    : Summary of results:
+nsamples: 11573
+ln_noise_evidence:  0.000
+ln_evidence: -140.317 +/-  0.054
+ln_bayes_factor: -140.317 +/-  0.054
+
+14:06 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/possisNoROQ_tf/AT2017gfo_posterior_samples.dat
+14:06 INFO    : Summary of results:
+nsamples: 11573
+ln_noise_evidence:  0.000
+ln_evidence: -140.317 +/-  0.054
+ln_bayes_factor: -140.317 +/-  0.054
+
+14:06 INFO    : Summary of results:
+nsamples: 11573
+ln_noise_evidence:  0.000
+ln_evidence: -140.317 +/-  0.054
+ln_bayes_factor: -140.317 +/-  0.054
+
+14:06 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/possisNoROQ_tf/AT2017gfo_posterior_samples.dat
+14:06 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/possisNoROQ_tf/AT2017gfo_posterior_samples.dat

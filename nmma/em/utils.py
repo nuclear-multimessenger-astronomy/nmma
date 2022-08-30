@@ -18,6 +18,8 @@ import astropy.constants
 
 from wrapt_timeout_decorator import timeout
 
+from sklearn.decomposition import PCA
+
 import warnings
 
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
@@ -363,9 +365,12 @@ def calc_lc(
 
         # coverrors = np.dot(VA[:, :n_coeff], np.dot(np.power(np.diag(cAstd[:n_coeff]), 2), VA[:, :n_coeff].T))
         # errors = np.diag(coverrors)
-
-        mag_back = np.dot(VA[:, :n_coeff], cAproj)
-        mag_back = mag_back * (maxs - mins) + mins
+        if 'pca_fit' in (svd_mag_model[filt].keys()):
+            mag_back = svd_mag_model[filt]['pca_fit'].inverse_transform(cAproj)
+            mag_back = mag_back * (maxs - mins) + mins
+        else:
+            mag_back = np.dot(VA[:, :n_coeff], cAproj)
+            mag_back = mag_back * (maxs - mins) + mins
         # mag_back = scipy.signal.medfilt(mag_back, kernel_size=3)
 
         ii = np.where((~np.isnan(mag_back)) * (tt_interp < 20.0))[0]
