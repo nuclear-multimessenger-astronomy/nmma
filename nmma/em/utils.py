@@ -331,6 +331,7 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
                 data[name][filt] = lc(tt)
         else:
             mag_d = np.loadtxt(filename)
+            mag_d_shape = mag_d.shape
 
             data[name] = {}
             data[name]["t"] = mag_d[:, 0]
@@ -344,12 +345,59 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
             data[name]["H"] = mag_d[:, 8]
             data[name]["K"] = mag_d[:, 9]
 
+            if mag_d_shape[1] == 15:
+                data[name]["U"] = mag_d[:, 10]
+                data[name]["B"] = mag_d[:, 11]
+                data[name]["V"] = mag_d[:, 12]
+                data[name]["R"] = mag_d[:, 13]
+                data[name]["I"] = mag_d[:, 14]
+
         if filters is not None:
             filters_to_remove = set(list(data[name].keys())) - set(filters + ["t"])
             for filt in filters_to_remove:
                 del data[name][filt]
 
     return data
+
+
+def get_default_filts_lambdas():
+
+    filts = [
+        "u",
+        "g",
+        "r",
+        "i",
+        "z",
+        "y",
+        "J",
+        "H",
+        "K",
+        "U",
+        "B",
+        "V",
+        "R",
+        "I",
+        "radio-3GHz",
+        "radio-1.25GHz",
+        "radio-5.5GHz",
+        "radio-6GHz",
+        "X-ray-1keV",
+        "X-ray-5keV",
+    ]
+    lambdas_sloan = 1e-10 * np.array(
+        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
+    )
+    lambdas_bessel = 1e-10 * np.array([3605.07, 4413.08, 5512.12, 6585.91, 8059.88])
+    lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
+    lambdas_Xray = scipy.constants.c / (
+        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
+    )
+
+    lambdas = np.concatenate(
+        [lambdas_sloan, lambdas_bessel, lambdas_radio, lambdas_Xray]
+    )
+
+    return filts, lambdas
 
 
 def calc_lc(
@@ -360,8 +408,11 @@ def calc_lc(
     mag_ncoeff=None,
     lbol_ncoeff=None,
     interpolation_type="sklearn_gp",
-    filters=["u", "g", "r", "i", "z", "y", "J", "H", "K"],
+    filters=None,
 ):
+
+    if filters is None:
+        filters = list(svd_mag_model.keys())
 
     mAB = {}
     for jj, filt in enumerate(filters):
@@ -581,32 +632,7 @@ def grb_lc(t_day, Ebv, param_dict):
     tnode = min(len(t_day), 201)
     default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
 
-    filts = [
-        "u",
-        "g",
-        "r",
-        "i",
-        "z",
-        "y",
-        "J",
-        "H",
-        "K",
-        "radio-3GHz",
-        "radio-1.25GHz",
-        "radio-5.5GHz",
-        "radio-6GHz",
-        "X-ray-1keV",
-        "X-ray-5keV",
-    ]
-    lambdas_optical = 1e-10 * np.array(
-        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
-    )
-    lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (
-        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
-    )
-
-    lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
+    filts, lambdas = get_default_filts_lambdas()
 
     nu_0s = scipy.constants.c / lambdas
 
@@ -668,35 +694,7 @@ def sn_lc(
     parameters={},
 ):
 
-    filts = [
-        "u",
-        "g",
-        "r",
-        "i",
-        "z",
-        "y",
-        "J",
-        "H",
-        "K",
-        "radio-1.25GHz",
-        "radio-5.5GHz",
-        "radio-6GHz",
-        "radio-3GHz",
-        "X-ray-1keV",
-        "X-ray-5keV",
-    ]
-    # wavelength in Angstrom
-    lambdas_optical = np.array(
-        [3561.8, 4866.46, 6214.6, 6389.4, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
-    )
-    lambdas_radio = scipy.constants.c / np.array([1.25e9, 5.5e9, 6e9, 3e9]) / 1e-10
-    lambdas_Xray = (
-        scipy.constants.c
-        / (np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h)
-        / 1e-10
-    )
-
-    lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
+    filts, lambdas = get_default_filts_lambdas()
 
     nus = scipy.constants.c / (1e-10 * lambdas)
 
@@ -756,32 +754,7 @@ def sc_lc(t_day, param_dict):
     Ebv = param_dict["Ebv"]
     z = param_dict["z"]
 
-    filts = [
-        "u",
-        "g",
-        "r",
-        "i",
-        "z",
-        "y",
-        "J",
-        "H",
-        "K",
-        "radio-3GHz",
-        "radio-1.25GHz",
-        "radio-5.5GHz",
-        "radio-6GHz",
-        "X-ray-1keV",
-        "X-ray-5keV",
-    ]
-    lambdas_optical = 1e-10 * np.array(
-        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
-    )
-    lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (
-        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
-    )
-
-    lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
+    filts, lambdas = get_default_filts_lambdas()
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)
@@ -933,33 +906,7 @@ def metzger_lc(t_day, param_dict):
     Xn0 = Xn0max * 2 * np.arctan(Mn / m / Msun) / np.pi  # neutron mass fraction
     Xr = 1.0 - Xn0  # r-process fraction
 
-    # setting up wavelength and filters
-    filts = [
-        "u",
-        "g",
-        "r",
-        "i",
-        "z",
-        "y",
-        "J",
-        "H",
-        "K",
-        "radio-3GHz",
-        "radio-1.25GHz",
-        "radio-5.5GHz",
-        "radio-6GHz",
-        "X-ray-1keV",
-        "X-ray-5keV",
-    ]
-    lambdas_optical = 1e-10 * np.array(
-        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
-    )
-    lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (
-        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
-    )
-
-    lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
+    filts, lambdas = get_default_filts_lambdas()
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)
@@ -1101,7 +1048,7 @@ def metzger_lc(t_day, param_dict):
 
     Ltot = Ltotm
     lbol = Ltotm * 1e40
-    Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto ** 2 * sigSB)) ** (0.25)
+    Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto**2 * sigSB)) ** (0.25)
 
     ii = np.where(~np.isnan(Tobs) & (Tobs > 0))[0]
     f = interp.interp1d(t_day[ii], Tobs[ii], fill_value="extrapolate")
@@ -1172,34 +1119,7 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
         10, -0.4 * (powerlaw_mag + 48.6)
     )
 
-    # setting up wavelength and filters
-    filts = [
-        "u",
-        "g",
-        "r",
-        "i",
-        "z",
-        "y",
-        "J",
-        "H",
-        "K",
-        "radio-3GHz",
-        "radio-1.25GHz",
-        "radio-5.5GHz",
-        "radio-6GHz",
-        "X-ray-1keV",
-        "X-ray-5keV",
-    ]
-    # these lambdas are in meter
-    lambdas_optical = 1e-10 * np.array(
-        [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
-    )
-    lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (
-        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
-    )
-
-    lambdas = np.concatenate([lambdas_optical, lambdas_radio, lambdas_Xray])
+    filts, lambdas = get_default_filts_lambdas()
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)

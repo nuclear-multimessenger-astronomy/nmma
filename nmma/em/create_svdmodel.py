@@ -102,7 +102,6 @@ def main():
         "--filters",
         type=str,
         help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
-        default="u,g,r,i,z,y,J,H,K",
     )
     parser.add_argument(
         "--outdir", type=str, default="output", help="Path to the output directory"
@@ -126,7 +125,6 @@ def main():
 
     # initialize light curve model
     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
-    filts = args.filters.split(",")
 
     MODEL_FUNCTIONS = {
         k: v for k, v in model_parameters.__dict__.items() if inspect.isfunction(v)
@@ -157,6 +155,12 @@ def main():
     training_data, parameters = model_function(data)
     if args.axial_symmetry:
         training_data = axial_symmetry(training_data)
+
+    if args.filters is not None:
+        filts = args.filters.split(",")
+    else:
+        keys = list(data.keys())
+        filts = list(set(data[keys[0]].keys()) - {"t"})
 
     training_model = SVDTrainingModel(
         args.model,
