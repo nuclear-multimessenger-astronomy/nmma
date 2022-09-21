@@ -428,6 +428,18 @@ class SVDTrainingModel(object):
 
         if self.interpolation_type == "sklearn_gp":
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+            outdir = modelfile.replace(".pkl", "")
+            if not os.path.isdir(outdir):
+                os.makedirs(outdir)
+            for filt in self.svd_model.keys():
+                outfile = os.path.join(outdir, f"{filt}.pkl")
+                with open(outfile, "wb") as handle:
+                    pickle.dump(
+                        self.svd_model[filt]["gps"],
+                        handle,
+                        protocol=pickle.HIGHEST_PROTOCOL,
+                    )
+                    del self.svd_model[filt]["gps"]
         elif self.interpolation_type == "tensorflow":
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             outdir = modelfile.replace(".pkl", "")
@@ -449,6 +461,15 @@ class SVDTrainingModel(object):
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
+
+            outdir = modelfile.replace(".pkl", "")
+            for filt in self.svd_model.keys():
+                outfile = os.path.join(outdir, f"{filt}.pkl")
+                if not os.path.isfile(outfile):
+                    continue
+                with open(outfile, "rb") as handle:
+                    self.svd_model[filt]["gps"] = pickle.load(handle)
+
         elif self.interpolation_type == "tensorflow":
             try:
                 from tensorflow.keras.models import load_model as load_tf_model
