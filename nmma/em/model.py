@@ -150,11 +150,29 @@ class SVDLightCurveModel(object):
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
+
+                outdir = modelfile.replace(".pkl", "")
+                for filt in self.svd_mag_model.keys():
+                    outfile = os.path.join(outdir, f"{filt}.pkl")
+                    if not os.path.isfile(outfile):
+                        continue
+                    with open(outfile, "rb") as handle:
+                        self.svd_mag_model[filt]["gps"] = pickle.load(handle)
+
                 self.svd_lbol_model = None
             else:
                 mag_modelfile = os.path.join(self.svd_path, "{0}_mag.pkl".format(model))
                 with open(mag_modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
+
+                outdir = mag_modelfile.replace(".pkl", "")
+                for filt in self.svd_mag_model.keys():
+                    outfile = os.path.join(outdir, f"{filt}.pkl")
+                    if not os.path.isfile(outfile):
+                        continue
+                    with open(outfile, "rb") as handle:
+                        self.svd_mag_model[filt]["gps"] = pickle.load(handle)
+
                 lbol_modelfile = os.path.join(
                     self.svd_path, "{0}_lbol.pkl".format(model)
                 )
