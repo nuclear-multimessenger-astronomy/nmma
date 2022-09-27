@@ -1,0 +1,55 @@
+From df23a00eb7d02352ab40e8beaf511f8dc5c3214f Mon Sep 17 00:00:00 2001
+From: Peter Tsun Ho Pang <t.h.pang@nikhef.nl>
+Date: Tue, 20 Jul 2021 14:00:34 +0200
+Subject: [PATCH 6/6] Fixing name for ET1 and ET2
+
+---
+ bilby/gw/detector/detectors/ET1.interferometer | 6 +++---
+ bilby/gw/detector/detectors/ET2.interferometer | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/bilby/gw/detector/detectors/ET1.interferometer b/bilby/gw/detector/detectors/ET1.interferometer
+index bae67783..43437237 100644
+--- a/bilby/gw/detector/detectors/ET1.interferometer
++++ b/bilby/gw/detector/detectors/ET1.interferometer
+@@ -1,7 +1,7 @@
+ # The proposed Einstein Telescope located at the site of Virgo.
+ # LIGO-T980044-10
+ # https://dcc.ligo.org/LIGO-P1600143/public
+-name = 'ET2'
++name = 'ET1'
+ power_spectral_density = PowerSpectralDensity(psd_file='ET_B_psd.txt')
+ length = 10
+ minimum_frequency = 10
+@@ -9,5 +9,5 @@ maximum_frequency = 2048
+ latitude = 43 + 37. / 60 + 53.0921 / 3600
+ longitude = 10 + 30. / 60 + 16.1878 / 3600
+ elevation = 51.884
+-xarm_azimuth = 310.5674
+-yarm_azimuth = 10.5674
++xarm_azimuth = 70.5674
++yarm_azimuth = 130.5674
+diff --git a/bilby/gw/detector/detectors/ET2.interferometer b/bilby/gw/detector/detectors/ET2.interferometer
+index 43437237..bae67783 100644
+--- a/bilby/gw/detector/detectors/ET2.interferometer
++++ b/bilby/gw/detector/detectors/ET2.interferometer
+@@ -1,7 +1,7 @@
+ # The proposed Einstein Telescope located at the site of Virgo.
+ # LIGO-T980044-10
+ # https://dcc.ligo.org/LIGO-P1600143/public
+-name = 'ET1'
++name = 'ET2'
+ power_spectral_density = PowerSpectralDensity(psd_file='ET_B_psd.txt')
+ length = 10
+ minimum_frequency = 10
+@@ -9,5 +9,5 @@ maximum_frequency = 2048
+ latitude = 43 + 37. / 60 + 53.0921 / 3600
+ longitude = 10 + 30. / 60 + 16.1878 / 3600
+ elevation = 51.884
+-xarm_azimuth = 70.5674
+-yarm_azimuth = 130.5674
++xarm_azimuth = 310.5674
++yarm_azimuth = 10.5674
+-- 
+2.26.2
+

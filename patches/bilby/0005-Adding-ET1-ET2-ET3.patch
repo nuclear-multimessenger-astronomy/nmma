@@ -1,0 +1,74 @@
+From c38fec7e4da1aa983ee063a1d341f90dbe599047 Mon Sep 17 00:00:00 2001
+From: Peter Tsun Ho Pang <t.h.pang@nikhef.nl>
+Date: Fri, 16 Jul 2021 13:06:57 +0200
+Subject: [PATCH 5/6] Adding ET1, ET2, ET3
+
+---
+ bilby/gw/detector/detectors/ET1.interferometer | 13 +++++++++++++
+ bilby/gw/detector/detectors/ET2.interferometer | 13 +++++++++++++
+ bilby/gw/detector/detectors/ET3.interferometer | 13 +++++++++++++
+ 3 files changed, 39 insertions(+)
+ create mode 100644 bilby/gw/detector/detectors/ET1.interferometer
+ create mode 100644 bilby/gw/detector/detectors/ET2.interferometer
+ create mode 100644 bilby/gw/detector/detectors/ET3.interferometer
+
+diff --git a/bilby/gw/detector/detectors/ET1.interferometer b/bilby/gw/detector/detectors/ET1.interferometer
+new file mode 100644
+index 00000000..bae67783
+--- /dev/null
++++ b/bilby/gw/detector/detectors/ET1.interferometer
+@@ -0,0 +1,13 @@
++# The proposed Einstein Telescope located at the site of Virgo.
++# LIGO-T980044-10
++# https://dcc.ligo.org/LIGO-P1600143/public
++name = 'ET2'
++power_spectral_density = PowerSpectralDensity(psd_file='ET_B_psd.txt')
++length = 10
++minimum_frequency = 10
++maximum_frequency = 2048
++latitude = 43 + 37. / 60 + 53.0921 / 3600
++longitude = 10 + 30. / 60 + 16.1878 / 3600
++elevation = 51.884
++xarm_azimuth = 310.5674
++yarm_azimuth = 10.5674
+diff --git a/bilby/gw/detector/detectors/ET2.interferometer b/bilby/gw/detector/detectors/ET2.interferometer
+new file mode 100644
+index 00000000..43437237
+--- /dev/null
++++ b/bilby/gw/detector/detectors/ET2.interferometer
+@@ -0,0 +1,13 @@
++# The proposed Einstein Telescope located at the site of Virgo.
++# LIGO-T980044-10
++# https://dcc.ligo.org/LIGO-P1600143/public
++name = 'ET1'
++power_spectral_density = PowerSpectralDensity(psd_file='ET_B_psd.txt')
++length = 10
++minimum_frequency = 10
++maximum_frequency = 2048
++latitude = 43 + 37. / 60 + 53.0921 / 3600
++longitude = 10 + 30. / 60 + 16.1878 / 3600
++elevation = 51.884
++xarm_azimuth = 70.5674
++yarm_azimuth = 130.5674
+diff --git a/bilby/gw/detector/detectors/ET3.interferometer b/bilby/gw/detector/detectors/ET3.interferometer
+new file mode 100644
+index 00000000..acb0009d
+--- /dev/null
++++ b/bilby/gw/detector/detectors/ET3.interferometer
+@@ -0,0 +1,13 @@
++# The proposed Einstein Telescope located at the site of Virgo.
++# LIGO-T980044-10
++# https://dcc.ligo.org/LIGO-P1600143/public
++name = 'ET3'
++power_spectral_density = PowerSpectralDensity(psd_file='ET_B_psd.txt')
++length = 10
++minimum_frequency = 10
++maximum_frequency = 2048
++latitude = 43 + 37. / 60 + 53.0921 / 3600
++longitude = 10 + 30. / 60 + 16.1878 / 3600
++elevation = 51.884
++xarm_azimuth = 190.5674
++yarm_azimuth = 250.5674
+-- 
+2.26.2
+
