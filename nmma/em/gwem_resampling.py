@@ -65,6 +65,11 @@ def main():
         action="store_true",
         help="To run with total ejecta mass, if not activated, the two ejecta are consider seperately",
     )
+    parser.add_argument(
+        "--withNSBH", 
+        action="store_true",
+        help="Compute GW-EM-resampling for NSBH source, else: for BNS source.",
+    )
     args = parser.parse_args()
 
     # read the GW samples
@@ -82,20 +87,36 @@ def main():
     # read the prior files
     GWprior = bilby.gw.prior.PriorDict(args.GWprior)
     EMprior = bilby.gw.prior.PriorDict(args.EMprior)
+    
+    if args.withNSBH:
+        try:
+            os.makedirs(args.outdir + "/pm/")
+        except Exception:
+            pass
+        pymulti_kwargs = dict(
+            outputfiles_basename=args.outdir + "/pm/",
+            n_dims=7,
+            n_live_points=args.nlive,
+            verbose=True,
+            resume=True,
+            seed=42,
+            importance_nested_sampling=False,
+        )
 
-    try:
-        os.makedirs(args.outdir + "/pm/")
-    except Exception:
-        pass
-    pymulti_kwargs = dict(
-        outputfiles_basename=args.outdir + "/pm/",
-        n_dims=5,
-        n_live_points=args.nlive,
-        verbose=True,
-        resume=True,
-        seed=42,
-        importance_nested_sampling=False,
-    )
+    else:
+        try:
+            os.makedirs(args.outdir + "/pm/")
+        except Exception:
+            pass
+        pymulti_kwargs = dict(
+            outputfiles_basename=args.outdir + "/pm/",
+            n_dims=5,
+            n_live_points=args.nlive,
+            verbose=True,
+            resume=True,
+            seed=42,
+            importance_nested_sampling=False,
+        )
 
     if args.total_ejecta_mass:
         solution = sampler_functions.TotalEjectaMassInference(
@@ -105,6 +126,7 @@ def main():
             EMprior,
             args.Neos,
             args.EOSpath,
+            args.withNSBH,
             **pymulti_kwargs
         )
     else:
@@ -115,23 +137,41 @@ def main():
             EMprior,
             args.Neos,
             args.EOSpath,
+            args.withNSBH,
             **pymulti_kwargs
         )
+    
+    if args.withNSBH:
+        
+        samples = solution.samples.T
+        posterior_samples = dict()
+        posterior_samples["chirp_mass"] = samples[0]
+        posterior_samples["mass_ratio"] = samples[1]
+        posterior_samples["EOS"] = samples[2]
+        posterior_samples["alpha"] = samples[3]
+        posterior_samples["zeta"] = samples[4]
+        posterior_samples["chi_1"] = samples[5]
+        posterior_samples["chi_2"] = samples[6]
 
-    samples = solution.samples.T
-    posterior_samples = dict()
-    posterior_samples["chirp_mass"] = samples[0]
-    posterior_samples["mass_ratio"] = samples[1]
-    posterior_samples["EOS"] = samples[2]
-    posterior_samples["alpha"] = samples[3]
-    posterior_samples["zeta"] = samples[4]
+        posterior_samples = pd.DataFrame.from_dict(posterior_samples)
+        posterior_samples.to_csv("{0}/posterior_samples.dat".format(args.outdir), sep=" ", index=False)
 
-    posterior_samples = pd.DataFrame.from_dict(posterior_samples)
-    posterior_samples.to_csv(
-        "{0}/posterior_samples.dat".format(args.outdir), sep=" ", index=False
-    )
+        sampler_functions.corner_plot(posterior_samples, solution, args.outdir,args.withNSBH)
 
-    sampler_functions.corner_plot(posterior_samples, solution, args.outdir)
+    else:
+        samples = solution.samples.T
+        
+        posterior_samples = dict()
+        posterior_samples["chirp_mass"] = samples[0]
+        posterior_samples["mass_ratio"] = samples[1]
+        posterior_samples["EOS"] = samples[2]
+        posterior_samples["alpha"] = samples[3]
+        posterior_samples["zeta"] = samples[4]
+
+        posterior_samples = pd.DataFrame.from_dict(posterior_samples)
+        posterior_samples.to_csv("{0}/posterior_samples.dat".format(args.outdir), sep=" ", index=False)
+
+        sampler_functions.corner_plot(posterior_samples, solution, args.outdir, args.withNSBH)
 
 
 if __name__ == "__main__":
