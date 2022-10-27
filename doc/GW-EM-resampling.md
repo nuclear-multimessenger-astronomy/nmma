@@ -18,13 +18,13 @@ For estimating the source properties, the following input files are required:
 
 Here, we take the observed gamma-ray burst [GRB211211A](https://arxiv.org/abs/2204.10864) as an example and assume that associated electromagnetic signals 
 originated from a BNS merger. For this signal, a joint inference (kilonova + GRB) can be carried out and will provide you with the required `EMsamples`.
-For the `GWsamples` input file, we need to generate some fiducial dummy GW samples. A script for the generation can be found [here](https://github.com/ninakuni/nmma/blob/main/doc/gwsamples_generation.py).
+For the `GWsamples` input file, we need to generate some fiducial dummy GW samples. A script for the generation can be found [here](example_files/tools/gwem_resampling/gwsamples_generation.py).
 The GW sample generation is based on the EOS set `15nsat_cse_uniform_R14` which can be found on [Zenodo](https://zenodo.org/record/6106130#.Y1pdM9JBxhG). 
 The `EMprior` file is the same as used for the KN+GRB inference (see [priors](https://github.com/nuclear-multimessenger-astronomy/nmma/tree/main/priors)) and the GWprior file should be adjusted to the GWsamples. 
 
 Finally, we can use this command:
 
-    gwem_resampling --outdir outdir --GWsamples ./GWsamples.dat --GWprior ./GW.prior --EMsamples ./GRB211211A_posterior_samples.dat --EOSpath ./15nsat_cse_uniform_R14/macro/ --Neos 5000 --EMprior ./Bu2019lm_TrPi2018GRB211211A.prior --nlive 1024  
+    gwem_resampling --outdir outdir --GWsamples example_files/tools/gwem_resampling/GWsamples.dat --GWprior example_files/tools/gwem_resampling/GW.prior --EMsamples example_files/tools/gwem_resampling/GRB211211A_posterior_samples.dat --EOSpath example_files/tools/gwem_resampling/15nsat_cse_uniform_R14/macro/ --Neos 5000 --EMprior example_files/tools/gwem_resampling/Bu2019lm_TrPi2018GRB211211A.prior --nlive 1024  
 
 The result will be a posterior file containing information on:
 
@@ -37,7 +37,7 @@ The result will be a posterior file containing information on:
 
 A corner plot is shown below:
 
-![GWEMcornerplot](https://github.com/ninakuni/nmma/blob/main/doc/corner_samples.png)
+![GWEMcornerplot](doc/images/corner_samples.png)
 
 
 ## Estimating NSBH properties 
@@ -45,7 +45,7 @@ A corner plot is shown below:
 In order to estimate the properties of a NSBH system, you need to adjust the `GWsamples` and `GWprior` file accordingly and run the resampling
 with the arguemnt `withNSBH` (otherwise, you will run for a BNS system).
 
-    gwem_resampling --outdir outdir --GWsamples ./GWsamples.dat --GWprior ./GW.prior --withNSBH --EMsamples ./GRB211211A_posterior_samples.dat --EOSpath ./15nsat_cse_uniform_R14/macro/ --Neos 5000 --EMprior ./Bu2019nsbh_TrPi2018GRB211211A.prior --nlive 1024  
+    gwem_resampling --outdir outdir --GWsamples example_files/tools/gwem_resampling/GWsamplesi_NSBH.dat --GWprior example_files/tools/gwem_resampling/GWNSBH.prior --withNSBH --EMsamples example_files/tools/gwem_resampling/GRB211211A_NSBH_posterior_samples.dat --EOSpath example_files/tools/gwem_resampling/15nsat_cse_uniform_R14/macro/ --Neos 5000 --EMprior example_files/tools/gwem_resampling/Bu2019nsbh_TrPi2018_GRB211211A.prior --nlive 1024  
 
 
 
