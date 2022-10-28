@@ -1,0 +1,20 @@
+
+KNphi = Uniform(name='KNphi', minimum=15., maximum=75., latex_label='$\Phi$')
+# incl_EM with i = 60 deg >> pi/3 assumed that it is smaller than inclination of GW170817&GRB170817A
+inclination_EM = Sine(name='inclination_EM', minimum=0., maximum=np.pi/4., latex_label='$\\iota$')
+KNtimeshift = 0.0
+log10_mej_dyn  = Uniform(name='log10_mej_dyn', minimum=-3., maximum=-1., latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$')
+log10_mej_wind = Uniform(name='log10_mej_wind', minimum=-3., maximum=-0.5, latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$')
+
+luminosity_distance = Uniform(minimum=0., maximum=1000., name='luminosity_distance',latex_label='$D_L$')
+log10_E0 =  Uniform(minimum=47., maximum=55., name='log10_E0',latex_label='$\\log_{10}E_0$')
+thetaCore = Uniform(name='theta_core', minimum=0.01, maximum=np.pi/10., latex_label='$\\theta_c$')
+thetaWing = Uniform(name='theta_wing', minimum=0.01, maximum=np.pi/4., latex_label='$\\theta_w$')
+log10_n0 = Uniform(name='log10_n0', minimum=-5, maximum=0., latex_label='$\\log_{10}n_0$')
+p = Uniform(name='p', minimum=2.01, maximum=3., latex_label='$p$')
+log10_epsilon_e = Uniform(name='log10_epsilon_e', minimum=-5, maximum=0, latex_label='$\\log_{10}\epsilon_e$')
+log10_epsilon_B = Uniform(name='log10_epsilon_B', minimum=-10, maximum=0, latex_label='$\\log_{10}\epsilon_B$')
+
+alpha = Gaussian(mu=0., sigma=4e-4, name='alpha',latex_label='$\\alpha$')
+zeta = Uniform(minimum=0., maximum=1.0, name='ratio_zeta',latex_label='$\\zeta$')
+
