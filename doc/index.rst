@@ -55,6 +55,7 @@ User Guide
    training
    fitting
    models
+   GW-EM-resampling
    combined_analysis
    contributing
 
