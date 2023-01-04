@@ -71,6 +71,8 @@ nu = scipy.constants.c / lambdas
 
 filt_to_nu_dict = dict(zip(filts, nu))
 
+speed_of_light_cm_s = scipy.constants.c * 100.0
+
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
@@ -78,8 +80,8 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
     # Pei 1992 SMC model
 
     # Get model wavelength range
-    ext_range_nu_lo = dustShp.P92.x_range[0] * 1e4 * afterglowpy.c
-    ext_range_nu_hi = min(cutoff_hi, dustShp.P92.x_range[1] * 1e4 * afterglowpy.c)
+    ext_range_nu_lo = dustShp.P92.x_range[0] * 1e4 * speed_of_light_cm_s
+    ext_range_nu_hi = min(cutoff_hi, dustShp.P92.x_range[1] * 1e4 * speed_of_light_cm_s)
 
     # host-frame frequencies
     nu_host = nu * (1 + z)
@@ -88,7 +90,7 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
     opt = (nu_host >= ext_range_nu_lo) & (nu_host <= ext_range_nu_hi)
 
     # host-frame wavelengths
-    lam_host = (afterglowpy.c / nu_host[opt]) * astropy.units.cm
+    lam_host = (speed_of_light_cm_s / nu_host[opt]) * astropy.units.cm
 
     # amplitudes have to be converted from B reference to V
     abav = dustShp.P92.AbAv
