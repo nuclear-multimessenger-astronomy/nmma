@@ -1042,3 +1042,14 @@ ln_evidence: -164.217 +/-  0.071
 ln_bayes_factor: -164.217 +/-  0.071
 
 14:08 INFO    : Writing samples file to /nfs/enlil/pouyans/codes/nmma/output/pcatest2/AT2017gfo_posterior_samples.dat
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
+15:13 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/pcatest2'
