@@ -21,7 +21,7 @@ EMdata will house the posteriors of the electromagnetic data you will produce: i
 
 	do
 	  mkdir -p ./output/EMdata/outdir/$macroeventID/
-	  light_curve_analysis --model Bu2019lm --svd-path ./svdmodels --gptype tensorflow --outdir ./output/EMdata/outdir/$macroeventID --label injection_Bu2019lm --prior ./priors/Bu2019lm.prior --tmin 0 --tmax 7 --dt 0.5 --error-budget 1.0 --nlive 256 --Ebv-max 0 --injection ./output/injection.json --injection-num $macroeventID --injection-detection-limit 22,22,22 --injection-outfile ./output/EMdata/outdir/$macroeventID/lc.csv --generation-seed 42 --filters g,r,i --ztf-sampling --ztf-uncertainties --plot --remove-nondetections --optimal-augmentation --optimal-augmentation-filters u,g,r,i,z,y,J,H,K --optimal-augmentation-N 100
+	  light_curve_analysis --model Bu2019lm --svd-path ./svdmodels --interpolation_type tensorflow --outdir ./output/EMdata/outdir/$macroeventID --label injection_Bu2019lm --prior ./priors/Bu2019lm.prior --tmin 0 --tmax 7 --dt 0.5 --error-budget 1.0 --nlive 256 --Ebv-max 0 --injection ./output/injection.json --injection-num $macroeventID --injection-detection-limit 22,22,22 --injection-outfile ./output/EMdata/outdir/$macroeventID/lc.csv --generation-seed 42 --filters g,r,i --ztf-sampling --ztf-uncertainties --plot --remove-nondetections --photometry-augmentation --photometry-augmentation-filters u,g,r,i,z,y,J,H,K --photometry-augmentation-N-points 100
 	done
 
 
