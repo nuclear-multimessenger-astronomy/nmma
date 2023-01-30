@@ -1,4 +1,4 @@
-time mpiexec -np 60 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir output/tfsrcGP_pca --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lmD40.prior --Ebv-max 0 --tmin 0.1 --tmax 14.1 --dt 0.2
+time mpiexec -np 60 light_curve_analysis --model Bu2019lm --interpolation_type tensorflow --svd-path svdmodels --outdir output/tfsrcGP_svd_10 --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2019lmD40.prior --Ebv-max 0 --tmin 0.1 --tmax 14.1 --dt 0.2
 
 GP command:
 time mpiexec -np 60 light_curve_analysis --model Bu2019lm --interpolation_type sklearn_gp --svd-path "/home/enlil/pouyans/codes/thesis/Final Results/01_DBs/GP/lc_generate" --outdir "/home/enlil/pouyans/codes/thesis/Final Results/03_Comparison/PE" --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior "/home/enlil/pouyans/codes/nmma/priors/Bu2019lmD40.prior" --Ebv-max 0 --tmin 0.1 --tmax 14 --dt 0.2
