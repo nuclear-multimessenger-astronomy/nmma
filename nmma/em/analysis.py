@@ -507,7 +507,11 @@ def main(args=None):
         else:
             filters = args.filters.split(",")
 
-        filters_to_analyze = list(set(filters).intersection(set(list(data.keys()))))
+        values_to_indices = {v: i for i, v in enumerate(filters)}
+        filters_to_analyze = sorted(
+            list(set(filters).intersection(set(list(data.keys())))),
+            key=lambda v: values_to_indices[v],
+        )
 
         if len(error_budget) == 1:
             error_budget = dict(
@@ -632,6 +636,7 @@ def main(args=None):
         bestfit_params = posterior_samples.to_dict(orient="list")
         for key in bestfit_params.keys():
             bestfit_params[key] = bestfit_params[key][bestfit_idx]
+        print(f"Best fit parameters: {str(bestfit_params)}")
 
         #########################
         # Generate the lightcurve
@@ -643,6 +648,10 @@ def main(args=None):
                     bestfit_params["luminosity_distance"] * 1e6 / 10.0
                 )
         mag["bestfit_sample_times"] = sample_times
+        if "KNtimeshift" in bestfit_params:
+            mag["bestfit_sample_times"] = (
+                mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
+            )
 
         if len(models) > 1:
             _, mag_all = light_curve_model.generate_lightcurve(
@@ -706,11 +715,17 @@ def main(args=None):
 
             mag_plot = getFilteredMag(mag, filt)
 
-            plt.plot(sample_times, mag_plot, color=color2, linewidth=3, linestyle="--")
+            plt.plot(
+                mag["bestfit_sample_times"],
+                mag_plot,
+                color=color2,
+                linewidth=3,
+                linestyle="--",
+            )
 
             if len(models) > 1:
                 plt.fill_between(
-                    sample_times,
+                    mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
                     mag_plot - error_budget[filt],
                     facecolor=color2,
@@ -719,7 +734,7 @@ def main(args=None):
                 )
             else:
                 plt.fill_between(
-                    sample_times,
+                    mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
                     mag_plot - error_budget[filt],
                     facecolor=color2,
@@ -730,14 +745,14 @@ def main(args=None):
                 for ii in range(len(mag_all)):
                     mag_plot = getFilteredMag(mag_all[ii], filt)
                     plt.plot(
-                        sample_times,
+                        mag["bestfit_sample_times"],
                         mag_plot,
                         color=color2,
                         linewidth=3,
                         linestyle="--",
                     )
                     plt.fill_between(
-                        sample_times,
+                        mag["bestfit_sample_times"],
                         mag_plot + error_budget[filt],
                         mag_plot - error_budget[filt],
                         facecolor=model_colors[ii],

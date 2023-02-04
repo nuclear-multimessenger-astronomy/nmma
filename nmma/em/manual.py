@@ -502,7 +502,11 @@ def main(args=None):
         else:
             filters = args.filters.split(",")
 
-        filters_to_analyze = list(set(filters).intersection(set(list(data.keys()))))
+        values_to_indices = {v: i for i, v in enumerate(filters)}
+        filters_to_analyze = sorted(
+            list(set(filters).intersection(set(list(data.keys())))),
+            key=lambda v: values_to_indices[v],
+        )
 
         if len(error_budget) == 1:
             error_budget = dict(
@@ -547,6 +551,10 @@ def main(args=None):
                         params["luminosity_distance"] * 1e6 / 10.0
                     )
             mag["bestfit_sample_times"] = sample_times
+            if "KNtimeshift" in params:
+                mag["bestfit_sample_times"] = (
+                    mag["bestfit_sample_times"] + params["KNtimeshift"]
+                )
 
             if len(models) > 1:
                 _, mag_all = light_curve_model.generate_lightcurve(
@@ -610,20 +618,26 @@ def main(args=None):
                 t[idx], y[idx], sigma_y[idx], fmt="v", color="k", markersize=16
             )  # or color=color
 
-            for kk, mag in enumerate(mags):
+            for kk, (mag, params) in enumerate(zip(mags, parameters)):
                 mag_plot = getFilteredMag(mag, filt)
 
+                if "label" in params:
+                    legend_label = params["label"]
+                else:
+                    legend_label = str(kk)
+
                 plt.plot(
-                    sample_times,
+                    mag["bestfit_sample_times"],
                     mag_plot,
                     color=lightcurve_colors[kk],
                     linewidth=3,
                     linestyle="--",
+                    label=legend_label,
                 )
 
                 if len(models) > 1:
                     plt.fill_between(
-                        sample_times,
+                        mag["bestfit_sample_times"],
                         mag_plot + error_budget[filt],
                         mag_plot - error_budget[filt],
                         facecolor=lightcurve_colors[kk],
@@ -632,7 +646,7 @@ def main(args=None):
                     )
                 else:
                     plt.fill_between(
-                        sample_times,
+                        mag["bestfit_sample_times"],
                         mag_plot + error_budget[filt],
                         mag_plot - error_budget[filt],
                         facecolor=lightcurve_colors[kk],
@@ -643,14 +657,14 @@ def main(args=None):
                     for ii in range(len(mag_all)):
                         mag_plot = getFilteredMag(mag_all[ii], filt)
                         plt.plot(
-                            sample_times,
+                            mag["bestfit_sample_times"],
                             mag_plot,
                             color=lightcurve_colors[kk],
                             linewidth=3,
                             linestyle="--",
                         )
                         plt.fill_between(
-                            sample_times,
+                            mag["bestfit_sample_times"],
                             mag_plot + error_budget[filt],
                             mag_plot - error_budget[filt],
                             facecolor=model_colors[ii],
@@ -667,14 +681,13 @@ def main(args=None):
             if cnt == 1:
                 ax1.set_yticks([26, 22, 18, 14])
                 plt.setp(ax1.get_xticklabels(), visible=False)
-                if len(models) > 1:
-                    plt.legend(
-                        loc="upper right",
-                        prop={"size": 18},
-                        numpoints=1,
-                        shadow=True,
-                        fancybox=True,
-                    )
+                plt.legend(
+                    loc="upper right",
+                    prop={"size": 36},
+                    numpoints=1,
+                    shadow=True,
+                    fancybox=True,
+                )
             elif not cnt == len(filters_plot):
                 plt.setp(ax2.get_xticklabels(), visible=False)
             plt.xticks(fontsize=36)
