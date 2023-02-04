@@ -51,7 +51,7 @@ def write_version_file(version):
 
 
 def get_long_description():
-    """ Finds the README and reads in the description """
+    """Finds the README and reads in the description"""
     here = os.path.abspath(os.path.dirname(__file__))
     with open(os.path.join(here, "README.md")) as f:
         long_description = f.read()
@@ -123,6 +123,7 @@ setup(
             "light_curve_injection_summary=nmma.em.injection_summary:main",
             "light_curve_injection_slurm_setup=nmma.em.create_injection_slurm:main",
             "light_curve_injection_condor_setup=nmma.em.create_injection_condor:main",
+            "light_curve_manual=nmma.em.manual:main",
             "lightcurve_marginalization=nmma.em.lightcurve_marginalization:main",
             "combine_EOS=nmma.em.combine_EOS:main",
             "create_light_curve_slurm=nmma.em.create_lightcurves_slurm:main",
