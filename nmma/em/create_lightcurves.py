@@ -147,198 +147,231 @@ def main():
         help="A comma seperated list of filters to use for augmentation (e.g. g,r,i). If none is provided, will use all the filters available",
     )
     args = parser.parse_args()
-
-    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
-    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
-
-    # initialize light curve model
-    sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
-
-    if args.joint_light_curve:
-
-        assert args.model != "TrPi2018", "TrPi2018 is not a kilonova / supernova model"
-
-        if args.model != "nugent-hyper" or args.model != "salt2":
-
-            kilonova_kwargs = dict(
-                model=args.model,
-                svd_path=args.svd_path,
-                mag_ncoeff=args.svd_mag_ncoeff,
-                lbol_ncoeff=args.svd_lbol_ncoeff,
-                gptype=args.gptype,
-                parameter_conversion=None,
-            )
-
-            light_curve_model = KilonovaGRBLightCurveModel(
-                sample_times=sample_times,
-                kilonova_kwargs=kilonova_kwargs,
-                GRB_resolution=args.grb_resolution,
-                jetType=args.jet_type,
-            )
-
-        else:
-
-            light_curve_model = SupernovaGRBLightCurveModel(
-                sample_times=sample_times,
-                GRB_resolution=args.grb_resolution,
-                SNmodel=args.model,
-                jetType=args.jet_type,
-            )
+    
+    #seed = args.generation_seed
+    #np.random.seed(seed)
+    
+    if args.ztf_sampling or args.ztf_ToO or args.rubin_ToO:
+        
+        print('\n===================================================================') 
+        print('Sorry we could not use ZTF or  flags to generate those statistics')
+        print('===================================================================')
+        print('Please remove all flags rely on with ZTF or Rubin then retry again')
+        print('===================================================================\n')
 
     else:
-        if args.model == "TrPi2018":
-            light_curve_model = GRBLightCurveModel(
-                sample_times=sample_times,
-                resolution=args.grb_resolution,
-                jetType=args.jet_type,
-            )
-        elif args.model == "nugent-hyper" or args.model == "salt2":
-            light_curve_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model=args.model
-            )
+        
+        bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
+        bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+
+        # initialize light curve model
+        sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+
+        if args.joint_light_curve:
+
+            assert args.model != "TrPi2018", "TrPi2018 is not a kilonova / supernova model"
+
+            if args.model != "nugent-hyper" or args.model != "salt2":
+
+                kilonova_kwargs = dict(
+                    model=args.model,
+                    svd_path=args.svd_path,
+                    mag_ncoeff=args.svd_mag_ncoeff,
+                    lbol_ncoeff=args.svd_lbol_ncoeff,
+                    gptype=args.gptype,
+                    parameter_conversion=None,
+                )
+
+                light_curve_model = KilonovaGRBLightCurveModel(
+                    sample_times=sample_times,
+                    kilonova_kwargs=kilonova_kwargs,
+                    GRB_resolution=args.grb_resolution,
+                    jetType=args.jet_type,
+                )
+
+            else:
+
+                light_curve_model = SupernovaGRBLightCurveModel(
+                    sample_times=sample_times,
+                    GRB_resolution=args.grb_resolution,
+                    SNmodel=args.model,
+                    jetType=args.jet_type,
+                )
 
         else:
-            light_curve_kwargs = dict(
-                model=args.model,
-                sample_times=sample_times,
-                svd_path=args.svd_path,
-                mag_ncoeff=args.svd_mag_ncoeff,
-                lbol_ncoeff=args.svd_lbol_ncoeff,
-                gptype=args.gptype,
-            )
-            light_curve_model = SVDLightCurveModel(**light_curve_kwargs)
+            if args.model == "TrPi2018":
+                light_curve_model = GRBLightCurveModel(
+                    sample_times=sample_times,
+                    resolution=args.grb_resolution,
+                    jetType=args.jet_type,
+                )
+            elif args.model == "nugent-hyper" or args.model == "salt2":
+                light_curve_model = SupernovaLightCurveModel(
+                    sample_times=sample_times, model=args.model
+                )
 
-    with open(args.injection, "r") as f:
-        injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
-
-    args.kilonova_tmin = args.tmin
-    args.kilonova_tmax = args.tmax
-    args.kilonova_tstep = args.dt
-
-    args.kilonova_injection_model = args.model
-    args.kilonova_injection_svd = args.svd_path
-    args.injection_svd_mag_ncoeff = args.svd_mag_ncoeff
-    args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
-
-    # args.injection_detection_limit = np.inf
-    args.kilonova_error = 0
-
-    injection_df = injection_dict["injections"]
-    mag_ds = {}
-    for index, row in injection_df.iterrows():
-
-        injection_outfile = os.path.join(args.outdir, "%d.dat" % index)
-        if os.path.isfile(injection_outfile):
-            mag_ds[index] = np.loadtxt(injection_outfile)
-            continue
-
-        injection_parameters = row.to_dict()
-
-        try:
-            tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
-        except KeyError:
-            tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
-        trigger_time = tc_gps.mjd
-
-        injection_parameters["kilonova_trigger_time"] = trigger_time
-
-        data = create_light_curve_data(
-            injection_parameters,
-            args,
-            doAbsolute=args.absolute,
-            light_curve_model=light_curve_model,
-        )
-        print("Injection generated")
-
-        fid = open(injection_outfile, "w")
-        # fid.write('# t[days] u g r i z y J H K\n')
-        # fid.write(str(" ".join(('# t[days]'," ".join(args.filters.split(',')),"\n"))))
-        fid.write("# t[days] ")
-        fid.write(str(" ".join(args.filters.split(","))))
-        fid.write("\n")
-        for ii, tt in enumerate(sample_times):
-            fid.write("%.5f " % sample_times[ii])
-            for filt in data.keys():
-                if args.filters:
-                    if filt not in args.filters.split(","):
-                        continue
-                fid.write("%.3f " % data[filt][ii, 1])
-            fid.write("\n")
-        fid.close()
-
-        mag_ds[index] = np.loadtxt(injection_outfile)
-
-    if args.plot:
-        import matplotlib.pyplot as plt
-
-        plotName = os.path.join(
-            args.outdir, "injection_" + args.model + "_lightcurves.pdf"
-        )
-        fig = plt.figure(figsize=(16, 18))
-
-        filts = args.filters.split(",")
-        ncols = 1
-        nrows = int(np.ceil(len(filts) / ncols))
-        gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
-
-        for ii, filt in enumerate(filts):
-            loc_x, loc_y = np.divmod(ii, nrows)
-            loc_x, loc_y = int(loc_x), int(loc_y)
-            ax = fig.add_subplot(gs[loc_y, loc_x])
-
-            data_out = []
-            for jj, key in enumerate(list(mag_ds.keys())):
-                data_out.append(mag_ds[key][:, ii + 1])
-            data_out = np.vstack(data_out)
-
-            bins = np.linspace(-20, 1, 50)
-
-            def return_hist(x):
-                hist, bin_edges = np.histogram(x, bins=bins)
-                return hist
-
-            hist = np.apply_along_axis(lambda x: return_hist(x), -1, data_out.T)
-            bins = (bins[1:] + bins[:-1]) / 2.0
-
-            X, Y = np.meshgrid(sample_times, bins)
-            hist = hist.astype(np.float64)
-            hist[hist == 0.0] = np.nan
-
-            ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="viridis", alpha=0.7)
-
-            # plot 10th, 50th, 90th percentiles
-            ax.plot(
-                sample_times,
-                np.nanpercentile(data_out, 50, axis=0),
-                c="k",
-                linestyle="--",
-            )
-            ax.plot(sample_times, np.nanpercentile(data_out, 90, axis=0), "k--")
-            ax.plot(sample_times, np.nanpercentile(data_out, 10, axis=0), "k--")
-
-            ax.set_xlim([0, 14])
-            ax.set_ylim([-12, -18])
-            ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
-
-            if ii == len(filts) - 1:
-                ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
             else:
-                plt.setp(ax.get_xticklabels(), visible=False)
-            ax.set_yticks([-18, -16, -14, -12])
-            ax.tick_params(axis="x", labelsize=30)
-            ax.tick_params(axis="y", labelsize=30)
-            ax.grid(which="both", alpha=0.5)
+                light_curve_kwargs = dict(
+                    model=args.model,
+                    sample_times=sample_times,
+                    svd_path=args.svd_path,
+                    mag_ncoeff=args.svd_mag_ncoeff,
+                    lbol_ncoeff=args.svd_lbol_ncoeff,
+                    gptype=args.gptype,
+                )
+                light_curve_model = SVDLightCurveModel(**light_curve_kwargs)
 
-        fig.text(0.45, 0.05, "Time [days]", fontsize=30)
-        fig.text(
-            0.01,
-            0.5,
-            "Absolute Magnitude",
-            va="center",
-            rotation="vertical",
-            fontsize=30,
-        )
+        with open(args.injection, "r") as f:
+            injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
 
-        plt.tight_layout()
-        plt.savefig(plotName, bbox_inches="tight")
-        plt.close()
+        args.kilonova_tmin = args.tmin
+        args.kilonova_tmax = args.tmax
+        args.kilonova_tstep = args.dt
+
+        args.kilonova_injection_model = args.model
+        args.kilonova_injection_svd = args.svd_path
+        args.injection_svd_mag_ncoeff = args.svd_mag_ncoeff
+        args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
+
+        # args.injection_detection_limit = np.inf
+        args.kilonova_error = 0
+
+        injection_df = injection_dict["injections"]
+        
+        # save simulation_id from observing scenarios data
+        # we save lighcurve for each event with its initial simulation ID
+        # from observing scenarios 
+        simulation_id = injection_df['simulation_id']
+        
+        mag_ds = {}
+        for index, row in injection_df.iterrows():
+
+            injection_outfile = os.path.join(args.outdir, "%d.dat" % simulation_id[index])
+            if os.path.isfile(injection_outfile):
+                mag_ds[index] = np.loadtxt(injection_outfile)
+                continue
+
+            injection_parameters = row.to_dict()
+
+            try:
+                tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
+            except KeyError:
+                tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
+            trigger_time = tc_gps.mjd
+
+            injection_parameters["kilonova_trigger_time"] = trigger_time
+
+            data = create_light_curve_data(
+                injection_parameters,
+                args,
+                doAbsolute=args.absolute,
+                light_curve_model=light_curve_model,
+            )
+            print("Injection generated")
+
+            fid = open(injection_outfile, "w")
+            # fid.write('# t[days] u g r i z y J H K\n')
+            # fid.write(str(" ".join(('# t[days]'," ".join(args.filters.split(',')),"\n"))))
+            fid.write("# t[days] ")
+            fid.write(str(" ".join(args.filters.split(","))))
+            fid.write("\n")
+            for ii, tt in enumerate(sample_times):
+                fid.write("%.5f " % sample_times[ii])
+                for filt in data.keys():
+                    if args.filters:
+                        if filt not in args.filters.split(","):
+                            continue
+                    fid.write("%.3f " % data[filt][ii, 1])
+                fid.write("\n")
+            fid.close()
+
+            mag_ds[index] = np.loadtxt(injection_outfile)
+
+        if args.plot:
+            import matplotlib.pyplot as plt
+            import matplotlib
+            matplotlib.use("agg")      
+                  
+            params = {
+            "backend": "pdf",
+            "axes.labelsize": 30,
+            "legend.fontsize": 30,
+            "xtick.labelsize": 24,
+            "ytick.labelsize": 24,
+            "text.usetex": True,
+            "font.family": "Times New Roman",
+            "figure.figsize": [16, 20],
+            }
+            matplotlib.rcParams.update(params)
+
+            plotName = os.path.join(
+                args.outdir, "injection_" + args.model + "_lightcurves.pdf"
+            )
+            fig = plt.figure(figsize=(16, 18))
+
+            filts = args.filters.split(",")
+            ncols = 1
+            nrows = int(np.ceil(len(filts) / ncols))
+            gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
+
+            for ii, filt in enumerate(filts):
+                loc_x, loc_y = np.divmod(ii, nrows)
+                loc_x, loc_y = int(loc_x), int(loc_y)
+                ax = fig.add_subplot(gs[loc_y, loc_x])
+
+                data_out = []
+                for jj, key in enumerate(list(mag_ds.keys())):
+                    data_out.append(mag_ds[key][:, ii + 1])
+                data_out = np.vstack(data_out)
+
+                bins = np.linspace(-20, 1, 50)
+
+                def return_hist(x):
+                    hist, bin_edges = np.histogram(x, bins=bins)
+                    return hist
+
+                hist = np.apply_along_axis(lambda x: return_hist(x), -1, data_out.T)
+                bins = (bins[1:] + bins[:-1]) / 2.0
+
+                X, Y = np.meshgrid(sample_times, bins)
+                hist = hist.astype(np.float64)
+                hist[hist == 0.0] = np.nan
+
+                ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="viridis", alpha=0.7)
+
+                # plot 10th, 50th, 90th percentiles
+                ax.plot(
+                    sample_times,
+                    np.nanpercentile(data_out, 50, axis=0),
+                    c="k",
+                    linestyle="--",
+                )
+                ax.plot(sample_times, np.nanpercentile(data_out, 90, axis=0), "k--")
+                ax.plot(sample_times, np.nanpercentile(data_out, 10, axis=0), "k--")
+
+                ax.set_xlim([0, 14])
+                ax.set_ylim([-12, -18])
+                ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
+
+                if ii == len(filts) - 1:
+                    ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
+                else:
+                    plt.setp(ax.get_xticklabels(), visible=False)
+                ax.set_yticks([-18, -16, -14, -12])
+                ax.tick_params(axis="x", labelsize=30)
+                ax.tick_params(axis="y", labelsize=30)
+                ax.grid(which="both", alpha=0.5)
+
+            fig.text(0.45, 0.05, "Time [days]", fontsize=30)
+            fig.text(
+                0.01,
+                0.5,
+                "Absolute Magnitude",
+                va="center",
+                rotation="vertical",
+                fontsize=30,
+            )
+
+            #plt.tight_layout()
+            plt.savefig(plotName, bbox_inches="tight")
+            plt.close()
