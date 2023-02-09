@@ -45,19 +45,39 @@ def main():
         required=True,
         help="lightcurve file directory with lightcurves",
     )
-    parser.add_argument("-i", "--indices-file", type=str)
-    parser.add_argument("-d", "--detections-file", type=str)
     parser.add_argument(
-        "--binary-type", type=str, required=True, help="Either BNS or NSBH"
+        "-i", 
+        "--indices-file", 
+        type=str
     )
     parser.add_argument(
-        "-c", "--configDirectory", help="gwemopt config file directory.", required=True
+        "-d", 
+        "--detections-file", 
+        type=str
     )
     parser.add_argument(
-        "--outdir", type=str, required=True, help="Path to the output directory"
+        "--binary-type", 
+        type=str, 
+        required=True, 
+        help="Either BNS or NSBH"
     )
     parser.add_argument(
-        "--telescope", type=str, default="ZTF", help="telescope to recover"
+        "-c", 
+        "--configDirectory", 
+        help="gwemopt config file directory.", 
+        required=True
+    )
+    parser.add_argument(
+        "--outdir", 
+        type=str, 
+        required=True, 
+        help="Path to the output directory"
+    )
+    parser.add_argument(
+        "--telescope", 
+        type=str, 
+        default="ZTF", 
+        help="telescope to recover"
     )
     parser.add_argument(
         "--tmin",
@@ -68,8 +88,14 @@ def main():
     parser.add_argument(
         "--tmax",
         type=float,
-        default=3.0,
+        default=14.0,
         help="Days to be stoped analysing from the trigger time (default: 14)",
+    )
+    parser.add_argument(
+        "--dt", 
+        type=float, 
+        default=0.1, 
+        help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
         "--filters",
@@ -84,15 +110,23 @@ def main():
         default=42,
         help="Injection generation seed (default: 42)",
     )
-    parser.add_argument("--exposuretime", type=int, required=True)
-
     parser.add_argument(
-        "--parallel", action="store_true", default=False, help="parallel the runs"
+        "--exposuretime", 
+        type=int, 
+        required=True
     )
     parser.add_argument(
-        "--number-of-cores", type=int, default=1, help="Number of cores"
+        "--parallel", 
+        action="store_true", 
+        default=False, 
+        help="parallel the runs"
     )
-
+    parser.add_argument(
+        "--number-of-cores", 
+        type=int, 
+        default=1, 
+        help="Number of cores"
+    ) 
     args = parser.parse_args()
 
     # load the injection json file
@@ -102,6 +136,9 @@ def main():
                 injection_data = json.load(f)
                 datadict = injection_data["injections"]["content"]
                 dataframe_from_inj = pd.DataFrame.from_dict(datadict)
+                
+                # get the injection index from the oserving scenarios simulations 
+                simulation_id = dataframe_from_inj['simulation_id']
         else:
             print("Only json supported.")
             exit(1)
@@ -109,8 +146,9 @@ def main():
     if len(dataframe_from_inj) > 0:
         args.n_injection = len(dataframe_from_inj)
 
-    indices = np.loadtxt(args.indices_file)
-
+    #indices = np.loadtxt(args.indices_file)
+    indices = simulation_id
+    
     commands = []
     lcs = {}
     for index, row in dataframe_from_inj.iterrows():
@@ -119,10 +157,10 @@ def main():
             os.makedirs(outdir)
 
         skymap_file = os.path.join(args.skymap_dir, "%d.fits" % indices[index])
-        lc_file = os.path.join(args.lightcurve_dir, "%d.dat" % index)
+        lc_file = os.path.join(args.lightcurve_dir, "%d.dat" %  indices[index])
         lcs[index] = np.loadtxt(lc_file)
 
-        efffile = os.path.join(outdir, f"efficiency_true_{index}.txt")
+        efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
         if os.path.isfile(efffile):
             continue
 
@@ -140,7 +178,7 @@ def main():
             [str(args.exposuretime) for i in args.filters.split(",")]
         )
 
-        command = f"gwemopt_run --telescopes {args.telescope} --do3D --doTiles --doSchedule --doSkymap --doTrueLocation --true_ra {ra} --true_dec {dec} --true_distance {dist} --doObservability --doObservabilityExit --timeallocationType powerlaw --scheduleType greedy -o {outdir} --gpstime {gpstime} --skymap {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file} --modelType file --configDirectory {args.configDirectory}"
+        command = f"gwemopt_run --telescopes {args.telescope} --do3D --doTiles --doSchedule --doSkymap --doTrueLocation --true_ra {ra} --true_dec {dec} --true_distance {dist} --doObservability --doObservabilityExit --timeallocationType powerlaw --scheduleType greedy -o {outdir} --gpstime {gpstime} --skymap {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file} --modelType file --configDirectory {args.configDirectory} --doPlots"
         commands.append(command)
 
     print("Number of jobs remaining... %d." % len(commands))
@@ -159,8 +197,17 @@ def main():
     fid = open(args.detections_file, "w")
     for index, row in dataframe_from_inj.iterrows():
         outdir = os.path.join(args.outdir, str(index))
-        efffile = os.path.join(outdir, f"efficiency_true_{index}.txt")
-        absmag.append(np.min(lcs[index][:, 3]))
+        efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
+        
+        ## Choose band for the best proxy
+        # for ZTF r-band give the best proxy 
+        if args.telescope == 'ZTF':
+            absmag.append(np.min(lcs[index][:, 3]))
+        # For Rubin i-band or z-band are best but here we choose r-band,
+        # that give the same results  
+        else:
+            absmag.append(np.min(lcs[index][:, 4]))
+            
         if not os.path.isfile(efffile):
             fid.write("0\n")
             effs.append(0.0)
@@ -177,7 +224,7 @@ def main():
                 data_out = file.read()
             effs.append(float(data_out.split("\n")[1].split("\t")[4]))
 
-        efffile = os.path.join(outdir, f"efficiency_{index}.txt")
+        efffile = os.path.join(outdir, f"efficiency_{indices[index]}.txt")
         if not os.path.isfile(efffile):
             probs.append(0.0)
         else:
@@ -202,11 +249,11 @@ def main():
     probs_miss = probs[idy]
 
     (mchirp_det, eta_det, q_det) = ms2mc(
-        dataframe_from_detected["mass_1_source"],
-        dataframe_from_detected["mass_2_source"],
+        dataframe_from_detected["mass_1"],
+        dataframe_from_detected["mass_2"],
     )
     (mchirp_miss, eta_miss, q_miss) = ms2mc(
-        dataframe_from_missed["mass_1_source"], dataframe_from_missed["mass_2_source"]
+        dataframe_from_missed["mass_1"], dataframe_from_missed["mass_2"]
     )
 
     cmap = plt.cm.rainbow
