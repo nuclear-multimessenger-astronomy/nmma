@@ -37,6 +37,7 @@ def file_to_dataframe(
         raise ValueError("Only understand xml and dat")
 
     injection_values = {
+        "simulation_id": [],
         "mass_1": [],
         "mass_2": [],
         "luminosity_distance": [],
@@ -54,6 +55,7 @@ def file_to_dataframe(
         "phi_jl": [],
     }
     for row in table:
+        injection_values["simulation_id"].append(int(row["simulation_id"]))
         injection_values["mass_1"].append(max(float(row["mass1"]), float(row["mass2"])))
         injection_values["mass_2"].append(min(float(row["mass1"]), float(row["mass2"])))
         injection_values["luminosity_distance"].append(float(row["distance"]))
