@@ -104,7 +104,9 @@ def main():
         help="The highest mAB to be presented in the injection data set, any mAB higher than this will become a non-detection limit. Should be comma delimited list same size as injection set.",
     )
     parser.add_argument(
-        "--gptype", type=str, help="SVD interpolation scheme.", default="sklearn"
+        "--interpolation-type", 
+        type=str, 
+        help="SVD interpolation scheme.", default="sklearn_gp"
     )
     parser.add_argument(
         "--absolute", action="store_true", default=False, help="Absolute Magnitude"
@@ -124,28 +126,49 @@ def main():
         choices=["180", "300"],
     )
     parser.add_argument(
-        "--optimal-augmentation",
+        "--rubin-ToO",
+        help="Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--rubin-ToO-type",
+        help="Type of ToO observation. Won't work w/o --rubin-ToO",
+        type=str,
+        choices=["BNS", "NSBH"],
+    )    
+    parser.add_argument(
+        "--photometry-augmentation",
         help="Augment photometry to improve parameter recovery",
         action="store_true",
     )
     parser.add_argument(
-        "--optimal-augmentation-seed",
+        "--photometry-augmentation-seed",
         metavar="seed",
         type=int,
         default=0,
         help="Optimal generation seed (default: 0)",
     )
     parser.add_argument(
-        "--optimal-augmentation-N-points",
+        "--photometry-augmentation-N-points",
         help="Number of augmented points to include",
         type=int,
         default=10,
     )
     parser.add_argument(
-        "--optimal-augmentation-filters",
+        "--photometry-augmentation-filters",
         type=str,
         help="A comma seperated list of filters to use for augmentation (e.g. g,r,i). If none is provided, will use all the filters available",
     )
+    parser.add_argument(
+        "--photometry-augmentation-times",
+        type=str,
+        help="A comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax",
+    )
+    parser.add_argument(
+        "--train-stats",
+        help="Creates a file too.csv to derive statistics",
+        action="store_true",
+    )  
     args = parser.parse_args()
     
     #seed = args.generation_seed
@@ -178,7 +201,7 @@ def main():
                     svd_path=args.svd_path,
                     mag_ncoeff=args.svd_mag_ncoeff,
                     lbol_ncoeff=args.svd_lbol_ncoeff,
-                    gptype=args.gptype,
+                    interpolation_type =args.interpolation_type,
                     parameter_conversion=None,
                 )
 
@@ -217,7 +240,7 @@ def main():
                     svd_path=args.svd_path,
                     mag_ncoeff=args.svd_mag_ncoeff,
                     lbol_ncoeff=args.svd_lbol_ncoeff,
-                    gptype=args.gptype,
+                    interpolation_type =args.interpolation_type,
                 )
                 light_curve_model = SVDLightCurveModel(**light_curve_kwargs)
 
