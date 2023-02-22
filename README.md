@@ -10,4 +10,4 @@ Please check our official documentation here: https://nuclear-multimessenger-ast
 How to contribute: https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html
 
 
-A tutorial about how to produce simulations of lightcurves in https://nuclear-multimessenger-astronomy.github.io/nmma/tutorials/
+A tutorial about how to produce simulations of lightcurves is given in nmma/tutorials/tutorial-lightcurve_simulation.ipynb
