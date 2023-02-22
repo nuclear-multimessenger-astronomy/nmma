@@ -70,6 +70,7 @@ User Guide
    models
    GW-EM-resampling
    combined_analysis
+   Cluster_Resources
    contributing
 
 .. Indices and tables
