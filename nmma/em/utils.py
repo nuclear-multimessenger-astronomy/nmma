@@ -1,5 +1,6 @@
 import copy
 
+import json
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interpolate as interp
@@ -1175,3 +1176,18 @@ def estimate_mag_err(uncer_params, df):
         axis=1,
     )
     return df
+
+
+def check_default_attr(args, attr, default=False):
+
+    if hasattr(args, attr):
+        return getattr(args, attr)
+    else:
+        return default
+
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)

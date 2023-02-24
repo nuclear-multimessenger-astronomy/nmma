@@ -70,7 +70,7 @@ def get_parser():
     parser.add_argument(
         "--tmin",
         type=float,
-        default=0.0,
+        default=0.05,
         help="Days to start analysing from the trigger time (default: 0)",
     )
     parser.add_argument(
