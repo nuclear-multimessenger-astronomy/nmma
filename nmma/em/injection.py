@@ -6,12 +6,21 @@ from importlib import resources
 from scipy.interpolate import interp1d
 
 from .model import SVDLightCurveModel, KilonovaGRBLightCurveModel
-from .utils import estimate_mag_err
+from .utils import estimate_mag_err, check_default_attr
 
 
 def create_light_curve_data(
     injection_parameters, args, doAbsolute=False, light_curve_model=None
 ):
+
+    train_stats = check_default_attr(args, "train_stats")
+    ztf_sampling = check_default_attr(args, "ztf_sampling")
+    ztf_uncertainties = check_default_attr(args, "ztf_uncertainties")
+    ztf_ToO = check_default_attr(args, "ztf_ToO")
+    rubin_ToO = check_default_attr(args, "rubin_ToO")
+    photometry_augmentation = check_default_attr(
+        args, "photometry_augmentation", default=None
+    )
 
     kilonova_kwargs = dict(
         model=args.kilonova_injection_model,
@@ -23,7 +32,7 @@ def create_light_curve_data(
     bands = {1: "g", 2: "r", 3: "i"}
     inv_bands = {v: k for k, v in bands.items()}
 
-    if args.ztf_sampling:
+    if ztf_sampling:
         with resources.open_binary(
             __package__ + ".data", "ZTF_revisit_kde_public.joblib"
         ) as f:
@@ -43,20 +52,20 @@ def create_light_curve_data(
         with resources.open_binary(__package__ + ".data", "lims_i.joblib") as f:
             ztflimi = load(f)
 
-    if args.ztf_uncertainties:
+    if ztf_uncertainties:
         with resources.open_binary(__package__ + ".data", "ZTF_uncer_params.pkl") as f:
             ztfuncer = load(f)
-    if args.ztf_ToO:
+    if ztf_ToO:
         with resources.open_binary(
-            __package__ + ".data", "sampling_ToO_" + args.ztf_ToO + ".pkl"
+            __package__ + ".data", "sampling_ToO_" + ztf_ToO + ".pkl"
         ) as f:
             ztftoo = load(f)
         with resources.open_binary(
-            __package__ + ".data", "lims_ToO_" + args.ztf_ToO + "_g.joblib"
+            __package__ + ".data", "lims_ToO_" + ztf_ToO + "_g.joblib"
         ) as f:
             ztftoolimg = load(f)
         with resources.open_binary(
-            __package__ + ".data", "lims_ToO_" + args.ztf_ToO + "_r.joblib"
+            __package__ + ".data", "lims_ToO_" + ztf_ToO + "_r.joblib"
         ) as f:
             ztftoolimr = load(f)
 
@@ -100,7 +109,7 @@ def create_light_curve_data(
 
     data = {}
 
-    if args.ztf_sampling or args.rubin_ToO or args.photometry_augmentation:
+    if ztf_sampling or rubin_ToO or photometry_augmentation:
         passbands_to_keep = []
 
     for filt in mag:
@@ -108,7 +117,7 @@ def create_light_curve_data(
         if filt in detection_limit:
             det_lim = detection_limit[filt]
         elif (
-            args.photometry_augmentation_filters is not None
+            photometry_augmentation
             and filt in args.photometry_augmentation_filters.split(",")
         ):
             det_lim = 30.0
@@ -126,7 +135,7 @@ def create_light_curve_data(
                 data_per_filt[tidx] = [sample_times[tidx] + tc, det_lim, np.inf]
             else:
                 noise = np.random.normal(scale=dmag)
-                if args.ztf_uncertainties and filt in ["g", "r", "i"]:
+                if ztf_uncertainties and filt in ["g", "r", "i"]:
                     df = pd.DataFrame.from_dict(
                         {
                             "passband": [inv_bands[filt]],
@@ -151,7 +160,7 @@ def create_light_curve_data(
         data[filt] = data_per_filt
 
     data_original = copy.deepcopy(data)
-    if args.ztf_sampling:
+    if ztf_sampling:
         sim = pd.DataFrame()
         start = np.random.uniform(tc, tc + 2)
         t = start
@@ -177,7 +186,7 @@ def create_light_curve_data(
             t += float(ztfrevisit_i.sample())
         sim["ToO"] = False
         # toO
-        if args.ztf_ToO:
+        if ztf_ToO:
             sim_ToO = pd.DataFrame()
             start = np.random.uniform(tc, tc + 1)
             t = start
@@ -219,7 +228,7 @@ def create_light_curve_data(
             sim.loc[group.index, "mag_err"] = lc_err(group["mjd"].tolist())
 
         for filt, group in sim.groupby("passband"):
-            if args.ztf_uncertainties and filt in ["g", "r", "i"]:
+            if ztf_uncertainties and filt in ["g", "r", "i"]:
                 mag_err = []
                 for idx, row in group.iterrows():
                     upperlimit = False
@@ -280,11 +289,11 @@ def create_light_curve_data(
                 ).T
             data[filt] = data_per_filt
             passbands_to_keep.append(filt)
-        if args.train_stats:
+        if train_stats:
             sim["tc"] = tc
             sim.to_csv(args.outdir + "/too.csv", index=False)
 
-    if args.rubin_ToO:
+    if rubin_ToO:
         start = tmin + tc
         if args.rubin_ToO_type == "BNS":
             strategy = [
@@ -332,7 +341,7 @@ def create_light_curve_data(
             data[filt] = data_per_filt
             passbands_to_keep.append(filt)
 
-    if args.photometry_augmentation:
+    if photometry_augmentation:
         np.random.seed(args.photometry_augmentation_seed)
         if args.photometry_augmentation_filters is None:
             filts = np.random.choice(
@@ -382,7 +391,7 @@ def create_light_curve_data(
                 data[filt] = data[filt][data[filt][:, 0].argsort()]
             passbands_to_keep.append(filt)
 
-    if args.ztf_sampling or args.rubin_ToO or args.photometry_augmentation:
+    if ztf_sampling or rubin_ToO or photometry_augmentation:
         passbands_to_lose = set(list(data.keys())) - set(passbands_to_keep)
         for filt in passbands_to_lose:
             del data[filt]
