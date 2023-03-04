@@ -568,7 +568,7 @@ def main(args=None):
 
     if args.conditional_gaussian_prior_thetaObs:
         priors_dict = dict(priors)
-	  original_iota_prior = priors_dict['inclination_EM']
+        original_iota_prior = priors_dict['inclination_EM']
 	  setup = dict(minimum = original_iota_prior.minimum,
 	               maximum = original_iota_prior.maximum,
 	               name = original_iota_prior.name
