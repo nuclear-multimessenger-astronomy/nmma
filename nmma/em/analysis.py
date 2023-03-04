@@ -21,6 +21,7 @@ from .model import model_parameters_dict
 from .utils import loadEvent, getFilteredMag
 from .injection import create_light_curve_data
 from .likelihood import OpticalLightCurve
+from .priors import ConditionalGaussianIotaGivenThetaCore
 
 matplotlib.use("agg")
 
@@ -281,6 +282,20 @@ def get_parser():
         type=str,
         help="A comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax",
     )
+
+    parser.add_argument(
+        "--conditional-gaussian-prior-thetaObs",
+	  action="store_true",
+	  default=False,
+	  help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma"
+    )
+
+    parser.add_argument(
+        "--conditional-gaussian-prior-N-sigma",
+	  default=1,
+	  help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True"
+    )
+
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -547,6 +562,29 @@ def main(args=None):
         priors["Ebv"] = bilby.core.prior.DeltaFunction(
             name="Ebv", peak=0.0, latex_label="$E(B-V)$"
         )
+
+
+    # re-setup the prior if the conditional prior for inclination is used
+
+    if args.conditional_gaussian_prior_thetaObs:
+        priors_dict = dict(priors)
+	  original_iota_prior = priors_dict['inclination_EM']
+	  setup = dict(minimum = original_iota_prior.minimum,
+	               maximum = original_iota_prior.maximum,
+	               name = original_iota_prior.name
+	               latex_label = original_iota_prior.latex_label,
+	               unit = original_iota_prior.unit
+	               boundary = original_iota_prior.boundary
+	               N_sigma = args.conditional_gaussian_prior_N_sigma)
+	
+	  priors_dict['inclination_EM'] = ConditionalGaussianIotaGivenThetaCore(**setup)
+	  priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
+
+
+
+
+
+
 
     # setup the likelihood
     if args.detection_limit:
