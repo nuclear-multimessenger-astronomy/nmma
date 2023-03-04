@@ -569,16 +569,16 @@ def main(args=None):
     if args.conditional_gaussian_prior_thetaObs:
         priors_dict = dict(priors)
         original_iota_prior = priors_dict['inclination_EM']
-	  setup = dict(minimum = original_iota_prior.minimum,
-	               maximum = original_iota_prior.maximum,
-	               name = original_iota_prior.name
-	               latex_label = original_iota_prior.latex_label,
-	               unit = original_iota_prior.unit
-	               boundary = original_iota_prior.boundary
-	               N_sigma = args.conditional_gaussian_prior_N_sigma)
-	
-	  priors_dict['inclination_EM'] = ConditionalGaussianIotaGivenThetaCore(**setup)
-	  priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
+        setup = dict(minimum = original_iota_prior.minimum,
+                     maximum = original_iota_prior.maximum,
+                     name = original_iota_prior.name,
+                     latex_label = original_iota_prior.latex_label,
+                     unit = original_iota_prior.unit,
+                     boundary = original_iota_prior.boundary,
+                     N_sigma = args.conditional_gaussian_prior_N_sigma)
+
+        priors_dict['inclination_EM'] = ConditionalGaussianIotaGivenThetaCore(**setup)
+        priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
 
 
 
