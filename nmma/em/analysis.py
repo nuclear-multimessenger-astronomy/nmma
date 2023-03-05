@@ -21,7 +21,7 @@ from .model import model_parameters_dict
 from .utils import loadEvent, getFilteredMag
 from .injection import create_light_curve_data
 from .likelihood import OpticalLightCurve
-from .priors import ConditionalGaussianIotaGivenThetaCore
+from .prior import ConditionalGaussianIotaGivenThetaCore
 
 matplotlib.use("agg")
 
