@@ -29,7 +29,8 @@ def create_light_curve_data(
         lbol_ncoeff=args.injection_svd_lbol_ncoeff,
     )
 
-    bands = {1: "g", 2: "r", 3: "i"}
+    #bands = {1: "g", 2: "r", 3: "i"}
+    bands = {i+1: b for i, b in enumerate(args.filters.split(","))}
     inv_bands = {v: k for k, v in bands.items()}
 
     if ztf_sampling:
@@ -82,6 +83,8 @@ def create_light_curve_data(
                 args.filters.split(","), args.injection_detection_limit.split(",")
             )
         }
+    assert len(detection_limit) == len(args.filters.split(","))
+    
     seed = args.generation_seed
 
     np.random.seed(seed)
@@ -228,6 +231,9 @@ def create_light_curve_data(
             sim.loc[group.index, "mag_err"] = lc_err(group["mjd"].tolist())
 
         for filt, group in sim.groupby("passband"):
+            if filt not in args.filters.split(","):
+                #print("Filter {} not in filters list".format(filt))
+                continue
             if ztf_uncertainties and filt in ["g", "r", "i"]:
                 mag_err = []
                 for idx, row in group.iterrows():
