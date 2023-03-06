@@ -6,7 +6,6 @@ Home-page: https://github.com/nuclear-multimessenger-astronomy/nmma
 Author: Peter Tsun Ho Pang, Michael Coughlin, Tim Dietrich, Ingo Tews
 Author-email: nuclear_multimessenger_astronomy@googlegroups.com
 License: MIT
-Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3.6
 Classifier: Programming Language :: Python :: 3.7
 Classifier: License :: OSI Approved :: MIT License
@@ -27,5 +26,3 @@ Please check our official documentation here: https://nuclear-multimessenger-ast
 
 
 How to contribute: https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html
-
-
