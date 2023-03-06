@@ -18,3 +18,4 @@ nmma_create_injection = nmma.eos.create_injection:main
 nmma_generation = nmma.pbilby.generation:main
 parallel_em_analysis = nmma.pbilby.em_analysis:main
 parallel_em_generation = nmma.pbilby.em_generation:main
+

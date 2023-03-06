@@ -1,0 +1,16 @@
+16:38 INFO    : Running for label 'AT2017gfo', output will be saved to 'output/bu2021fd'
+16:38 INFO    : Search parameters:
+16:38 INFO    :   KNphi = Uniform(minimum=15.0, maximum=75.0, name='KNphi', latex_label='$\\Phi$', unit=None, boundary=None)
+16:38 INFO    :   inclination_EM = Sine(minimum=0.0, maximum=1.5707963267948966, name='inclination_EM', latex_label='$\\iota$', unit=None, boundary=None)
+16:38 INFO    :   KNtimeshift = Uniform(minimum=-2.0, maximum=1.0, name='trigger_time', latex_label='$t_0$', unit=None, boundary=None)
+16:38 INFO    :   log10_mej_dyn = Uniform(minimum=-3.0, maximum=-1.0, name='log10_mej_dyn', latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$', unit=None, boundary=None)
+16:38 INFO    :   log10_mej_wind = Uniform(minimum=-3.0, maximum=-0.5, name='log10_mej_wind', latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$', unit=None, boundary=None)
+16:38 INFO    :   scale_kappa = Uniform(minimum=0.01, maximum=1, name='scale_kappa', latex_label='$fd$', unit=None, boundary=None)
+16:38 INFO    :   luminosity_distance = 40.0
+16:38 INFO    :   Ebv = 0.0
+16:38 WARNING : Supplied argument 'npool' not an argument of 'Pymultinest', removing.
+16:38 WARNING : Supplied argument 'queue_size' not an argument of 'Pymultinest', removing.
+16:38 WARNING : Supplied argument 'check_point_delta_t' not an argument of 'Pymultinest', removing.
+16:38 INFO    : Using sampler Pymultinest with kwargs {'importance_nested_sampling': False, 'resume': True, 'verbose': True, 'sampling_efficiency': 'parameter', 'n_live_points': 2048, 'n_params': 6, 'n_clustering_params': None, 'wrapped_params': None, 'multimodal': True, 'const_efficiency_mode': False, 'evidence_tolerance': 0.5, 'n_iter_before_update': 100, 'null_log_evidence': -1e+90, 'max_modes': 100, 'mode_tolerance': -1e+90, 'seed': 42, 'context': 0, 'write_output': True, 'log_zero': -1e+100, 'max_iter': 0, 'init_MPI': False, 'dump_callback': <bound method Pymultinest._dump_callback of <bilby.core.sampler.pymultinest.Pymultinest object at 0x7f39a8306d00>>}
+16:38 INFO    : Using temporary file /tmp/tmpyt4hr11h
+16:38 INFO    : Overwriting output/bu2021fd/pm_AT2017gfo/ with /tmp/tmpyt4hr11h/
