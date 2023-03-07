@@ -190,8 +190,8 @@ def Bu2022Ye(data):
         ]
 
         # Best to interpolate mass in log10 space
-        rr[0] = np.log10(rr[0])
-        rr[3] = np.log10(rr[3])
+        rr[1] = np.log10(rr[1])
+        rr[4] = np.log10(rr[4])
         
         data_out[key] = {
             param: rr[idx] for param, idx in zip(parameters, parameters_idx)
