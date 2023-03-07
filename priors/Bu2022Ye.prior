@@ -1,0 +1,8 @@
+log10_mej_dyn  = Uniform(name='log10_mej_dyn', minimum=-3., maximum=-1., latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$')   
+vej_dyn = Uniform(name='vej_dyn', minimum=0., maximum=0.3, latex_label='$V^{\\rm{dyn}}_{\\rm{ej}}$')   
+Yedyn = Uniform(name='Yedyn', minimum=0.10, maximum=0.30, latex_label='$Y_{\\rm{e,dyn}}$')
+log10_mej_wind = Uniform(name='log10_mej_wind', minimum=-3., maximum=-0.5, latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$')
+vej_wind = Uniform(name='vej_wind', minimum=0., maximum=0.3, latex_label='$V^{\\rm{wind}}_{\\rm{ej}}$')
+inclination_EM = Sine(name='inclination_EM', minimum=0., maximum=np.pi/2., latex_label='$\\iota$')
+luminosity_distance = Uniform(minimum=0.0, maximum=200., name='luminosity_distance',latex_label='$D_L$')
+KNtimeshift = Uniform(minimum=-2.0, maximum=1.0, name='trigger_time',latex_label='$t_0$')
