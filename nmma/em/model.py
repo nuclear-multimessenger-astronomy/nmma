@@ -454,8 +454,15 @@ class KilonovaGRBLightCurveModel(object):
         for filt in grb_mag.keys():
             grb_mAB = grb_mag[filt]
 
-            if filt in kilonova_mag:
-                kilonova_mAB = kilonova_mag[filt]
+            try:
+                kilonova_mAB = utils.getFilteredMag(kilonova_mag, filt)
+
+                # check if the kilnova_mAB is valid, if it is 0
+                # meaning the filter is unknown to getFilteredMag
+                # and therefore, we have the kilonova_mAB set to inf (0 flux)
+
+                if isinstance(kilonova_mAB, int) and kilonova_mAB == 0:
+                    kilonova_mAB = np.inf
 
                 total_mag[filt] = (
                     -5.0
@@ -466,7 +473,7 @@ class KilonovaGRBLightCurveModel(object):
                     )
                     / ln10
                 )
-            else:
+            except KeyError:
                 total_mag[filt] = copy.deepcopy(grb_mAB)
 
         total_lbol = grb_lbol + kilonova_lbol
