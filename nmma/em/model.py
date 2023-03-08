@@ -1,5 +1,6 @@
 from __future__ import division
 
+import copy
 import os
 import pickle
 
@@ -452,17 +453,21 @@ class KilonovaGRBLightCurveModel(object):
 
         for filt in grb_mag.keys():
             grb_mAB = grb_mag[filt]
-            kilonova_mAB = kilonova_mag[filt]
 
-            total_mag[filt] = (
-                -5.0
-                / 2.0
-                * logsumexp(
-                    [-2.0 / 5.0 * ln10 * grb_mAB, -2.0 / 5.0 * ln10 * kilonova_mAB],
-                    axis=0,
+            if filt in kilonova_mag:
+                kilonova_mAB = kilonova_mag[filt]
+
+                total_mag[filt] = (
+                    -5.0
+                    / 2.0
+                    * logsumexp(
+                        [-2.0 / 5.0 * ln10 * grb_mAB, -2.0 / 5.0 * ln10 * kilonova_mAB],
+                        axis=0,
+                    )
+                    / ln10
                 )
-                / ln10
-            )
+            else:
+                total_mag[filt] = copy.deepcopy(grb_mAB)
 
         total_lbol = grb_lbol + kilonova_lbol
 
