@@ -70,6 +70,12 @@ def main():
         default="u,g,r,i,z,y,J,H,K",
     )
     parser.add_argument(
+        "--grb-resolution",
+        type=float,
+        default=5,
+        help="The upper bound on the ratio between thetaWing and thetaCore (default: 5)",
+    )
+    parser.add_argument(
         "--generation-seed",
         metavar="seed",
         type=int,
