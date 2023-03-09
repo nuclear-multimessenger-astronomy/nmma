@@ -76,6 +76,12 @@ def main():
         help="The upper bound on the ratio between thetaWing and thetaCore (default: 5)",
     )
     parser.add_argument(
+        "--jet-type",
+        type=int,
+        default=0,
+        help="Jet type to used used for GRB afterglow light curve (default: 0)",
+    )
+    parser.add_argument(
         "--generation-seed",
         metavar="seed",
         type=int,
