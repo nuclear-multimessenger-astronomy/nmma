@@ -726,16 +726,16 @@ def sn_lc(
     lbol = 1e43 * np.ones(tt.shape)
 
     for filt_idx, (filt, lambda_A) in enumerate(zip(filts, lambdas)):
-
-        if lambda_A < model.minwave() or lambda_A > model.maxwave():
+        # convert back to AA
+        lambda_AA = 1e10 * lambda_A
+        if lambda_AA < model.minwave() or lambda_AA > model.maxwave():
             mag[filt] = np.inf * np.ones(tt.shape)
-
         else:
             try:
                 # the output is in ergs / s / cm^2 / Angstrom
-                flux = model.flux(tt, [lambda_A]) * ext[filt_idx]
+                flux = model.flux(tt, [lambda_AA]) * ext[filt_idx]
                 # see https://en.wikipedia.org/wiki/AB_magnitude
-                flux_jy = 3.34e4 * np.power(lambda_A, 2.0) * flux
+                flux_jy = 3.34e4 * np.power(lambda_AA, 2.0) * flux
                 mag_per_filt = -2.5 * np.log10(flux_jy) + 8.9
                 mag[filt] = mag_per_filt[:, 0]
             except Exception:
@@ -1175,6 +1175,14 @@ def estimate_mag_err(uncer_params, df):
         ),
         axis=1,
     )
+    if not df["mag_err"].values:
+        argmin_slice = np.argmin(uncer_params["interval"])
+        for value in df["mag"].values:
+            if uncer_params.iloc[argmin_slice]["interval"].left > value:
+                print(
+                    f'WARNING: {value} is outside of the measured uncertainty region with a lower limit of {uncer_params.iloc[argmin_slice]["interval"].left}'
+                )
+
     return df
 
 
