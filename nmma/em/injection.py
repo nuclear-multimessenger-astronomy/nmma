@@ -106,6 +106,8 @@ def create_light_curve_data(
         sample_times, injection_parameters
     )
     dmag = args.kilonova_error
+    if not mag:
+        raise ValueError("Injection parameters return empty light curve.")
 
     data = {}
 
