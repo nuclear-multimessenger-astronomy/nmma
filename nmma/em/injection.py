@@ -212,6 +212,8 @@ def create_light_curve_data(
         sim["mag_err"] = np.nan
 
         for filt, group in sim.groupby("passband"):
+            if filt not in args.filters.split(","):
+                continue
             data_per_filt = copy.deepcopy(data_original[filt])
             lc = interp1d(
                 data_per_filt[:, 0],
@@ -232,7 +234,6 @@ def create_light_curve_data(
 
         for filt, group in sim.groupby("passband"):
             if filt not in args.filters.split(","):
-                #print("Filter {} not in filters list".format(filt))
                 continue
             if ztf_uncertainties and filt in ["g", "r", "i"]:
                 mag_err = []
