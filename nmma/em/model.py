@@ -74,7 +74,18 @@ class GenericCombineLightCurveModel(object):
         for filt in filts:
             mAB_list = []
             for mag in mag_per_model:
-                mAB_list.append(-2.0 / 5.0 * ln10 * np.array(mag[filt]))
+                try:
+                    mag_per_filt = utils.getFilteredMag(mag, filt)
+                    # check if the mag_flit is valid, if it is 0
+                    # meaning the filter is unknown to getFilteredMag
+                    # and therefore, we have the mag_per_filt set to inf (0 flux)
+                    if isinstance(mag_per_filt, int) and mag_per_filt == 0:
+                        mag_per_filt = np.ones(len(sample_times)) * np.inf
+
+                except KeyError:
+                    mag_per_filt = np.ones(len(sample_times)) * np.inf
+
+                mAB_list.append(-2.0 / 5.0 * ln10 * np.array(mag_per_filt))
 
             total_mag[filt] = -5.0 / 2.0 * logsumexp(mAB_list, axis=0) / ln10
 
