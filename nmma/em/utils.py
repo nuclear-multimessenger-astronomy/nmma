@@ -365,6 +365,7 @@ def calc_lc(
 
         # coverrors = np.dot(VA[:, :n_coeff], np.dot(np.power(np.diag(cAstd[:n_coeff]), 2), VA[:, :n_coeff].T))
         # errors = np.diag(coverrors)
+        #test
         if svd_mag_model[filt]['reduc_method'] == 'pca':
             mag_back = svd_mag_model[filt]['pca_fit'].inverse_transform(cAproj)
             mag_back = mag_back * (maxs - mins) + mins
