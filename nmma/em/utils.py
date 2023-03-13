@@ -476,18 +476,15 @@ def calc_lc(
 
         # coverrors = np.dot(VA[:, :n_coeff], np.dot(np.power(np.diag(cAstd[:n_coeff]), 2), VA[:, :n_coeff].T))
         # errors = np.diag(coverrors)
-
-        if svd_mag_model[filt]['reduc_method'] == 'pca':
+        reduc_method = svd_mag_model[filt].get('reduc_method','svd')
+        if reduc_method == 'pca':
             mag_back = svd_mag_model[filt]['pca_fit'].inverse_transform(cAproj)
             mag_back = mag_back * (maxs - mins) + mins
-        elif svd_mag_model[filt]['reduc_method'] == 'svd':
+        elif reduc_method == 'svd':
             mag_back = np.dot(VA[:, :n_coeff], cAproj)
             mag_back = mag_back * (maxs - mins) + mins
-        elif svd_mag_model[filt]['reduc_method'] == 'direct':
+        elif reduc_method == 'direct':
             mag_back = cAproj
-            mag_back = mag_back * (maxs - mins) + mins
-        else:
-            mag_back = np.dot(VA[:, :n_coeff], cAproj)
             mag_back = mag_back * (maxs - mins) + mins
         # mag_back = scipy.signal.medfilt(mag_back, kernel_size=3)
 
