@@ -374,6 +374,9 @@ def calc_lc(
         elif svd_mag_model[filt]['reduc_method'] == 'direct':
             mag_back = cAproj
             mag_back = mag_back * (maxs - mins) + mins
+        else:
+            mag_back = cAproj
+            mag_back = mag_back * (maxs - mins) + mins
         # mag_back = scipy.signal.medfilt(mag_back, kernel_size=3)
 
         ii = np.where((~np.isnan(mag_back)) * (tt_interp < 20.0))[0]
