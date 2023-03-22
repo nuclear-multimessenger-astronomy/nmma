@@ -221,9 +221,10 @@ def main():
 
                 plt.plot(sample_times, training["data"][:, ii], "k--", label="grid")
                 plt.plot(sample_times, mag[filt], "b-", label="interpolated")
+
                 ax.set_xlim([0, 14])
                 if args.model == "CV":
-                    ax.set_ylim([28, 16])
+                    ax.set_ylim([28, 12])
                 else:
                     ax.set_ylim([-12, -18])
                 ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)

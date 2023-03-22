@@ -308,7 +308,22 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
         # ZTF rest style file
         if "forced.csv" in filename or "alerts.csv" in filename:
             df = pd.read_csv(filename)
-            idx = np.where(df["mag_unc"] != 99.0)[0]
+
+            if "mag" in df:
+                mag_key = "mag"
+            elif "magpsf" in df:
+                mag_key = "magpsf"
+            else:
+                raise ValueError("Unknown magnitude key")
+
+            if "mag_unc" in df:
+                magerror_key = "mag_unc"
+            elif "sigmapsf" in df:
+                magerror_key = "sigmapsf"
+            else:
+                raise ValueError("Unknown uncertainty key")
+
+            idx = np.where(df[magerror_key] != 99.0)[0]
             if len(idx) < 2:
                 print(f"{name} does not have enough detections to interpolate.")
                 continue
@@ -321,12 +336,12 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
                 data[name][filt] = np.nan * tt
 
             for filt, group in df.groupby("filter"):
-                idx = np.where(group["mag_unc"] != 99.0)[0]
+                idx = np.where(group[magerror_key] != 99.0)[0]
                 if len(idx) < 2:
                     continue
                 lc = interp.interp1d(
                     group["jd"].iloc[idx] - jd_min,
-                    group["mag"].iloc[idx],
+                    group[mag_key].iloc[idx],
                     fill_value=np.nan,
                     bounds_error=False,
                     assume_sorted=True,
