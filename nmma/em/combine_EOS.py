@@ -219,7 +219,7 @@ def main():
         delimiter=" ",
     )
     data_GW = pd.read_csv(
-        "{0}/GW_R14trend.dat".format(args.gwR14trend), header=0, delimiter=" "
+        "{0}".format(args.gwR14trend), header=0, delimiter=" "
     )
 
     fig = plt.figure()
