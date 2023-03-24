@@ -204,7 +204,7 @@ def main():
     )
     df = pd.DataFrame.from_dict(df_dict)
     df.to_csv(
-        "{0}/GW_EM_R14trend_{1}.dat".format(args.outdir, args.label),
+        "{0}".format(args.outdir),
         index=False,
         sep=" ",
     )
