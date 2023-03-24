@@ -140,7 +140,7 @@ def main():
         sample = reweight_to_flat_mass_prior(sample)
         # during the sampling, EOS is treated as a continous variable
         # we convert them back to integer
-        EOSTrue = sample.EOS.to_numpy().astype(int) + 1
+        EOSTrue = sample.EOS.to_numpy().astype(int)
         # calulcate the posterio probability by counting the samples
         counts = []
         for j in range(1, args.Neos + 1):
