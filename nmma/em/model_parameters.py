@@ -219,7 +219,7 @@ def LANL2022(data):
         "vej_dyn",
         "log10_mej_wind",
         "vej_wind",
-        "KNTheta",
+        "KNtheta",
     ]
 
     data_out = {}

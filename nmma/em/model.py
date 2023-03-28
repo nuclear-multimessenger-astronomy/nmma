@@ -42,7 +42,22 @@ model_parameters_dict = {
     "AnBa2022_sparse": ["mrp", "xmix"],
     "salt2": ["x0", "x1", "c"],
     "nugent-hyper": ["supernova_mag_boost"],
-    "Bu2022Ye": ["log10_mej_dyn", "vej_dyn", "Yedyn", "log10_mej_wind", "vej_wind", "KNtheta"],
+    "Bu2022Ye": [
+        "log10_mej_dyn",
+        "vej_dyn",
+        "Yedyn",
+        "log10_mej_wind",
+        "vej_wind",
+        "KNtheta",
+    ],
+    "LANL2022": [
+        "Ye_wind",
+        "log10_mej_dyn",
+        "vej_dyn",
+        "log10_mej_wind",
+        "vej_wind",
+        "KNtheta",
+    ],
 }
 
 

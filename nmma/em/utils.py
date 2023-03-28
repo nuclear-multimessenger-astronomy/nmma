@@ -1560,7 +1560,7 @@ def get_knprops_from_LANLfilename(filename):
         "vej_dyn": vd,
         "mej_wind": mw,
         "vej_wind": vw,
-        "KNTheta": KNTheta,
+        "KNtheta": KNTheta,
     }
     knprops = {}
     for prop in [
@@ -1570,7 +1570,7 @@ def get_knprops_from_LANLfilename(filename):
         "vej_dyn",
         "mej_wind",
         "vej_wind",
-        "KNTheta",
+        "KNtheta",
     ]:
         prop_value = param_values[prop]
         if prop_value is not None:
