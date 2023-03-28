@@ -2,6 +2,7 @@ import copy
 
 import json
 import numpy as np
+import os
 import pandas as pd
 from scipy.interpolate import interpolate as interp
 import scipy.signal
@@ -15,6 +16,9 @@ from astropy.time import Time
 from astropy.cosmology import Planck18, z_at_value
 import astropy.units
 import astropy.constants
+
+import matplotlib
+import matplotlib.pyplot as plt
 
 try:
     import afterglowpy
@@ -1214,3 +1218,417 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+# The following LANL File readers are taken from Eve Chase's cocteau package
+
+
+class SpectraOverTime(object):
+    """
+    A collection of spectra at successive timesteps
+    Written by Eve Chase.
+    """
+
+    def __init__(self, timesteps=np.array([]), spectra=np.array([]), num_angles=1):
+        """
+        Parameters:
+        -----------
+        timesteps: array
+            array of timesteps in days
+        spectra: array
+            array of Spectrum objects, each at corresponding timestep
+        num_angles: int
+            number of angular bins. This assumes each
+            bin spans equal solid angle.
+        """
+        # FIXME: this seems like the wrong datastructure here
+        self.timesteps = timesteps
+        self.spectra = spectra
+        self.num_angles = num_angles
+
+
+class Spectrum(object):
+    """
+    Spectrum as a function of wavelength
+    Written by Eve Chase.
+    """
+
+    def __init__(self, timestep=None, wavelengths=None, flux_density=None):
+        """
+        Parameters:
+        -----------
+        timestep: float
+            time in days corresponding to spectrum
+        wavelengths: array
+            input wavelengths in cm
+        flux_density: array
+            flux at R=10pc in units of erg / s / cm^3
+        """
+        # FIXME: assert that wavelengths are sorted
+        self.timestep = timestep
+        self.wavelength_arr = wavelengths.cgs
+        self.flux_density_arr = flux_density.cgs
+
+    def interpolate(self):
+        """
+        Interpolate a functional form of the flux density
+        array as a function of wavelength
+        Returns
+        -------
+        spectrum_func: scipy.interpolate.interpolate.interp1d
+            functional representation of spectrum
+        """
+
+        # Values must be in cgs for interpolation
+        return interp.interp1d(
+            self.wavelength_arr.cgs,
+            self.flux_density_arr.cgs,
+            bounds_error=False,
+            fill_value=0,
+        )
+
+    def plot(self, ax=None, **kwargs):
+        """
+        Plot spectrum in format similar to Even et al. (2019)
+        Returns:
+        --------
+        ax: Axes object
+            contains figure information
+        """
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        ax.plot(
+            self.wavelength_arr.cgs.value * 1e4,
+            np.log10(
+                self.flux_density_arr.cgs.value
+                * (4 * np.pi * (10 * 3.08567758e18) ** 2)
+            ),
+            **kwargs,
+        )
+
+        ax.set_ylabel(r"$\log_{10}$ dL\d$\lambda$  (erg s$^-1 \AA^{-1}$) + const. ")
+        ax.set_xlabel("Wavelength (Microns)")
+        ax.set_xscale("log")
+        ax.set_xticks([0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8])
+        ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.xaxis.set_tick_params(which="minor", bottom=False)
+
+        return ax
+
+
+def read_LANL_spectra(
+    self,
+    filename,
+    time_units=astropy.units.day,
+    wl_units=astropy.units.cm,
+    angles=[0],
+    remove_zero=False,
+    fd_units=(
+        astropy.units.erg
+        / astropy.units.s
+        / astropy.units.cm**2
+        / astropy.units.angstrom
+    ),
+):
+    """
+    Read in spectra at multiple timesteps
+    for Even et al. (2019) and subsequent
+    paper data format. Written by Eve Chase.
+    Parameters
+    ----------
+    filename: string
+        path to spectrum file
+    Returns
+    -------
+    spectra: dictionary
+        - time in days as keys
+        - each time contains a dictionary with
+        a wavelength array in cm and a flux density
+        array in erg / s / cm^3
+    """
+
+    assert os.path.isfile(filename)
+
+    # Check that units are appropriate
+    wl_units.to(astropy.units.angstrom)
+    fd_units.to(
+        astropy.units.erg
+        / astropy.units.s
+        / astropy.units.cm**2
+        / astropy.units.angstrom
+    )
+
+    # Determine time steps in file
+    nrows, timesteps_in_file = self.parse_file(filename, key="time")
+
+    if len(timesteps_in_file) == 0:
+        raise IOError("File not read. Check file type.")
+
+    # Set up properties to collect spectra
+    timesteps = np.array(list(timesteps_in_file.keys())) * time_units
+    spectra_arr = np.zeros(len(timesteps), dtype=object)
+
+    col_names = ["wavelength_low", "wavelength_high"]
+    spectra = {}
+    num_angles = len(angles)
+    for angle in angles:
+        col_names.append(f"spec_angle{angle}")
+        spectra[angle] = SpectraOverTime(timesteps=timesteps, num_angles=num_angles)
+
+    col_idx = np.concatenate([np.array([0, 1]), np.asarray(angles) + 2])
+
+    # Read in the spectrum at a given timestep
+    for i, time in enumerate(timesteps):
+        rows_to_skip = np.arange(timesteps_in_file[time.value])
+
+        spectrum_df = pd.read_csv(
+            filename,
+            skiprows=rows_to_skip,
+            names=col_names,
+            usecols=col_idx,
+            nrows=nrows,
+            delim_whitespace=True,
+            dtype="float",
+        )
+        # Store each angular bin separately
+        for angle in angles:
+            col_name = f"spec_angle{angle}"
+            spectrum_copy = spectrum_df.copy()
+
+            # Remove all points where the spectrum is zero
+            if remove_zero:
+                spectrum_copy = spectrum_copy.drop(
+                    spectrum_copy[spectrum_copy[col_name] == 0].index
+                )
+
+            # Compute average wavelength in bin
+            wavelengths = (
+                0.5
+                * (
+                    spectrum_copy["wavelength_low"] + spectrum_copy["wavelength_high"]
+                ).values
+                * wl_units
+            )
+
+            # Make Spectrum object
+            flux_density_arr = spectrum_copy[col_name].values * fd_units
+
+            spectra[angle].spectra = np.append(
+                spectra[angle].spectra,
+                Spectrum(time, wavelengths, flux_density_arr),
+            )
+
+    assert timesteps.size > 0
+    assert spectra_arr.size > 0
+
+    return spectra
+
+
+def get_knprops_from_LANLfilename(filename):
+    """
+    Read the standard LANL filename format.
+    Typically this looks something like this:
+    'Run_TP_dyn_all_lanth_wind2_all_md0.1_vd0.3_mw0.001_vw0.05_mags_2020-01-04.dat'
+    Written by Eve Chase.
+    Parameters
+    ----------
+    filename: str
+        string representation of filename
+    """
+
+    wind = None
+    morph = None
+    md = None
+    vd = None
+    mw = None
+    vw = None
+    KNTheta = None
+    num_comp = 2
+
+    # Reduce filename to last part
+    filename = filename.split("/")[-1]
+
+    for info in filename.split("_"):
+        # Record morphology
+        if morph is None:
+            if "TS" in info:
+                morph = 0
+            elif "TP" in info:
+                morph = 1
+            elif "ST" in info:
+                morph = 2
+            elif "SS" in info:
+                morph = 3
+            elif "SP" in info:
+                morph = 4
+            elif "PS" in info:
+                morph = 5
+            elif "H" in info:
+                morph = 6
+                num_comp = 1
+            elif "P" in info:
+                morph = 7
+                num_comp = 1
+            elif "R" in info and "Run" not in info:
+                morph = 8
+                num_comp = 1
+            elif "S" in info:
+                morph = 9
+                num_comp = 1
+            elif "T" in info:
+                morph = 10
+                num_comp = 1
+
+        # Record velocity and mass for two component models
+        if num_comp == 2:
+            # Record wind
+            if "wind" in info:
+                wind = int(info[-1])
+
+            # Record dynamical ejecta mass
+            elif "md" in info:
+                md = float(info[2:])
+                if "." not in info:
+                    if "1" in info:
+                        md /= 100
+                    else:
+                        md /= 1000
+
+            # Record dynamical ejecta velocity
+            elif "vd" in info:
+                vd = float(info[2:])
+                if "." not in info:
+                    if "5" in info:
+                        vd /= 100
+                    else:
+                        vd /= 10
+
+            # Record wind ejecta mass
+            elif "mw" in info:
+                mw = float(info[2:])
+                if "." not in info:
+                    if "1" in info:
+                        mw /= 100
+                    else:
+                        mw /= 1000
+
+            # Record wind ejecta velocity
+            elif "vw" in info:
+                vw = float(info[2:])
+                if "." not in info:
+                    if "5" in info:
+                        vw /= 100
+                    else:
+                        vw /= 10
+
+            elif "KNTheta" in info:
+                KNTheta = float(info[7:])
+
+        # Record velocity and ejecta mass for single component models
+        elif num_comp == 1:
+            if "m" in info and "v" in info:
+                mass, vel = info.split("v")
+                md = float(mass[2:])
+                vd = float(vel)
+
+            # Record mass
+            elif "m" == info[0] and info != "mags":
+                md = float(info[2:])
+                # Recast masses
+                if md in [1, 5]:
+                    md /= 100
+                elif md in [2]:
+                    md /= 1000
+
+            # Record velocity
+            elif "v" == info[0]:
+                vd = float(info[1:]) / 100
+
+            # Record composition
+            elif "Ye" == info[:2]:
+                wind = float(info[2:]) / 100
+
+            elif "KNTheta" in info:
+                KNTheta = float(info[7:])
+
+    param_values = {
+        "morphology": morph,
+        "Ye_wind": wind,
+        "mej_dyn": md,
+        "vej_dyn": vd,
+        "mej_wind": mw,
+        "vej_wind": vw,
+        "KNTheta": KNTheta,
+    }
+    knprops = {}
+    for prop in [
+        "morphology",
+        "Ye_wind",
+        "mej_dyn",
+        "vej_dyn",
+        "mej_wind",
+        "vej_wind",
+        "KNTheta",
+    ]:
+        prop_value = param_values[prop]
+        if prop_value is not None:
+            knprops[prop] = prop_value
+
+    return knprops
+
+
+def parse_LANLfile(filename, key="band"):
+    """
+    Tool for reading data from the Wollaeger et al. (2018)
+    and subsequent paper data format.
+    Used to determine the number of rows for a given passband
+    filter or timestep.
+    Written by Eve Chase.
+    Parameters
+    ----------
+    filename: string
+        path to magnitude file
+    key: string
+        key to search for in file. Options: 'band', 'time'
+    Returns
+    -------
+    nrows: int
+        Number of rows between successive appearances of key
+    keys_in_file: dictionary
+        Dictionary where keys are each occurance of the selected
+        keyword (i.e. each bandname or each timestep) and values
+        are the line number to start searching for that value in.
+    """
+
+    assert key in ["time", "band", "bolometric"]
+
+    keys_in_file = {}
+
+    # Find out how many rows are in each band
+    with open(filename, "r") as datafile:
+        # Read each line until the key appears
+        count = 1
+        key_count = 0  # Line number where key appears
+        line = datafile.readline()
+        if key in ["band", "bolometric"]:
+            line = datafile.readline()
+        while line:
+            if key in line:
+                key_count = count
+                if key in ["band", "bolometric"]:
+                    keys_in_file[line.split()[1]] = count
+                    if key == "bolometric":
+                        key = "band"
+                elif key == "time":
+                    keys_in_file[float(line.split()[-1])] = count
+            line = datafile.readline()
+
+            count += 1
+    # if key == 'band':
+    #    nrows = count - key_count - 4
+    # elif key == 'time':
+    nrows = count - key_count - 3
+
+    return nrows, keys_in_file
