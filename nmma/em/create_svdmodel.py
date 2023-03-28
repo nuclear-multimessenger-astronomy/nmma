@@ -135,9 +135,10 @@ def main():
         )
     model_function = MODEL_FUNCTIONS[args.model]
 
-    filenames = glob.glob(f"{args.data_path}/*.dat") + glob.glob(
-        f"{args.data_path}/*.csv"
-    )
+    file_extensions = ["dat", "csv", "dat.gz"]
+    filenames = []
+    for file_extension in file_extensions:
+        filenames = filenames + glob.glob(f"{args.data_path}/*.{file_extension}")
     if len(filenames) == 0:
         raise ValueError("Need at least one file to interpolate.")
 
