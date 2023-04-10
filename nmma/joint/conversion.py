@@ -327,6 +327,10 @@ class BNSEjectaFitting(object):
         converted_parameters["log10_mej_dyn"] = log10_mej_dyn
         log10_mej_wind = np.log10(converted_parameters["ratio_zeta"]) + log10_mdisk_fit
         converted_parameters["log10_mej_wind"] = log10_mej_wind
+        # total eject mass
+        total_ejeta_mass = 10**log10_mej_dyn + 10**log10_mej_wind
+        log10_mej = np.log10(total_ejeta_mass)
+        converted_parameters["log10_mej"] = log10_mej
         # GRB afterglow energy
         log10_E0_MSUN = (
             np.log10(converted_parameters["ratio_epsilon"])
@@ -355,6 +359,12 @@ class BNSEjectaFitting(object):
             else:
                 converted_parameters.loc[mwind_nan_index, "log10_mej_wind"] = -np.inf
 
+            mej_tot_nan_index = np.where((~np.isfinite(log10_mej)))[0]
+            if not isinstance(converted_parameters, pd.DataFrame):
+                converted_parameters["log10_mej"][mej_tot_nan_index] = -np.inf
+            else:
+                converted_parameters.loc[mej_tot_nan_index, "log10_mej"] = -np.inf
+
             E0_nan_index = np.where((~np.isfinite(log10_E0_erg)))[0]
             if not isinstance(converted_parameters, pd.DataFrame):
                 converted_parameters["log10_E0"][E0_nan_index] = -np.inf
@@ -365,10 +375,12 @@ class BNSEjectaFitting(object):
             if not isinstance(converted_parameters, pd.DataFrame):
                 converted_parameters["log10_mej_dyn"][BH_index] = -np.inf
                 converted_parameters["log10_mej_wind"][BH_index] = -np.inf
+                converted_parameters["log10_mej"][BH_index] = -np.inf
                 converted_parameters["log10_E0"][BH_index] = -np.inf
             else:
                 converted_parameters.loc[BH_index, "log10_mej_dyn"] = -np.inf
                 converted_parameters.loc[BH_index, "log10_mej_wind"] = -np.inf
+                converted_parameters.loc[BH_index, "log10_mej"] = -np.inf
                 converted_parameters.loc[BH_index, "log10_E0"] = -np.inf
 
         else:
@@ -378,15 +390,19 @@ class BNSEjectaFitting(object):
             if not np.isfinite(log10_mej_wind):
                 converted_parameters["log10_mej_wind"] = -np.inf
 
+            if not np.isfinite(log10_mej):
+                converted_parameters["log10_mej"] = -np.inf
+
             if not np.isfinite(log10_E0_erg):
                 converted_parameters["log10_E0"] = -np.inf
 
             if compactness_1 == 0.5 or compactness_2 == 0.5:
                 converted_parameters["log10_mej_dyn"] = -np.inf
                 converted_parameters["log10_mej_wind"] = -np.inf
+                converted_parameters["log10_mej"] = -np.inf
                 converted_parameters["log10_E0"] = -np.inf
 
-        added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind", "log10_E0"]
+        added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
         np.seterr(**old)
 
