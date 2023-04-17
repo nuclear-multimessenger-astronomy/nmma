@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib import gridspec
 
-font = {"size": 30}
+font = {"size": 32}
 matplotlib.rc("font", **font)
 
 
@@ -56,21 +56,21 @@ def main():
         type=str
     )
     parser.add_argument(
-        "--binary-type", 
+        "--binary-type",
         type=str, 
         required=True, 
         help="Either BNS or NSBH"
     )
     parser.add_argument(
         "-c", 
-        "--configDirectory", 
+        "--configDirectory",
         help="gwemopt config file directory.", 
         required=True
     )
     parser.add_argument(
         "--outdir", 
         type=str, 
-        required=True, 
+        default="outdir",
         help="Path to the output directory"
     )
     parser.add_argument(
@@ -115,6 +115,7 @@ def main():
         type=int, 
         required=True
     )
+
     parser.add_argument(
         "--parallel", 
         action="store_true", 
@@ -126,7 +127,8 @@ def main():
         type=int, 
         default=1, 
         help="Number of cores"
-    ) 
+    )
+
     args = parser.parse_args()
 
     # load the injection json file
@@ -134,7 +136,7 @@ def main():
         if args.injection_file.endswith(".json"):
             with open(args.injection_file, "rb") as f:
                 injection_data = json.load(f)
-                datadict = injection_data["injections"]["content"]
+                datadict = injection_data["injections"]["content"] 
                 dataframe_from_inj = pd.DataFrame.from_dict(datadict)
                 
                 # get the injection index from the oserving scenarios simulations 
@@ -148,19 +150,33 @@ def main():
 
     #indices = np.loadtxt(args.indices_file)
     indices = simulation_id
-    
+
     commands = []
     lcs = {}
     for index, row in dataframe_from_inj.iterrows():
         outdir = os.path.join(args.outdir, str(index))
+        #outdir = os.path.join('./obs_paper/detection_lc/outdir_BNS', str(index))
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
-
+ 
         skymap_file = os.path.join(args.skymap_dir, "%d.fits" % indices[index])
         lc_file = os.path.join(args.lightcurve_dir, "%d.dat" %  indices[index])
+        
+        #skymap_file = os.path.join('~/OBSERVING_SCENARIOS/runs/O4/farah/allsky', "%d.fits" % indices[index])
+        #lc_file = os.path.join('./obs_paper/absolute_mag_lc/outdir_BNS', "%d.dat" %  indices[index])
+        
+                # fixed scheduling time as observation plan
+        #number_shot = int(1 + (args.tmax - args.tmin)/args.dt)
+        
+        #lcs[index] = np.loadtxt(lc_file)[0:number_shot,]
+        
         lcs[index] = np.loadtxt(lc_file)
+        
+        print(lcs)
+  
 
         efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
+        print(efffile)
         if os.path.isfile(efffile):
             continue
 
@@ -195,19 +211,24 @@ def main():
 
     absmag, effs, probs = [], [], []
     fid = open(args.detections_file, "w")
+    #fid = open('lc_skymap_detection', "w")
     for index, row in dataframe_from_inj.iterrows():
         outdir = os.path.join(args.outdir, str(index))
+        #outdir = os.path.join('./obs_paper/detection_lc/outdir_BNS', str(index))
+        
         efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
+        #print(efffile)
         
         ## Choose band for the best proxy
         # for ZTF r-band give the best proxy 
         if args.telescope == 'ZTF':
             absmag.append(np.min(lcs[index][:, 3]))
-        # For Rubin i-band or z-band are best but here we choose r-band,
-        # that give the same results  
+        # For Rubin i-band or z-band are best 
         else:
             absmag.append(np.min(lcs[index][:, 4]))
             
+        print(absmag)
+        
         if not os.path.isfile(efffile):
             fid.write("0\n")
             effs.append(0.0)
@@ -248,6 +269,8 @@ def main():
     probs_det = probs[idx]
     probs_miss = probs[idy]
 
+    print( dataframe_from_detected["mass_1"], " :",dataframe_from_detected["mass_2"] )
+    print( dataframe_from_missed)
     (mchirp_det, eta_det, q_det) = ms2mc(
         dataframe_from_detected["mass_1"],
         dataframe_from_detected["mass_2"],
@@ -285,9 +308,9 @@ def main():
         label="Missed",
     )
     if args.binary_type == "BNS":
-        plt.xlim([-17.5, -14.0])
+        plt.xlim([-17.5, -14.5])
     elif args.binary_type == "NSBH":
-        plt.xlim([-16.5, -13.0])
+        plt.xlim([-16.5, -13.5])
     plt.gca().invert_xaxis()
     plt.xlabel("Absolute Magnitude")
     plt.ylabel("Distance [Mpc]")
@@ -298,7 +321,7 @@ def main():
     plt.savefig(plotName)
     plt.close()
 
-    fig = plt.figure(figsize=(20, 16))
+    fig = plt.figure(figsize=(22, 16))
 
     gs = gridspec.GridSpec(4, 4)
     ax1 = fig.add_subplot(gs[1:4, 0:3])
@@ -311,7 +334,7 @@ def main():
     plt.scatter(
         absmag_det,
         1 - probs_det,
-        s=150 * np.ones(absmag_det.shape),
+        s=600 * np.ones(absmag_det.shape),
         cmap=cmap,
         norm=norm,
         marker="*",
@@ -321,7 +344,7 @@ def main():
     plt.scatter(
         absmag_miss,
         1 - probs_miss,
-        s=150 * np.ones(absmag_miss.shape),
+        s=600 * np.ones(absmag_miss.shape),
         cmap=cmap,
         norm=norm,
         marker="o",
@@ -335,7 +358,7 @@ def main():
             marker="o",
             color="w",
             label="Missed",
-            markersize=20,
+            markersize=30,
             markerfacecolor="k",
         ),
         Line2D(
@@ -344,14 +367,14 @@ def main():
             marker="*",
             color="w",
             label="Found",
-            markersize=20,
+            markersize=30,
             markerfacecolor="k",
         ),
     ]
     if args.binary_type == "BNS":
-        plt.xlim([-17.5, -14.0])
+        plt.xlim([-17.5, -14.5])
     elif args.binary_type == "NSBH":
-        plt.xlim([-16.5, -13.0])
+        plt.xlim([-16.5, -13.5])
     plt.ylim([0.001, 1.0])
     ax1.set_yscale("log")
     plt.gca().invert_xaxis()
@@ -401,9 +424,9 @@ def main():
 
     plt.axes(ax2)
     if args.binary_type == "BNS":
-        xedges = np.linspace(-17.5, -14.0, 30)
+        xedges = np.linspace(-17.5, -14.5, 30)
     elif args.binary_type == "NSBH":
-        xedges = np.linspace(-16.5, -13.0, 30)
+        xedges = np.linspace(-16.5, -13.5, 30)
 
     hist, bin_edges = np.histogram(absmag_miss, bins=xedges, density=False)
     bins = (bin_edges[1:] + bin_edges[:-1]) / 2.0
@@ -430,15 +453,15 @@ def main():
     plt.legend()
     plt.ylabel("Counts")
     if args.binary_type == "BNS":
-        plt.xlim([-17.5, -14.0])
+        plt.xlim([-17.5, -14.5])
     elif args.binary_type == "NSBH":
-        plt.xlim([-16.5, -13.0])
+        plt.xlim([-16.5, -13.5])
     # plt.xlim([0.02, 50])
     # ax2.set_xscale('log')
     plt.gca().invert_xaxis()
     ax2.set_yscale("log")
     ax2.set_xticklabels([])
 
-    plotName = os.path.join(plotdir, "eff.pdf")
-    plt.savefig(plotName, bbox_inches="tight")
+    plotName = os.path.join(plotdir, f"eff_{args.binary_type}_{args.telescope}.pdf")
+    plt.savefig(plotName,bbox_inches='tight', dpi=2500)
     plt.close()
