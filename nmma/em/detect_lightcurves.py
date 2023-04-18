@@ -212,7 +212,6 @@ def main():
         outdir = os.path.join(args.outdir, str(index))
         
         efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
-        #print(efffile)
         
         ## Choose band for the best proxy
         # for ZTF r-band give the best proxy 
