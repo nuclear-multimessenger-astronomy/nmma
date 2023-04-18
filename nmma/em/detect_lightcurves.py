@@ -173,7 +173,6 @@ def main():
   
 
         efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
-        print(efffile)
         if os.path.isfile(efffile):
             continue
 
