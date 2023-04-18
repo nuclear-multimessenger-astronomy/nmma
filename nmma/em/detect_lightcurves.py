@@ -270,7 +270,6 @@ def main():
     probs_miss = probs[idy]
 
     print( dataframe_from_detected["mass_1"], " :",dataframe_from_detected["mass_2"] )
-    print( dataframe_from_missed)
     (mchirp_det, eta_det, q_det) = ms2mc(
         dataframe_from_detected["mass_1"],
         dataframe_from_detected["mass_2"],
