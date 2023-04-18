@@ -172,7 +172,6 @@ def main():
         
         lcs[index] = np.loadtxt(lc_file)
         
-        print(lcs)
   
 
         efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
