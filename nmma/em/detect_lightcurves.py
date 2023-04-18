@@ -221,7 +221,6 @@ def main():
         else:
             absmag.append(np.min(lcs[index][:, 4]))
             
-        print(absmag)
         
         if not os.path.isfile(efffile):
             fid.write("0\n")
