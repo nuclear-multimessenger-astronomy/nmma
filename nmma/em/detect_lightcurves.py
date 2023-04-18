@@ -162,7 +162,6 @@ def main():
         skymap_file = os.path.join(args.skymap_dir, "%d.fits" % indices[index])
         lc_file = os.path.join(args.lightcurve_dir, "%d.dat" %  indices[index])
         
-        #skymap_file = os.path.join('~/OBSERVING_SCENARIOS/runs/O4/farah/allsky', "%d.fits" % indices[index])
         #lc_file = os.path.join('./obs_paper/absolute_mag_lc/outdir_BNS', "%d.dat" %  indices[index])
         
                 # fixed scheduling time as observation plan
