@@ -155,7 +155,6 @@ def main():
     lcs = {}
     for index, row in dataframe_from_inj.iterrows():
         outdir = os.path.join(args.outdir, str(index))
-        #outdir = os.path.join('./obs_paper/detection_lc/outdir_BNS', str(index))
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
  
