@@ -211,7 +211,6 @@ def main():
     #fid = open('lc_skymap_detection', "w")
     for index, row in dataframe_from_inj.iterrows():
         outdir = os.path.join(args.outdir, str(index))
-        #outdir = os.path.join('./obs_paper/detection_lc/outdir_BNS', str(index))
         
         efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
         #print(efffile)
