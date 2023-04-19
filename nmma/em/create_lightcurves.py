@@ -296,8 +296,17 @@ def main():
             
             injection_outfile = os.path.join(args.outdir, "%d.dat" % simulation_id[index])
             if os.path.isfile(injection_outfile):
+            try:
                 mag_ds[index] = np.loadtxt(injection_outfile)
                 continue
+                
+            except ValueError :
+                print('\n===================================================================') 
+                print('The previous run generated light curves with unreadable content.\n')
+                print('Please remove all output files in .dat format then retry.')
+                print('===================================================================\n')
+                exit()
+
 
             injection_parameters = row.to_dict()
 
