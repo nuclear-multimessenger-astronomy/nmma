@@ -325,11 +325,15 @@ def main():
                 light_curve_model=light_curve_model,
             )
             print("Injection generated")
-            
+
+        try:
             fid = open(injection_outfile, "w")
+            # fid.write('# t[days] u g r i z y J H K\n')
+            # fid.write(str(" ".join(('# t[days]'," ".join(args.filters.split(',')),"\n"))))
             fid.write("# t[days] ")
             fid.write(str(" ".join(args.filters.split(","))))
             fid.write("\n")
+
             for ii, tt in enumerate(sample_times):
                 fid.write("%.5f " % sample_times[ii])
                 for filt in data.keys():
@@ -339,7 +343,13 @@ def main():
                     fid.write("%.3f " % data[filt][ii, 1])
                 fid.write("\n")
             fid.close()
-
+            
+        except IndexError:
+            print('\n===================================================================') 
+            print('Sorry we could not use ZTF or Rubin flags to generate those statistics\n')
+            print('Please remove all flags rely on with ZTF or Rubin then retry again')
+            print('===================================================================\n')
+            exit()
             mag_ds[index] = np.loadtxt(injection_outfile)
             
         if args.plot:
