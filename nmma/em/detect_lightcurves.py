@@ -160,10 +160,9 @@ def main():
  
         skymap_file = os.path.join(args.skymap_dir, "%d.fits" % indices[index])
         lc_file = os.path.join(args.lightcurve_dir, "%d.dat" %  indices[index])
+
         
-        #lc_file = os.path.join('./obs_paper/absolute_mag_lc/outdir_BNS', "%d.dat" %  indices[index])
-        
-                # fixed scheduling time as observation plan
+        # fixed scheduling time as observation plan
         #number_shot = int(1 + (args.tmax - args.tmin)/args.dt)
         
         #lcs[index] = np.loadtxt(lc_file)[0:number_shot,]
