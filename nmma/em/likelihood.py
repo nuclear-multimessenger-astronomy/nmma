@@ -106,7 +106,7 @@ class OpticalLightCurve(Likelihood):
 
     def log_likelihood(self):
         lbol, mag_abs = self.light_curve_model.generate_lightcurve(
-            self.sample_times, self.parameters
+            self.parameters
         )
 
         # sanity checking

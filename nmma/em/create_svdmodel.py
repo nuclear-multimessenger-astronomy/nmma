@@ -196,10 +196,10 @@ def main():
         data = {param: training[param] for param in parameters}
         data["redshift"] = 0
         if args.data_type == "photometry":
-            lbol, mag = light_curve_model.generate_lightcurve(sample_times, data)
+            lbol, mag = light_curve_model.generate_lightcurve(data)
         elif args.data_type == "spectroscopy":
             spec = light_curve_model.generate_spectra(
-                sample_times, training_model.filters, data
+                training_model.filters, data
             )
 
         import matplotlib.pyplot as plt
