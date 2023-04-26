@@ -66,8 +66,8 @@ class GenericCombineLightCurveModel(object):
         self.models = models
         self.sample_times = sample_times
 
-    def generate_lightcurve(self, parameters, return_all=False):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None, return_all=False):
+        sample_times = self.sample_times if sample_times is None else sample_times
 
         total_lbol = np.zeros(len(sample_times))
         total_mag = {}
@@ -272,8 +272,8 @@ class SVDLightCurveModel(object):
             )
         return parameters
 
-    def generate_lightcurve(self, parameters):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         if self.parameter_conversion:
             new_parameters = parameters.copy()
             new_parameters, _ = self.parameter_conversion(new_parameters)
@@ -303,8 +303,8 @@ class SVDLightCurveModel(object):
 
         return lbol, mag
 
-    def generate_spectra(self, wavelengths, parameters):
-        sample_times = self.sample_times
+    def generate_spectra(self, wavelengths, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         if self.parameter_conversion:
             new_parameters = parameters.copy()
             new_parameters, _ = self.parameter_conversion(new_parameters)
@@ -372,8 +372,8 @@ class GRBLightCurveModel(object):
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
 
-    def generate_lightcurve(self, parameters):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         if self.parameter_conversion:
             new_parameters = parameters.copy()
             new_parameters, _ = self.parameter_conversion(new_parameters)
@@ -453,8 +453,8 @@ class KilonovaGRBLightCurveModel(object):
 
         return parameters
 
-    def generate_lightcurve(self, parameters):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         total_lbol = np.zeros(len(sample_times))
         total_mag = {}
 
@@ -536,8 +536,8 @@ class SupernovaLightCurveModel(object):
     def __repr__(self):
         return self.__class__.__name__ + "(model={self.model})"
 
-    def generate_lightcurve(self, parameters):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         if self.parameter_conversion:
             new_parameters = parameters.copy()
             new_parameters, _ = self.parameter_conversion(new_parameters)
@@ -585,8 +585,8 @@ class SupernovaGRBLightCurveModel(object):
         details = "(grb model using afterglowpy with supernova model nugent-hyper)"
         return self.__class__.__name__ + details
 
-    def generate_lightcurve(self, parameters):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         total_lbol = np.zeros(len(sample_times))
         total_mag = {}
 
@@ -655,8 +655,8 @@ class ShockCoolingLightCurveModel(object):
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
 
-    def generate_lightcurve(self, parameters):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         if self.parameter_conversion:
             new_parameters = parameters.copy()
             new_parameters, _ = self.parameter_conversion(new_parameters)
@@ -694,8 +694,8 @@ class SupernovaShockCoolingLightCurveModel(object):
         )
         return self.__class__.__name__ + details
 
-    def generate_lightcurve(self, parameters):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         total_lbol = np.zeros(len(sample_times))
         total_mag = {}
 
@@ -764,8 +764,8 @@ class SimpleKilonovaLightCurveModel(object):
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
 
-    def generate_lightcurve(self, parameters):
-        sample_times = self.sample_times
+    def generate_lightcurve(self, parameters, sample_times=None):
+        sample_times = self.sample_times if sample_times is None else sample_times
         if self.parameter_conversion:
             new_parameters = parameters.copy()
             new_parameters, _ = self.parameter_conversion(new_parameters)
