@@ -2,8 +2,8 @@
 
 ## Preliminary Steps:
 
-The steps highlighted below are primarily for Linux systems and Windows users are advised to use WSL (preferrably Ubuntu 20.04) for smooth installation. 
-Ubuntu 20.04 is available for free download on Microsoft Store. 
+The steps highlighted below are primarily for Linux systems and Windows users are advised to use WSL (preferrably Ubuntu 20.04) for smooth installation.
+Ubuntu 20.04 is available for free download on Microsoft Store.
 
 **Installing Anaconda3**
 
@@ -19,9 +19,9 @@ On your Linux/WSL terminal, run the following commands to install anaconda (repl
 (For 32-bit installation, skip the ‘_64’ in both commands)
 
 NOTE: If you already have Anaconda3 installed, please make sure that it is updated to the latest version (conda update --all). Also check that you do not have multiple
-versions of python installed in usr/lib/ directory as it can cause version conflicts while installing dependencies. 
+versions of python installed in usr/lib/ directory as it can cause version conflicts while installing dependencies.
 
-Now do: 
+Now do:
 
 
 * $ conda update --all
@@ -38,7 +38,7 @@ Fork the NMMA repository given below:
 Note that we link above to the main branch, but suggest making changes on your own fork (please also see our [contributing guide](./contributing.html)). Now, after forking, run the following command to clone the repository into your currently directory (by default, in your home directory):
 
 
-* $ git clone https://github.com/your_github_username/nmma  
+* $ git clone https://github.com/your_github_username/nmma
 Change directory to the nmma folder:
 
 
@@ -78,7 +78,7 @@ Check python and pip version like this:
 * $ pip --version
 
 
-Python 3.8 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation. 
+Python 3.8 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation.
 
 For the moment we advise Linux users to avoid using python3.9 and python3.10 in their nmma environment this can generate major problems for the operation. So use preferably python3.8.
 
@@ -87,10 +87,10 @@ Install mpi4py:
 
 * $ conda install mpi4py
 
-OR 
+OR
 
 
-* $ pip install mpi4py 
+* $ pip install mpi4py
 
 
 Install parallel-bilby:
@@ -110,8 +110,8 @@ Install pymultinest
 
 * $ conda install -c conda-forge pymultinest
 
- 
-NOTE: In case if an error comes up during an NMMA analysis of the form:
+
+NOTE: In case an error comes up during an NMMA analysis of the form:
 
 ERROR:   Could not load MultiNest library "libmultinest.so"
 ERROR:   You have to build it first,
@@ -125,12 +125,13 @@ https://johannesbuchner.github.io/PyMultiNest/install.html
 
 
 
-Use the commands below to install the dependencies given in requirements.txt file which are necessary for NMMA: 
+Use the command below to install the dependencies given in requirements.txt file which are necessary for NMMA:
 
+```
+python setup.py install
+```
 
-* $ python setup.py install
-
-To make sure, install again the requirements with pip like this:
+If any package appeared to have an issue installing, you can check by attempting to install it again using pip:
 
 * $ pip install importlib_resources
 
@@ -157,6 +158,28 @@ if not covered by python setup.py install. Also, if running python setup.py inst
 
 and redo python setup.py install.
 
+**Known arm64 Mac issues**
+
+For arm64 Macs (e.g. M1, M2), there is an issue installing `pyfftw` with pip (see https://github.com/pyFFTW/pyFFTW/issues/349#issuecomment-1468638458). To address, first run
+* $ brew install fftw
+
+then add the following lines to your `.zprofile` or `.bash_profile`:
+```
+export PATH="/opt/homebrew/bin:$PATH"
+export DYLD_LIBRARY_PATH=/opt/homebrew/opt/fftw/lib
+export LDFLAGS="-Wl,-S,-rpath,/opt/homebrew/opt/fftw/lib -L/opt/homebrew/opt/fftw/lib"
+export CFLAGS="-Wno-implicit-function-declaration -I/opt/homebrew/opt/fftw/include"
+```
+
+Close and reopen your terminal and run
+* $ pip install pyfftw
+
+There are also issues with `tensorflow` and arm64 Macs. If using `tensorflow`, install it with the following commands:
+```
+conda install -c apple tensorflow-deps
+pip install tensorflow-macos
+pip install tensorflow-metal
+```
 
 
 **First Test for NMMA**
@@ -171,13 +194,13 @@ Run the following commands:
 NOTE (Okay, last one!): if everything is ok, it's the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
 those with their given commands. In case modules like afterglowpy and dust_extinction are needed, don't hesitate to do it with pip (normally it shouldn't happen), but some modules may not install correctly in case of disturbance.
 
-Please pay special attention to the `import nmma.em.analysis` and make sure that it does not generate any errors. 
+Please pay special attention to the `import nmma.em.analysis` and make sure that it does not generate any errors.
 
 Unfortunately, due to the web of package requirements that NMMA depends on, running setup.py does not typically finish without errors the first time through. Experience has shown that in the vast majority of cases, simply pinning versions such as:
 
 	pip install astropy==4.3.1
 
-and then trying again is sufficient for completion of the installation. This instruction file will likely cover the issues you might face during your installation. However, please open issues on GitHub if there appear to be unresolvable conflicts. 
+and then trying again is sufficient for completion of the installation. This instruction file will likely cover the issues you might face during your installation. However, please open issues on GitHub if there appear to be unresolvable conflicts.
 
 
 ## Installation on expanse and other cluster resources
@@ -189,7 +212,7 @@ For example, on XSEDE's Expanse cluster, one can start a terminal session with:
 	module load sdsc
 	module load openmpi
 
-and follow the instructions above. 
+and follow the instructions above.
 
 NOTE: If "module load openmpi" does not execute directly and it asks for dependencies, one can proceed with:
 
