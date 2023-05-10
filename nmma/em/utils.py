@@ -31,7 +31,7 @@ except ImportError:
 try:
     from wrapt_timeout_decorator import timeout
 except ImportError:
-    print("Install afterglowpy if you want to timeout simulations.")
+    print("Install wrapt_timeout_decorator if you want timeout simulations.")
 
     def timeout(*args, **kwargs):
         def inner(func):
