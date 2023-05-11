@@ -119,6 +119,8 @@ setup(
             "nmma_generation=nmma.pbilby.generation:main",
             "parallel_em_analysis=nmma.pbilby.em_analysis:main",
             "parallel_em_generation=nmma.pbilby.em_generation:main",
+            "nmma_gw_analysis=nmma.pbilby.gw_analysis:main",
+            "nmma_gw_generation=nmma.pbilby.gw_generation:main",
             "light_curve_analysis=nmma.em.analysis:main",
             "light_curve_injection_summary=nmma.em.injection_summary:main",
             "light_curve_injection_slurm_setup=nmma.em.create_injection_slurm:main",
