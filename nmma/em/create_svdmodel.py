@@ -121,6 +121,12 @@ def main():
         default=False,
         help="print out log likelihoods",
     )
+    parser.add_argument(
+        "--ignore-bolometric",
+        action="store_true",
+        default=False,
+        help="ignore bolometric light curve files (ending in _Lbol.file_extension)",
+    )
     args = parser.parse_args()
 
     # initialize light curve model
@@ -138,12 +144,22 @@ def main():
     file_extensions = ["dat", "csv", "dat.gz"]
     filenames = []
     for file_extension in file_extensions:
-        filenames = filenames + glob.glob(f"{args.data_path}/*.{file_extension}")
+        if not args.ignore_bolometric:
+            filenames = filenames + glob.glob(f"{args.data_path}/*.{file_extension}")
+        else:
+            filenames = filenames + glob.glob(
+                f"{args.data_path}/*[!_Lbol].{file_extension}"
+            )
     if len(filenames) == 0:
         raise ValueError("Need at least one file to interpolate.")
 
     if args.data_type == "photometry":
-        data = read_photometry_files(filenames)
+        try:
+            data = read_photometry_files(filenames)
+        except IndexError:
+            raise IndexError(
+                "If there are bolometric light curves in your --data-path, try setting --ignore-bolometric"
+            )
     elif args.data_type == "spectroscopy":
         data = read_spectroscopy_files(
             filenames, wavelength_min=args.lmin, wavelength_max=args.lmax, smooth=True
