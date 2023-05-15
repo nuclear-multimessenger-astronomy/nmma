@@ -90,6 +90,15 @@ OR
 $ pip install parallel-bilby
 ```
 
+Note: for those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
+This can be resolved by installing gcc with the following command:
+
+```
+ $ sudo apt-get install gcc
+```
+
+and attempting to install parallel-bilby again.
+
 Install pymultinest (note this line may not work for arm64 Macs; see specifc instructions below)
 ```
 $ conda install -c conda-forge pymultinest
