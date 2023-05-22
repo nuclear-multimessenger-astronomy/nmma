@@ -898,7 +898,7 @@ def metzger_lc(t_day, param_dict):
 
     vm = v0 * np.power(m * Msun / M0, -1.0 / beta)
     vm[vm > c] = c
-
+    
     # define thermalization efficiency rom Barnes+16
     ca3 = 1.3
     cb3 = 0.2
@@ -1011,6 +1011,9 @@ def metzger_lc(t_day, param_dict):
 
     for j in range(tprec - 1):
         # one zone calculation
+        
+        if E[j]<0.0: 
+            E[j]=np.abs(E[j])
         temp[j] = 1e10 * (3 * E[j] / (arad * 4 * np.pi * R[j] ** (3))) ** (0.25)
         if temp[j] > 4000.0:
             kappaoz = kappa_r
@@ -1030,7 +1033,14 @@ def metzger_lc(t_day, param_dict):
 
         templayer = (
             3 * ene[:-1, j] * dm * Msun / (arad * 4 * np.pi * (t[j] * vm[:-1]) ** 3)
-        ) ** (0.25)
+        )
+
+        if np.isnan(templayer).any():
+            templayer=np.nan_to_num(templayer)
+            templayer=abs(templayer)**0.25
+        else:
+            templayer =  abs(templayer) ** (0.25)
+
         kappa_correction = np.ones(templayer.shape)
         kappa_correction[templayer > 4000.0] = 1.0
         kappa_correction[templayer < 4000.0] = templayer[
@@ -1058,7 +1068,7 @@ def metzger_lc(t_day, param_dict):
 
         tau[mprec - 1, j] = tau[mprec - 2, j]
         # photosphere
-        pig = np.argmin(np.abs(tau[:, j] - 1))
+        pig = np.argmin(np.abs(tau[:, j])-1)
         vphoto[j] = vm[pig]
         Rphoto[j] = vphoto[j] * t[j]
         mphoto[j] = m[pig]
@@ -1068,9 +1078,13 @@ def metzger_lc(t_day, param_dict):
     Ltotm = Ltotm / 1e20
     Ltotm = Ltotm / 1e20
 
-    Ltot = Ltotm
+    Ltot = np.abs(Ltotm)
     lbol = Ltotm * 1e40
+
+
+    
     Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto**2 * sigSB)) ** (0.25)
+    
 
     ii = np.where(~np.isnan(Tobs) & (Tobs > 0))[0]
     f = interp.interp1d(t_day[ii], Tobs[ii], fill_value="extrapolate")
