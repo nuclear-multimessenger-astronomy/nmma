@@ -28,9 +28,9 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./
-          file: ./api.Dockerfile
+          file: ./api/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/nmma_db:latest
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/nmma_api:latest
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
