@@ -3,7 +3,11 @@
 
 name: Unit Test nmma
 
-on: [push]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
@@ -12,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.8, 3.9]
+        python-version: ['3.8', '3.9', '3.10']
 
     services:
       postgres:
