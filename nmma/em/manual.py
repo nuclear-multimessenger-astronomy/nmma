@@ -544,7 +544,7 @@ def main(args=None):
 
         mags = []
         for params in parameters:
-            _, mag = light_curve_model.generate_lightcurve(sample_times, params)
+            _, mag = light_curve_model.generate_lightcurve(params)
             for filt in mag.keys():
                 if params["luminosity_distance"] > 0:
                     mag[filt] += 5.0 * np.log10(
@@ -558,7 +558,7 @@ def main(args=None):
 
             if len(models) > 1:
                 _, mag_all = light_curve_model.generate_lightcurve(
-                    sample_times, params, return_all=True
+                    params, return_all=True
                 )
 
                 for ii in range(len(mag_all)):
