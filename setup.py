@@ -73,11 +73,11 @@ def readfile(filename):
 
 requirements = [
     "future",
-    "bilby>=1.2.0",
-    "bilby_pipe==1.0.5",
+    "bilby>=2.1.1",
+    "bilby_pipe>=1.1.0",
     "numpy>=1.9",
     "matplotlib>=2.0",
-    "scipy>=1.7.1, < 1.10.0",
+    "scipy>=1.7.1",
     "pandas>=1.3.4",
     "astropy>=4.3.1",
     "scikit-learn==1.0.2",
@@ -105,9 +105,12 @@ setup(
         "nmma",
         "nmma.em",
         "nmma.em.data",
+        "nmma.gw",
         "nmma.joint",
         "nmma.eos",
         "nmma.pbilby",
+        "nmma.pbilby.parser",
+        "nmma.pbilby.analysis"
     ],
     package_dir={"nmma": "nmma"},
     package_data={"nmma": [version_file], "nmma.em.data": ["*.pkl", "*.joblib"]},
@@ -115,12 +118,10 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "nmma_analysis=nmma.pbilby.analysis:main",
-            "nmma_generation=nmma.pbilby.generation:main",
-            "parallel_em_analysis=nmma.pbilby.em_analysis:main",
-            "parallel_em_generation=nmma.pbilby.em_generation:main",
-            "nmma_gw_analysis=nmma.pbilby.gw_analysis:main",
-            "nmma_gw_generation=nmma.pbilby.gw_generation:main",
+            "nmma_generation=nmma.pbilby.generation:main_nmma",
+            "nmma_gw_generation=nmma.pbilby.generation:main_nmma_gw",
+            "nmma_analysis=nmma.pbilby.analysis:main_nmma",
+            "nmma_gw_analysis=nmma.pbilby.analysis:main_nmma_gw",
             "light_curve_analysis=nmma.em.analysis:main",
             "light_curve_injection_summary=nmma.em.injection_summary:main",
             "light_curve_injection_slurm_setup=nmma.em.create_injection_slurm:main",
@@ -158,7 +159,7 @@ setup(
             "jsx-lexer",
         ],
         "production": [
-            "parallel_bilby>=1.0.0",
+            "parallel_bilby>=2.0.2",
             "mpi4py",
         ],
         "afterglowpy": [
