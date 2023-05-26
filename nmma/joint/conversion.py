@@ -402,6 +402,16 @@ class BNSEjectaFitting(object):
                 converted_parameters["log10_mej"] = -np.inf
                 converted_parameters["log10_E0"] = -np.inf
 
+            log10_mej_dyn = converted_parameters["log10_mej_dyn"]
+            log10_mej_wind = converted_parameters["log10_mej_wind"]
+            log10_mej = converted_parameters["log10_mej"]
+            log10_E0 = converted_parameters["log10_E0"]
+
+            converted_parameters["log10_mej_dyn"] = float(log10_mej_dyn)
+            converted_parameters["log10_mej_wind"] = float(log10_mej_wind)
+            converted_parameters["log10_mej"] = float(log10_mej)
+            converted_parameters["log10_E0"] = float(log10_E0)
+
         added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
         np.seterr(**old)
@@ -410,11 +420,12 @@ class BNSEjectaFitting(object):
 
 
 class MultimessengerConversion(object):
-    def __init__(self, eos_data_path, Neos, binary_type):
+    def __init__(self, eos_data_path, Neos, binary_type, with_ejecta=True):
         self.eos_data_path = eos_data_path
         self.Neos = Neos
         self.eos_interp_dict = {}
         self.binary_type = binary_type
+        self.with_ejecta = with_ejecta
 
         for EOSID in range(1, self.Neos + 1):
             radius, mass, Lambda = np.loadtxt(
@@ -547,19 +558,21 @@ class MultimessengerConversion(object):
                 "R_16",
             ]
 
-            converted_parameters, added_keys = self.ejecta_parameter_conversion(
-                converted_parameters, added_keys
-            )
+            if self.with_ejecta:
 
-            theta_jn = converted_parameters["theta_jn"]
-            converted_parameters["KNtheta"] = (
-                180 / np.pi * np.minimum(theta_jn, np.pi - theta_jn)
-            )
-            converted_parameters["inclination_EM"] = (
-                converted_parameters["KNtheta"] * np.pi / 180.0
-            )
+                converted_parameters, added_keys = self.ejecta_parameter_conversion(
+                    converted_parameters, added_keys
+                )
 
-            added_keys = added_keys + ["KNtheta", "inclination_EM"]
+                theta_jn = converted_parameters["theta_jn"]
+                converted_parameters["KNtheta"] = (
+                    180 / np.pi * np.minimum(theta_jn, np.pi - theta_jn)
+                )
+                converted_parameters["inclination_EM"] = (
+                    converted_parameters["KNtheta"] * np.pi / 180.0
+                )
+
+                added_keys = added_keys + ["KNtheta", "inclination_EM"]
 
         added_keys = [
             key for key in converted_parameters.keys() if key not in original_keys
@@ -593,8 +606,9 @@ class MultimessengerConversion(object):
 
 
 class MultimessengerConversionWithLambdas(object):
-    def __init__(self, binary_type):
+    def __init__(self, binary_type, with_ejecta=True):
         self.binary_type = binary_type
+        self.with_ejecta = with_ejecta
 
         if self.binary_type == "BNS":
             ejectaFitting = BNSEjectaFitting()
@@ -655,19 +669,21 @@ class MultimessengerConversionWithLambdas(object):
 
         added_keys = added_keys + ["radius_1", "radius_2", "R_16"]
 
-        converted_parameters, added_keys = self.ejecta_parameter_conversion(
-            converted_parameters, added_keys
-        )
+        if self.with_ejecta:
 
-        theta_jn = converted_parameters["theta_jn"]
-        converted_parameters["KNtheta"] = (
-            180 / np.pi * np.minimum(theta_jn, np.pi - theta_jn)
-        )
-        converted_parameters["inclination_EM"] = (
-            converted_parameters["KNtheta"] * np.pi / 180.0
-        )
+            converted_parameters, added_keys = self.ejecta_parameter_conversion(
+                converted_parameters, added_keys
+            )
 
-        added_keys = added_keys + ["KNtheta", "inclination_EM"]
+            theta_jn = converted_parameters["theta_jn"]
+            converted_parameters["KNtheta"] = (
+                180 / np.pi * np.minimum(theta_jn, np.pi - theta_jn)
+            )
+            converted_parameters["inclination_EM"] = (
+                converted_parameters["KNtheta"] * np.pi / 180.0
+            )
+
+            added_keys = added_keys + ["KNtheta", "inclination_EM"]
 
         added_keys = [
             key for key in converted_parameters.keys() if key not in original_keys

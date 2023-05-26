@@ -2,7 +2,10 @@ from __future__ import division
 
 import numpy as np
 
-from .conversion import MultimessengerConversion, MultimessengerConversionWithLambdas
+from ..joint.conversion import (
+    MultimessengerConversion,
+    MultimessengerConversionWithLambdas
+    )
 
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient
 from bilby.core.likelihood import Likelihood
@@ -107,10 +110,13 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
             priors['EOS'] = eos_prior
 
             # construct the eos conversion
-            parameter_conversion_class = MultimessengerConversion(eos_data_path=eos_path, Neos=Neos,
-                                                                  binary_type=binary_type)
+            parameter_conversion_class = MultimessengerConversion(eos_data_path=eos_path,
+                                                                  Neos=Neos,
+                                                                  binary_type=binary_type,
+                                                                  with_ejecta=False)
         else:
-            parameter_conversion_class = MultimessengerConversionWithLambdas(binary_type=binary_type)
+            parameter_conversion_class = MultimessengerConversionWithLambdas(binary_type=binary_type,
+                                                                             with_ejecta=False)
 
         priors.conversion_function = parameter_conversion_class.priors_conversion_function
         parameter_conversion = parameter_conversion_class.convert_to_multimessenger_parameters
