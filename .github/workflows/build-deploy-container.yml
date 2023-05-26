@@ -2,7 +2,8 @@ name: CI to Docker Hub
 
 on:
   push:
-    branches: [ main, nmma_api ]
+    branches:
+      - '*'
 
 jobs:
 
