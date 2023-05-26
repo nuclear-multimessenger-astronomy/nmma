@@ -2,8 +2,7 @@ name: Website Deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build:

@@ -3,7 +3,11 @@
 
 name: Unit Test nmma
 
-on: [push]
+on:
+  push:
+    branches: [ main ]
+  pull-request:
+    branches: [ main ]
 
 jobs:
   build:
