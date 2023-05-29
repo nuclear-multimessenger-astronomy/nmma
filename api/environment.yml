@@ -1,0 +1,12 @@
+name: nmma
+
+channels:
+- conda-forge
+
+dependencies:
+- python=3.9.*
+- numpy
+- mpi4py
+
+- pip:
+  - -r requirements.txt
