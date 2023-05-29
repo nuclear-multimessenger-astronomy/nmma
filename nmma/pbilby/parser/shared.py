@@ -106,6 +106,7 @@ def _add_em_settings_to_parser(parser):
     em_input_parser.add(
         "--filters",
         type=str,
+        default=None,
         help="A comma seperated list of filters to use (e.g. g,r,i)."
         "If none is provided, will use all the filters available",
     )
