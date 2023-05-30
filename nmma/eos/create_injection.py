@@ -327,7 +327,7 @@ def main():
         default_prior="PriorDict",
         trigger_time=args.trigger_time,
         deltaT=args.deltaT,
-        gps_file=args.gps_file,
+        gpstimes=args.gps_file,
         duration=args.duration,
         post_trigger_duration=args.post_trigger_duration,
         generation_seed=args.generation_seed,
