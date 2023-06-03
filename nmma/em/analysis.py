@@ -174,6 +174,9 @@ def get_parser():
         help="Path to the output injection lightcurve",
     )
     parser.add_argument(
+        "--injection-model", type=str, help="Name of the kilonova model to be used for injection (default: the same as model used for recovery)"
+    )
+    parser.add_argument(
         "--remove-nondetections",
         action="store_true",
         default=False,
@@ -306,25 +309,14 @@ def get_parser():
     return parser
 
 
-def main(args=None):
-
-    if args is None:
-        parser = get_parser()
-        args = parser.parse_args()
-
-    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
-    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
-
-    # initialize light curve model
-    sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
-
+def create_light_curve_model_from_args(model_name_arg, args, sample_times):
     models = []
     # check if there are more than one model
-    if "," in args.model:
+    if "," in model_name_arg:
         print("Running with combination of multiple light curve models")
-        model_names = args.model.split(",")
+        model_names = model_name_arg.split(",")
     else:
-        model_names = [args.model]
+        model_names = [model_name_arg]
 
     for model_name in model_names:
         if model_name == "TrPi2018":
@@ -370,6 +362,23 @@ def main(args=None):
         else:
             light_curve_model = models[0]
 
+    return light_curve_model
+
+
+def main(args=None):
+
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
+
+    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
+    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+
+    # initialize light curve model
+    sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    print("Creating light curve model for inference")
+    light_curve_model = create_light_curve_model_from_args(args.model, args, sample_times)
+
     # create the kilonova data if an injection set is given
     if args.injection:
         with open(args.injection, "r") as f:
@@ -407,13 +416,19 @@ def main(args=None):
         args.kilonova_tstep = args.dt
         args.kilonova_error = args.photometric_error_budget
 
-        args.kilonova_injection_model = args.model
+        if not args.injection_model:
+            args.kilonova_injection_model = args.model
+        else:
+            args.kilonova_injection_model = args.injection_model
         args.kilonova_injection_svd = args.svd_path
         args.injection_svd_mag_ncoeff = args.svd_mag_ncoeff
         args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
 
+        print("Creating injection light curve model")
+        injection_model = create_light_curve_model_from_args(
+            args.kilonova_injection_model, args, sample_times)
         data = create_light_curve_data(
-            injection_parameters, args, light_curve_model=light_curve_model
+            injection_parameters, args, light_curve_model=injection_model
         )
         print("Injection generated")
 
