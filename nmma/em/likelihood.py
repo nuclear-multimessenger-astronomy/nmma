@@ -3,16 +3,17 @@ from __future__ import division
 import numpy as np
 import scipy.stats
 from scipy.interpolate import interp1d
-from scipy.stats import truncnorm
+from scipy.stats import truncnorm, chi2
 
 from bilby.core.likelihood import Likelihood
 from . import utils
+from bilby.core.prior import Prior
 
 
 def truncated_gaussian(m_det, m_err, m_est, lim):
-
     a, b = (-np.inf - m_est) / m_err, (lim - m_est) / m_err
     logpdf = truncnorm.logpdf(m_det, a, b, loc=m_est, scale=m_err)
+
 
     return logpdf
 
@@ -60,7 +61,9 @@ class OpticalLightCurve(Likelihood):
         tmin=0.0,
         tmax=14.0,
         verbose=False,
+        likelihood_type="gaussian",
     ):
+        self.likelihood_type = likelihood_type
         self.light_curve_model = light_curve_model
         super(OpticalLightCurve, self).__init__(dict())
         self.filters = filters
@@ -115,6 +118,12 @@ class OpticalLightCurve(Likelihood):
         if np.sum(lbol) == 0.0:
             return np.nan_to_num(-np.inf)
 
+
+        
+    
+
+
+
         # create light curve templates
         mag_app_interp = {}
         for filt in self.filters:
@@ -145,8 +154,12 @@ class OpticalLightCurve(Likelihood):
                 )
 
         # compare the estimated light curve and the measured data
-        minus_chisquare_total = 0.0
-        gaussprob_total = 0.0
+
+        
+        _temp_total = 0.0 #temp sums
+        minus_chisquare_total = 0.0 #gaussian likelihood
+        chisquare_prob = 0.0 #chi2 likelihood 
+        prob_total = 0.0
         for filt in self.filters:
             # decompose the data
             data_time = self.light_curve_data[filt][:, 0]
@@ -154,41 +167,85 @@ class OpticalLightCurve(Likelihood):
             data_sigma = self.light_curve_data[filt][:, 2]
 
             # include the error budget into calculation
-            data_sigma = np.sqrt(data_sigma ** 2 + self.error_budget[filt] ** 2)
+
+            if 'em_syserr' in self.parameters:
+                data_sigma = np.sqrt(data_sigma ** 2 + self.parameters['em_syserr'] ** 2)
+            else:
+                data_sigma = np.sqrt(data_sigma ** 2 + self.error_budget[filt] ** 2)
+
 
             # evaluate the light curve magnitude at the data points
             mag_est = mag_app_interp[filt](data_time)
+            # mag_est = (1 + self.parameters["em_syserr"]) * mag_est
+
 
             # seperate the data into bounds (inf err) and actual measurement
             infIdx = np.where(~np.isfinite(data_sigma))[0]
             finiteIdx = np.where(np.isfinite(data_sigma))[0]
 
-            # evaluate the chisuquare
-            if len(finiteIdx) >= 1:
-                minus_chisquare = np.sum(
-                    truncated_gaussian(
-                        data_mag[finiteIdx],
-                        data_sigma[finiteIdx],
-                        mag_est[finiteIdx],
-                        self.detection_limit[filt],
+
+            if self.likelihood_type == "gaussian":
+
+            # evaluate the chisquare (~1-n^2)
+                if len(finiteIdx) >= 1:
+                    minus_chisquare = np.sum(
+                        truncated_gaussian(
+                            data_mag[finiteIdx],
+                            data_sigma[finiteIdx],
+                            mag_est[finiteIdx],
+                            self.detection_limit[filt],
+                        )
                     )
-                )
-            else:
-                minus_chisquare = 0.0
+                else:
+                    minus_chisquare = 0.0
 
-            if np.isnan(minus_chisquare):
-                return np.nan_to_num(-np.inf)
+                if np.isnan(minus_chisquare):
+                    return np.nan_to_num(-np.inf)
 
-            minus_chisquare_total += minus_chisquare
+                minus_chisquare_total += minus_chisquare
+
+                _temp_total=minus_chisquare_total
+
+
+            elif self.likelihood_type == "chi2":
+
+                chisquarevals = ((data_mag - mag_est) / data_sigma) ** 2
+                chisquaresum = np.sum(chisquarevals)
+
+                if np.isnan(chisquaresum):
+                    chisquare = np.nan
+                    return chisquare
+
+                if not float(len(chisquarevals) - 1) == 0:
+                    chisquaresum = (1 / float(len(chisquarevals) - 1)) * chisquaresum
+
+                chisquare = chisquaresum
+
+                if np.isnan(chisquare):
+                    prob = -np.inf
+                else:
+                    prob = chi2.logpdf(chisquare, 1, loc=0, scale=1)
+
+                if np.isnan(prob):
+                    prob = -np.inf
+
+                chisquare_prob += prob
+
+                _temp_total=chisquare_prob
 
             # evaluate the data with infinite error
             if len(infIdx) > 0:
-                gausslogsf = scipy.stats.norm.logsf(
-                    data_mag[infIdx], mag_est[infIdx], self.error_budget[filt]
-                )
-                gaussprob_total += np.sum(gausslogsf)
+                if 'em_syserr' in self.parameters:
+                    gausslogsf = scipy.stats.norm.logsf(
+                        data_mag[infIdx], mag_est[infIdx], self.parameters['em_syserr']
+                    )
+                else:
+                    gausslogsf = scipy.stats.norm.logsf(
+                        data_mag[infIdx], mag_est[infIdx], self.error_budget[filt]
+                    )
+                prob_total += np.sum(gausslogsf)
 
-        log_prob = minus_chisquare_total + gaussprob_total
+        log_prob =  _temp_total + prob_total
 
         if self.verbose:
             print(self.parameters, log_prob)
