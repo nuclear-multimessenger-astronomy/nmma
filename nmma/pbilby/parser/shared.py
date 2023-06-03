@@ -38,6 +38,7 @@ def _create_base_nmma_parser(sampler="dynesty"):
         base_parser = _add_dynesty_settings_to_parser(base_parser)
     base_parser = _add_em_settings_to_parser(base_parser)
     base_parser = _add_eos_settings_to_parser(base_parser)
+    base_parser = _add_Hubble_settings_to_parser(base_parser)
     base_parser = _add_misc_settings_to_parser(base_parser)
     return base_parser
 
@@ -52,6 +53,7 @@ def _create_base_nmma_gw_parser(sampler="dynesty"):
     if sampler in ["all", "dynesty"]:
         base_parser = _add_dynesty_settings_to_parser(base_parser)
     base_parser = _add_eos_settings_to_parser(base_parser)
+    base_parser = _add_Hubble_settings_to_parser(base_parser)
     base_parser = _add_misc_settings_to_parser(base_parser)
     return base_parser
 
@@ -184,12 +186,30 @@ def _add_eos_settings_to_parser(parser):
     eos_input_parser.add(
         "--with-eos",
         action="store_true",
+        default=True,
         help="Flag for sampling over EOS (default:True)",
     )
     eos_input_parser.add("--eos-data", type=str, help="Path to the EOS directory")
     eos_input_parser.add("--Neos", type=int, help="Number of EOSs to be used")
     eos_input_parser.add(
         "--eos-weight", type=str, help="Path to the precalculated EOS weighting"
+    )
+
+    return parser
+
+
+def _add_Hubble_settings_to_parser(parser):
+    H0_input_parser = parser.add_argument_group(
+        title="Hubble input arguments", description="Specify Hubble inputs"
+    )
+    H0_input_parser.add(
+        "--with-Hubble",
+        action="store_true",
+        default=False,
+        help="Flag for sampling over Hubble constants (default:False)",
+    )
+    H0_input_parser.add(
+        "--Hubble-weight", type=str, help="Path to the precalculated Hubble weighting"
     )
 
     return parser

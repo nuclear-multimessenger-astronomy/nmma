@@ -1,10 +1,13 @@
 import inspect
 from importlib import import_module
 
+import numpy as np
+import pandas as pd
+
 import bilby
 import bilby_pipe
-import numpy as np
 from bilby.core.utils import logger
+from bilby.core.prior import Interped
 
 from ...joint.likelihood import MultiMessengerLikelihood
 from ...gw.likelihood import GravitationalWaveTransientLikelihoodwithEOS
@@ -187,6 +190,21 @@ def setup_nmma_likelihood(
             gw_likelihood_type=args.likelihood_type,
         )
 
+    if args.with_Hubble and args.Hubble_weight:
+        logger.info("Sampling over Hubble constant with pre-calculated prior")
+        logger.info("Assuming the redshift prior is the Hubble flow")
+        logger.info("Overwriting any Hubble prior in the prior file")
+
+        Hubble_prior_data = pd.read_csv(args.Hubble_weight,
+                                        delimiter=' ', header=0)
+        xx = Hubble_prior_data.Hubble.to_numpy()
+        yy = Hubble_prior_data.prior_weight.to_numpy()
+        Hmin = xx[0]
+        Hmax = xx[-1]
+
+        priors['Hubble_constants'] = Interped(xx, yy, minimum=Hmin, maximum=Hmax,
+                                              name='Hubble_constants')
+
     Likelihood = MultiMessengerLikelihood
     if args.likelihood_type == "GravitationalWaveTransient":
         likelihood_kwargs.update(jitter_time=args.jitter_time)
@@ -289,6 +307,21 @@ def setup_nmma_gw_likelihood(
             binary_type=args.binary_type,
             gw_likelihood_type=args.likelihood_type,
         )
+
+    if args.with_Hubble and args.Hubble_weight:
+        logger.info("Sampling over Hubble constant with pre-calculated prior")
+        logger.info("Assuming the redshift prior is the Hubble flow")
+        logger.info("Overwriting any Hubble prior in the prior file")
+
+        Hubble_prior_data = pd.read_csv(args.Hubble_weight,
+                                        delimiter=' ', header=0)
+        xx = Hubble_prior_data.Hubble.to_numpy()
+        yy = Hubble_prior_data.prior_weight.to_numpy()
+        Hmin = xx[0]
+        Hmax = xx[-1]
+
+        priors['Hubble_constants'] = Interped(xx, yy, minimum=Hmin, maximum=Hmax,
+                                              name='Hubble_constants')
 
     Likelihood = GravitationalWaveTransientLikelihoodwithEOS
     if args.likelihood_type == "GravitationalWaveTransient":
