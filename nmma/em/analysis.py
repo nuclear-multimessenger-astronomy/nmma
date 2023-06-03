@@ -362,7 +362,7 @@ def create_light_curve_model_from_args(model_name_arg, args, sample_times):
         else:
             light_curve_model = models[0]
 
-    return light_curve_model
+    return model_names, models, light_curve_model
 
 
 def main(args=None):
@@ -377,7 +377,7 @@ def main(args=None):
     # initialize light curve model
     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
     print("Creating light curve model for inference")
-    light_curve_model = create_light_curve_model_from_args(args.model, args, sample_times)
+    model_names, models, light_curve_model = create_light_curve_model_from_args(args.model, args, sample_times)
 
     # create the kilonova data if an injection set is given
     if args.injection:
@@ -425,7 +425,7 @@ def main(args=None):
         args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
 
         print("Creating injection light curve model")
-        injection_model = create_light_curve_model_from_args(
+        _, _, injection_model = create_light_curve_model_from_args(
             args.kilonova_injection_model, args, sample_times)
         data = create_light_curve_data(
             injection_parameters, args, light_curve_model=injection_model
@@ -594,12 +594,6 @@ def main(args=None):
 
         priors_dict['inclination_EM'] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
-
-
-
-
-
-
 
     # setup the likelihood
     if args.detection_limit:
