@@ -51,7 +51,7 @@ def main():
         prior_dict=None,
         n_injection=args.n_injection,
         default_prior="PriorDict",
-        gps_file=None,
+        gpstimes=None,
         trigger_time=0,
         generation_seed=0,
     )
