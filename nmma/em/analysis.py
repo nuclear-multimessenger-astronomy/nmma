@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import scipy.constants
 import argparse
 import json
 import pandas as pd
@@ -288,15 +289,22 @@ def get_parser():
 
     parser.add_argument(
         "--conditional-gaussian-prior-thetaObs",
-	  action="store_true",
-	  default=False,
-	  help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma"
+        action="store_true",
+        default=False,
+        help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma"
     )
 
     parser.add_argument(
         "--conditional-gaussian-prior-N-sigma",
-	  default=1,
-	  help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True"
+        default=1,
+        help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True"
+    )
+
+    parser.add_argument(
+        "--sample-over-Hubble",
+        action="store_true",
+        default=False,
+        help="To sample over Hubble constant and redshift",
     )
 
     parser.add_argument(
@@ -310,6 +318,22 @@ def get_parser():
 
 
 def create_light_curve_model_from_args(model_name_arg, args, sample_times):
+    # check if sampling over Hubble,
+    # if so define the parameter_conversion accordingly
+    if args.sample_over_Hubble:
+        def parameter_conversion(converted_parameters, added_keys):
+            if "luminosity_distance" not in converted_parameters:
+                Hubble_constant = converted_parameters["Hubble_constants"]
+                redshift = converted_parameters["redshift"]
+                # redshift is supposed to be dimensionless
+                # Hubble constant is supposed to be km/s/Mpc
+                distance = redshift / Hubble_constant * scipy.constants.c / 1e3
+                converted_parameters["luminosity_distance"] = distance
+                added_keys = added_keys + ["luminosity_distance"]
+            return converted_parameters, added_keys
+    else:
+        parameter_conversion = None
+
     models = []
     # check if there are more than one model
     if "," in model_name_arg:
@@ -324,24 +348,31 @@ def create_light_curve_model_from_args(model_name_arg, args, sample_times):
                 sample_times=sample_times,
                 resolution=args.grb_resolution,
                 jetType=args.jet_type,
+                parameter_conversion=parameter_conversion,
             )
 
         elif model_name == "nugent-hyper":
             lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model="nugent-hyper"
+                sample_times=sample_times, model="nugent-hyper",
+                parameter_conversion=parameter_conversion,
             )
 
         elif model_name == "salt2":
             lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model="salt2"
+                sample_times=sample_times, model="salt2",
+                parameter_conversion=parameter_conversion,
             )
 
         elif model_name == "Piro2021":
-            lc_model = ShockCoolingLightCurveModel(sample_times=sample_times)
+            lc_model = ShockCoolingLightCurveModel(
+                sample_times=sample_times,
+                parameter_conversion=parameter_conversion,
+            )
 
         elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
             lc_model = SimpleKilonovaLightCurveModel(
-                sample_times=sample_times, model=model_name
+                sample_times=sample_times, model=model_name,
+                parameter_conversion=parameter_conversion,
             )
 
         else:
@@ -352,6 +383,7 @@ def create_light_curve_model_from_args(model_name_arg, args, sample_times):
                 mag_ncoeff=args.svd_mag_ncoeff,
                 lbol_ncoeff=args.svd_lbol_ncoeff,
                 interpolation_type=args.interpolation_type,
+                parameter_conversion=parameter_conversion,
             )
             lc_model = SVDLightCurveModel(**lc_kwargs)
 
@@ -577,7 +609,6 @@ def main(args=None):
         priors["Ebv"] = bilby.core.prior.DeltaFunction(
             name="Ebv", peak=0.0, latex_label="$E(B-V)$"
         )
-
 
     # re-setup the prior if the conditional prior for inclination is used
 

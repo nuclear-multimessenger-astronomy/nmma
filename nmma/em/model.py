@@ -274,7 +274,7 @@ class SVDLightCurveModel(object):
     def generate_lightcurve(self, sample_times, parameters):
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -304,7 +304,7 @@ class SVDLightCurveModel(object):
     def generate_spectra(self, sample_times, wavelengths, parameters):
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -373,7 +373,7 @@ class GRBLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -457,7 +457,7 @@ class KilonovaGRBLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -537,7 +537,7 @@ class SupernovaLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -656,7 +656,7 @@ class ShockCoolingLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -765,7 +765,7 @@ class SimpleKilonovaLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
