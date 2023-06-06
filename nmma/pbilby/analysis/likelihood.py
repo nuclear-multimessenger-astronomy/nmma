@@ -202,8 +202,8 @@ def setup_nmma_likelihood(
         Hmin = xx[0]
         Hmax = xx[-1]
 
-        priors['Hubble_constants'] = Interped(xx, yy, minimum=Hmin, maximum=Hmax,
-                                              name='Hubble_constants')
+        priors['Hubble_constant'] = Interped(xx, yy, minimum=Hmin, maximum=Hmax,
+                                              name='Hubble_constant')
 
     Likelihood = MultiMessengerLikelihood
     if args.likelihood_type == "GravitationalWaveTransient":
@@ -320,8 +320,8 @@ def setup_nmma_gw_likelihood(
         Hmin = xx[0]
         Hmax = xx[-1]
 
-        priors['Hubble_constants'] = Interped(xx, yy, minimum=Hmin, maximum=Hmax,
-                                              name='Hubble_constants')
+        priors['Hubble_constant'] = Interped(xx, yy, minimum=Hmin, maximum=Hmax,
+                                              name='Hubble_constant')
 
     Likelihood = GravitationalWaveTransientLikelihoodwithEOS
     if args.likelihood_type == "GravitationalWaveTransient":
