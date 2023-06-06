@@ -22,8 +22,8 @@ from bilby.gw.conversion import (
 def Hubble_constant_to_distance(converted_parameters, added_keys):
     # FIXME for future detection with high redshift
     # a proper cosmological model is needed
-    if "redshift" in converted_parameters.keys() and "Hubble_constants" in converted_parameters.keys():
-        Hubble_constant = converted_parameters["Hubble_constants"]
+    if "redshift" in converted_parameters.keys() and "Hubble_constant" in converted_parameters.keys():
+        Hubble_constant = converted_parameters["Hubble_constant"]
         redshift = converted_parameters["redshift"]
         # redshift is supposed to be dimensionless
         # Hubble constant is supposed to be km/s/Mpc

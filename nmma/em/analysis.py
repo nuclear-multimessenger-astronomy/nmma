@@ -323,7 +323,7 @@ def create_light_curve_model_from_args(model_name_arg, args, sample_times):
     if args.sample_over_Hubble:
         def parameter_conversion(converted_parameters, added_keys):
             if "luminosity_distance" not in converted_parameters:
-                Hubble_constant = converted_parameters["Hubble_constants"]
+                Hubble_constant = converted_parameters["Hubble_constant"]
                 redshift = converted_parameters["redshift"]
                 # redshift is supposed to be dimensionless
                 # Hubble constant is supposed to be km/s/Mpc
