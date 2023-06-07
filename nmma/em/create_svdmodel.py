@@ -48,6 +48,12 @@ def main():
         help="Path to the directory of light curve files",
     )
     parser.add_argument(
+        "--data-file-type",
+        type=str,
+        help="Type of light curve files [bulla, standard, ztf]",
+        default="standard",
+    )
+    parser.add_argument(
         "--interpolation_type",
         type=str,
         required=True,
@@ -155,7 +161,7 @@ def main():
 
     if args.data_type == "photometry":
         try:
-            data = read_photometry_files(filenames)
+            data = read_photometry_files(filenames, datatype=args.data_file_type)
         except IndexError:
             raise IndexError(
                 "If there are bolometric light curves in your --data-path, try setting --ignore-bolometric"

@@ -484,6 +484,7 @@ class SVDTrainingModel(object):
             outdir = modelfile.replace(".pkl", "")
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.h5")
+                print(outfile)
                 self.svd_model[filt]["model"] = load_tf_model(outfile)
         elif self.interpolation_type == "api_gp":
             modelfile = os.path.join(self.svd_path, f"{self.model}_api.pkl")
