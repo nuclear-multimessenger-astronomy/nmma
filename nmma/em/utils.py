@@ -298,7 +298,9 @@ def read_spectroscopy_files(
     return data
 
 
-def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
+def read_photometry_files(
+    files, filters=None, tt=np.linspace(0, 14, 100), datatype="bulla"
+):
 
     data = {}
     for filename in files:
@@ -310,7 +312,7 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
         )
 
         # ZTF rest style file
-        if "forced.csv" in filename or "alerts.csv" in filename:
+        if datatype == "ztf":
             df = pd.read_csv(filename)
 
             if "mag" in df:
@@ -351,7 +353,24 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
                     assume_sorted=True,
                 )
                 data[name][filt] = lc(tt)
-        else:
+        elif datatype == "bulla":
+            with open(filename, "r") as f:
+                header = list(filter(None, f.readline().rstrip().strip("#").split(" ")))
+            df = pd.read_csv(
+                filename,
+                delimiter=" ",
+                comment="#",
+                header=0,
+                names=header,
+                index_col=False,
+            )
+            df.rename(columns={"t[days]": "t"}, inplace=True)
+            data[name] = df.to_dict(orient="series")
+            data[name] = {
+                k.replace(":", "_"): v.to_numpy() for k, v in data[name].items()
+            }
+
+        elif datatype == "standard":
             mag_d = np.loadtxt(filename)
             mag_d_shape = mag_d.shape
 
@@ -373,6 +392,8 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
                 data[name]["V"] = mag_d[:, 12]
                 data[name]["R"] = mag_d[:, 13]
                 data[name]["I"] = mag_d[:, 14]
+        else:
+            raise ValueError(f"datatype {datatype} unknown")
 
         if filters is not None:
             filters_to_remove = set(list(data[name].keys())) - set(filters + ["t"])
@@ -898,7 +919,7 @@ def metzger_lc(t_day, param_dict):
 
     vm = v0 * np.power(m * Msun / M0, -1.0 / beta)
     vm[vm > c] = c
-    
+
     # define thermalization efficiency rom Barnes+16
     ca3 = 1.3
     cb3 = 0.2
@@ -1011,9 +1032,9 @@ def metzger_lc(t_day, param_dict):
 
     for j in range(tprec - 1):
         # one zone calculation
-        
-        if E[j]<0.0: 
-            E[j]=np.abs(E[j])
+
+        if E[j] < 0.0:
+            E[j] = np.abs(E[j])
         temp[j] = 1e10 * (3 * E[j] / (arad * 4 * np.pi * R[j] ** (3))) ** (0.25)
         if temp[j] > 4000.0:
             kappaoz = kappa_r
@@ -1036,10 +1057,10 @@ def metzger_lc(t_day, param_dict):
         )
 
         if np.isnan(templayer).any():
-            templayer=np.nan_to_num(templayer)
-            templayer=abs(templayer)**0.25
+            templayer = np.nan_to_num(templayer)
+            templayer = abs(templayer) ** 0.25
         else:
-            templayer =  abs(templayer) ** (0.25)
+            templayer = abs(templayer) ** (0.25)
 
         kappa_correction = np.ones(templayer.shape)
         kappa_correction[templayer > 4000.0] = 1.0
@@ -1068,7 +1089,7 @@ def metzger_lc(t_day, param_dict):
 
         tau[mprec - 1, j] = tau[mprec - 2, j]
         # photosphere
-        pig = np.argmin(np.abs(tau[:, j])-1)
+        pig = np.argmin(np.abs(tau[:, j]) - 1)
         vphoto[j] = vm[pig]
         Rphoto[j] = vphoto[j] * t[j]
         mphoto[j] = m[pig]
@@ -1081,10 +1102,7 @@ def metzger_lc(t_day, param_dict):
     Ltot = np.abs(Ltotm)
     lbol = Ltotm * 1e40
 
-
-    
     Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto**2 * sigSB)) ** (0.25)
-    
 
     ii = np.where(~np.isnan(Tobs) & (Tobs > 0))[0]
     f = interp.interp1d(t_day[ii], Tobs[ii], fill_value="extrapolate")
