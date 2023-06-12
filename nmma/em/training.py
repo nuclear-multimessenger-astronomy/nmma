@@ -324,14 +324,14 @@ class SVDTrainingModel(object):
 
             self.svd_model[filt]["gps"] = gps
 
-    def train_tensorflow_model(self):
+    def train_tensorflow_model(self, dropout_rate=0.3):
 
         try:
             import tensorflow as tf
 
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras import Sequential
-            from tensorflow.keras.layers import Dense
+            from tensorflow.keras.layers import Dense, Dropout
             from sklearn.model_selection import train_test_split
         except ImportError:
             print("Install tensorflow if you want to use it...")
@@ -362,9 +362,9 @@ class SVDTrainingModel(object):
                     input_shape=(train_X.shape[1],),
                 )
             )
-            model.add(Dense(64, activation="relu", kernel_initializer="he_normal"))
-            model.add(Dense(128, activation="relu", kernel_initializer="he_normal"))
-            model.add(Dense(128, activation="relu", kernel_initializer="he_normal"))
+            # One/few layers of wide NN approximate GP
+            model.add(Dense(4096, activation="relu", kernel_initializer="he_normal"))
+            model.add(Dropout(dropout_rate))
             model.add(Dense(self.n_coeff))
 
             # compile the model
