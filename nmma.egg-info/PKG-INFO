@@ -1,0 +1,39 @@
+Metadata-Version: 2.1
+Name: nmma
+Version: 0.0.8
+Summary: A nuclear physics multi-messenger Bayesian inference library
+Home-page: https://github.com/nuclear-multimessenger-astronomy/nmma
+Author: Peter Tsun Ho Pang, Michael Coughlin, Tim Dietrich, Ingo Tews
+Author-email: nuclear_multimessenger_astronomy@googlegroups.com
+License: MIT
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/x-rst
+Provides-Extra: doc
+Provides-Extra: production
+Provides-Extra: afterglowpy
+License-File: LICENSE
+
+<div align="center">
+   <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/nuclear-multimessenger-astronomy/nmma/raw/main/doc/images/dark-logo.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://github.com/nuclear-multimessenger-astronomy/nmma/raw/main/doc/images/light-logo.svg">
+      <img alt="NMMA" src="https://github.com/nuclear-multimessenger-astronomy/nmma/raw/main/doc/images/light-logo.svg" width="600px" height="300px">
+   </picture>
+   <h1>NMMA</h1>
+   <h2>a pythonic library for probing nuclear physics and cosmology with multimessenger analysis</h2>
+   <br/><br/>
+</div>
+
+
+Please check our official documentation here: https://nuclear-multimessenger-astronomy.github.io/nmma/
+
+
+How to contribute: https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html
+
+
+A tutorial about how to produce simulations of lightcurves is given in nmma/tutorials/tutorial-lightcurve_simulation.ipynb
