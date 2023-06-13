@@ -245,7 +245,12 @@ class SVDTrainingModel(object):
             nsvds, nparams = param_array_postprocess.shape
 
             # Set of Gaussian Process
-            kernel = 1.0 * RationalQuadratic(length_scale=1.0, alpha=0.1)
+            kernel = 1.0 * RationalQuadratic(
+                length_scale=1.0,
+                alpha=0.1,
+                length_scale_bounds=(1e-10, 1e10),
+                alpha_bounds=(1e-10, 1e10),
+            )
             gps = []
             for i in range(self.n_coeff):
                 if np.mod(i, 1) == 0:
