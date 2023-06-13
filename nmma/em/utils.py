@@ -1571,8 +1571,8 @@ def get_knprops_from_LANLfilename(filename):
                     else:
                         vw /= 10
 
-            elif "KNTheta" in info:
-                KNTheta = float(info[7:])
+            elif "theta" in info:
+                KNTheta = float(info[5:])
 
         # Record velocity and ejecta mass for single component models
         elif num_comp == 1:
@@ -1598,8 +1598,8 @@ def get_knprops_from_LANLfilename(filename):
             elif "Ye" == info[:2]:
                 wind = float(info[2:]) / 100
 
-            elif "KNTheta" in info:
-                KNTheta = float(info[7:])
+            elif "theta" in info:
+                KNTheta = float(info[5:])
 
     param_values = {
         "morphology": morph,
