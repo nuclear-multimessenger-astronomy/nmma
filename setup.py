@@ -95,7 +95,7 @@ setup(
     name="nmma",
     description="A nuclear physics multi-messenger Bayesian inference library",
     long_description=long_description,
-    long_description_content_type="text/x-rst",
+    long_description_content_type="text/markdown",
     url="https://github.com/nuclear-multimessenger-astronomy/nmma",
     author="Peter Tsun Ho Pang, Michael Coughlin, Tim Dietrich, Ingo Tews",
     author_email="nuclear_multimessenger_astronomy@googlegroups.com",
