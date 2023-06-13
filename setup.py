@@ -87,7 +87,7 @@ requirements = [
     "arviz",
 ]
 
-VERSION = "0.0.8"
+VERSION = "0.0.9"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
@@ -110,7 +110,7 @@ setup(
         "nmma.eos",
         "nmma.pbilby",
         "nmma.pbilby.parser",
-        "nmma.pbilby.analysis"
+        "nmma.pbilby.analysis",
     ],
     package_dir={"nmma": "nmma"},
     package_data={"nmma": [version_file], "nmma.em.data": ["*.pkl", "*.joblib"]},
