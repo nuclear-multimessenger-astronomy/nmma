@@ -80,7 +80,7 @@ requirements = [
     "scipy>=1.7.1",
     "pandas>=1.3.4",
     "astropy>=4.3.1",
-    "scikit-learn==1.0.2",
+    "scikit-learn>=1.0.2",
     "pymultinest",
     "sncosmo",
     "dust_extinction",
