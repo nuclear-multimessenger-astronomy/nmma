@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import interpolate as interp
 
-from nmma.utils import get_models_home, get_model
+from ..utils.models import get_models_home, get_model
 
 
 class SVDTrainingModel(object):

@@ -7,9 +7,9 @@ import pickle
 import numpy as np
 from scipy.special import logsumexp
 
-from nmma.utils import get_models_home, get_model
-
 from . import utils
+
+from ..utils.models import get_models_home, get_model
 
 ln10 = np.log(10)
 
