@@ -1,4 +1,4 @@
-## Light curve fitting
+## Inference of electromagnetic signals
 
 Given a light curve from an optical survey telescope (and potential follow-up), the goal is to analyze the light curve to perform parameter inference. Within NMMA, there are a number of [models](./models.html) available.
 
