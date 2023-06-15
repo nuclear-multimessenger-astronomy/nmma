@@ -50,22 +50,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
                 ]
         command_string = ' '.join(command_array)
         subprocess.run(command_string, shell=True)
-        
-        ## Update: Brian added a fix for this, removing the need for this workaround
-        ## this is a workaround for the simulation_id being missing from the injection file, this should be a separate issue probably
-        # with open(injection_name, 'r') as f:
-        #     injection_file = json.load(f)
-        #     content = injection_file['injections']['content']
-        
-        # if 'simulation_id' not in content.keys():
-        #     content['simulation_id'] = [n for n in range(len(content['luminosity_distance']))]
-        #     with open(injection_name, 'w') as f:
-        #         f.seek(0,0)
-        #         json.dump(injection_file, f, indent=4)
-        #         f.truncate()
-        # with open(injection_name, 'r') as f:
-        #     new_injection_file = json.load(f)
-        assert 'simulation_id' in new_injection_file['injections']['content'].keys(), 'simulation_id not in injection file'
+        assert os.path.exists(injection_name), 'injection file does not exist'
         return injection_name
     def create_lightcurve_from_command_line(model_name, injection_file):
         '''
