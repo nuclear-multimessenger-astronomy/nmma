@@ -82,7 +82,7 @@ def get_model(
         raise ValueError("model_name must be specified, got None")
     if model_name not in MODELS:
         #raise ValueError("model_name must be one of %s, got %s" % (MODELS.keys(), model_name))
-        pass #TODO: upload all the models on zenodo
+        return [] #TODO: upload all the models on zenodo so we can throw an error here instead of returning an empty list
     model_info = MODELS[model_name]
 
     models_home = get_models_home(models_home)
