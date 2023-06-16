@@ -232,7 +232,7 @@ class SVDLightCurveModel(object):
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
 
-            get_model(self.svd_path, f"{self.model}_tf", self.svd_mag_model.keys())
+            get_model(self.svd_path, f"{self.model}_tf", filters=filters)
             modelfile = os.path.join(self.svd_path, "{0}_tf.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
@@ -243,9 +243,7 @@ class SVDLightCurveModel(object):
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
             else:
-                get_model(
-                    self.svd_path, f"{self.model}_mag_tf", self.svd_mag_model.keys()
-                )
+                get_model(self.svd_path, f"{self.model}_mag_tf", filters=filters)
                 mag_modelfile = os.path.join(
                     self.svd_path, "{0}_mag_tf.pkl".format(model)
                 )
