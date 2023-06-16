@@ -1,10 +1,6 @@
 ## Inference of electromagnetic signals
 
-Given a light curve from an optical survey telescope (and potential follow-up), the goal is to analyze the light curve to perform parameter inference. Within NMMA, there are a number of [models](./models.html) available.
-
-### Models
-
-Some are analytic / semi-analytic models that can be sampled, others rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks).
+Given a light curve from an optical survey telescope (and potential follow-up), the goal is to analyze the light curve to perform parameter inference. Within NMMA, there are a number of [models](./models.html) available. Some are analytic / semi-analytic models that can be sampled, others rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks). 
 
 In many cases, the lightcurve predicted by each set of parameters is **extremely high-dimensional**, given the number of measurements made. Our goal for this example is to to determine the best-fit model parameters for an object based on its observed lightcurve.
 
@@ -61,3 +57,27 @@ This produces a light curve and parameter inference of the form:
 
 ![ZTF21abjvfbc corner plot](images/ZTF21abjvfbc_corner.png)
 ![ZTF21abjvfbc light curve fit](images/ZTF21abjvfbc_lightcurves.png)
+
+### Inference of multiple EM signals
+
+Whereas the examples above dealt with stand-alone Bayesian inferences of just one model or astrophysical source, NMMA enables to run a combined inference using multiple models. Below, we show examples for 2 different types of sources:
+
+- Binary Neutron Star (BNS)
+- Neutron-Star-Black-Hole (NSBH)
+
+Here, we use the observed GRB211211A signal as a case study to run Bayesian inference with multiple models. In principle, this sort of signal can originate from a BNS source, but also a NSBH source could be explain the observed signature.
+
+**Example: BNS source** 
+
+If we assume a BNS source, we can use the model `TrPi2018` for modelling Gamma-ray burst afterglows along with the kilonova model `Bu2019lm`. To run a joint inference with these 2 models, we use the observed data `GRB211211A.txt`, an adapted prior file which includes prior settings for both models and the model grid for the `Bu2019lm` kilonova model. The joint inference can be started using the command:
+
+    mpiexec -np 16 light_curve_analysis --model Bu2019lm,TrPi2018 --svd-path /nmma/svdmodels/ --interpolation_type sklearn_gp --outdir outdir --label GRB211211A --prior ./Bu2019lm_TrPi2018GRB211211A.prior --tmin 0.01 --tmax 10 --dt 0.01 --error-budget 1 --nlive 1024 --Ebv-max 0 --trigger-time 59559.54791666667 --data ./GRB211211A.txt --plot   
+
+The joint Bayesian inference using both model yields posterior samples for the source parameters describing the kilonova and GRB afterglow. Some of the source parameter posteriors are shown below.
+
+
+**Example: NSBH source** 
+
+For the assumption that also a NSBH source could produce a signal such as GRB211211A, we use a NSBH-kilonova model `Bu2019nsbh` and again the model `TrPi2018` for modelling gamma-ray burst afterglows. We use the same observational data and adapt the prior setting for the `Bu2019nsbh` model. To run tje joint inference with these 2 models, run the command:
+
+    mpiexec -np 16 light_curve_analysis --model Bu2019nsbh,TrPi2018 --svd-path /nmma/svdmodels/ --interpolation_type sklearn_gp --outdir outdir --label GRB211211A_NSBH --prior ./Bu2019nsbh_TrPi2018_GRB211211A.prior --tmin 0.01 --tmax 10 --dt 0.01 --error-budget 1 --nlive 1024 --Ebv-max 0 --trigger-time 59559.54791666667 --data ./GRB211211A.txt --plot
