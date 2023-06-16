@@ -75,6 +75,8 @@ If we assume a BNS source, we can use the model `TrPi2018` for modelling Gamma-r
 
 The joint Bayesian inference using both model yields posterior samples for the source parameters describing the kilonova and GRB afterglow. Some of the source parameter posteriors are shown below.
 
+![BNS corner plot GRB211211A](images/Corner_narrow_Bulla.png)
+
 
 **Example: NSBH source** 
 
