@@ -411,12 +411,10 @@ class SVDTrainingModel(object):
         model_exists = True
 
         if self.interpolation_type == "sklearn_gp":
-            get_model(self.svd_path, f"{self.model}", self.filters)
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
             if not os.path.isfile(modelfile):
                 model_exists = False
         elif self.interpolation_type == "tensorflow":
-            get_model(self.svd_path, f"{self.model}_tf", self.filters)
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             if not os.path.isfile(modelfile):
                 model_exists = False
@@ -426,7 +424,6 @@ class SVDTrainingModel(object):
                 if not os.path.isfile(outfile):
                     model_exists = False
         elif self.interpolation_type == "api_gp":
-            get_model(self.svd_path, f"{self.model}_api", self.filters)
             modelfile = os.path.join(self.svd_path, f"{self.model}_api.pkl")
             if not os.path.isfile(modelfile):
                 model_exists = False
