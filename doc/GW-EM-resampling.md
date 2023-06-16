@@ -10,7 +10,7 @@ For estimating the source properties, the following input files are required:
 * `EMprior` - is the prior file that was used for the EM inference 
 * `EOS` - number of equation of state files which will be used in the resampling
 * `EOSpath` - path to the folder of all EOS files
-* `GWsamples` - some fiducial randomly generated posterior samples for masses $m_{1,2}$ , chirp mass $\mathcal{M}_c$, mass ratio $q$, luminosity distance $D_L$, and EOS samples,
+* `GWsamples` - some fiducial randomly generated posterior samples for masses, chirp mass, mass ratio, luminosity distance, and EOS samples,
 * `GWprior` - a prior file for gravitational wave sources
 
 **Estimating BNS properties**
