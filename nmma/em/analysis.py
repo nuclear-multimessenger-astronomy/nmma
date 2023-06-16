@@ -175,7 +175,9 @@ def get_parser():
         help="Path to the output injection lightcurve",
     )
     parser.add_argument(
-        "--injection-model", type=str, help="Name of the kilonova model to be used for injection (default: the same as model used for recovery)"
+        "--injection-model",
+        type=str,
+        help="Name of the kilonova model to be used for injection (default: the same as model used for recovery)",
     )
     parser.add_argument(
         "--remove-nondetections",
@@ -291,13 +293,13 @@ def get_parser():
         "--conditional-gaussian-prior-thetaObs",
         action="store_true",
         default=False,
-        help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma"
+        help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma",
     )
 
     parser.add_argument(
         "--conditional-gaussian-prior-N-sigma",
         default=1,
-        help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True"
+        help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True",
     )
 
     parser.add_argument(
@@ -317,10 +319,13 @@ def get_parser():
     return parser
 
 
-def create_light_curve_model_from_args(model_name_arg, args, sample_times):
+def create_light_curve_model_from_args(
+    model_name_arg, args, sample_times, filters=None
+):
     # check if sampling over Hubble,
     # if so define the parameter_conversion accordingly
     if args.sample_over_Hubble:
+
         def parameter_conversion(converted_parameters, added_keys):
             if "luminosity_distance" not in converted_parameters:
                 Hubble_constant = converted_parameters["Hubble_constant"]
@@ -331,6 +336,7 @@ def create_light_curve_model_from_args(model_name_arg, args, sample_times):
                 converted_parameters["luminosity_distance"] = distance
                 added_keys = added_keys + ["luminosity_distance"]
             return converted_parameters, added_keys
+
     else:
         parameter_conversion = None
 
@@ -353,13 +359,15 @@ def create_light_curve_model_from_args(model_name_arg, args, sample_times):
 
         elif model_name == "nugent-hyper":
             lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model="nugent-hyper",
+                sample_times=sample_times,
+                model="nugent-hyper",
                 parameter_conversion=parameter_conversion,
             )
 
         elif model_name == "salt2":
             lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model="salt2",
+                sample_times=sample_times,
+                model="salt2",
                 parameter_conversion=parameter_conversion,
             )
 
@@ -371,7 +379,8 @@ def create_light_curve_model_from_args(model_name_arg, args, sample_times):
 
         elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
             lc_model = SimpleKilonovaLightCurveModel(
-                sample_times=sample_times, model=model_name,
+                sample_times=sample_times,
+                model=model_name,
                 parameter_conversion=parameter_conversion,
             )
 
@@ -384,6 +393,7 @@ def create_light_curve_model_from_args(model_name_arg, args, sample_times):
                 lbol_ncoeff=args.svd_lbol_ncoeff,
                 interpolation_type=args.interpolation_type,
                 parameter_conversion=parameter_conversion,
+                filters=filters,
             )
             lc_model = SVDLightCurveModel(**lc_kwargs)
 
@@ -409,7 +419,15 @@ def main(args=None):
     # initialize light curve model
     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
     print("Creating light curve model for inference")
-    model_names, models, light_curve_model = create_light_curve_model_from_args(args.model, args, sample_times)
+
+    if args.filters:
+        filters = args.filters.split(",")
+    else:
+        filters = None
+
+    model_names, models, light_curve_model = create_light_curve_model_from_args(
+        args.model, args, sample_times, filters=filters
+    )
 
     # create the kilonova data if an injection set is given
     if args.injection:
@@ -458,7 +476,8 @@ def main(args=None):
 
         print("Creating injection light curve model")
         _, _, injection_model = create_light_curve_model_from_args(
-            args.kilonova_injection_model, args, sample_times)
+            args.kilonova_injection_model, args, sample_times, filters=filters
+        )
         data = create_light_curve_data(
             injection_parameters, args, light_curve_model=injection_model
         )
@@ -614,16 +633,18 @@ def main(args=None):
 
     if args.conditional_gaussian_prior_thetaObs:
         priors_dict = dict(priors)
-        original_iota_prior = priors_dict['inclination_EM']
-        setup = dict(minimum = original_iota_prior.minimum,
-                     maximum = original_iota_prior.maximum,
-                     name = original_iota_prior.name,
-                     latex_label = original_iota_prior.latex_label,
-                     unit = original_iota_prior.unit,
-                     boundary = original_iota_prior.boundary,
-                     N_sigma = args.conditional_gaussian_prior_N_sigma)
+        original_iota_prior = priors_dict["inclination_EM"]
+        setup = dict(
+            minimum=original_iota_prior.minimum,
+            maximum=original_iota_prior.maximum,
+            name=original_iota_prior.name,
+            latex_label=original_iota_prior.latex_label,
+            unit=original_iota_prior.unit,
+            boundary=original_iota_prior.boundary,
+            N_sigma=args.conditional_gaussian_prior_N_sigma,
+        )
 
-        priors_dict['inclination_EM'] = ConditionalGaussianIotaGivenThetaCore(**setup)
+        priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
 
     # setup the likelihood
