@@ -80,14 +80,14 @@ requirements = [
     "scipy>=1.7.1",
     "pandas>=1.3.4",
     "astropy>=4.3.1",
-    "scikit-learn==1.0.2",
+    "scikit-learn>=1.0.2",
     "pymultinest",
     "sncosmo",
     "dust_extinction",
     "arviz",
 ]
 
-VERSION = "0.0.8"
+VERSION = "0.0.10"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
@@ -95,7 +95,7 @@ setup(
     name="nmma",
     description="A nuclear physics multi-messenger Bayesian inference library",
     long_description=long_description,
-    long_description_content_type="text/x-rst",
+    long_description_content_type="text/markdown",
     url="https://github.com/nuclear-multimessenger-astronomy/nmma",
     author="Peter Tsun Ho Pang, Michael Coughlin, Tim Dietrich, Ingo Tews",
     author_email="nuclear_multimessenger_astronomy@googlegroups.com",
@@ -110,7 +110,7 @@ setup(
         "nmma.eos",
         "nmma.pbilby",
         "nmma.pbilby.parser",
-        "nmma.pbilby.analysis"
+        "nmma.pbilby.analysis",
     ],
     package_dir={"nmma": "nmma"},
     package_data={"nmma": [version_file], "nmma.em.data": ["*.pkl", "*.joblib"]},

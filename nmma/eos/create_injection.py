@@ -354,6 +354,10 @@ def main():
         dataframe = dataframe.iloc[dets]
         dataframe = dataframe.reset_index(drop=True)
 
+    # Move dataframe index column to simulation_id if column does not exist
+    if "simulation_id" not in dataframe.columns:
+        dataframe = dataframe.reset_index().rename({"index": "simulation_id"}, axis=1)
+
     if args.original_parameters:
         # dump the whole thing back into a json injection file
         injection_creator.write_injection_dataframe(

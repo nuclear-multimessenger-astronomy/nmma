@@ -9,6 +9,8 @@ from scipy.special import logsumexp
 
 from . import utils
 
+from ..utils.models import get_models_home, get_model
+
 ln10 = np.log(10)
 
 # As different KN models have very different parameters,
@@ -131,6 +133,9 @@ class SVDLightCurveModel(object):
         mag_ncoeff highest eigenvalues to be taken for mag's SVD evaluation
     lbol_ncoeff: int
         lbol_ncoeff highest eigenvalues to be taken for lbol's SVD evaluation
+    filters : List[str]
+        List of filters to create model for.
+        Defaults to all available filters.
 
     Returns
     -------
@@ -149,6 +154,7 @@ class SVDLightCurveModel(object):
         lbol_ncoeff=None,
         interpolation_type="sklearn_gp",
         model_parameters=None,
+        filters=None,
     ):
 
         if model_parameters is None:
@@ -167,13 +173,15 @@ class SVDLightCurveModel(object):
         self.lbol_ncoeff = lbol_ncoeff
 
         self.interpolation_type = interpolation_type
+        self.filters = filters
 
         if svd_path is None:
-            self.svd_path = os.path.join(os.path.dirname(__file__), "svdmodels")
+            self.svd_path = get_models_home()
         else:
             self.svd_path = svd_path
 
         if self.interpolation_type == "sklearn_gp":
+            get_model(self.svd_path, f"{self.model}", filters=filters)
             modelfile = os.path.join(self.svd_path, "{0}.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
@@ -186,9 +194,9 @@ class SVDLightCurveModel(object):
                         continue
                     with open(outfile, "rb") as handle:
                         self.svd_mag_model[filt]["gps"] = pickle.load(handle)
-
                 self.svd_lbol_model = None
             else:
+                # Try old style request
                 mag_modelfile = os.path.join(self.svd_path, "{0}_mag.pkl".format(model))
                 with open(mag_modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
@@ -200,7 +208,6 @@ class SVDLightCurveModel(object):
                         continue
                     with open(outfile, "rb") as handle:
                         self.svd_mag_model[filt]["gps"] = pickle.load(handle)
-
                 lbol_modelfile = os.path.join(
                     self.svd_path, "{0}_lbol.pkl".format(model)
                 )
@@ -225,6 +232,7 @@ class SVDLightCurveModel(object):
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
 
+            get_model(self.svd_path, f"{self.model}_tf", self.svd_mag_model.keys())
             modelfile = os.path.join(self.svd_path, "{0}_tf.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
@@ -235,6 +243,9 @@ class SVDLightCurveModel(object):
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
             else:
+                get_model(
+                    self.svd_path, f"{self.model}_mag_tf", self.svd_mag_model.keys()
+                )
                 mag_modelfile = os.path.join(
                     self.svd_path, "{0}_mag_tf.pkl".format(model)
                 )
@@ -245,6 +256,9 @@ class SVDLightCurveModel(object):
                     outfile = os.path.join(outdir, f"{filt}.h5")
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
 
+                get_model(
+                    self.svd_path, f"{self.model}_lbol_tf", self.svd_mag_model.keys()
+                )
                 lbol_modelfile = os.path.join(
                     self.svd_path, "{0}_lbol_tf.pkl".format(model)
                 )
@@ -294,6 +308,7 @@ class SVDLightCurveModel(object):
             mag_ncoeff=self.mag_ncoeff,
             lbol_ncoeff=self.lbol_ncoeff,
             interpolation_type=self.interpolation_type,
+            filters=self.filters,
         )
         lbol *= 1.0 + z
         for filt in mag.keys():

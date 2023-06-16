@@ -214,7 +214,7 @@ def Bu2022Ye(data):
 def LANL2022(data):
 
     parameters = [
-        "Ye_wind",
+        # "Ye_wind",
         "log10_mej_dyn",
         "vej_dyn",
         "log10_mej_wind",

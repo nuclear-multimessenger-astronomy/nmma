@@ -183,7 +183,7 @@ def main():
         filts = args.filters.split(",")
     else:
         keys = list(data.keys())
-        filts = list(set(data[keys[0]].keys()) - {"t"})
+        filts = sorted(list(set(data[keys[0]].keys()) - {"t"}))
 
     training_model = SVDTrainingModel(
         args.model,
