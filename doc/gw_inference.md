@@ -67,9 +67,9 @@ An example is shown below:
     ################################################################################
     
     with-eos=True 
-    eos-data=./eos/eos_IST_sorted 
+    eos-data=./eos/eos_sorted 
     Neos=9501
-    eos-weight=./eos/EOS_IST_sorted_weight.dat
+    eos-weight=./eos/EOS_sorted_weight.dat
 
 The `trigger time` is the time of the observed event. With regard to detector arguments, one has to specify which detectors should be used. For example, `detectors = [H1, L1, V1]` stand for LIGO detectors Hanford, Livingston and Virgo. For each detector, the noise power spectral density of gravitational wave detector needs to be provided. Within `data_dict`, one needs to provide the GW170817 data measured within each detector.
 
