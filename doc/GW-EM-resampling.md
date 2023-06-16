@@ -1,4 +1,4 @@
-## Connecting Electromagnetic Signals to Source Properties 
+## Connecting Electromagnetic signals to Binary Source Properties 
 
 In NMMA, it is possible to use the results from GW inferences together with kilonova inferences or joint KN+GRB afterglow inferences to get estimates on the binary properties. 
 A binary system can be a binary neutron star (BNS) merger or a neutron-star-black-hole (NSBH) merger. We can connect observed electromagnetic signals to potential 
@@ -13,7 +13,7 @@ For estimating the source properties, the following input files are required:
 * `GWsamples` - some fiducial randomly generated posterior samples for masses $m_{1,2}$ , chirp mass $\mathcal{M}_c$, mass ratio $q$, luminosity distance $D_L$, and EOS samples,
 * `GWprior` - a prior file for gravitational wave sources
 
-## Estimating BNS properties 
+**Estimating BNS properties**
 
 Here, we take the observed gamma-ray burst [GRB211211A](https://arxiv.org/abs/2204.10864) as an example and assume that associated electromagnetic signals 
 originated from a BNS merger. For this signal, a joint inference (kilonova + GRB) can be carried out and will provide you with the required `EMsamples`.
@@ -39,7 +39,7 @@ A corner plot is shown below:
 ![GWEMcornerplot](images/corner_samples.png)
 
 
-## Estimating NSBH properties 
+**Estimating NSBH properties**
 
 In order to estimate the properties of a NSBH system, you need to adjust the `GWsamples` and `GWprior` file accordingly and run the resampling
 with the argument `withNSBH` (otherwise, you will run for a BNS system).
