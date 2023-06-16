@@ -8,6 +8,7 @@ from scipy.interpolate import interpolate as interp
 import scipy.signal
 import scipy.constants
 import scipy.stats
+from sncosmo.bandpasses import _BANDPASSES
 
 import sncosmo
 import dust_extinction.shapes as dustShp
@@ -173,7 +174,20 @@ def getFilteredMag(mag, filt):
         "radio-1.25GHz",
         "radio-6GHz",
         "radio-3GHz",
+        "sdss__u",
+        "sdss__g",
+        "sdss__r",
+        "sdss__i",
+        "sdss__z",
+        "swope2__y",
+        "swope2__J",
+        "swope2__H",
     ]
+    sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
+    sncosmo_maps = {
+        name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts
+    }
+
     # These average between filters is equivalent to
     # the geometric mean of the flux. These averages
     # are kind of justifiable because the spectral
@@ -181,6 +195,8 @@ def getFilteredMag(mag, filt):
     # where \nu is the frequency.
     if filt in unprocessed_filt:
         return mag[filt]
+    elif filt in sncosmo_maps:
+        return mag[sncosmo_maps[filt]]
     elif filt == "w":
         return (mag["g"] + mag["r"] + mag["i"]) / 3.0
     elif filt in ["U", "UVW2", "UVW1", "UVM2"]:
@@ -1555,8 +1571,8 @@ def get_knprops_from_LANLfilename(filename):
                     else:
                         vw /= 10
 
-            elif "KNTheta" in info:
-                KNTheta = float(info[7:])
+            elif "theta" in info:
+                KNTheta = float(info[5:])
 
         # Record velocity and ejecta mass for single component models
         elif num_comp == 1:
@@ -1582,8 +1598,8 @@ def get_knprops_from_LANLfilename(filename):
             elif "Ye" == info[:2]:
                 wind = float(info[2:]) / 100
 
-            elif "KNTheta" in info:
-                KNTheta = float(info[7:])
+            elif "theta" in info:
+                KNTheta = float(info[5:])
 
     param_values = {
         "morphology": morph,
