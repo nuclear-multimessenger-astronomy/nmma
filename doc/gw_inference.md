@@ -30,9 +30,8 @@ An example is shown below:
     detectors = [H1, L1, V1]
     psd_dict = {H1=data/GW170817/h1_psd.txt, L1=data/GW170817/l1_psd.txt, V1=data/GW170817/v1_psd.txt}
     channel_dict = {H1=LOSC-STRAIN, L1=LOSC-STRAIN, V1=LOSC-STRAIN}
-    data_dict = {H1=data/GW170817/H-H1_LOSC_CLN_16_V1-1187007040-2048.gwf, L1=data/GW170817/L- 
- L1_LOSC_CLN_16_V1-1187007040-2048.gwf, V1=data/GW170817/V-V1_LOSC_CLN_16_V1-1187007040-2048.gwf}
- duration = 128
+    data_dict = {H1=data/GW170817/H-H1_LOSC_CLN_16_V1-1187007040-2048.gwf, L1=data/GW170817/L-L1_LOSC_CLN_16_V1-1187007040-2048.gwf, V1=data/GW170817/V-V1_LOSC_CLN_16_V1-1187007040-2048.gwf}
+    duration = 128
     
     ################################################################################
     ## Job submission arguments
