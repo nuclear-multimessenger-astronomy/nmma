@@ -65,7 +65,7 @@ Whereas the examples above dealt with stand-alone Bayesian inferences of just on
 - Binary Neutron Star (BNS)
 - Neutron-Star-Black-Hole (NSBH)
 
-Here, we use the observed GRB211211A signal as a case study to run Bayesian inference with multiple models. In principle, this sort of signal can originate from a BNS source, but also a NSBH source could be explain the observed signature.
+Here, we use the observed [GRB211211A](https://arxiv.org/pdf/2204.10864.pdf) signal as a case study to run Bayesian inference with multiple models. In principle, this sort of signal can originate from a BNS source, but also a NSBH source could be explain the observed signature.
 
 **Example: BNS source** 
 
