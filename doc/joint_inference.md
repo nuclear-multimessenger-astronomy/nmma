@@ -4,10 +4,11 @@ A joint inference on gravitational-wave and electromagnetic signals requires NMM
 
 In order to run a multi-messenger inference, we need to follow to main steps:
 
-1) setting up a `config.ini` file and running the command
-    nmma_gw_generation config.ini
-2) perform the analysis or parameter estimation using:
-    nmma_gw_analysis <name_of_analysis>_data_dump.pickle
+	nmma_generation config.ini
+
+Perform the analysis or parameter estimation using:
+
+    nmma_analysis <name_of_analysis>_data_dump.pickle
 
 First of all, we set up the `config.ini` file and provide all required data and information.
 
