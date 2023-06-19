@@ -23,7 +23,7 @@ These observational data need to be provided in the `config.ini` file for the jo
 
 **Prior**
 
-Moreover, a prior on all observed messengers is required and needs to be tailored to the models used in the inference. Here, we use the GRB afterglow light curve model `TrPi2018` from afterglowpy and the kilonova model `Bu2019lm`. For the gravitational-wave signal, we assume the model `IMRPhenomPv2_NRTidalv2` for a precessing neutron star binary. a A prior for the joint inference can be found [here](https://github.com/nuclear-multimessenger-astronomy/nmma/tree/main/example_files/prior), called `GW170817_AT2017gfo_GRB170817A.prior`.
+Moreover, a prior on all observed messengers is required and needs to be tailored to the models used in the inference. Here, we use the GRB afterglow light curve model `TrPi2018` from afterglowpy and the kilonova model `Bu2019lm`. For the gravitational-wave signal, we assume the model `IMRPhenomPv2_NRTidalv2` for a precessing neutron star binary. A prior for the joint inference can be found [here](https://github.com/nuclear-multimessenger-astronomy/nmma/tree/main/example_files/prior), called `GW170817_AT2017gfo_GRB170817A.prior`.
 
 **Electroamagnetic data and models**
 
