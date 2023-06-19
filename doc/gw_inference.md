@@ -106,7 +106,7 @@ Once the `config.ini` file is set, the genertation can be run with `nmma_gw_gene
 
 	mpiexec -n $SLURM_NTASKS nmma_gw_analysis outdir/data/GW170817_data_dump.pickle --nlive 2048 --maxmcmc 10000 --nact 10 --no-plot --label GW170817 --outdir outdir/result --sampling-seed 1234
 
-The final posterior samples for the observed event GW170817 can be found under `outdir/result/`.
+The final posterior samples for the observed event GW170817 can be found under `outdir/result/`. Note that settings might differ from cluster to cluster and also the installation of NMMA might be changed (conda vs. python installation).
 
 
 ### Injected GW signals
