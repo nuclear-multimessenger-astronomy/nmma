@@ -51,9 +51,24 @@ For further details, see [here](https://docs.astropy.org/en/stable/api/astropy.t
 
 Example: AT2017gfo data excerpt
 
-    2017-08-18T00:00:00.000 g 17.41000 0.02000
-    2017-08-18T00:00:00.000 r 17.56000 0.04000
-    2017-08-18T00:00:00.000 i 17.48000 0.03000
-    2017-08-18T00:00:00.000 z 17.59000 0.03000
+    2017-08-18T00:00:00.000 ps1::g 17.41000 0.02000
+    2017-08-18T00:00:00.000 ps1::r 17.56000 0.04000
+    2017-08-18T00:00:00.000 ps1::i 17.48000 0.03000
+    2017-08-18T00:00:00.000 ps1::z 17.59000 0.03000
+    2017-08-18T00:00:00.000 ps1::y 17.46000 0.01000
+    2017-08-18T00:00:00.000 2massj 17.88000 0.03000
+    2017-08-18T00:00:00.000 2massh 18.26000 0.15000
+    2017-08-18T00:00:00.000 2massk 18.62000 0.11000
+    2017-08-18T05:32:38.400 ps1::i 17.24000 0.06000
+    2017-08-18T05:32:38.400 ps1::z 17.26000 0.06000
+    2017-08-18T05:32:38.400 ps1::y 17.38000 0.10000
+    2017-08-18T10:04:48.000 ps1::g 17.46000 0.08000
+    2017-08-18T10:04:48.000 ps1::r 17.32000 0.07000
+    2017-08-18T10:04:48.000 ps1::i 17.42000 0.05000
+    2017-08-18T18:11:31.200 ps1::g 18.05000 0.12000
+    2017-08-18T18:11:31.200 ps1::r 17.89000 0.03000
+    2017-08-18T18:11:31.200 2massj 17.51000 0.03000
+    2017-08-18T18:11:31.200 2massh 17.64000 0.04000
+    2017-08-18T18:11:31.200 2massk 17.91000 0.05000
 
 The first column represents the ISOT time, followed by the filter or spectral band in the second column, the measured AB magnitude and its respective error are given in the third and fourth column. This data structure detailed above is also applicable for other astrophysical sources (SNe, GRBs) or models implemented in NMMA. 
