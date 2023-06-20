@@ -299,6 +299,7 @@ def get_parser():
     parser.add_argument(
         "--conditional-gaussian-prior-N-sigma",
         default=1,
+        type=float,
         help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True",
     )
 
@@ -424,10 +425,6 @@ def main(args=None):
         filters = args.filters.split(",")
     else:
         filters = None
-
-    model_names, models, light_curve_model = create_light_curve_model_from_args(
-        args.model, args, sample_times, filters=filters
-    )
 
     # create the kilonova data if an injection set is given
     if args.injection:
@@ -647,6 +644,13 @@ def main(args=None):
         priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
 
+    model_names, models, light_curve_model = create_light_curve_model_from_args(
+        args.model,
+        args,
+        sample_times,
+        filters=filters_to_analyze,
+    )
+
     # setup the likelihood
     if args.detection_limit:
         args.detection_limit = literal_eval(args.detection_limit)
@@ -674,7 +678,7 @@ def main(args=None):
         label=args.label,
         nlive=args.nlive,
         seed=args.seed,
-        soft_init=True,
+        soft_init=False,
         queue_size=args.cpus,
         check_point_delta_t=3600,
     )
