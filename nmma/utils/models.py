@@ -43,9 +43,21 @@ def clear_data_home(models_home=None):
 
 
 def get_latest_zenodo_doi(permanent_doi):
-    r = requests.get(f"https://zenodo.org/record/{permanent_doi}", allow_redirects=True)
-    data = r.text.split("10.5281/zenodo.")[1]
-    doi = re.findall(r"^\d+", data)[0]
+    headers={ # we emulate a browser request with a recent chrome version to avoid zenodo blocking us
+        'X-Requested-With': 'XMLHttpRequest',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Host': 'zenodo.org',
+        'Connection': 'keep-alive',
+        'Pragma': 'no-cache',
+        'Cache-Control': 'no-cache'
+    }
+    r = requests.get(f"https://zenodo.org/record/{permanent_doi}", allow_redirects=True, headers=headers)
+    try:
+        data = r.text.split("10.5281/zenodo.")[1]
+        doi = re.findall(r"^\d+", data)[0]
+    except Exception as e:
+        raise ValueError(f'Could not find latest DOI: {str(e)}')
     return doi
 
 
