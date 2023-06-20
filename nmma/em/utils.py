@@ -187,6 +187,7 @@ def getFilteredMag(mag, filt):
     sncosmo_maps = {
         name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts
     }
+    sncosmo_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
 
     # These average between filters is equivalent to
     # the geometric mean of the flux. These averages
@@ -214,8 +215,7 @@ def getFilteredMag(mag, filt):
     elif filt == "F160W":
         return mag["H"]
     else:
-        print("Unknown filter\n")
-        return 0
+        raise ValueError(f"Unknown filter: {filt}")
 
 
 def dataProcess(raw_data, filters, triggerTime, tmin, tmax):

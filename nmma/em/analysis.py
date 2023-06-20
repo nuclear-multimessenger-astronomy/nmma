@@ -675,7 +675,7 @@ def main(args=None):
         label=args.label,
         nlive=args.nlive,
         seed=args.seed,
-        soft_init=True,
+        soft_init=False,
         queue_size=args.cpus,
         check_point_delta_t=3600,
     )
