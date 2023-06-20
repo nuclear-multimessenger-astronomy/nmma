@@ -191,7 +191,7 @@ class SVDLightCurveModel(object):
                 for filt in self.svd_mag_model.keys():
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
-                        raise ValueError(f"Could not find model file for filter {filt}")
+                        print(f"Could not find model file for filter {filt}")
                     else:
                         print(f"Loaded filter {filt}")
                     with open(outfile, "rb") as handle:
@@ -207,7 +207,7 @@ class SVDLightCurveModel(object):
                 for filt in self.svd_mag_model.keys():
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
-                        raise ValueError(f"Could not find model file for filter {filt}")
+                        print(f"Could not find model file for filter {filt}")
                     else:
                         print(f"Loaded filter {filt}")
                     with open(outfile, "rb") as handle:
