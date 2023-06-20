@@ -1105,7 +1105,7 @@ def metzger_lc(t_day, param_dict):
 
         tau[mprec - 1, j] = tau[mprec - 2, j]
         # photosphere
-        pig = np.argmin(np.abs(tau[:, j]) - 1)
+        pig = np.argmin(np.abs(tau[:, j] - 1))
         vphoto[j] = vm[pig]
         Rphoto[j] = vphoto[j] * t[j]
         mphoto[j] = m[pig]
