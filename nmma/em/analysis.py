@@ -299,6 +299,7 @@ def get_parser():
     parser.add_argument(
         "--conditional-gaussian-prior-N-sigma",
         default=1,
+        type=float,
         help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True",
     )
 
