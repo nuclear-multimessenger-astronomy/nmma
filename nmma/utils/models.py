@@ -17,6 +17,16 @@ RemoteFileMetadata = namedtuple("RemoteFileMetadata", ["filename", "url", "check
 
 pbar = {}
 
+# X-ray and Radio data
+custom_filters = [
+    "X-ray-1keV",
+    "X-ray-5keV",
+    "radio-5.5GHz",
+    "radio-1.25GHz",
+    "radio-3GHz",
+    "radio-6GHz",
+]
+
 
 def get_models_home(models_home=None) -> str:
     if models_home is None:
@@ -114,7 +124,9 @@ def get_model(
     if not exists(Path(models_home, model_name, "filters")):
         makedirs(Path(models_home, model_name, "filters"))
 
-    all_filters = model_info["filters"]
+    filter_synonyms = [filt.replace("_", ":") for filt in model_info["filters"]]
+
+    all_filters = list(set(model_info["filters"] + filter_synonyms + custom_filters))
     if filters in [[], None, ""] and "filters" in model_info:
         filters = model_info["filters"]
 
