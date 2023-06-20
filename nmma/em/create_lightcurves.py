@@ -16,16 +16,14 @@ from .model import (
 )
 from .injection import create_light_curve_data
 
+
 def main():
 
     parser = argparse.ArgumentParser(
         description="Inference on kilonova ejecta parameters."
     )
     parser.add_argument(
-        "--model", 
-        type=str, 
-        required=True, 
-        help="Name of the kilonova model to be used"
+        "--model", type=str, required=True, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
         "--svd-path",
@@ -34,17 +32,9 @@ def main():
         help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
     )
     parser.add_argument(
-        "--outdir", 
-        type=str, 
-        required=True, 
-        help="Path to the output directory"
+        "--outdir", type=str, required=True, help="Path to the output directory"
     )
-    parser.add_argument(
-        "--label", 
-        type=str, 
-        required=True, 
-        help="Label for the run"
-    )
+    parser.add_argument("--label", type=str, required=True, help="Label for the run")
     parser.add_argument(
         "--tmin",
         type=float,
@@ -58,10 +48,7 @@ def main():
         help="Days to be stoped analysing from the trigger time (default: 14)",
     )
     parser.add_argument(
-        "--dt", 
-        type=float, 
-        default=0.1, 
-        help="Time step in day (default: 0.1)"
+        "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
         "--svd-mag-ncoeff",
@@ -89,10 +76,7 @@ def main():
         help="Injection generation seed (default: 42)",
     )
     parser.add_argument(
-        "--injection", 
-        metavar="PATH", 
-        type=str, 
-        help="Path to the injection json file"
+        "--injection", metavar="PATH", type=str, help="Path to the injection json file"
     )
     parser.add_argument(
         "--joint-light-curve",
@@ -105,10 +89,7 @@ def main():
         action="store_true",
     )
     parser.add_argument(
-        "--plot", 
-        action="store_true", 
-        default=False, 
-        help="add best fit plot"
+        "--plot", action="store_true", default=False, help="add best fit plot"
     )
     parser.add_argument(
         "--verbose",
@@ -130,15 +111,10 @@ def main():
         default="sklearn_gp",
     )
     parser.add_argument(
-        "--absolute", 
-        action="store_true", 
-        default=False, 
-        help="Absolute Magnitude"
+        "--absolute", action="store_true", default=False, help="Absolute Magnitude"
     )
     parser.add_argument(
-        "--ztf-sampling", 
-        help="Use realistic ZTF sampling", 
-        action="store_true"
+        "--ztf-sampling", help="Use realistic ZTF sampling", action="store_true"
     )
     parser.add_argument(
         "--ztf-uncertainties",
@@ -258,8 +234,8 @@ def main():
                 interpolation_type=args.interpolation_type,
             )
             light_curve_model = SVDLightCurveModel(**light_curve_kwargs)
-    
-    ## read injection file 
+
+    # read injection file
     with open(args.injection, "r") as f:
         injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
 
@@ -276,26 +252,34 @@ def main():
     args.kilonova_error = 0
 
     injection_df = injection_dict["injections"]
-    
+
     # save simulation_id from observing scenarios data
     # we save lighcurve for each event with its initial simulation ID
-    # from observing scenarios 
-    simulation_id = injection_df['simulation_id']
-    
+    # from observing scenarios
+
+    # simulation_id = injection_df["simulation_id"]
+
     mag_ds = {}
     for index, row in injection_df.iterrows():
-        
-        injection_outfile = os.path.join(args.outdir, "%d.dat" % simulation_id[index])
+
+        # injection_outfile = os.path.join(args.outdir, "%d.dat" % simulation_id[index])
+        injection_outfile = os.path.join(args.outdir, "%s.dat" % args.label)
         if os.path.isfile(injection_outfile):
             try:
                 mag_ds[index] = np.loadtxt(injection_outfile)
                 continue
-            
-            except ValueError :
-                print('\n===================================================================') 
-                print('The previous run generated light curves with unreadable content.\n')
-                print('Please remove all output files in .dat format then retry.')
-                print('===================================================================\n')
+
+            except ValueError:
+                print(
+                    "\n==================================================================="
+                )
+                print(
+                    "The previous run generated light curves with unreadable content.\n"
+                )
+                print("Please remove all output files in .dat format then retry.")
+                print(
+                    "===================================================================\n"
+                )
                 exit()
 
         injection_parameters = row.to_dict()
@@ -333,19 +317,26 @@ def main():
                     fid.write("%.3f " % data[filt][ii, 1])
                 fid.write("\n")
             fid.close()
-            
+
         except IndexError:
-            print('\n===================================================================') 
-            print('Sorry we could not use ZTF or Rubin flags to generate those statistics\n')
-            print('Please remove all flags rely on with ZTF or Rubin then retry again')
-            print('===================================================================\n')
+            print(
+                "\n==================================================================="
+            )
+            print(
+                "Sorry we could not use ZTF or Rubin flags to generate those statistics\n"
+            )
+            print("Please remove all flags rely on with ZTF or Rubin then retry again")
+            print(
+                "===================================================================\n"
+            )
             exit()
-        
+
     mag_ds[index] = np.loadtxt(injection_outfile)
-        
+
     if args.plot:
         import matplotlib.pyplot as plt
         import matplotlib
+
         matplotlib.use("agg")
         params = {
             "backend": "pdf",
@@ -362,11 +353,11 @@ def main():
         plotName = os.path.join(
             args.outdir, "injection_" + args.model + "_lightcurves.pdf"
         )
-        
+
         fig = plt.figure()
-        
+
         filts = args.filters.split(",")
-        #filts = "u,g,r,i,z,y,J,H,K".split(",")
+        # filts = "u,g,r,i,z,y,J,H,K".split(",")
         ncols = 1
         nrows = int(np.ceil(len(filts) / ncols))
         gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
@@ -394,7 +385,7 @@ def main():
             hist = hist.astype(np.float64)
             hist[hist == 0.0] = np.nan
 
-            c= ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="cividis", alpha=0.7)
+            c = ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="cividis", alpha=0.7)
 
             # plot 10th, 50th, 90th percentiles
             ax.plot(sample_times, np.nanpercentile(data_out, 50, axis=0), "k--")
@@ -413,8 +404,8 @@ def main():
             ax.tick_params(axis="x", labelsize=42)
             ax.tick_params(axis="y", labelsize=42)
             ax.grid(which="both", alpha=0.5)
-            
-        fig.colorbar(c, ax = ax)
+
+        fig.colorbar(c, ax=ax)
         fig.text(0.4, 0.05, r"Time [days]", fontsize=42)
         fig.text(
             0.01,
@@ -425,6 +416,6 @@ def main():
             fontsize=42,
         )
 
-        #plt.tight_layout()
+        # plt.tight_layout()
         plt.savefig(plotName, bbox_inches="tight")
         plt.close()
