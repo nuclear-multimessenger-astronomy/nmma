@@ -187,6 +187,7 @@ def getFilteredMag(mag, filt):
     sncosmo_maps = {
         name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts
     }
+    sncosmo_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
 
     # These average between filters is equivalent to
     # the geometric mean of the flux. These averages
@@ -214,8 +215,7 @@ def getFilteredMag(mag, filt):
     elif filt == "F160W":
         return mag["H"]
     else:
-        print("Unknown filter\n")
-        return 0
+        raise ValueError(f"Unknown filter: {filt}")
 
 
 def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
@@ -242,12 +242,19 @@ def loadEvent(filename):
     lines = [line.rstrip("\n") for line in open(filename)]
     lines = filter(None, lines)
 
+    sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
+    sncosmo_maps = {name: name.replace(":", "_") for name in sncosmo_filts}
+
     data = {}
     for line in lines:
         lineSplit = line.split(" ")
         lineSplit = list(filter(None, lineSplit))
         mjd = Time(lineSplit[0], format="isot").mjd
         filt = lineSplit[1]
+
+        if filt in sncosmo_maps:
+            filt = sncosmo_maps[filt]
+
         mag = float(lineSplit[2])
         dmag = float(lineSplit[3])
 
@@ -474,7 +481,18 @@ def calc_lc(
         filters = list(svd_mag_model.keys())
 
     mAB = {}
+    # fill radio and X-ray with null light curves
+    mAB["radio-5.5GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-1.25GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-3GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-6GHz"] = np.inf * np.ones(len(tt))
+    mAB["X-ray-1keV"] = np.inf * np.ones(len(tt))
+    mAB["X-ray-5keV"] = np.inf * np.ones(len(tt))
+
     for jj, filt in enumerate(filters):
+        if filt in mAB:
+            continue
+
         if mag_ncoeff:
             n_coeff = min(mag_ncoeff, svd_mag_model[filt]["n_coeff"])
         else:
@@ -592,14 +610,6 @@ def calc_lc(
         lbol = lbolinterp
     else:
         lbol = np.inf * np.ones(len(tt))
-
-    # fill radio and X-ray with null light curves
-    mAB["radio-5.5GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-1.25GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-3GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-6GHz"] = np.inf * np.ones(len(tt))
-    mAB["X-ray-1keV"] = np.inf * np.ones(len(tt))
-    mAB["X-ray-5keV"] = np.inf * np.ones(len(tt))
 
     return np.squeeze(tt), np.squeeze(lbol), mAB
 
@@ -1105,7 +1115,7 @@ def metzger_lc(t_day, param_dict):
 
         tau[mprec - 1, j] = tau[mprec - 2, j]
         # photosphere
-        pig = np.argmin(np.abs(tau[:, j]) - 1)
+        pig = np.argmin(np.abs(tau[:, j] - 1))
         vphoto[j] = vm[pig]
         Rphoto[j] = vphoto[j] * t[j]
         mphoto[j] = m[pig]

@@ -65,9 +65,12 @@ User Guide
    :maxdepth: 1
 
    installation
-   training
-   fitting
    models
+   training
+   data_inj_obs
+   fitting
+   gw_inference
+   joint_inference
    GW-EM-resampling
    combined_analysis
    Cluster_Resources
