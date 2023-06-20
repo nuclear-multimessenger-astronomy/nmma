@@ -66,7 +66,8 @@ def download(file_info):
     resp = requests.get(url, stream=True)
     total = int(resp.headers.get("content-length", 0))
     chunk_size = 1024
-    with open(filepath, "wb") as f, tqdm(
+    file_content = b""
+    with tqdm(
         total=total,
         unit="iB",
         unit_scale=True,
@@ -74,8 +75,16 @@ def download(file_info):
         desc=f"{str(filepath).split('/')[-1]}",
     ) as pbar:
         for chunk in resp.iter_content(chunk_size=chunk_size):
-            size = f.write(chunk)
-            pbar.update(size)
+            file_content += chunk
+            pbar.update(len(chunk))
+
+    if len(file_content) != total:
+        raise ValueError(
+            f"Downloaded file {filepath} is incomplete. "
+            f"Only {len(file_content)} of {total} bytes were downloaded."
+        )
+    with open(filepath, "wb") as f:
+        f.write(file_content)
 
     return filepath
 
