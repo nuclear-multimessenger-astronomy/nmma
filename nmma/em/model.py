@@ -191,9 +191,11 @@ class SVDLightCurveModel(object):
                 for filt in self.svd_mag_model.keys():
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
-                        continue
-                    with open(outfile, "rb") as handle:
-                        self.svd_mag_model[filt]["gps"] = pickle.load(handle)
+                        print(f"Could not find model file for filter {filt}")
+                    else:
+                        print(f"Loaded filter {filt}")
+                        with open(outfile, "rb") as handle:
+                            self.svd_mag_model[filt]["gps"] = pickle.load(handle)
                 self.svd_lbol_model = None
             else:
                 # Try old style request
@@ -205,9 +207,11 @@ class SVDLightCurveModel(object):
                 for filt in self.svd_mag_model.keys():
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
-                        continue
-                    with open(outfile, "rb") as handle:
-                        self.svd_mag_model[filt]["gps"] = pickle.load(handle)
+                        print(f"Could not find model file for filter {filt}")
+                    else:
+                        print(f"Loaded filter {filt}")
+                        with open(outfile, "rb") as handle:
+                            self.svd_mag_model[filt]["gps"] = pickle.load(handle)
                 lbol_modelfile = os.path.join(
                     self.svd_path, "{0}_lbol.pkl".format(model)
                 )

@@ -111,6 +111,7 @@ setup(
         "nmma.pbilby",
         "nmma.pbilby.parser",
         "nmma.pbilby.analysis",
+        "nmma.utils",
     ],
     package_dir={"nmma": "nmma"},
     package_data={"nmma": [version_file], "nmma.em.data": ["*.pkl", "*.joblib"]},
