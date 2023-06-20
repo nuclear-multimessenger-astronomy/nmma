@@ -330,7 +330,7 @@ class SVDTrainingModel(object):
 
             self.svd_model[filt]["gps"] = gps
 
-    def train_tensorflow_model(self, dropout_rate=0.3):
+    def train_tensorflow_model(self, dropout_rate=0.6):
 
         try:
             import tensorflow as tf
@@ -369,7 +369,7 @@ class SVDTrainingModel(object):
                 )
             )
             # One/few layers of wide NN approximate GP
-            model.add(Dense(4096, activation="relu", kernel_initializer="he_normal"))
+            model.add(Dense(2048, activation="relu", kernel_initializer="he_normal"))
             model.add(Dropout(dropout_rate))
             model.add(Dense(self.n_coeff))
 
