@@ -7,6 +7,7 @@ from os.path import exists, expanduser, join
 from pathlib import Path
 
 import requests
+from requests.exceptions import ConnectionError
 from tqdm.auto import tqdm
 from yaml import load
 from multiprocessing import cpu_count
@@ -93,10 +94,14 @@ def load_models_list(doi=None):
     return models
 
 
-DOI = get_latest_zenodo_doi(PERMANENT_DOI)
-MODELS = load_models_list(DOI)
-# FIXME: temporary mapping
-MODELS["Bu2019lm"] = MODELS["Bu2019bns"]
+try:
+    DOI = get_latest_zenodo_doi(PERMANENT_DOI)
+    MODELS = load_models_list(DOI)
+    # FIXME: temporary mapping
+    MODELS["Bu2019lm"] = MODELS["Bu2019bns"]
+except ConnectionError:
+    DOI = ""
+    MODELS = {}
 
 
 def get_model(
