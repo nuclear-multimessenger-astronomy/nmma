@@ -23,14 +23,22 @@ import bilby
 from nmma.em.analysis import get_parser, main
 
 from log import make_log
+
 # we need to set the backend here to insure we
 # can render the plot headlessly
 matplotlib.use("Agg")
 rng = np.random.default_rng()
 
-default_analysis_parameters = {"source": "Me2017", "fix_z": False}
+default_analysis_parameters = {
+    "source": "Me2017",
+    "fix_z": False,
+    "tmin": 0.01,
+    "tmax": 7,
+    "dt": 0.1,
+}
 
 log = make_log("nmma")
+
 
 def upload_analysis_results(results, data_dict, request_timeout=60):
     """
@@ -75,6 +83,9 @@ def run_nmma_model(data_dict):
 
     source = analysis_parameters.get("source")
     fix_z = analysis_parameters.get("fix_z") in [True, "True", "t", "true"]
+    tmin = analysis_parameters.get("tmin")
+    tmax = analysis_parameters.get("tmax")
+    dt = analysis_parameters.get("dt")
 
     # this example analysis service expects the photometry to be in
     # a csv file (at data_dict["inputs"]["photometry"]) with the following columns
@@ -116,17 +127,15 @@ def run_nmma_model(data_dict):
         plotdir = tempfile.mkdtemp()
 
         # cpus = 2
-        nlive = 32
+        nlive = 512
         error_budget = 1.0
 
-        tmin = 0.01
-        tmax = 7
-        dt = 0.1
         Ebv_max = 0.5724
 
-        t0 = np.min(data["mjd"])
-        interpolation_type = "sklearn_gp"
-        sampler = "dynesty"
+        # Set t0 based on first detection
+        t0 = np.min(data[data["mag"] != np.ma.masked]["mjd"])
+        interpolation_type = "tensorflow"
+        sampler = "pymultinest"
 
         prior = f"{prior_directory}/{source}.prior"
         if not os.path.isfile(prior):
@@ -136,6 +145,7 @@ def run_nmma_model(data_dict):
         if fix_z:
             if z is not None:
                 from astropy.coordinates.distances import Distance
+
                 distance = Distance(z=z, unit="Mpc")
                 priors["luminosity_distance"] = distance.value
             else:
@@ -148,7 +158,12 @@ def run_nmma_model(data_dict):
         # in the format desired by NMMA
         f = tempfile.NamedTemporaryFile(suffix=".dat", mode="w", delete=False)
         # remove rows where mag and magerr are missing, or not float, or negative
-        data = data[np.isfinite(data["mag"]) & np.isfinite(data["magerr"]) & (data["mag"] > 0) & (data["magerr"] > 0)]
+        data = data[
+            np.isfinite(data["mag"])
+            & np.isfinite(data["magerr"])
+            & (data["mag"] > 0)
+            & (data["magerr"] > 0)
+        ]
         for row in data:
             tt = Time(row["mjd"], format="mjd").isot
             filt = row["filter"][-1]
@@ -329,10 +344,11 @@ class MainHandler(tornado.web.RequestHandler):
             {"status": "pending", "message": "nmma_analysis_service: analysis started"}
         )
 
-class HealthHandler(tornado.web.RequestHandler):
 
+class HealthHandler(tornado.web.RequestHandler):
     def get(self):
         self.write("OK")
+
 
 def make_app():
     return tornado.web.Application(
@@ -345,8 +361,8 @@ def make_app():
 
 if __name__ == "__main__":
     nmma_analysis = make_app()
-    if 'PORT' in os.environ:
-        port = int(os.environ['PORT'])
+    if "PORT" in os.environ:
+        port = int(os.environ["PORT"])
     else:
         port = 6901
     nmma_analysis.listen(port)
