@@ -281,6 +281,25 @@ def loadEventSpec(filename):
     return spec
 
 
+def interpolate_nans(data):
+
+    for name in data.keys():
+        for d in data[name].keys():
+            if d == "t":
+                continue
+            if not any(np.isnan(data[name][d])):
+                continue
+
+            ii = np.where(~np.isnan(data[name][d]))[0]
+            if len(ii) > 1:
+                f = interp.interp1d(
+                    data[name]["t"][ii], data[name][d][ii], fill_value="extrapolate"
+                )
+                data[name][d] = f(data[name]["t"])
+
+    return data
+
+
 def read_spectroscopy_files(
     files, wavelength_min=3000.0, wavelength_max=10000.0, smooth=False
 ):
@@ -426,7 +445,7 @@ def read_photometry_files(
     return data
 
 
-def get_default_filts_lambdas():
+def get_default_filts_lambdas(filters=None):
 
     filts = [
         "u",
@@ -462,6 +481,30 @@ def get_default_filts_lambdas():
     lambdas = np.concatenate(
         [lambdas_sloan, lambdas_bessel, lambdas_radio, lambdas_Xray]
     )
+
+    bandpasses = [
+        sncosmo.get_bandpass(val["name"]) for val in _BANDPASSES.get_loaders_metadata()
+    ]
+
+    filts = filts + [band.name for band in bandpasses]
+    lambdas = np.concatenate([lambdas, [1e-10 * band.wave_eff for band in bandpasses]])
+
+    if filters is not None:
+        filts_slice = []
+        lambdas_slice = []
+
+        for filt in filters:
+            try:
+                ii = filts.index(filt)
+                filts_slice.append(filts[ii])
+                lambdas_slice.append(lambdas[ii])
+            except ValueError:
+                ii = filts.index(filt.replace("_", ":"))
+                filts_slice.append(filts[ii].replace(":", "_"))
+                lambdas_slice.append(lambdas[ii])
+
+        filts = filts_slice
+        lambdas = np.array(lambdas_slice)
 
     return filts, lambdas
 
@@ -693,7 +736,7 @@ def fluxDensity(t, nu, **params):
     return mJy
 
 
-def grb_lc(t_day, Ebv, param_dict):
+def grb_lc(t_day, Ebv, param_dict, filters=None):
 
     day = 86400.0  # in seconds
     tStart = (np.amin(t_day)) * day
@@ -701,7 +744,7 @@ def grb_lc(t_day, Ebv, param_dict):
     tnode = min(len(t_day), 201)
     default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_0s = scipy.constants.c / lambdas
 
@@ -761,9 +804,10 @@ def sn_lc(
     regularize_band="sdssu",
     model_name="nugent-hyper",
     parameters={},
+    filters=None,
 ):
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nus = scipy.constants.c / (1e-10 * lambdas)
 
@@ -811,7 +855,7 @@ def sn_lc(
     return tt, lbol, mag
 
 
-def sc_lc(t_day, param_dict):
+def sc_lc(t_day, param_dict, filters=None):
 
     day = 86400.0  # in seconds
     t = t_day * day
@@ -823,7 +867,7 @@ def sc_lc(t_day, param_dict):
     Ebv = param_dict["Ebv"]
     z = param_dict["z"]
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)
@@ -902,7 +946,7 @@ def sc_lc(t_day, param_dict):
     return t_day, lbol, mag
 
 
-def metzger_lc(t_day, param_dict):
+def metzger_lc(t_day, param_dict, filters=None):
 
     # convert time from day to second
     day = 86400.0  # in seconds
@@ -975,7 +1019,7 @@ def metzger_lc(t_day, param_dict):
     Xn0 = Xn0max * 2 * np.arctan(Mn / m / Msun) / np.pi  # neutron mass fraction
     Xr = 1.0 - Xn0  # r-process fraction
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)
@@ -1162,7 +1206,7 @@ def metzger_lc(t_day, param_dict):
     return t_day, lbol, mag
 
 
-def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
+def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict, filters=None):
 
     # prevent the output message flooded by these warning messages
     old = np.seterr()
@@ -1199,7 +1243,7 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
         10, -0.4 * (powerlaw_mag + 48.6)
     )
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)

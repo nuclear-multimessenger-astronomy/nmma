@@ -356,6 +356,7 @@ def create_light_curve_model_from_args(
                 resolution=args.grb_resolution,
                 jetType=args.jet_type,
                 parameter_conversion=parameter_conversion,
+                filters=filters,
             )
 
         elif model_name == "nugent-hyper":
@@ -363,6 +364,7 @@ def create_light_curve_model_from_args(
                 sample_times=sample_times,
                 model="nugent-hyper",
                 parameter_conversion=parameter_conversion,
+                filters=filters,
             )
 
         elif model_name == "salt2":
@@ -370,12 +372,14 @@ def create_light_curve_model_from_args(
                 sample_times=sample_times,
                 model="salt2",
                 parameter_conversion=parameter_conversion,
+                filters=filters,
             )
 
         elif model_name == "Piro2021":
             lc_model = ShockCoolingLightCurveModel(
                 sample_times=sample_times,
                 parameter_conversion=parameter_conversion,
+                filters=filters,
             )
 
         elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
@@ -383,6 +387,7 @@ def create_light_curve_model_from_args(
                 sample_times=sample_times,
                 model=model_name,
                 parameter_conversion=parameter_conversion,
+                filters=filters,
             )
 
         else:

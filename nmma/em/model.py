@@ -355,6 +355,7 @@ class GRBLightCurveModel(object):
         model="TrPi2018",
         resolution=12,
         jetType=0,
+        filters=None,
     ):
         """A light curve model object
 
@@ -382,6 +383,7 @@ class GRBLightCurveModel(object):
         self.parameter_conversion = parameter_conversion
         self.resolution = resolution
         self.jetType = jetType
+        self.filters = filters
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
@@ -427,7 +429,9 @@ class GRBLightCurveModel(object):
 
         Ebv = new_parameters.get("Ebv", 0.0)
 
-        _, lbol, mag = utils.grb_lc(sample_times, Ebv, grb_param_dict)
+        _, lbol, mag = utils.grb_lc(
+            sample_times, Ebv, grb_param_dict, filters=self.filters
+        )
         return lbol, mag
 
 
@@ -525,7 +529,13 @@ class KilonovaGRBLightCurveModel(object):
 
 
 class SupernovaLightCurveModel(object):
-    def __init__(self, sample_times, parameter_conversion=None, model="nugent-hyper"):
+    def __init__(
+        self,
+        sample_times,
+        parameter_conversion=None,
+        model="nugent-hyper",
+        filters=None,
+    ):
         """A light curve model object
 
         An object to evaluted the supernova light curve across filters
@@ -546,6 +556,7 @@ class SupernovaLightCurveModel(object):
         self.sample_times = sample_times
         self.parameter_conversion = parameter_conversion
         self.model = model
+        self.filters = filters
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={self.model})"
@@ -563,7 +574,12 @@ class SupernovaLightCurveModel(object):
         Ebv = new_parameters.get("Ebv", 0.0)
 
         _, lbol, mag = utils.sn_lc(
-            sample_times, z, Ebv, model_name=self.model, parameters=new_parameters
+            sample_times,
+            z,
+            Ebv,
+            model_name=self.model,
+            parameters=new_parameters,
+            filters=self.filters,
         )
 
         if self.model == "nugent-hyper":
@@ -641,7 +657,9 @@ class SupernovaGRBLightCurveModel(object):
 
 
 class ShockCoolingLightCurveModel(object):
-    def __init__(self, sample_times, parameter_conversion=None, model="Piro2021"):
+    def __init__(
+        self, sample_times, parameter_conversion=None, model="Piro2021", filters=None
+    ):
         """A light curve model object
 
         An object to evaluted the shock cooling light curve across filters
@@ -665,6 +683,7 @@ class ShockCoolingLightCurveModel(object):
         self.model_parameters = model_parameters_dict[model]
         self.sample_times = sample_times
         self.parameter_conversion = parameter_conversion
+        self.filters = filters
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
@@ -686,12 +705,12 @@ class ShockCoolingLightCurveModel(object):
         param_dict["z"] = z
         param_dict["Ebv"] = Ebv
 
-        _, lbol, mag = utils.sc_lc(sample_times, param_dict)
+        _, lbol, mag = utils.sc_lc(sample_times, param_dict, filters=self.filters)
         return lbol, mag
 
 
 class SupernovaShockCoolingLightCurveModel(object):
-    def __init__(self, sample_times, parameter_conversion=None):
+    def __init__(self, sample_times, parameter_conversion=None, filters=None):
 
         self.sample_times = sample_times
 
@@ -701,6 +720,7 @@ class SupernovaShockCoolingLightCurveModel(object):
         self.supernova_lightcurve_model = SupernovaLightCurveModel(
             sample_times, parameter_conversion
         )
+        self.filters = filters
 
     def __repr__(self):
         details = (
@@ -714,7 +734,9 @@ class SupernovaShockCoolingLightCurveModel(object):
         total_mag = {}
 
         sc_lbol, sc_mag = self.sc_lightcurve_model.generate_lightcurve(
-            sample_times, parameters
+            sample_times,
+            parameters,
+            filters=self.filters,
         )
 
         if np.sum(sc_lbol) == 0.0 or len(np.isfinite(sc_lbol)) == 0:
@@ -724,7 +746,9 @@ class SupernovaShockCoolingLightCurveModel(object):
             supernova_lbol,
             supernova_mag,
         ) = self.supernova_lightcurve_model.generate_lightcurve(
-            sample_times, parameters
+            sample_times,
+            parameters,
+            filters=self.filters,
         )
 
         if np.sum(supernova_lbol) == 0.0 or len(np.isfinite(supernova_lbol)) == 0:
@@ -750,7 +774,9 @@ class SupernovaShockCoolingLightCurveModel(object):
 
 
 class SimpleKilonovaLightCurveModel(object):
-    def __init__(self, sample_times, parameter_conversion=None, model="Me2017"):
+    def __init__(
+        self, sample_times, parameter_conversion=None, model="Me2017", filters=None
+    ):
         """A light curve model object
 
         An object to evaluted the kilonova (with Me2017) light curve across filters
@@ -774,6 +800,7 @@ class SimpleKilonovaLightCurveModel(object):
         self.model_parameters = model_parameters_dict[model]
         self.sample_times = sample_times
         self.parameter_conversion = parameter_conversion
+        self.filters = filters
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
@@ -796,9 +823,11 @@ class SimpleKilonovaLightCurveModel(object):
         param_dict["Ebv"] = Ebv
 
         if self.model == "Me2017":
-            _, lbol, mag = utils.metzger_lc(sample_times, param_dict)
+            _, lbol, mag = utils.metzger_lc(
+                sample_times, param_dict, filters=self.filters
+            )
         elif self.model == "PL_BB_fixedT":
             _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(
-                sample_times, param_dict
+                sample_times, param_dict, filters=self.filters
             )
         return lbol, mag
