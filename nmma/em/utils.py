@@ -281,6 +281,25 @@ def loadEventSpec(filename):
     return spec
 
 
+def interpolate_nans(data):
+
+    for name in data.keys():
+        for d in data[name].keys():
+            if d == "t":
+                continue
+            if not any(np.isnan(data[name][d])):
+                continue
+
+            ii = np.where(~np.isnan(data[name][d]))[0]
+            if len(ii) > 1:
+                f = interp.interp1d(
+                    data[name]["t"][ii], data[name][d][ii], fill_value="extrapolate"
+                )
+                data[name][d] = f(data[name]["t"])
+
+    return data
+
+
 def read_spectroscopy_files(
     files, wavelength_min=3000.0, wavelength_max=10000.0, smooth=False
 ):
