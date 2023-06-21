@@ -7,7 +7,7 @@ import inspect
 
 from .training import SVDTrainingModel
 from .model import SVDLightCurveModel
-from .utils import read_photometry_files, read_spectroscopy_files
+from .utils import read_photometry_files, read_spectroscopy_files, interpolate_nans
 from . import model_parameters
 
 
@@ -174,6 +174,8 @@ def main():
         filts = data[keys[0]]["lambda"]
     else:
         raise ValueError("data-type should be photometry or spectroscopy")
+
+    data = interpolate_nans(data)
 
     training_data, parameters = model_function(data)
     if args.axial_symmetry:

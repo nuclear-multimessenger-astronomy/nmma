@@ -211,6 +211,37 @@ def Bu2022Ye(data):
     return data_out, parameters
 
 
+def Ka2017(data):
+
+    parameters = [
+        "mej",
+        "vej",
+        "Xlan",
+    ]
+
+    data_out = {}
+
+    parameters_idx = [2, 3, 5]
+    magkeys = data.keys()
+    for jj, key in enumerate(magkeys):
+        rr = [
+            np.abs(float(x))
+            for x in re.findall(
+                r"[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", key
+            )
+        ]
+
+        # Best to interpolate mass in log10 space
+        rr[0] = np.log10(rr[0])
+
+        data_out[key] = {
+            param: rr[idx] for param, idx in zip(parameters, parameters_idx)
+        }
+        data_out[key] = {**data_out[key], **data[key]}
+
+    return data_out, parameters
+
+
 def LANL2022(data):
 
     parameters = [
