@@ -7,3 +7,6 @@ nmma.egg-info/
 # models
 svdmodels/Bu2019lm_lbol.pkl
 svdmodels/Bu2019lm_mag.pkl
+
+# misc
+.vscode/
