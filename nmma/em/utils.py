@@ -8,6 +8,7 @@ from scipy.interpolate import interpolate as interp
 import scipy.signal
 import scipy.constants
 import scipy.stats
+from sncosmo.bandpasses import _BANDPASSES
 
 import sncosmo
 import dust_extinction.shapes as dustShp
@@ -173,7 +174,21 @@ def getFilteredMag(mag, filt):
         "radio-1.25GHz",
         "radio-6GHz",
         "radio-3GHz",
+        "sdss__u",
+        "sdss__g",
+        "sdss__r",
+        "sdss__i",
+        "sdss__z",
+        "swope2__y",
+        "swope2__J",
+        "swope2__H",
     ]
+    sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
+    sncosmo_maps = {
+        name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts
+    }
+    sncosmo_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
+
     # These average between filters is equivalent to
     # the geometric mean of the flux. These averages
     # are kind of justifiable because the spectral
@@ -181,6 +196,8 @@ def getFilteredMag(mag, filt):
     # where \nu is the frequency.
     if filt in unprocessed_filt:
         return mag[filt]
+    elif filt in sncosmo_maps:
+        return mag[sncosmo_maps[filt]]
     elif filt == "w":
         return (mag["g"] + mag["r"] + mag["i"]) / 3.0
     elif filt in ["U", "UVW2", "UVW1", "UVM2"]:
@@ -198,8 +215,7 @@ def getFilteredMag(mag, filt):
     elif filt == "F160W":
         return mag["H"]
     else:
-        print("Unknown filter\n")
-        return 0
+        raise ValueError(f"Unknown filter: {filt}")
 
 
 def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
@@ -226,12 +242,19 @@ def loadEvent(filename):
     lines = [line.rstrip("\n") for line in open(filename)]
     lines = filter(None, lines)
 
+    sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
+    sncosmo_maps = {name: name.replace(":", "_") for name in sncosmo_filts}
+
     data = {}
     for line in lines:
         lineSplit = line.split(" ")
         lineSplit = list(filter(None, lineSplit))
         mjd = Time(lineSplit[0], format="isot").mjd
         filt = lineSplit[1]
+
+        if filt in sncosmo_maps:
+            filt = sncosmo_maps[filt]
+
         mag = float(lineSplit[2])
         dmag = float(lineSplit[3])
 
@@ -256,6 +279,25 @@ def loadEventSpec(filename):
     spec["error"][idx] = 0.5 * spec["data"][idx]
 
     return spec
+
+
+def interpolate_nans(data):
+
+    for name in data.keys():
+        for d in data[name].keys():
+            if d == "t":
+                continue
+            if not any(np.isnan(data[name][d])):
+                continue
+
+            ii = np.where(~np.isnan(data[name][d]))[0]
+            if len(ii) > 1:
+                f = interp.interp1d(
+                    data[name]["t"][ii], data[name][d][ii], fill_value="extrapolate"
+                )
+                data[name][d] = f(data[name]["t"])
+
+    return data
 
 
 def read_spectroscopy_files(
@@ -298,7 +340,9 @@ def read_spectroscopy_files(
     return data
 
 
-def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
+def read_photometry_files(
+    files, filters=None, tt=np.linspace(0, 14, 100), datatype="bulla"
+):
 
     data = {}
     for filename in files:
@@ -310,7 +354,7 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
         )
 
         # ZTF rest style file
-        if "forced.csv" in filename or "alerts.csv" in filename:
+        if datatype == "ztf":
             df = pd.read_csv(filename)
 
             if "mag" in df:
@@ -351,7 +395,24 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
                     assume_sorted=True,
                 )
                 data[name][filt] = lc(tt)
-        else:
+        elif datatype == "bulla":
+            with open(filename, "r") as f:
+                header = list(filter(None, f.readline().rstrip().strip("#").split(" ")))
+            df = pd.read_csv(
+                filename,
+                delimiter=" ",
+                comment="#",
+                header=0,
+                names=header,
+                index_col=False,
+            )
+            df.rename(columns={"t[days]": "t"}, inplace=True)
+            data[name] = df.to_dict(orient="series")
+            data[name] = {
+                k.replace(":", "_"): v.to_numpy() for k, v in data[name].items()
+            }
+
+        elif datatype == "standard":
             mag_d = np.loadtxt(filename)
             mag_d_shape = mag_d.shape
 
@@ -373,6 +434,8 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
                 data[name]["V"] = mag_d[:, 12]
                 data[name]["R"] = mag_d[:, 13]
                 data[name]["I"] = mag_d[:, 14]
+        else:
+            raise ValueError(f"datatype {datatype} unknown")
 
         if filters is not None:
             filters_to_remove = set(list(data[name].keys())) - set(filters + ["t"])
@@ -382,7 +445,7 @@ def read_photometry_files(files, filters=None, tt=np.linspace(0, 14, 100)):
     return data
 
 
-def get_default_filts_lambdas():
+def get_default_filts_lambdas(filters=None):
 
     filts = [
         "u",
@@ -419,6 +482,30 @@ def get_default_filts_lambdas():
         [lambdas_sloan, lambdas_bessel, lambdas_radio, lambdas_Xray]
     )
 
+    bandpasses = [
+        sncosmo.get_bandpass(val["name"]) for val in _BANDPASSES.get_loaders_metadata()
+    ]
+
+    filts = filts + [band.name for band in bandpasses]
+    lambdas = np.concatenate([lambdas, [1e-10 * band.wave_eff for band in bandpasses]])
+
+    if filters is not None:
+        filts_slice = []
+        lambdas_slice = []
+
+        for filt in filters:
+            try:
+                ii = filts.index(filt)
+                filts_slice.append(filts[ii])
+                lambdas_slice.append(lambdas[ii])
+            except ValueError:
+                ii = filts.index(filt.replace("_", ":"))
+                filts_slice.append(filts[ii].replace(":", "_"))
+                lambdas_slice.append(lambdas[ii])
+
+        filts = filts_slice
+        lambdas = np.array(lambdas_slice)
+
     return filts, lambdas
 
 
@@ -437,7 +524,18 @@ def calc_lc(
         filters = list(svd_mag_model.keys())
 
     mAB = {}
+    # fill radio and X-ray with null light curves
+    mAB["radio-5.5GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-1.25GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-3GHz"] = np.inf * np.ones(len(tt))
+    mAB["radio-6GHz"] = np.inf * np.ones(len(tt))
+    mAB["X-ray-1keV"] = np.inf * np.ones(len(tt))
+    mAB["X-ray-5keV"] = np.inf * np.ones(len(tt))
+
     for jj, filt in enumerate(filters):
+        if filt in mAB:
+            continue
+
         if mag_ncoeff:
             n_coeff = min(mag_ncoeff, svd_mag_model[filt]["n_coeff"])
         else:
@@ -556,14 +654,6 @@ def calc_lc(
     else:
         lbol = np.inf * np.ones(len(tt))
 
-    # fill radio and X-ray with null light curves
-    mAB["radio-5.5GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-1.25GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-3GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-6GHz"] = np.inf * np.ones(len(tt))
-    mAB["X-ray-1keV"] = np.inf * np.ones(len(tt))
-    mAB["X-ray-5keV"] = np.inf * np.ones(len(tt))
-
     return np.squeeze(tt), np.squeeze(lbol), mAB
 
 
@@ -646,7 +736,7 @@ def fluxDensity(t, nu, **params):
     return mJy
 
 
-def grb_lc(t_day, Ebv, param_dict):
+def grb_lc(t_day, Ebv, param_dict, filters=None):
 
     day = 86400.0  # in seconds
     tStart = (np.amin(t_day)) * day
@@ -654,7 +744,7 @@ def grb_lc(t_day, Ebv, param_dict):
     tnode = min(len(t_day), 201)
     default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_0s = scipy.constants.c / lambdas
 
@@ -714,9 +804,10 @@ def sn_lc(
     regularize_band="sdssu",
     model_name="nugent-hyper",
     parameters={},
+    filters=None,
 ):
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nus = scipy.constants.c / (1e-10 * lambdas)
 
@@ -764,7 +855,7 @@ def sn_lc(
     return tt, lbol, mag
 
 
-def sc_lc(t_day, param_dict):
+def sc_lc(t_day, param_dict, filters=None):
 
     day = 86400.0  # in seconds
     t = t_day * day
@@ -776,7 +867,7 @@ def sc_lc(t_day, param_dict):
     Ebv = param_dict["Ebv"]
     z = param_dict["z"]
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)
@@ -855,7 +946,7 @@ def sc_lc(t_day, param_dict):
     return t_day, lbol, mag
 
 
-def metzger_lc(t_day, param_dict):
+def metzger_lc(t_day, param_dict, filters=None):
 
     # convert time from day to second
     day = 86400.0  # in seconds
@@ -898,7 +989,7 @@ def metzger_lc(t_day, param_dict):
 
     vm = v0 * np.power(m * Msun / M0, -1.0 / beta)
     vm[vm > c] = c
-    
+
     # define thermalization efficiency rom Barnes+16
     ca3 = 1.3
     cb3 = 0.2
@@ -928,7 +1019,7 @@ def metzger_lc(t_day, param_dict):
     Xn0 = Xn0max * 2 * np.arctan(Mn / m / Msun) / np.pi  # neutron mass fraction
     Xr = 1.0 - Xn0  # r-process fraction
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)
@@ -1011,9 +1102,9 @@ def metzger_lc(t_day, param_dict):
 
     for j in range(tprec - 1):
         # one zone calculation
-        
-        if E[j]<0.0: 
-            E[j]=np.abs(E[j])
+
+        if E[j] < 0.0:
+            E[j] = np.abs(E[j])
         temp[j] = 1e10 * (3 * E[j] / (arad * 4 * np.pi * R[j] ** (3))) ** (0.25)
         if temp[j] > 4000.0:
             kappaoz = kappa_r
@@ -1036,10 +1127,10 @@ def metzger_lc(t_day, param_dict):
         )
 
         if np.isnan(templayer).any():
-            templayer=np.nan_to_num(templayer)
-            templayer=abs(templayer)**0.25
+            templayer = np.nan_to_num(templayer)
+            templayer = abs(templayer) ** 0.25
         else:
-            templayer =  abs(templayer) ** (0.25)
+            templayer = abs(templayer) ** (0.25)
 
         kappa_correction = np.ones(templayer.shape)
         kappa_correction[templayer > 4000.0] = 1.0
@@ -1068,7 +1159,7 @@ def metzger_lc(t_day, param_dict):
 
         tau[mprec - 1, j] = tau[mprec - 2, j]
         # photosphere
-        pig = np.argmin(np.abs(tau[:, j])-1)
+        pig = np.argmin(np.abs(tau[:, j] - 1))
         vphoto[j] = vm[pig]
         Rphoto[j] = vphoto[j] * t[j]
         mphoto[j] = m[pig]
@@ -1081,10 +1172,7 @@ def metzger_lc(t_day, param_dict):
     Ltot = np.abs(Ltotm)
     lbol = Ltotm * 1e40
 
-
-    
     Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto**2 * sigSB)) ** (0.25)
-    
 
     ii = np.where(~np.isnan(Tobs) & (Tobs > 0))[0]
     f = interp.interp1d(t_day[ii], Tobs[ii], fill_value="extrapolate")
@@ -1118,7 +1206,7 @@ def metzger_lc(t_day, param_dict):
     return t_day, lbol, mag
 
 
-def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
+def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict, filters=None):
 
     # prevent the output message flooded by these warning messages
     old = np.seterr()
@@ -1155,7 +1243,7 @@ def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict):
         10, -0.4 * (powerlaw_mag + 48.6)
     )
 
-    filts, lambdas = get_default_filts_lambdas()
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_obs = scipy.constants.c / lambdas
     nu_host = nu_obs * (1 + z)
@@ -1537,8 +1625,8 @@ def get_knprops_from_LANLfilename(filename):
                     else:
                         vw /= 10
 
-            elif "KNTheta" in info:
-                KNTheta = float(info[7:])
+            elif "theta" in info:
+                KNTheta = float(info[5:])
 
         # Record velocity and ejecta mass for single component models
         elif num_comp == 1:
@@ -1564,8 +1652,8 @@ def get_knprops_from_LANLfilename(filename):
             elif "Ye" == info[:2]:
                 wind = float(info[2:]) / 100
 
-            elif "KNTheta" in info:
-                KNTheta = float(info[7:])
+            elif "theta" in info:
+                KNTheta = float(info[5:])
 
     param_values = {
         "morphology": morph,

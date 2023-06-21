@@ -9,6 +9,8 @@ from scipy.special import logsumexp
 
 from . import utils
 
+from ..utils.models import get_models_home, get_model
+
 ln10 = np.log(10)
 
 # As different KN models have very different parameters,
@@ -131,6 +133,9 @@ class SVDLightCurveModel(object):
         mag_ncoeff highest eigenvalues to be taken for mag's SVD evaluation
     lbol_ncoeff: int
         lbol_ncoeff highest eigenvalues to be taken for lbol's SVD evaluation
+    filters : List[str]
+        List of filters to create model for.
+        Defaults to all available filters.
 
     Returns
     -------
@@ -149,6 +154,7 @@ class SVDLightCurveModel(object):
         lbol_ncoeff=None,
         interpolation_type="sklearn_gp",
         model_parameters=None,
+        filters=None,
     ):
 
         if model_parameters is None:
@@ -167,13 +173,15 @@ class SVDLightCurveModel(object):
         self.lbol_ncoeff = lbol_ncoeff
 
         self.interpolation_type = interpolation_type
+        self.filters = filters
 
         if svd_path is None:
-            self.svd_path = os.path.join(os.path.dirname(__file__), "svdmodels")
+            self.svd_path = get_models_home()
         else:
             self.svd_path = svd_path
 
         if self.interpolation_type == "sklearn_gp":
+            get_model(self.svd_path, f"{self.model}", filters=filters)
             modelfile = os.path.join(self.svd_path, "{0}.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
@@ -183,12 +191,14 @@ class SVDLightCurveModel(object):
                 for filt in self.svd_mag_model.keys():
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
-                        continue
-                    with open(outfile, "rb") as handle:
-                        self.svd_mag_model[filt]["gps"] = pickle.load(handle)
-
+                        print(f"Could not find model file for filter {filt}")
+                    else:
+                        print(f"Loaded filter {filt}")
+                        with open(outfile, "rb") as handle:
+                            self.svd_mag_model[filt]["gps"] = pickle.load(handle)
                 self.svd_lbol_model = None
             else:
+                # Try old style request
                 mag_modelfile = os.path.join(self.svd_path, "{0}_mag.pkl".format(model))
                 with open(mag_modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
@@ -197,10 +207,11 @@ class SVDLightCurveModel(object):
                 for filt in self.svd_mag_model.keys():
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
-                        continue
-                    with open(outfile, "rb") as handle:
-                        self.svd_mag_model[filt]["gps"] = pickle.load(handle)
-
+                        print(f"Could not find model file for filter {filt}")
+                    else:
+                        print(f"Loaded filter {filt}")
+                        with open(outfile, "rb") as handle:
+                            self.svd_mag_model[filt]["gps"] = pickle.load(handle)
                 lbol_modelfile = os.path.join(
                     self.svd_path, "{0}_lbol.pkl".format(model)
                 )
@@ -225,6 +236,7 @@ class SVDLightCurveModel(object):
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
 
+            get_model(self.svd_path, f"{self.model}_tf", filters=filters)
             modelfile = os.path.join(self.svd_path, "{0}_tf.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
@@ -235,6 +247,7 @@ class SVDLightCurveModel(object):
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
             else:
+                get_model(self.svd_path, f"{self.model}_mag_tf", filters=filters)
                 mag_modelfile = os.path.join(
                     self.svd_path, "{0}_mag_tf.pkl".format(model)
                 )
@@ -245,6 +258,9 @@ class SVDLightCurveModel(object):
                     outfile = os.path.join(outdir, f"{filt}.h5")
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
 
+                get_model(
+                    self.svd_path, f"{self.model}_lbol_tf", self.svd_mag_model.keys()
+                )
                 lbol_modelfile = os.path.join(
                     self.svd_path, "{0}_lbol_tf.pkl".format(model)
                 )
@@ -274,7 +290,7 @@ class SVDLightCurveModel(object):
     def generate_lightcurve(self, sample_times, parameters):
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -294,6 +310,7 @@ class SVDLightCurveModel(object):
             mag_ncoeff=self.mag_ncoeff,
             lbol_ncoeff=self.lbol_ncoeff,
             interpolation_type=self.interpolation_type,
+            filters=self.filters,
         )
         lbol *= 1.0 + z
         for filt in mag.keys():
@@ -304,7 +321,7 @@ class SVDLightCurveModel(object):
     def generate_spectra(self, sample_times, wavelengths, parameters):
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -338,6 +355,7 @@ class GRBLightCurveModel(object):
         model="TrPi2018",
         resolution=12,
         jetType=0,
+        filters=None,
     ):
         """A light curve model object
 
@@ -365,6 +383,7 @@ class GRBLightCurveModel(object):
         self.parameter_conversion = parameter_conversion
         self.resolution = resolution
         self.jetType = jetType
+        self.filters = filters
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
@@ -373,7 +392,7 @@ class GRBLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -410,7 +429,9 @@ class GRBLightCurveModel(object):
 
         Ebv = new_parameters.get("Ebv", 0.0)
 
-        _, lbol, mag = utils.grb_lc(sample_times, Ebv, grb_param_dict)
+        _, lbol, mag = utils.grb_lc(
+            sample_times, Ebv, grb_param_dict, filters=self.filters
+        )
         return lbol, mag
 
 
@@ -457,7 +478,7 @@ class KilonovaGRBLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -508,7 +529,13 @@ class KilonovaGRBLightCurveModel(object):
 
 
 class SupernovaLightCurveModel(object):
-    def __init__(self, sample_times, parameter_conversion=None, model="nugent-hyper"):
+    def __init__(
+        self,
+        sample_times,
+        parameter_conversion=None,
+        model="nugent-hyper",
+        filters=None,
+    ):
         """A light curve model object
 
         An object to evaluted the supernova light curve across filters
@@ -529,6 +556,7 @@ class SupernovaLightCurveModel(object):
         self.sample_times = sample_times
         self.parameter_conversion = parameter_conversion
         self.model = model
+        self.filters = filters
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={self.model})"
@@ -537,7 +565,7 @@ class SupernovaLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -546,7 +574,12 @@ class SupernovaLightCurveModel(object):
         Ebv = new_parameters.get("Ebv", 0.0)
 
         _, lbol, mag = utils.sn_lc(
-            sample_times, z, Ebv, model_name=self.model, parameters=new_parameters
+            sample_times,
+            z,
+            Ebv,
+            model_name=self.model,
+            parameters=new_parameters,
+            filters=self.filters,
         )
 
         if self.model == "nugent-hyper":
@@ -624,7 +657,9 @@ class SupernovaGRBLightCurveModel(object):
 
 
 class ShockCoolingLightCurveModel(object):
-    def __init__(self, sample_times, parameter_conversion=None, model="Piro2021"):
+    def __init__(
+        self, sample_times, parameter_conversion=None, model="Piro2021", filters=None
+    ):
         """A light curve model object
 
         An object to evaluted the shock cooling light curve across filters
@@ -648,6 +683,7 @@ class ShockCoolingLightCurveModel(object):
         self.model_parameters = model_parameters_dict[model]
         self.sample_times = sample_times
         self.parameter_conversion = parameter_conversion
+        self.filters = filters
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
@@ -656,7 +692,7 @@ class ShockCoolingLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -669,12 +705,12 @@ class ShockCoolingLightCurveModel(object):
         param_dict["z"] = z
         param_dict["Ebv"] = Ebv
 
-        _, lbol, mag = utils.sc_lc(sample_times, param_dict)
+        _, lbol, mag = utils.sc_lc(sample_times, param_dict, filters=self.filters)
         return lbol, mag
 
 
 class SupernovaShockCoolingLightCurveModel(object):
-    def __init__(self, sample_times, parameter_conversion=None):
+    def __init__(self, sample_times, parameter_conversion=None, filters=None):
 
         self.sample_times = sample_times
 
@@ -684,6 +720,7 @@ class SupernovaShockCoolingLightCurveModel(object):
         self.supernova_lightcurve_model = SupernovaLightCurveModel(
             sample_times, parameter_conversion
         )
+        self.filters = filters
 
     def __repr__(self):
         details = (
@@ -697,7 +734,9 @@ class SupernovaShockCoolingLightCurveModel(object):
         total_mag = {}
 
         sc_lbol, sc_mag = self.sc_lightcurve_model.generate_lightcurve(
-            sample_times, parameters
+            sample_times,
+            parameters,
+            filters=self.filters,
         )
 
         if np.sum(sc_lbol) == 0.0 or len(np.isfinite(sc_lbol)) == 0:
@@ -707,7 +746,9 @@ class SupernovaShockCoolingLightCurveModel(object):
             supernova_lbol,
             supernova_mag,
         ) = self.supernova_lightcurve_model.generate_lightcurve(
-            sample_times, parameters
+            sample_times,
+            parameters,
+            filters=self.filters,
         )
 
         if np.sum(supernova_lbol) == 0.0 or len(np.isfinite(supernova_lbol)) == 0:
@@ -733,7 +774,9 @@ class SupernovaShockCoolingLightCurveModel(object):
 
 
 class SimpleKilonovaLightCurveModel(object):
-    def __init__(self, sample_times, parameter_conversion=None, model="Me2017"):
+    def __init__(
+        self, sample_times, parameter_conversion=None, model="Me2017", filters=None
+    ):
         """A light curve model object
 
         An object to evaluted the kilonova (with Me2017) light curve across filters
@@ -757,6 +800,7 @@ class SimpleKilonovaLightCurveModel(object):
         self.model_parameters = model_parameters_dict[model]
         self.sample_times = sample_times
         self.parameter_conversion = parameter_conversion
+        self.filters = filters
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
@@ -765,7 +809,7 @@ class SimpleKilonovaLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters)
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
         else:
             new_parameters = parameters.copy()
 
@@ -779,9 +823,11 @@ class SimpleKilonovaLightCurveModel(object):
         param_dict["Ebv"] = Ebv
 
         if self.model == "Me2017":
-            _, lbol, mag = utils.metzger_lc(sample_times, param_dict)
+            _, lbol, mag = utils.metzger_lc(
+                sample_times, param_dict, filters=self.filters
+            )
         elif self.model == "PL_BB_fixedT":
             _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(
-                sample_times, param_dict
+                sample_times, param_dict, filters=self.filters
             )
         return lbol, mag

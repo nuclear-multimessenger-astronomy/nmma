@@ -7,7 +7,7 @@ import inspect
 
 from .training import SVDTrainingModel
 from .model import SVDLightCurveModel
-from .utils import read_photometry_files, read_spectroscopy_files
+from .utils import read_photometry_files, read_spectroscopy_files, interpolate_nans
 from . import model_parameters
 
 
@@ -46,6 +46,12 @@ def main():
         "--data-path",
         type=str,
         help="Path to the directory of light curve files",
+    )
+    parser.add_argument(
+        "--data-file-type",
+        type=str,
+        help="Type of light curve files [bulla, standard, ztf]",
+        default="standard",
     )
     parser.add_argument(
         "--interpolation_type",
@@ -155,7 +161,7 @@ def main():
 
     if args.data_type == "photometry":
         try:
-            data = read_photometry_files(filenames)
+            data = read_photometry_files(filenames, datatype=args.data_file_type)
         except IndexError:
             raise IndexError(
                 "If there are bolometric light curves in your --data-path, try setting --ignore-bolometric"
@@ -169,6 +175,8 @@ def main():
     else:
         raise ValueError("data-type should be photometry or spectroscopy")
 
+    data = interpolate_nans(data)
+
     training_data, parameters = model_function(data)
     if args.axial_symmetry:
         training_data = axial_symmetry(training_data)
@@ -177,7 +185,7 @@ def main():
         filts = args.filters.split(",")
     else:
         keys = list(data.keys())
-        filts = list(set(data[keys[0]].keys()) - {"t"})
+        filts = sorted(list(set(data[keys[0]].keys()) - {"t"}))
 
     training_model = SVDTrainingModel(
         args.model,

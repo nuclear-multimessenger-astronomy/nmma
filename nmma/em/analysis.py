@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import scipy.constants
 import argparse
 import json
 import pandas as pd
@@ -174,6 +175,11 @@ def get_parser():
         help="Path to the output injection lightcurve",
     )
     parser.add_argument(
+        "--injection-model",
+        type=str,
+        help="Name of the kilonova model to be used for injection (default: the same as model used for recovery)",
+    )
+    parser.add_argument(
         "--remove-nondetections",
         action="store_true",
         default=False,
@@ -285,15 +291,23 @@ def get_parser():
 
     parser.add_argument(
         "--conditional-gaussian-prior-thetaObs",
-	  action="store_true",
-	  default=False,
-	  help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma"
+        action="store_true",
+        default=False,
+        help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma",
     )
 
     parser.add_argument(
         "--conditional-gaussian-prior-N-sigma",
-	  default=1,
-	  help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True"
+        default=1,
+        type=float,
+        help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True",
+    )
+
+    parser.add_argument(
+        "--sample-over-Hubble",
+        action="store_true",
+        default=False,
+        help="To sample over Hubble constant and redshift",
     )
 
     parser.add_argument(
@@ -304,6 +318,99 @@ def get_parser():
     )
 
     return parser
+
+
+def create_light_curve_model_from_args(
+    model_name_arg, args, sample_times, filters=None
+):
+    # check if sampling over Hubble,
+    # if so define the parameter_conversion accordingly
+    if args.sample_over_Hubble:
+
+        def parameter_conversion(converted_parameters, added_keys):
+            if "luminosity_distance" not in converted_parameters:
+                Hubble_constant = converted_parameters["Hubble_constant"]
+                redshift = converted_parameters["redshift"]
+                # redshift is supposed to be dimensionless
+                # Hubble constant is supposed to be km/s/Mpc
+                distance = redshift / Hubble_constant * scipy.constants.c / 1e3
+                converted_parameters["luminosity_distance"] = distance
+                added_keys = added_keys + ["luminosity_distance"]
+            return converted_parameters, added_keys
+
+    else:
+        parameter_conversion = None
+
+    models = []
+    # check if there are more than one model
+    if "," in model_name_arg:
+        print("Running with combination of multiple light curve models")
+        model_names = model_name_arg.split(",")
+    else:
+        model_names = [model_name_arg]
+
+    for model_name in model_names:
+        if model_name == "TrPi2018":
+            lc_model = GRBLightCurveModel(
+                sample_times=sample_times,
+                resolution=args.grb_resolution,
+                jetType=args.jet_type,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == "nugent-hyper":
+            lc_model = SupernovaLightCurveModel(
+                sample_times=sample_times,
+                model="nugent-hyper",
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == "salt2":
+            lc_model = SupernovaLightCurveModel(
+                sample_times=sample_times,
+                model="salt2",
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == "Piro2021":
+            lc_model = ShockCoolingLightCurveModel(
+                sample_times=sample_times,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
+            lc_model = SimpleKilonovaLightCurveModel(
+                sample_times=sample_times,
+                model=model_name,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        else:
+            lc_kwargs = dict(
+                model=model_name,
+                sample_times=sample_times,
+                svd_path=args.svd_path,
+                mag_ncoeff=args.svd_mag_ncoeff,
+                lbol_ncoeff=args.svd_lbol_ncoeff,
+                interpolation_type=args.interpolation_type,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+            lc_model = SVDLightCurveModel(**lc_kwargs)
+
+        models.append(lc_model)
+
+        if len(models) > 1:
+            light_curve_model = GenericCombineLightCurveModel(models, sample_times)
+        else:
+            light_curve_model = models[0]
+
+    return model_names, models, light_curve_model
 
 
 def main(args=None):
@@ -317,58 +424,12 @@ def main(args=None):
 
     # initialize light curve model
     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    print("Creating light curve model for inference")
 
-    models = []
-    # check if there are more than one model
-    if "," in args.model:
-        print("Running with combination of multiple light curve models")
-        model_names = args.model.split(",")
+    if args.filters:
+        filters = args.filters.split(",")
     else:
-        model_names = [args.model]
-
-    for model_name in model_names:
-        if model_name == "TrPi2018":
-            lc_model = GRBLightCurveModel(
-                sample_times=sample_times,
-                resolution=args.grb_resolution,
-                jetType=args.jet_type,
-            )
-
-        elif model_name == "nugent-hyper":
-            lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model="nugent-hyper"
-            )
-
-        elif model_name == "salt2":
-            lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model="salt2"
-            )
-
-        elif model_name == "Piro2021":
-            lc_model = ShockCoolingLightCurveModel(sample_times=sample_times)
-
-        elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
-            lc_model = SimpleKilonovaLightCurveModel(
-                sample_times=sample_times, model=model_name
-            )
-
-        else:
-            lc_kwargs = dict(
-                model=model_name,
-                sample_times=sample_times,
-                svd_path=args.svd_path,
-                mag_ncoeff=args.svd_mag_ncoeff,
-                lbol_ncoeff=args.svd_lbol_ncoeff,
-                interpolation_type=args.interpolation_type,
-            )
-            lc_model = SVDLightCurveModel(**lc_kwargs)
-
-        models.append(lc_model)
-
-        if len(models) > 1:
-            light_curve_model = GenericCombineLightCurveModel(models, sample_times)
-        else:
-            light_curve_model = models[0]
+        filters = None
 
     # create the kilonova data if an injection set is given
     if args.injection:
@@ -407,13 +468,20 @@ def main(args=None):
         args.kilonova_tstep = args.dt
         args.kilonova_error = args.photometric_error_budget
 
-        args.kilonova_injection_model = args.model
+        if not args.injection_model:
+            args.kilonova_injection_model = args.model
+        else:
+            args.kilonova_injection_model = args.injection_model
         args.kilonova_injection_svd = args.svd_path
         args.injection_svd_mag_ncoeff = args.svd_mag_ncoeff
         args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
 
+        print("Creating injection light curve model")
+        _, _, injection_model = create_light_curve_model_from_args(
+            args.kilonova_injection_model, args, sample_times, filters=filters
+        )
         data = create_light_curve_data(
-            injection_parameters, args, light_curve_model=light_curve_model
+            injection_parameters, args, light_curve_model=injection_model
         )
         print("Injection generated")
 
@@ -563,28 +631,30 @@ def main(args=None):
             name="Ebv", peak=0.0, latex_label="$E(B-V)$"
         )
 
-
     # re-setup the prior if the conditional prior for inclination is used
 
     if args.conditional_gaussian_prior_thetaObs:
         priors_dict = dict(priors)
-        original_iota_prior = priors_dict['inclination_EM']
-        setup = dict(minimum = original_iota_prior.minimum,
-                     maximum = original_iota_prior.maximum,
-                     name = original_iota_prior.name,
-                     latex_label = original_iota_prior.latex_label,
-                     unit = original_iota_prior.unit,
-                     boundary = original_iota_prior.boundary,
-                     N_sigma = args.conditional_gaussian_prior_N_sigma)
+        original_iota_prior = priors_dict["inclination_EM"]
+        setup = dict(
+            minimum=original_iota_prior.minimum,
+            maximum=original_iota_prior.maximum,
+            name=original_iota_prior.name,
+            latex_label=original_iota_prior.latex_label,
+            unit=original_iota_prior.unit,
+            boundary=original_iota_prior.boundary,
+            N_sigma=args.conditional_gaussian_prior_N_sigma,
+        )
 
-        priors_dict['inclination_EM'] = ConditionalGaussianIotaGivenThetaCore(**setup)
+        priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
 
-
-
-
-
-
+    model_names, models, light_curve_model = create_light_curve_model_from_args(
+        args.model,
+        args,
+        sample_times,
+        filters=filters_to_analyze,
+    )
 
     # setup the likelihood
     if args.detection_limit:
@@ -613,7 +683,7 @@ def main(args=None):
         label=args.label,
         nlive=args.nlive,
         seed=args.seed,
-        soft_init=True,
+        soft_init=False,
         queue_size=args.cpus,
         check_point_delta_t=3600,
     )

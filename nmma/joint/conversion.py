@@ -19,6 +19,21 @@ from bilby.gw.conversion import (
 )
 
 
+def Hubble_constant_to_distance(converted_parameters, added_keys):
+    # FIXME for future detection with high redshift
+    # a proper cosmological model is needed
+    if "redshift" in converted_parameters.keys() and "Hubble_constant" in converted_parameters.keys():
+        Hubble_constant = converted_parameters["Hubble_constant"]
+        redshift = converted_parameters["redshift"]
+        # redshift is supposed to be dimensionless
+        # Hubble constant is supposed to be km/s/Mpc
+        distance = redshift / Hubble_constant * scipy.constants.c / 1e3
+        converted_parameters["luminosity_distance"] = distance
+        added_keys = added_keys + ["luminosity_distance"]
+
+    return converted_parameters, added_keys
+
+
 def source_frame_masses(converted_parameters, added_keys):
 
     if "redshift" not in converted_parameters.keys():
@@ -458,6 +473,10 @@ class MultimessengerConversion(object):
             converted_parameters
         )
 
+        converted_parameters, added_keys = Hubble_constant_to_distance(
+            converted_parameters, added_keys
+        )
+
         converted_parameters, added_keys = source_frame_masses(
             converted_parameters, added_keys
         )
@@ -627,6 +646,10 @@ class MultimessengerConversionWithLambdas(object):
         original_keys = list(converted_parameters.keys())
         converted_parameters, added_keys = convert_to_lal_binary_black_hole_parameters(
             converted_parameters
+        )
+
+        converted_parameters, added_keys = Hubble_constant_to_distance(
+            converted_parameters, added_keys
         )
 
         converted_parameters, added_keys = source_frame_masses(

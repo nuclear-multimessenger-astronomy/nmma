@@ -1,9 +1,12 @@
 import json
 import os
+import pickle
+
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 from scipy.interpolate import interpolate as interp
+
+from ..utils.models import get_models_home, get_model
 
 
 class SVDTrainingModel(object):
@@ -76,7 +79,7 @@ class SVDTrainingModel(object):
                 os.mkdir(self.plotdir)
 
         if svd_path is None:
-            self.svd_path = os.path.join(os.path.dirname(__file__), "svdmodels")
+            self.svd_path = get_models_home()
         else:
             self.svd_path = svd_path
 
@@ -228,9 +231,7 @@ class SVDTrainingModel(object):
 
         try:
             from sklearn.gaussian_process import GaussianProcessRegressor
-            from sklearn.gaussian_process.kernels import (
-                RationalQuadratic,
-            )
+            from sklearn.gaussian_process.kernels import RationalQuadratic
         except ImportError:
             print("Install scikit-learn if you want to use it...")
             return
@@ -245,7 +246,12 @@ class SVDTrainingModel(object):
             nsvds, nparams = param_array_postprocess.shape
 
             # Set of Gaussian Process
-            kernel = 1.0 * RationalQuadratic(length_scale=1.0, alpha=0.1)
+            kernel = 1.0 * RationalQuadratic(
+                length_scale=1.0,
+                alpha=0.1,
+                length_scale_bounds=(1e-10, 1e10),
+                alpha_bounds=(1e-10, 1e10),
+            )
             gps = []
             for i in range(self.n_coeff):
                 if np.mod(i, 1) == 0:
@@ -324,15 +330,15 @@ class SVDTrainingModel(object):
 
             self.svd_model[filt]["gps"] = gps
 
-    def train_tensorflow_model(self):
+    def train_tensorflow_model(self, dropout_rate=0.6):
 
         try:
             import tensorflow as tf
 
             tf.get_logger().setLevel("ERROR")
-            from tensorflow.keras import Sequential
-            from tensorflow.keras.layers import Dense
             from sklearn.model_selection import train_test_split
+            from tensorflow.keras import Sequential
+            from tensorflow.keras.layers import Dense, Dropout
         except ImportError:
             print("Install tensorflow if you want to use it...")
             return
@@ -362,9 +368,9 @@ class SVDTrainingModel(object):
                     input_shape=(train_X.shape[1],),
                 )
             )
-            model.add(Dense(64, activation="relu", kernel_initializer="he_normal"))
-            model.add(Dense(128, activation="relu", kernel_initializer="he_normal"))
-            model.add(Dense(128, activation="relu", kernel_initializer="he_normal"))
+            # One/few layers of wide NN approximate GP
+            model.add(Dense(2048, activation="relu", kernel_initializer="he_normal"))
+            model.add(Dropout(dropout_rate))
             model.add(Dense(self.n_coeff))
 
             # compile the model
@@ -427,6 +433,7 @@ class SVDTrainingModel(object):
     def save_model(self):
 
         if self.interpolation_type == "sklearn_gp":
+            get_model(self.svd_path, f"{self.model}", self.svd_model.keys())
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
             outdir = modelfile.replace(".pkl", "")
             if not os.path.isdir(outdir):
@@ -441,6 +448,7 @@ class SVDTrainingModel(object):
                     )
                     del self.svd_model[filt]["gps"]
         elif self.interpolation_type == "tensorflow":
+            get_model(self.svd_path, f"{self.model}_tf", self.svd_model.keys())
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             outdir = modelfile.replace(".pkl", "")
             if not os.path.isdir(outdir):
@@ -450,6 +458,7 @@ class SVDTrainingModel(object):
                 self.svd_model[filt]["model"].save(outfile)
                 del self.svd_model[filt]["model"]
         elif self.interpolation_type == "api_gp":
+            get_model(self.svd_path, f"{self.model}_api", self.svd_model.keys())
             modelfile = os.path.join(self.svd_path, f"{self.model}_api.pkl")
 
         with open(modelfile, "wb") as handle:
@@ -458,6 +467,7 @@ class SVDTrainingModel(object):
     def load_model(self):
 
         if self.interpolation_type == "sklearn_gp":
+            get_model(self.svd_path, f"{self.model}", self.svd_model.keys())
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
@@ -476,7 +486,7 @@ class SVDTrainingModel(object):
             except ImportError:
                 print("Install tensorflow if you want to use it...")
                 return
-
+            get_model(self.svd_path, f"{self.model}_tf", self.svd_model.keys())
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
@@ -484,8 +494,10 @@ class SVDTrainingModel(object):
             outdir = modelfile.replace(".pkl", "")
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.h5")
+                print(outfile)
                 self.svd_model[filt]["model"] = load_tf_model(outfile)
         elif self.interpolation_type == "api_gp":
+            get_model(self.svd_path, f"{self.model}_api", self.svd_model.keys())
             modelfile = os.path.join(self.svd_path, f"{self.model}_api.pkl")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
@@ -508,8 +520,8 @@ def load_api_gp_model(gp):
     gp_api.gaussian_process.GaussianProcess
     """
 
-    from gp_api.kernels import from_json as load_kernel
     from gp_api.gaussian_process import GaussianProcess
+    from gp_api.kernels import from_json as load_kernel
 
     param_names = gp.get("param_names", None)
     if param_names is not None:
