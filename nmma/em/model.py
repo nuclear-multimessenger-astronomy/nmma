@@ -3,9 +3,9 @@ from __future__ import division
 import copy
 import os
 import pickle
-
 import numpy as np
 from scipy.special import logsumexp
+import scipy.constants
 
 from . import utils
 
@@ -573,7 +573,7 @@ class SupernovaLightCurveModel(object):
 
         Ebv = new_parameters.get("Ebv", 0.0)
 
-        _, lbol, mag = utils.sn_lc(
+        tt, lbol, mag = utils.sn_lc(
             sample_times,
             z,
             Ebv,
@@ -831,3 +831,100 @@ class SimpleKilonovaLightCurveModel(object):
                 sample_times, param_dict, filters=self.filters
             )
         return lbol, mag
+
+
+def create_light_curve_model_from_args(
+    model_name_arg,
+    args,
+    sample_times,
+    filters=None,
+    sample_over_Hubble=False,
+):
+    # check if sampling over Hubble,
+    # if so define the parameter_conversion accordingly
+    if sample_over_Hubble:
+
+        def parameter_conversion(converted_parameters, added_keys):
+            if "luminosity_distance" not in converted_parameters:
+                Hubble_constant = converted_parameters["Hubble_constant"]
+                redshift = converted_parameters["redshift"]
+                # redshift is supposed to be dimensionless
+                # Hubble constant is supposed to be km/s/Mpc
+                distance = redshift / Hubble_constant * scipy.constants.c / 1e3
+                converted_parameters["luminosity_distance"] = distance
+                added_keys = added_keys + ["luminosity_distance"]
+            return converted_parameters, added_keys
+
+    else:
+        parameter_conversion = None
+
+    models = []
+    # check if there are more than one model
+    if "," in model_name_arg:
+        print("Running with combination of multiple light curve models")
+        model_names = model_name_arg.split(",")
+    else:
+        model_names = [model_name_arg]
+
+    for model_name in model_names:
+        if model_name == "TrPi2018":
+            lc_model = GRBLightCurveModel(
+                sample_times=sample_times,
+                resolution=args.grb_resolution,
+                jetType=args.jet_type,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == "nugent-hyper":
+            lc_model = SupernovaLightCurveModel(
+                sample_times=sample_times,
+                model="nugent-hyper",
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == "salt2":
+            lc_model = SupernovaLightCurveModel(
+                sample_times=sample_times,
+                model="salt2",
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == "Piro2021":
+            lc_model = ShockCoolingLightCurveModel(
+                sample_times=sample_times,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
+            lc_model = SimpleKilonovaLightCurveModel(
+                sample_times=sample_times,
+                model=model_name,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        else:
+            lc_kwargs = dict(
+                model=model_name,
+                sample_times=sample_times,
+                svd_path=args.svd_path,
+                mag_ncoeff=args.svd_mag_ncoeff,
+                lbol_ncoeff=args.svd_lbol_ncoeff,
+                interpolation_type=args.interpolation_type,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+            lc_model = SVDLightCurveModel(**lc_kwargs)
+
+        models.append(lc_model)
+
+    if len(models) > 1:
+        light_curve_model = GenericCombineLightCurveModel(models, sample_times)
+    else:
+        light_curve_model = models[0]
+
+    return model_names, models, light_curve_model

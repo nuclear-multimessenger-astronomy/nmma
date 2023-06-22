@@ -402,7 +402,7 @@ def read_photometry_files(
                 filename,
                 delimiter=" ",
                 comment="#",
-                header=0,
+                header=None,
                 names=header,
                 index_col=False,
             )
@@ -443,6 +443,23 @@ def read_photometry_files(
                 del data[name][filt]
 
     return data
+
+
+def read_lightcurve_file(filename):
+
+    with open(filename, "r") as f:
+        header = list(filter(None, f.readline().rstrip().strip("#").split(" ")))
+    df = pd.read_csv(
+        filename,
+        delimiter=" ",
+        comment="#",
+        header=None,
+        names=header,
+        index_col=False,
+    )
+    df.rename(columns={"t[days]": "t"}, inplace=True)
+
+    return df.to_dict(orient="series")
 
 
 def get_default_filts_lambdas(filters=None):

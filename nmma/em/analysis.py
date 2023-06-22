@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import scipy.constants
 import argparse
 import json
 import pandas as pd
@@ -14,11 +13,7 @@ import bilby
 import bilby.core
 from bilby.core.likelihood import ZeroLikelihood
 
-from .model import SVDLightCurveModel, GRBLightCurveModel, SupernovaLightCurveModel
-from .model import ShockCoolingLightCurveModel
-from .model import SimpleKilonovaLightCurveModel
-from .model import GenericCombineLightCurveModel
-from .model import model_parameters_dict
+from .model import model_parameters_dict, create_light_curve_model_from_args
 from .utils import loadEvent, getFilteredMag
 from .injection import create_light_curve_data
 from .likelihood import OpticalLightCurve
@@ -320,99 +315,6 @@ def get_parser():
     return parser
 
 
-def create_light_curve_model_from_args(
-    model_name_arg, args, sample_times, filters=None
-):
-    # check if sampling over Hubble,
-    # if so define the parameter_conversion accordingly
-    if args.sample_over_Hubble:
-
-        def parameter_conversion(converted_parameters, added_keys):
-            if "luminosity_distance" not in converted_parameters:
-                Hubble_constant = converted_parameters["Hubble_constant"]
-                redshift = converted_parameters["redshift"]
-                # redshift is supposed to be dimensionless
-                # Hubble constant is supposed to be km/s/Mpc
-                distance = redshift / Hubble_constant * scipy.constants.c / 1e3
-                converted_parameters["luminosity_distance"] = distance
-                added_keys = added_keys + ["luminosity_distance"]
-            return converted_parameters, added_keys
-
-    else:
-        parameter_conversion = None
-
-    models = []
-    # check if there are more than one model
-    if "," in model_name_arg:
-        print("Running with combination of multiple light curve models")
-        model_names = model_name_arg.split(",")
-    else:
-        model_names = [model_name_arg]
-
-    for model_name in model_names:
-        if model_name == "TrPi2018":
-            lc_model = GRBLightCurveModel(
-                sample_times=sample_times,
-                resolution=args.grb_resolution,
-                jetType=args.jet_type,
-                parameter_conversion=parameter_conversion,
-                filters=filters,
-            )
-
-        elif model_name == "nugent-hyper":
-            lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times,
-                model="nugent-hyper",
-                parameter_conversion=parameter_conversion,
-                filters=filters,
-            )
-
-        elif model_name == "salt2":
-            lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times,
-                model="salt2",
-                parameter_conversion=parameter_conversion,
-                filters=filters,
-            )
-
-        elif model_name == "Piro2021":
-            lc_model = ShockCoolingLightCurveModel(
-                sample_times=sample_times,
-                parameter_conversion=parameter_conversion,
-                filters=filters,
-            )
-
-        elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
-            lc_model = SimpleKilonovaLightCurveModel(
-                sample_times=sample_times,
-                model=model_name,
-                parameter_conversion=parameter_conversion,
-                filters=filters,
-            )
-
-        else:
-            lc_kwargs = dict(
-                model=model_name,
-                sample_times=sample_times,
-                svd_path=args.svd_path,
-                mag_ncoeff=args.svd_mag_ncoeff,
-                lbol_ncoeff=args.svd_lbol_ncoeff,
-                interpolation_type=args.interpolation_type,
-                parameter_conversion=parameter_conversion,
-                filters=filters,
-            )
-            lc_model = SVDLightCurveModel(**lc_kwargs)
-
-        models.append(lc_model)
-
-        if len(models) > 1:
-            light_curve_model = GenericCombineLightCurveModel(models, sample_times)
-        else:
-            light_curve_model = models[0]
-
-    return model_names, models, light_curve_model
-
-
 def main(args=None):
 
     if args is None:
@@ -478,7 +380,11 @@ def main(args=None):
 
         print("Creating injection light curve model")
         _, _, injection_model = create_light_curve_model_from_args(
-            args.kilonova_injection_model, args, sample_times, filters=filters
+            args.kilonova_injection_model,
+            args,
+            sample_times,
+            filters=filters,
+            sample_over_Hubble=args.sample_over_Hubble,
         )
         data = create_light_curve_data(
             injection_parameters, args, light_curve_model=injection_model
@@ -654,6 +560,7 @@ def main(args=None):
         args,
         sample_times,
         filters=filters_to_analyze,
+        sample_over_Hubble=args.sample_over_Hubble,
     )
 
     # setup the likelihood
