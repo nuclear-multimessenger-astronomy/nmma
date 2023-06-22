@@ -484,12 +484,12 @@ class SVDTrainingModel(object):
             except ImportError:
                 print("Install tensorflow if you want to use it...")
                 return
-            get_model(self.svd_path, f"{self.model}_tf", self.filters, format='h5')
-            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.h5")
+            get_model(self.svd_path, f"{self.model}_tf", self.filters)
+            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
 
-            outdir = modelfile.replace(".h5", "")
+            outdir = modelfile.replace(".pkl", "")
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.h5")
                 self.svd_model[filt]["model"] = load_tf_model(outfile)

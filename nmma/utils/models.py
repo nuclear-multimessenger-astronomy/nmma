@@ -151,7 +151,6 @@ def get_model(
     models_home=None,
     model_name=None,
     filters=[],
-    format="pkl",
     download_if_missing=True,
 ):
     global DOI
@@ -189,12 +188,17 @@ def get_model(
         raise ValueError(
             f'Zenodo does not have filters {",".join(missing_filters)} for {model_name}'
         )
+    
+    core_format = "pkl"
+    filter_format = "pkl"
+    if '_tf' in model_name:
+        filter_format = 'h5'
 
-    filepaths = [Path(models_home, f"{model_name}.{format}")] + [
-        Path(models_home, model_name, f"{f}.{format}") for f in filters
+    filepaths = [Path(models_home, f"{model_name}.{core_format}")] + [
+        Path(models_home, model_name, f"{f}.{filter_format}") for f in filters
     ]
-    urls = [f"{base_url}/{model_name}.{format}?download=1"] + [
-        f"{base_url}/{model_name}_{f}.{format}?download=1" for f in filters
+    urls = [f"{base_url}/{model_name}.{core_format}?download=1"] + [
+        f"{base_url}/{model_name}_{f}.{filter_format}?download=1" for f in filters
     ]
 
     missing = [(u, f) for u, f in zip(urls, filepaths) if not f.exists()]
@@ -215,4 +219,4 @@ def get_model(
 if __name__ == "__main__":
     # TODO: remove, this is for testing only
     refresh_models_list()
-    print(get_model("svdmodels", "Bu2019nsbh", filters=["sdssu"]))
+    print(get_model("svdmodels", "Bu2022Ye_tf", filters=["sdssu"]))
