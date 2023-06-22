@@ -133,7 +133,9 @@ except Exception as e:
     raise ValueError(f"Could not load models list: {str(e)}")
 
 def refresh_models_list(models_home=None):
+    global DOI
     global MODELS
+    DOI = get_latest_zenodo_doi(PERMANENT_DOI)
     models_home = get_models_home(models_home)
     if exists(Path(models_home, "models.yaml")):
         Path(models_home, "models.yaml").unlink()
