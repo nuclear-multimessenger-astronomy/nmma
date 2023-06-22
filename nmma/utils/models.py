@@ -13,6 +13,8 @@ from yaml import load
 from multiprocessing import cpu_count
 
 PERMANENT_DOI = "8039909"
+DOI = ""
+MODELS = {}
 
 RemoteFileMetadata = namedtuple("RemoteFileMetadata", ["filename", "url", "checksum"])
 
@@ -103,34 +105,57 @@ def download_models_list(doi=None):
 
 def load_models_list(doi=None):
     # if models.yaml doesn't exist, download it
+    global DOI
     models_home = get_models_home()
     if not exists(Path(models_home, "models.yaml")):
-        download_models_list(doi=doi)
+        try:
+            if doi in [None, ""]:
+                DOI = get_latest_zenodo_doi(PERMANENT_DOI)
+                doi = DOI
+            download_models_list(doi=DOI)
+        except ConnectionError:
+            print("Could not connect to Zenodo, models might not be available or up-to-date")
+            pass
     try:
         from yaml import CLoader as Loader
     except ImportError:
         from yaml import Loader
     with open(Path(models_home, "models.yaml"), "r") as f:
         models = load(f, Loader=Loader)
+
+    # temporary mapping
+    models["Bu2019lm"] = models["Bu2019bns"]
     return models
 
-
 try:
-    DOI = get_latest_zenodo_doi(PERMANENT_DOI)
     MODELS = load_models_list(DOI)
-    # FIXME: temporary mapping
-    MODELS["Bu2019lm"] = MODELS["Bu2019bns"]
-except ConnectionError:
-    DOI = ""
-    MODELS = {}
+except Exception as e:
+    raise ValueError(f"Could not load models list: {str(e)}")
 
+def refresh_models_list(models_home=None):
+    global MODELS
+    models_home = get_models_home(models_home)
+    if exists(Path(models_home, "models.yaml")):
+        Path(models_home, "models.yaml").unlink()
+    models = MODELS
+    try:
+        models = load_models_list(DOI)
+        MODELS = models
+    except Exception as e:
+        raise ValueError(f"Could not load models list: {str(e)}")
+    return models
 
 def get_model(
     models_home=None,
     model_name=None,
     filters=[],
+    format="pkl",
     download_if_missing=True,
 ):
+    global DOI
+    if DOI in [None, ""]:
+        DOI = get_latest_zenodo_doi(PERMANENT_DOI)
+
     base_url = f"https://zenodo.org/record/{DOI}/files"
     if model_name is None:
         raise ValueError("model_name must be specified, got None")
@@ -141,8 +166,9 @@ def get_model(
             []
         )  # TODO: upload all the models on zenodo so we can throw an error here instead of returning an empty list
     model_info = MODELS[model_name]
-
     models_home = get_models_home(models_home)
+
+    print(f"Using models found in {models_home}")
     if not exists(models_home):
         makedirs(models_home)
     if not exists(Path(models_home, model_name)):
@@ -162,11 +188,11 @@ def get_model(
             f'Zenodo does not have filters {",".join(missing_filters)} for {model_name}'
         )
 
-    filepaths = [Path(models_home, f"{model_name}.pkl")] + [
-        Path(models_home, model_name, f"{f}.pkl") for f in filters
+    filepaths = [Path(models_home, f"{model_name}.{format}")] + [
+        Path(models_home, model_name, f"{f}.{format}") for f in filters
     ]
-    urls = [f"{base_url}/{model_name}.pkl?download=1"] + [
-        f"{base_url}/{model_name}_{f}.pkl?download=1" for f in filters
+    urls = [f"{base_url}/{model_name}.{format}?download=1"] + [
+        f"{base_url}/{model_name}_{f}.{format}?download=1" for f in filters
     ]
 
     missing = [(u, f) for u, f in zip(urls, filepaths) if not f.exists()]
@@ -186,4 +212,5 @@ def get_model(
 
 if __name__ == "__main__":
     # TODO: remove, this is for testing only
+    refresh_models_list()
     print(get_model("svdmodels", "Bu2019nsbh", filters=["sdssu"]))

@@ -1,25 +1,25 @@
-import os
-import glob
 import argparse
-import numpy as np
-import healpy as hp
+import glob
+import os
 
 import bilby
-from astropy.cosmology import LambdaCDM
 import h5py
-from gwpy.table import Table
-from astropy import time
-from scipy.interpolate import interpolate as interp
+import healpy as hp
 import matplotlib.pyplot as plt
-
+import numpy as np
+from astropy import time
+from astropy.cosmology import LambdaCDM
+from gwpy.table import Table
+from ligo.skymap import bayestar, distance
 from ligo.skymap.io import read_sky_map
-from ligo.skymap import distance, bayestar
+from scipy.interpolate import interpolate as interp
 
-from nmma.joint.conversion import MultimessengerConversion, EOS2Parameters
-from nmma.em.model import SVDLightCurveModel, GRBLightCurveModel
-from nmma.em.model import SupernovaGRBLightCurveModel, KilonovaGRBLightCurveModel
 from nmma.em.injection import create_light_curve_data
+from nmma.em.model import (GRBLightCurveModel, KilonovaGRBLightCurveModel,
+                           SupernovaGRBLightCurveModel, SVDLightCurveModel)
+from nmma.joint.conversion import EOS2Parameters, MultimessengerConversion
 
+from ..utils.models import refresh_models_list
 
 np.random.seed(0)
 cosmo = LambdaCDM(H0=70, Om0=0.3, Ode0=0.7)
@@ -160,7 +160,22 @@ def main():
         "--absolute", action="store_true", default=False, help="Absolute Magnitude"
     )
 
+    parser.add_argument(
+        "--refresh-models-list",
+        type=bool,
+        default=False,
+        help="Refresh the list of models available on Zenodo",
+    )
+
     args = parser.parse_args()
+
+    refresh = False
+    try:
+        refresh = args.refresh_model_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
 
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
