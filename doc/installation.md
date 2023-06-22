@@ -90,7 +90,50 @@ OR
 $ pip install parallel-bilby
 ```
 
-Note: for those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
+Finally, navigate to where you have downloaded the nmma repository and run the following command to install NMMA:
+```
+$ python setup.py install
+```
+OR
+
+```
+$ pip install .
+```
+
+**Kilonova Models**
+In order to run the Bu2019lm model, you will need to download the kilonova pickle files. They can be found at the following links:
+
+- [Bu2019lm_mag.pkl](https://drive.google.com/file/d/1oEgXqTya65laRs-lUzG1LR9labNrZSHa/view)  (3.2 GB)
+- [Bu2019lm_lbol.pkl](https://drive.google.com/file/d/1y4VTu-KVFp9rkYzQ1sm32_kZa4uru5jF/view) (0.3 GB)
+
+These will need to be placed in the ```svdmodels/``` folder.
+
+While most utilities in NMMA include a parameter to specify the location of the svdmodels folder, it is recommended to create a [symbolic link](https://manpages.ubuntu.com/manpages/focal/en/man1/ln.1.html) to the svdmodels folder in the nmma directory and the conda installation directory. This can be done by running something along the lines of:
+
+```
+ln -sf /Users/[username]/anaconda3/envs/[nmma_env]/lib/[python_version]/site-packages/nmma/em/svdmodels/ /Users/[USERNAME]/nmma/svdmodels
+```
+
+where [USERNAME] is your username, [nmma_env] is the name of your nmma environment, and [python_version] is the version of python you are using (e.g. 'python3.8'). This command may need to be modified depending on your specific file system or anaconda configuration. It may also be necessary to run the command with sudo permissions depending on your file system permissions. Once the symbolic link is created, running NMMA utilities that make use of the svdmodels folder will use the files present in the NMMA repository svdmodels folder.
+
+**Known Issues**
+1.  In case an error comes up during an NMMA analysis of the form:
+
+ERROR:   Could not load MultiNest library "libmultinest.so"
+ERROR:   You have to build it first,
+ERROR:   and point the LD_LIBRARY_PATH environment variable to it!
+
+Then, for using the PyMultinest library, it is required to get and compile the Multinest library separately. Instructions for the same are given [here](https://johannesbuchner.github.io/PyMultiNest/install.html)
+
+
+Use the commands below to install the dependencies given in requirements.txt file which are necessary for NMMA:
+
+```
+$ pip install -r requirements.txt
+$ python setup.py install
+```
+
+2. For those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
 This can be resolved by installing gcc with the following command:
 
 ```
@@ -104,53 +147,34 @@ Install pymultinest (note this line may not work for arm64 Macs; see specifc ins
 $ conda install -c conda-forge pymultinest
 ```
 
-NOTE: In case an error comes up during an NMMA analysis of the form:
+3. Due to the web of package requirements that NMMA depends on, there can be unresolved package versioning issues. These can usually be resolved by pinning the version of the packages that are causing the issue before reattempting the installation. For example, if the installation fails due to an issue with astropy, then running the following command:
+```
+pip install astropy==4.3.1
+```
+However, please open a [new issue](https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new) if there appear to be unresolvable conflicts.
 
-ERROR:   Could not load MultiNest library "libmultinest.so"
-ERROR:   You have to build it first,
-ERROR:   and point the LD_LIBRARY_PATH environment variable to it!
-
-Then, for using the PyMultinest library, it is required to get and compile the Multinest library separately. Instructions for the same are given here:
-
-https://johannesbuchner.github.io/PyMultiNest/install.html
-
-
-Use the commands below to install the dependencies given in requirements.txt file which are necessary for NMMA:
+4.  There is an issue pip installing `pyfftw` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
 ```
-$ pip install -r requirements.txt
-$ python setup.py install
-```
-
-NOTE: there is an issue pip installing `pyfftw` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
-
 * $ pip install importlib_resources
-
-
 * $ pip install  extinction
-
-
 * $ pip install dill
-
-
 * $ pip install multiprocess
-
-
 * $ pip install lalsuite
-
-
 * $ pip install python-ligo-lw
-
+```
 
 NOTE: If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies
-if not covered by python setup.py install. Also, if running python setup.py install shows something on the lines of "cannot cythonize without cython", do:
+if not covered by python setup.py install. Also, if running python setup.py install shows something on the lines of "cannot cythonize without cython", run:
 
+```
 * $ conda install -c anaconda cython==0.29.24
+```
 
-and redo python setup.py install.
+and reattempt NMMA installation.
 
 **Known arm64 Mac issues**
-1. For arm64 Macs (e.g. M1, M2), there is an issue installing `pyfftw` with pip (see https://github.com/pyFFTW/pyFFTW/issues/349#issuecomment-1468638458). To address, use `Homebrew` to run
+1. For arm64 Macs (e.g. M1, M2), there is a [documented issue](https://github.com/pyFFTW/pyFFTW/issues/349#issuecomment-1468638458) installing `pyfftw` with pip. To resolve this, use `Homebrew` to run
 ```
 $ brew install fftw
 ```
@@ -207,11 +231,7 @@ those with their given commands. In case modules like afterglowpy and dust_extin
 
 Please pay special attention to the `import nmma.em.analysis` and make sure that it does not generate any errors.
 
-Unfortunately, due to the web of package requirements that NMMA depends on, running setup.py does not typically finish without errors the first time through. Experience has shown that in the vast majority of cases, simply pinning versions such as:
-```
-pip install astropy==4.3.1
-```
-and then trying again is sufficient for completion of the installation. This instruction file will likely cover the issues you might face during your installation. However, please open issues on GitHub if there appear to be unresolvable conflicts.
+If there are no errors, it is recommended to attempt the [quickstart tutorial](https://nuclear-multimessenger-astronomy.github.io/nmma/)
 
 
 ## Installation on expanse and other cluster resources
