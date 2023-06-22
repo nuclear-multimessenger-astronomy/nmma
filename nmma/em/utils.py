@@ -983,7 +983,7 @@ def metzger_lc(t_day, param_dict, filters=None):
     Mpc = astropy.constants.pc.cgs.value * 1e6
 
     # fetch parameters
-    M0 = 10 ** param_dict["log10_Mej"] * Msun  # total ejecta mass
+    M0 = 10 ** param_dict["log10_mej"] * Msun  # total ejecta mass
     v0 = 10 ** param_dict["log10_vej"] * c  # minimum escape velocity
     beta = param_dict["beta"]
     kappa_r = 10 ** param_dict["log10_kappa_r"]
