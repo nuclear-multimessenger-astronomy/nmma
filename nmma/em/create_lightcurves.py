@@ -8,24 +8,18 @@ from astropy import time
 import bilby
 import bilby.core
 
-from .model import SVDLightCurveModel, GRBLightCurveModel
-from .model import (
-    SupernovaLightCurveModel,
-    SupernovaGRBLightCurveModel,
-    KilonovaGRBLightCurveModel,
-)
+from .model import create_light_curve_model_from_args
 from .injection import create_light_curve_data
+from .utils import read_lightcurve_file
 
-def main():
+
+def get_parser():
 
     parser = argparse.ArgumentParser(
         description="Inference on kilonova ejecta parameters."
     )
     parser.add_argument(
-        "--model", 
-        type=str, 
-        required=True, 
-        help="Name of the kilonova model to be used"
+        "--model", type=str, required=True, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
         "--svd-path",
@@ -34,17 +28,9 @@ def main():
         help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
     )
     parser.add_argument(
-        "--outdir", 
-        type=str, 
-        required=True, 
-        help="Path to the output directory"
+        "--outdir", type=str, required=True, help="Path to the output directory"
     )
-    parser.add_argument(
-        "--label", 
-        type=str, 
-        required=True, 
-        help="Label for the run"
-    )
+    parser.add_argument("--label", type=str, required=True, help="Label for the run")
     parser.add_argument(
         "--tmin",
         type=float,
@@ -58,10 +44,7 @@ def main():
         help="Days to be stoped analysing from the trigger time (default: 14)",
     )
     parser.add_argument(
-        "--dt", 
-        type=float, 
-        default=0.1, 
-        help="Time step in day (default: 0.1)"
+        "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
         "--svd-mag-ncoeff",
@@ -89,10 +72,7 @@ def main():
         help="Injection generation seed (default: 42)",
     )
     parser.add_argument(
-        "--injection", 
-        metavar="PATH", 
-        type=str, 
-        help="Path to the injection json file"
+        "--injection", metavar="PATH", type=str, help="Path to the injection json file"
     )
     parser.add_argument(
         "--joint-light-curve",
@@ -105,10 +85,19 @@ def main():
         action="store_true",
     )
     parser.add_argument(
-        "--plot", 
-        action="store_true", 
-        default=False, 
-        help="add best fit plot"
+        "--grb-resolution",
+        type=float,
+        default=5,
+        help="The upper bound on the ratio between thetaWing and thetaCore (default: 5)",
+    )
+    parser.add_argument(
+        "--jet-type",
+        type=int,
+        default=0,
+        help="Jet type to used used for GRB afterglow light curve (default: 0)",
+    )
+    parser.add_argument(
+        "--plot", action="store_true", default=False, help="add best fit plot"
     )
     parser.add_argument(
         "--verbose",
@@ -130,15 +119,10 @@ def main():
         default="sklearn_gp",
     )
     parser.add_argument(
-        "--absolute", 
-        action="store_true", 
-        default=False, 
-        help="Absolute Magnitude"
+        "--absolute", action="store_true", default=False, help="Absolute Magnitude"
     )
     parser.add_argument(
-        "--ztf-sampling", 
-        help="Use realistic ZTF sampling", 
-        action="store_true"
+        "--ztf-sampling", help="Use realistic ZTF sampling", action="store_true"
     )
     parser.add_argument(
         "--ztf-uncertainties",
@@ -195,7 +179,15 @@ def main():
         help="Creates a file too.csv to derive statistics",
         action="store_true",
     )
-    args = parser.parse_args()
+
+    return parser
+
+
+def main(args=None):
+
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
 
     seed = args.generation_seed
     np.random.seed(seed)
@@ -205,61 +197,19 @@ def main():
     # initialize light curve model
     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
 
-    if args.joint_light_curve:
-
-        assert args.model != "TrPi2018", "TrPi2018 is not a kilonova / supernova model"
-
-        if args.model != "nugent-hyper" or args.model != "salt2":
-
-            kilonova_kwargs = dict(
-                model=args.model,
-                svd_path=args.svd_path,
-                mag_ncoeff=args.svd_mag_ncoeff,
-                lbol_ncoeff=args.svd_lbol_ncoeff,
-                interpolation_type=args.interpolation_type,
-                parameter_conversion=None,
-            )
-
-            light_curve_model = KilonovaGRBLightCurveModel(
-                sample_times=sample_times,
-                kilonova_kwargs=kilonova_kwargs,
-                GRB_resolution=args.grb_resolution,
-                jetType=args.jet_type,
-            )
-
-        else:
-
-            light_curve_model = SupernovaGRBLightCurveModel(
-                sample_times=sample_times,
-                GRB_resolution=args.grb_resolution,
-                SNmodel=args.model,
-                jetType=args.jet_type,
-            )
-
+    if args.filters:
+        filters = args.filters.split(",")
     else:
-        if args.model == "TrPi2018":
-            light_curve_model = GRBLightCurveModel(
-                sample_times=sample_times,
-                resolution=args.grb_resolution,
-                jetType=args.jet_type,
-            )
-        elif args.model == "nugent-hyper" or args.model == "salt2":
-            light_curve_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model=args.model
-            )
+        filters = None
 
-        else:
-            light_curve_kwargs = dict(
-                model=args.model,
-                sample_times=sample_times,
-                svd_path=args.svd_path,
-                mag_ncoeff=args.svd_mag_ncoeff,
-                lbol_ncoeff=args.svd_lbol_ncoeff,
-                interpolation_type=args.interpolation_type,
-            )
-            light_curve_model = SVDLightCurveModel(**light_curve_kwargs)
-    
-    ## read injection file 
+    _, _, light_curve_model = create_light_curve_model_from_args(
+        args.model,
+        args,
+        sample_times,
+        filters=filters,
+    )
+
+    # read injection file
     with open(args.injection, "r") as f:
         injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
 
@@ -276,26 +226,32 @@ def main():
     args.kilonova_error = 0
 
     injection_df = injection_dict["injections"]
-    
+
     # save simulation_id from observing scenarios data
     # we save lighcurve for each event with its initial simulation ID
-    # from observing scenarios 
-    simulation_id = injection_df['simulation_id']
-    
+    # from observing scenarios
+    simulation_id = injection_df["simulation_id"]
+
     mag_ds = {}
     for index, row in injection_df.iterrows():
-        
+
         injection_outfile = os.path.join(args.outdir, "%d.dat" % simulation_id[index])
         if os.path.isfile(injection_outfile):
             try:
-                mag_ds[index] = np.loadtxt(injection_outfile)
+                mag_ds[index] = read_lightcurve_file(injection_outfile)
                 continue
-            
-            except ValueError :
-                print('\n===================================================================') 
-                print('The previous run generated light curves with unreadable content.\n')
-                print('Please remove all output files in .dat format then retry.')
-                print('===================================================================\n')
+
+            except ValueError:
+                print(
+                    "\n==================================================================="
+                )
+                print(
+                    "The previous run generated light curves with unreadable content.\n"
+                )
+                print("Please remove all output files in .dat format then retry.")
+                print(
+                    "===================================================================\n"
+                )
                 exit()
 
         injection_parameters = row.to_dict()
@@ -333,19 +289,26 @@ def main():
                     fid.write("%.3f " % data[filt][ii, 1])
                 fid.write("\n")
             fid.close()
-            
+
         except IndexError:
-            print('\n===================================================================') 
-            print('Sorry we could not use ZTF or Rubin flags to generate those statistics\n')
-            print('Please remove all flags rely on with ZTF or Rubin then retry again')
-            print('===================================================================\n')
+            print(
+                "\n==================================================================="
+            )
+            print(
+                "Sorry we could not use ZTF or Rubin flags to generate those statistics\n"
+            )
+            print("Please remove all flags rely on with ZTF or Rubin then retry again")
+            print(
+                "===================================================================\n"
+            )
             exit()
-        
-    mag_ds[index] = np.loadtxt(injection_outfile)
-        
+
+        mag_ds[index] = read_lightcurve_file(injection_outfile)
+
     if args.plot:
         import matplotlib.pyplot as plt
         import matplotlib
+
         matplotlib.use("agg")
         params = {
             "backend": "pdf",
@@ -362,11 +325,11 @@ def main():
         plotName = os.path.join(
             args.outdir, "injection_" + args.model + "_lightcurves.pdf"
         )
-        
+
         fig = plt.figure()
-        
-        filts = args.filters.split(",")
-        #filts = "u,g,r,i,z,y,J,H,K".split(",")
+
+        filts = list(set(mag_ds[index].keys()).difference({"t"}))
+
         ncols = 1
         nrows = int(np.ceil(len(filts) / ncols))
         gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
@@ -378,7 +341,7 @@ def main():
 
             data_out = []
             for jj, key in enumerate(list(mag_ds.keys())):
-                data_out.append(mag_ds[key][:, ii + 1])
+                data_out.append(mag_ds[key][filt])
             data_out = np.vstack(data_out)
 
             bins = np.linspace(-20, 1, 50)
@@ -391,10 +354,11 @@ def main():
             bins = (bins[1:] + bins[:-1]) / 2.0
 
             X, Y = np.meshgrid(sample_times, bins)
+
             hist = hist.astype(np.float64)
             hist[hist == 0.0] = np.nan
 
-            c= ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="cividis", alpha=0.7)
+            c = ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="cividis", alpha=0.7)
 
             # plot 10th, 50th, 90th percentiles
             ax.plot(sample_times, np.nanpercentile(data_out, 50, axis=0), "k--")
@@ -413,8 +377,8 @@ def main():
             ax.tick_params(axis="x", labelsize=42)
             ax.tick_params(axis="y", labelsize=42)
             ax.grid(which="both", alpha=0.5)
-            
-        fig.colorbar(c, ax = ax)
+
+        fig.colorbar(c, ax=ax)
         fig.text(0.4, 0.05, r"Time [days]", fontsize=42)
         fig.text(
             0.01,
@@ -425,6 +389,6 @@ def main():
             fontsize=42,
         )
 
-        #plt.tight_layout()
+        # plt.tight_layout()
         plt.savefig(plotName, bbox_inches="tight")
         plt.close()

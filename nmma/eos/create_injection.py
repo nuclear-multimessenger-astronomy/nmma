@@ -1,6 +1,5 @@
 import argparse
 import json
-import sys
 import pandas as pd
 
 import numpy as np
@@ -138,7 +137,7 @@ def file_to_dataframe(
     return injection_values
 
 
-def main():
+def get_parser():
 
     parser = argparse.ArgumentParser(
         description="Process a bilby injection file for nmma consumption"
@@ -268,7 +267,15 @@ def main():
         action="store_true",
         help="Whether to only sample prior parameters in injection file",
     )
-    args = parser.parse_args()
+
+    return parser
+
+
+def main(args=None):
+
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
 
     if not args.original_parameters:
         # check the binary type
@@ -363,7 +370,7 @@ def main():
         injection_creator.write_injection_dataframe(
             dataframe, args.filename, args.extension
         )
-        sys.exit(0)
+        return
 
     # convert to all necessary parameters
     dataframe, _ = convert_to_lal_binary_black_hole_parameters(dataframe)
@@ -410,8 +417,7 @@ def main():
             ejectaFitting = NSBHEjectaFitting()
 
         else:
-            print("Unknown binary type, exiting")
-            sys.exit()
+            raise ValueError("Unknown binary type")
 
         dataframe, _ = ejectaFitting.ejecta_parameter_conversion(dataframe, [])
         theta_jn = dataframe["theta_jn"]
