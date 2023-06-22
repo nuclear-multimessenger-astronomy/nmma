@@ -433,7 +433,6 @@ class SVDTrainingModel(object):
     def save_model(self):
 
         if self.interpolation_type == "sklearn_gp":
-            get_model(self.svd_path, f"{self.model}", self.svd_model.keys())
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
             outdir = modelfile.replace(".pkl", "")
             if not os.path.isdir(outdir):
@@ -448,7 +447,6 @@ class SVDTrainingModel(object):
                     )
                     del self.svd_model[filt]["gps"]
         elif self.interpolation_type == "tensorflow":
-            get_model(self.svd_path, f"{self.model}_tf", self.svd_model.keys())
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             outdir = modelfile.replace(".pkl", "")
             if not os.path.isdir(outdir):
@@ -467,7 +465,7 @@ class SVDTrainingModel(object):
     def load_model(self):
 
         if self.interpolation_type == "sklearn_gp":
-            get_model(self.svd_path, f"{self.model}", self.svd_model.keys())
+            get_model(self.svd_path, f"{self.model}", self.filters)
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
@@ -486,7 +484,7 @@ class SVDTrainingModel(object):
             except ImportError:
                 print("Install tensorflow if you want to use it...")
                 return
-            get_model(self.svd_path, f"{self.model}_tf", self.svd_model.keys())
+            get_model(self.svd_path, f"{self.model}_tf", self.filters)
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
@@ -497,7 +495,7 @@ class SVDTrainingModel(object):
                 print(outfile)
                 self.svd_model[filt]["model"] = load_tf_model(outfile)
         elif self.interpolation_type == "api_gp":
-            get_model(self.svd_path, f"{self.model}_api", self.svd_model.keys())
+            get_model(self.svd_path, f"{self.model}_api", self.filters)
             modelfile = os.path.join(self.svd_path, f"{self.model}_api.pkl")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
