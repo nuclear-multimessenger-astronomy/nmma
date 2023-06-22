@@ -2,6 +2,7 @@
 
 import os
 import numpy as np
+from scipy.ndimage.filters import gaussian_filter
 import sncosmo
 import argparse
 import h5py
@@ -93,8 +94,15 @@ for kk, filename in enumerate(files):
         time = np.array(f["time"])
         Lnu = np.array(f["Lnu"], dtype="d")
 
+    # smooth over missing data
+    Lnu[Lnu == 0.0] = 1e20
+    Lnu = 10 ** gaussian_filter(np.log10(Lnu), 3.0)
+
+    Llam = Lnu * np.flipud(nu) ** 2.0 / CLIGHT_cm_s / 1e8  # ergs/s/Angstrom
+    Llam = Llam / (4 * np.pi * D_cm**2)  # ergs / s / cm^2 / Angstrom
+
     ph = np.array(time) / (60 * 60 * 24)  # get time in days
-    wave = np.flipud(CLIGHT_cm_s / nu * 1e8)  # AA
+    wave = 10 * np.flipud(CLIGHT_cm_s / nu * 1e8)  # AA
 
     # extract photometric lightcurves
     if args.doAB:
@@ -115,8 +123,6 @@ for kk, filename in enumerate(files):
         lc.write(f'# t[days] {" ".join(filters)} \n')
         m_tot = []
         for filt in filters:
-            Llam = Lnu * np.flipud(nu) ** 2.0 / CLIGHT_cm_s / 1e8  # ergs/s/Angstrom
-            Llam = Llam / (4 * np.pi * D_cm**2)  # ergs / s / cm^2 / Angstrom
             source = sncosmo.TimeSeriesSource(ph, wave, Llam)
             m = source.bandmag(filt, "ab", ph)
             m_tot.append(m)
