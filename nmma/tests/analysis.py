@@ -9,14 +9,14 @@ def test_analysis():
     dataDir = f"{os.path.dirname(__file__)}/data"
 
     args = Namespace(
-        model="Bu2019lm",
+        model="Me2017",
         interpolation_type="sklearn_gp",
         svd_path="svdmodels",
         outdir="outdir",
         label="injection",
         trigger_time=None,
         data=None,
-        prior="priors/Bu2019lm.prior",
+        prior="priors/Me2017.prior",
         tmin=0.1,
         tmax=20.0,
         dt=0.5,

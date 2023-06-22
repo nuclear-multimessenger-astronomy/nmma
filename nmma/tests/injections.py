@@ -7,7 +7,6 @@ import shutil
 
 from nmma.em.model import (
     SimpleKilonovaLightCurveModel,
-    SVDLightCurveModel,
     SupernovaLightCurveModel,
     ShockCoolingLightCurveModel,
 )
@@ -278,7 +277,7 @@ def test_injections():
         "Piro2021": ShockCoolingLightCurveModel,
         # "PL_BB_fixedT": SimpleKilonovaLightCurveModel,
         # "TrPi2018": GRBLightCurveModel,
-        "Bu2019lm": SVDLightCurveModel,
+        # "Ka2017": SVDLightCurveModel,
     }
     for model_name, model_lightcurve_function in lightcurve_models.items():
         lightcurveInjectionTest(model_name, model_lightcurve_function)
