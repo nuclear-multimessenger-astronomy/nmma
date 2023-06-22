@@ -188,7 +188,7 @@ class SVDLightCurveModel(object):
                     self.svd_mag_model = pickle.load(handle)
 
                 outdir = modelfile.replace(".pkl", "")
-                for filt in self.svd_mag_model.keys():
+                for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
                         print(f"Could not find model file for filter {filt}")
@@ -204,7 +204,7 @@ class SVDLightCurveModel(object):
                     self.svd_mag_model = pickle.load(handle)
 
                 outdir = mag_modelfile.replace(".pkl", "")
-                for filt in self.svd_mag_model.keys():
+                for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
                         print(f"Could not find model file for filter {filt}")
@@ -224,7 +224,7 @@ class SVDLightCurveModel(object):
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
-                for filt in self.svd_mag_model.keys():
+                for filt in self.filters:
                     for ii in range(len(self.svd_mag_model[filt]["gps"])):
                         self.svd_mag_model[filt]["gps"][ii] = load_api_gp_model(
                             self.svd_mag_model[filt]["gps"][ii]
@@ -242,7 +242,7 @@ class SVDLightCurveModel(object):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
                 outdir = modelfile.replace(".pkl", "")
-                for filt in self.svd_mag_model.keys():
+                for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.h5")
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
@@ -254,7 +254,7 @@ class SVDLightCurveModel(object):
                 with open(mag_modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
                 outdir = mag_modelfile.replace(".pkl", "")
-                for filt in self.svd_mag_model.keys():
+                for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.h5")
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
 
