@@ -236,38 +236,38 @@ class SVDLightCurveModel(object):
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
 
-            get_model(self.svd_path, f"{self.model}_tf", filters=filters)
-            modelfile = os.path.join(self.svd_path, "{0}_tf.pkl".format(model))
+            get_model(self.svd_path, f"{self.model}_tf", filters=filters, format='h5')
+            modelfile = os.path.join(self.svd_path, "{0}_tf.h5".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
-                outdir = modelfile.replace(".pkl", "")
+                outdir = modelfile.replace(".h5", "")
                 for filt in self.svd_mag_model.keys():
                     outfile = os.path.join(outdir, f"{filt}.h5")
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
             else:
-                get_model(self.svd_path, f"{self.model}_mag_tf", filters=filters)
+                get_model(self.svd_path, f"{self.model}_mag_tf", filters=filters, format='h5')
                 mag_modelfile = os.path.join(
-                    self.svd_path, "{0}_mag_tf.pkl".format(model)
+                    self.svd_path, "{0}_mag_tf.h5".format(model)
                 )
                 with open(mag_modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
-                outdir = mag_modelfile.replace(".pkl", "")
+                outdir = mag_modelfile.replace(".h5", "")
                 for filt in self.svd_mag_model.keys():
                     outfile = os.path.join(outdir, f"{filt}.h5")
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
 
                 get_model(
-                    self.svd_path, f"{self.model}_lbol_tf", self.svd_mag_model.keys()
+                    self.svd_path, f"{self.model}_lbol_tf", self.svd_mag_model.keys(), format='h5'
                 )
                 lbol_modelfile = os.path.join(
-                    self.svd_path, "{0}_lbol_tf.pkl".format(model)
+                    self.svd_path, "{0}_lbol_tf.h5".format(model)
                 )
                 with open(lbol_modelfile, "rb") as handle:
                     self.svd_lbol_model = pickle.load(handle)
 
-                outdir = lbol_modelfile.replace(".pkl", "")
+                outdir = lbol_modelfile.replace(".h5", "")
                 outfile = os.path.join(outdir, "model.h5")
                 self.svd_lbol_model["model"] = load_model(outfile)
         else:

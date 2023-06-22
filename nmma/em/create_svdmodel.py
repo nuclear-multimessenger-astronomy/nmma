@@ -1,14 +1,17 @@
-import os
-import copy
-import numpy as np
 import argparse
+import copy
 import glob
 import inspect
+import os
 
-from .training import SVDTrainingModel
-from .model import SVDLightCurveModel
-from .utils import read_photometry_files, read_spectroscopy_files, interpolate_nans
+import numpy as np
+
+from ..utils.models import refresh_models_list
 from . import model_parameters
+from .model import SVDLightCurveModel
+from .training import SVDTrainingModel
+from .utils import (interpolate_nans, read_photometry_files,
+                    read_spectroscopy_files)
 
 
 def axial_symmetry(training_data):
@@ -133,7 +136,21 @@ def main():
         default=False,
         help="ignore bolometric light curve files (ending in _Lbol.file_extension)",
     )
+    parser.add_argument(
+        "--refresh-models-list",
+        type=bool,
+        default=False,
+        help="Refresh the list of models available on Zenodo",
+    )
     args = parser.parse_args()
+
+    refresh = False
+    try:
+        refresh = args.refresh_model_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
 
     # initialize light curve model
     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)

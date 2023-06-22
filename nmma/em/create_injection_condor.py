@@ -1,12 +1,13 @@
-import os
 import argparse
 import json
-import pandas as pd
+import os
+from subprocess import check_output
 
 import bilby
+import pandas as pd
 from bilby_pipe.create_injections import InjectionCreator
 
-from subprocess import check_output
+from ..utils.models import refresh_models_list
 
 
 def main():
@@ -84,7 +85,21 @@ def main():
         type=int,
         default=10,
     )
+    parser.add_argument(
+        "--refresh-models-list",
+        type=bool,
+        default=False,
+        help="Refresh the list of models available on Zenodo",
+    )
     args = parser.parse_args()
+
+    refresh = False
+    try:
+        refresh = args.refresh_model_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(models_home="./svdmodels")
 
     # load the injection json file
     if args.injection_file:

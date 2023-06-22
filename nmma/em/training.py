@@ -447,8 +447,8 @@ class SVDTrainingModel(object):
                     )
                     del self.svd_model[filt]["gps"]
         elif self.interpolation_type == "tensorflow":
-            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
-            outdir = modelfile.replace(".pkl", "")
+            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.h5")
+            outdir = modelfile.replace(".h5", "")
             if not os.path.isdir(outdir):
                 os.makedirs(outdir)
             for filt in self.svd_model.keys():
@@ -484,15 +484,14 @@ class SVDTrainingModel(object):
             except ImportError:
                 print("Install tensorflow if you want to use it...")
                 return
-            get_model(self.svd_path, f"{self.model}_tf", self.filters)
-            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
+            get_model(self.svd_path, f"{self.model}_tf", self.filters, format='h5')
+            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.h5")
             with open(modelfile, "rb") as handle:
                 self.svd_model = pickle.load(handle)
 
-            outdir = modelfile.replace(".pkl", "")
+            outdir = modelfile.replace(".h5", "")
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.h5")
-                print(outfile)
                 self.svd_model[filt]["model"] = load_tf_model(outfile)
         elif self.interpolation_type == "api_gp":
             get_model(self.svd_path, f"{self.model}_api", self.filters)
