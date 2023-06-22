@@ -447,8 +447,8 @@ class SVDTrainingModel(object):
                     )
                     del self.svd_model[filt]["gps"]
         elif self.interpolation_type == "tensorflow":
-            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.h5")
-            outdir = modelfile.replace(".h5", "")
+            modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
+            outdir = modelfile.replace(".pkl", "")
             if not os.path.isdir(outdir):
                 os.makedirs(outdir)
             for filt in self.svd_model.keys():
