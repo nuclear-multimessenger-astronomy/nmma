@@ -1,0 +1,41 @@
+# Set the default behavior, in case people don't have core.autocrlf set.
+* text=auto eol=lf
+
+# python files
+*.py text eol=lf
+*.py3 text eol=lf
+*.ipynb text eol=lf
+
+## text files
+*.sh text eol=lf
+*.txt text eol=lf
+
+# markdown files
+*.md text eol=lf
+*.rst text eol=lf
+
+# data files
+*.dat text eol=lf
+*.csv text eol=lf
+
+# not sure about .prior files or .json files
+
+# image files 
+*.png binary
+*.jpg binary
+*.gif binary
+*.svg text eol=lf
+*.pdf binary
+
+# binary files
+*.pkl binary
+*.pickle binary
+*.h5 binary
+*.hdf5 binary
+*.npy binary
+*.npz binary
+*.gz binary
+*.zip binary
+*.tar binary
+*.tgz binary
+*.tar.gz binary
