@@ -227,6 +227,7 @@ def main():
         mag_ncoeff=args.svd_ncoeff,
         interpolation_type=args.interpolation_type,
         model_parameters=training_model.model_parameters,
+        filters=filts,
     )
     if args.plot:
         # we can plot an example where we compare the model performance
