@@ -1,9 +1,5 @@
 <div align="center">
-   <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/nuclear-multimessenger-astronomy/nmma/raw/main/doc/images/dark-logo.svg">
-      <source media="(prefers-color-scheme: light)" srcset="https://github.com/nuclear-multimessenger-astronomy/nmma/raw/main/doc/images/light-logo.svg">
-      <img alt="NMMA" src="https://github.com/nuclear-multimessenger-astronomy/nmma/raw/main/doc/images/light-logo.svg" width="600px" height="300px">
-   </picture>
+   <img alt="NMMA" src="https://github.com/nuclear-multimessenger-astronomy/nmma/raw/main/doc/images/light-logo.svg" width="600px" height="300px">
    <h1>NMMA</h1>
    <h2>a pythonic library for probing nuclear physics and cosmology with multimessenger analysis</h2>
    <br/><br/>
