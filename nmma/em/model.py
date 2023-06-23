@@ -181,7 +181,12 @@ class SVDLightCurveModel(object):
             self.svd_path = svd_path
 
         if self.interpolation_type == "sklearn_gp":
-            get_model(self.svd_path, f"{self.model}", filters=filters)
+            _, model_filters = get_model(
+                self.svd_path, f"{self.model}", filters=filters
+            )
+            if filters is None:
+                self.filters = model_filters
+
             modelfile = os.path.join(self.svd_path, "{0}.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
@@ -236,7 +241,12 @@ class SVDLightCurveModel(object):
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
 
-            get_model(self.svd_path, f"{self.model}_tf", filters=filters)
+            _, model_filters = get_model(
+                self.svd_path, f"{self.model}_tf", filters=filters
+            )
+            if filters is None:
+                self.filters = model_filters
+
             modelfile = os.path.join(self.svd_path, "{0}_tf.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:

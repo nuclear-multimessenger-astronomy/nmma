@@ -45,21 +45,25 @@ def clear_data_home(models_home=None):
 
 
 def get_latest_zenodo_doi(permanent_doi):
-    headers={ # we emulate a browser request with a recent chrome version to avoid zenodo blocking us
-        'X-Requested-With': 'XMLHttpRequest',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Host': 'zenodo.org',
-        'Connection': 'keep-alive',
-        'Pragma': 'no-cache',
-        'Cache-Control': 'no-cache'
+    headers = {  # we emulate a browser request with a recent chrome version to avoid zenodo blocking us
+        "X-Requested-With": "XMLHttpRequest",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Host": "zenodo.org",
+        "Connection": "keep-alive",
+        "Pragma": "no-cache",
+        "Cache-Control": "no-cache",
     }
-    r = requests.get(f"https://zenodo.org/record/{permanent_doi}", allow_redirects=True, headers=headers)
+    r = requests.get(
+        f"https://zenodo.org/record/{permanent_doi}",
+        allow_redirects=True,
+        headers=headers,
+    )
     try:
         data = r.text.split("10.5281/zenodo.")[1]
         doi = re.findall(r"^\d+", data)[0]
     except Exception as e:
-        raise ValueError(f'Could not find latest DOI: {str(e)}')
+        raise ValueError(f"Could not find latest DOI: {str(e)}")
     return doi
 
 
@@ -114,7 +118,9 @@ def load_models_list(doi=None):
                 doi = DOI
             download_models_list(doi=DOI)
         except ConnectionError:
-            print("Could not connect to Zenodo, models might not be available or up-to-date")
+            print(
+                "Could not connect to Zenodo, models might not be available or up-to-date"
+            )
             pass
     try:
         from yaml import CLoader as Loader
@@ -127,10 +133,12 @@ def load_models_list(doi=None):
     models["Bu2019lm"] = models["Bu2019bns"]
     return models
 
+
 try:
     MODELS = load_models_list(DOI)
 except Exception as e:
     raise ValueError(f"Could not load models list: {str(e)}")
+
 
 def refresh_models_list(models_home=None):
     global DOI
@@ -146,6 +154,7 @@ def refresh_models_list(models_home=None):
     except Exception as e:
         raise ValueError(f"Could not load models list: {str(e)}")
     return models
+
 
 def get_model(
     models_home=None,
@@ -188,11 +197,11 @@ def get_model(
         raise ValueError(
             f'Zenodo does not have filters {",".join(missing_filters)} for {model_name}'
         )
-    
+
     core_format = "pkl"
     filter_format = "pkl"
-    if '_tf' in model_name:
-        filter_format = 'h5'
+    if "_tf" in model_name:
+        filter_format = "h5"
 
     filepaths = [Path(models_home, f"{model_name}.{core_format}")] + [
         Path(models_home, model_name, f"{f}.{filter_format}") for f in filters
@@ -212,8 +221,8 @@ def get_model(
         ) as executor:
             executor.map(download, missing)
 
-    # return the paths to the files
-    return [str(f) for f in filepaths]
+    # return the paths to the files and corresponding filters
+    return [str(f) for f in filepaths], filters
 
 
 if __name__ == "__main__":

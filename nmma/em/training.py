@@ -186,7 +186,6 @@ class SVDTrainingModel(object):
             svd_model[filt]["mins"] = mins
             svd_model[filt]["maxs"] = maxs
             svd_model[filt]["tt"] = self.sample_times
-            svd_model[filt]["data_postprocess"] = data_array_postprocess
 
             UA, sA, VA = np.linalg.svd(data_array_postprocess, full_matrices=True)
             VA = VA.T

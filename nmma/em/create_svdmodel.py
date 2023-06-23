@@ -10,8 +10,7 @@ from ..utils.models import refresh_models_list
 from . import model_parameters
 from .model import SVDLightCurveModel
 from .training import SVDTrainingModel
-from .utils import (interpolate_nans, read_photometry_files,
-                    read_spectroscopy_files)
+from .utils import interpolate_nans, read_photometry_files, read_spectroscopy_files
 
 
 def axial_symmetry(training_data):
@@ -54,7 +53,7 @@ def main():
         "--data-file-type",
         type=str,
         help="Type of light curve files [bulla, standard, ztf]",
-        default="standard",
+        default="bulla",
     )
     parser.add_argument(
         "--interpolation_type",
@@ -150,7 +149,9 @@ def main():
     except AttributeError:
         pass
     if refresh:
-        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
 
     # initialize light curve model
     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
