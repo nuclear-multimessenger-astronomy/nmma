@@ -1,6 +1,9 @@
+import argparse
 import os
 from subprocess import check_output
-import argparse
+
+from ..utils.models import refresh_models_list
+
 
 def main():
 
@@ -279,7 +282,21 @@ def main():
     parser.add_argument(
         "--bash-file", type=str, required=True, help="The bash file to be created"
     )
+    parser.add_argument(
+        "--refresh-models-list",
+        type=bool,
+        default=False,
+        help="Refresh the list of models available on Zenodo",
+    )
     args = parser.parse_args()
+
+    refresh = False
+    try:
+        refresh = args.refresh_model_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
     
     binary_type_str = {'Bu2019lm':'BNS', 'Bu2019nsbh': 'NSBH'}
     prior_str = {'BNS':'Bu2019lm.prior', 'NSBH':'Bu2019nsbh.prior'}

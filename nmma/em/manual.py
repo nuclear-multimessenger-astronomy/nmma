@@ -1,21 +1,20 @@
-import os
-import numpy as np
 import argparse
 import json
-import pandas as pd
-import matplotlib
-
-from astropy import time
+import os
 
 import bilby
 import bilby.core
+import matplotlib
+import numpy as np
+import pandas as pd
+from astropy import time
 
-from .model import SVDLightCurveModel, GRBLightCurveModel, SupernovaLightCurveModel
-from .model import ShockCoolingLightCurveModel
-from .model import SimpleKilonovaLightCurveModel
-from .model import GenericCombineLightCurveModel
-from .utils import loadEvent, getFilteredMag
+from ..utils.models import refresh_models_list
 from .injection import create_light_curve_data
+from .model import (GenericCombineLightCurveModel, GRBLightCurveModel,
+                    ShockCoolingLightCurveModel, SimpleKilonovaLightCurveModel,
+                    SupernovaLightCurveModel, SVDLightCurveModel)
+from .utils import getFilteredMag, loadEvent
 
 matplotlib.use("agg")
 
@@ -282,6 +281,12 @@ def get_parser():
         default=False,
         help="print out log likelihoods",
     )
+    parser.add_argument(
+        "--refresh-models-list",
+        type=bool,
+        default=False,
+        help="Refresh the list of models available on Zenodo",
+    )
 
     return parser
 
@@ -291,6 +296,14 @@ def main(args=None):
     if args is None:
         parser = get_parser()
         args = parser.parse_args()
+
+    refresh = False
+    try:
+        refresh = args.refresh_model_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
 
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)

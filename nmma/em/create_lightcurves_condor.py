@@ -1,12 +1,12 @@
-import os
 import argparse
 import json
-
-import numpy as np
+import os
+from subprocess import check_output
 
 import bilby
+import numpy as np
 
-from subprocess import check_output
+from ..utils.models import refresh_models_list
 
 
 def main():
@@ -49,7 +49,21 @@ def main():
         help="Number of light curves per job",
         default=100,
     )
+    parser.add_argument(
+        "--refresh-models-list",
+        type=bool,
+        default=False,
+        help="Refresh the list of models available on Zenodo",
+    )
     args = parser.parse_args()
+
+    refresh = False
+    try:
+        refresh = args.refresh_model_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(models_home="/home/%s/gwemlightcurves/output/svdmodels" % os.environ["USER"])
 
     with open(args.injection, "r") as f:
         injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)

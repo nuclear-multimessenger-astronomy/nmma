@@ -11,6 +11,7 @@ import bilby.core
 from .model import create_light_curve_model_from_args
 from .injection import create_light_curve_data
 from .utils import read_lightcurve_file
+from ..utils.models import refresh_models_list
 
 
 def get_parser():
@@ -179,6 +180,12 @@ def get_parser():
         help="Creates a file too.csv to derive statistics",
         action="store_true",
     )
+    parser.add_argument(
+        "--refresh-models-list",
+        type=bool,
+        default=False,
+        help="Refresh the list of models available on Zenodo",
+    )
 
     return parser
 
@@ -188,6 +195,14 @@ def main(args=None):
     if args is None:
         parser = get_parser()
         args = parser.parse_args()
+
+    refresh = False
+    try:
+        refresh = args.refresh_model_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
 
     seed = args.generation_seed
     np.random.seed(seed)
