@@ -85,6 +85,7 @@ requirements = [
     "sncosmo",
     "dust_extinction",
     "arviz",
+    "p_tqdm",
 ]
 
 VERSION = "0.0.11"
@@ -133,6 +134,7 @@ setup(
             "create_light_curve_slurm=nmma.em.create_lightcurves_slurm:main",
             "create_light_curve_condor=nmma.em.create_lightcurves_condor:main",
             "create_svdmodel=nmma.em.create_svdmodel:main",
+            "svdmodel_benchmark=nmma.em.svdmodel_benchmark:main",
             "light_curve_generation=nmma.em.create_lightcurves:main",
             "light_curve_detection=nmma.em.detect_lightcurves:main",
             "nmma_create_injection=nmma.eos.create_injection:main",

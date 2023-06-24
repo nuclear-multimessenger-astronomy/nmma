@@ -12,6 +12,7 @@ pymultinest
 scikit-learn>=1.0.2
 scipy>=1.7.1
 sncosmo
+p_tqdm
 ### for mpi ###
 parallel_bilby>=2.0.2
 mpi4py
