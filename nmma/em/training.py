@@ -5,6 +5,7 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import interpolate as interp
+from scipy.interpolate import UnivariateSpline
 
 from ..utils.models import get_models_home, get_model
 
@@ -55,6 +56,9 @@ class SVDTrainingModel(object):
         data_type="photometry",
         plot=False,
         plotdir=os.path.join(os.getcwd(), "plot"),
+        ncpus=1,
+        univariate_spline=False,
+        univariate_spline_s=2,
     ):
 
         if interpolation_type not in ["sklearn_gp", "tensorflow", "api_gp"]:
@@ -73,6 +77,16 @@ class SVDTrainingModel(object):
         self.data_type = data_type
         self.plot = plot
         self.plotdir = plotdir
+        self.ncpus = ncpus
+        self.univariate_spline = univariate_spline
+        self.univariate_spline_s = univariate_spline_s
+        if self.univariate_spline:
+            print("The grid will be interpolated to sample_time with UnivariateSpline")
+        else:
+            print("The grid will be interpolated to sample_time with interp1d")
+
+        if self.ncpus > 1:
+            print(f"Running with {self.ncpus} CPUs")
 
         if self.plot:
             if not os.path.isdir(self.plotdir):
@@ -111,11 +125,18 @@ class SVDTrainingModel(object):
                     ii = np.where(np.isfinite(self.data[key][filt]))[0]
                     if len(ii) < 2:
                         continue
-                    f = interp.interp1d(
-                        self.data[key]["t"][ii],
-                        self.data[key][filt][ii],
-                        fill_value="extrapolate",
-                    )
+                    if self.univariate_spline:
+                        f = UnivariateSpline(
+                            self.data[key]["t"][ii],
+                            self.data[key][filt][ii],
+                            s=self.univariate_spline_s,
+                        )
+                    else:
+                        f = interp.interp1d(
+                            self.data[key]["t"][ii],
+                            self.data[key][filt][ii],
+                            fill_value="extrapolate",
+                        )
                     maginterp = f(self.sample_times)
                     self.data[key]["data"][:, jj] = maginterp
                     del self.data[key][filt]
@@ -251,13 +272,22 @@ class SVDTrainingModel(object):
                 length_scale_bounds=(1e-10, 1e10),
                 alpha_bounds=(1e-10, 1e10),
             )
-            gps = []
-            for i in range(self.n_coeff):
-                if np.mod(i, 1) == 0:
-                    print("Coefficient %d/%d..." % (i + 1, self.n_coeff))
+
+            print("Calculating the coefficents")
+
+            def gp_func(cAmat_i):
                 gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=0)
-                gp.fit(param_array_postprocess, cAmat[i, :])
-                gps.append(gp)
+                gp.fit(param_array_postprocess, cAmat_i)
+                return gp
+
+            if self.ncpus > 1:
+                from p_tqdm import p_map
+                gps = p_map(gp_func, cAmat[:self.n_coeff, :], num_cpus=self.ncpus)
+            else:
+                gps = []
+                for i in range(self.n_coeff):
+                    print("Coefficient %d/%d..." % (i + 1, self.n_coeff))
+                    gps.append(gp_func(cAmat[i, :]))
 
             self.svd_model[filt]["gps"] = gps
 

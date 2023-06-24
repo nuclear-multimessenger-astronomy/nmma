@@ -121,6 +121,23 @@ def main():
         help="add training samples based on the fact that there is axial symmetry",
     )
     parser.add_argument(
+        "--ncpus",
+        default=1,
+        type=int,
+        help="number of cpus to be used, only support for sklearn_gp",
+    )
+    parser.add_argument(
+        "--use-UnivariateSpline",
+        action="store_true",
+        default=False,
+        help="using UnivariateSpline to mitigate the numerical noise in the grid",
+    )
+    parser.add_argument(
+        "--UnivariateSpline-s",
+        default=2,
+        help="s-value to be used for UnivariateSpline",
+    )
+    parser.add_argument(
         "--plot", action="store_true", default=False, help="enable plotting"
     )
     parser.add_argument(
@@ -218,6 +235,9 @@ def main():
         data_type=args.data_type,
         plot=args.plot,
         plotdir=args.outdir,
+        ncpus=args.ncpus,
+        univariate_spline=args.use_UnivariateSpline,
+        univariate_spline_s=args.UnivariateSpline_s,
     )
 
     light_curve_model = SVDLightCurveModel(
