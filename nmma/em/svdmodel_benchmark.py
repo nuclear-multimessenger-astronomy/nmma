@@ -11,16 +11,17 @@ from . import model_parameters
 
 import matplotlib
 import matplotlib.pyplot as plt
+
 matplotlib.use("Agg")
-matplotlib.rcParams.update({'font.size': 16,
-                            'text.usetex': True,
-                            'font.family': 'Times New Roman'})
+matplotlib.rcParams.update(
+    {"font.size": 16, "text.usetex": True, "font.family": "Times New Roman"}
+)
 
 
 def main():
 
     parser = argparse.ArgumentParser(
-        description='Surrogate model performance benchmark'
+        description="Surrogate model performance benchmark"
     )
     parser.add_argument(
         "--model", type=str, required=True, help="Name of the SVD model created"
@@ -139,7 +140,7 @@ def main():
     if not args.filters:
         first_entry_name = list(grid_training_data.keys())[0]
         first_entry = grid_training_data[first_entry_name]
-        filts = first_entry.keys() - set(['t'] + parameters)
+        filts = first_entry.keys() - set(["t"] + parameters)
         filts = list(filts)
     else:
         filts = args.filters
@@ -149,7 +150,7 @@ def main():
     def chi2_func(grid_entry_name):
         # fetch the grid data and parameter
         grid_entry = grid_training_data[grid_entry_name]
-        grid_t = np.array(grid_entry['t'])
+        grid_t = np.array(grid_entry["t"])
         used_grid_t = grid_t[(grid_t > args.tmin) * (grid_t < args.tmax)]
         grid_mAB = {}
         for filt in filts:
@@ -158,7 +159,7 @@ def main():
             grid_mAB[filt] = grid_mAB_per_filt_array[time_indices]
         # fetch the grid parameters
         parameter_entry = {param: grid_entry[param] for param in parameters}
-        parameter_entry['redshift'] = 0.
+        parameter_entry["redshift"] = 0.0
         # generate the corresponding light curve with SVD model
         _, estimate_mAB = light_curve_model.generate_lightcurve(
             used_grid_t, parameter_entry
@@ -166,27 +167,27 @@ def main():
         # calculate chi2
         chi2 = {}
         for filt in grid_mAB.keys():
-            chi2[filt] = np.nanmean(
-                np.power(grid_mAB[filt] - estimate_mAB[filt], 2.)
-            )
+            chi2[filt] = np.nanmean(np.power(grid_mAB[filt] - estimate_mAB[filt], 2.0))
         return chi2
 
     grid_entry_names = list(grid_training_data.keys())
-    chi2_dict_array = p_map(chi2_func, grid_entry_names, num_cpus=args.ncpus)
+    if args.ncpus == 1:
+        chi2_dict_array = [
+            chi2_func(grid_entry_name) for grid_entry_name in grid_entry_names
+        ]
+    else:
+        chi2_dict_array = p_map(chi2_func, grid_entry_names, num_cpus=args.ncpus)
 
     chi2_array_by_filt = {}
     for filt in chi2_dict_array[0].keys():
-        chi2_array_by_filt[filt] = [dict_entry[filt] for
-                                    dict_entry in chi2_dict_array]
+        chi2_array_by_filt[filt] = [dict_entry[filt] for dict_entry in chi2_dict_array]
 
     # make the plots
     for figidx, filt in enumerate(filts):
         plt.figure(figidx)
-        plt.xlabel(r'$\chi^2 / {\rm d.o.f.}$')
-        plt.ylabel('Count')
-        plt.hist(chi2_array_by_filt[filt],
-                 label=filt,
-                 bins=51, histtype='step')
+        plt.xlabel(r"$\chi^2 / {\rm d.o.f.}$")
+        plt.ylabel("Count")
+        plt.hist(chi2_array_by_filt[filt], label=filt, bins=51, histtype="step")
         plt.legend()
-        plt.savefig(f'{args.outdir}/{filt}.pdf', bbox_inches='tight')
+        plt.savefig(f"{args.outdir}/{filt}.pdf", bbox_inches="tight")
         plt.close()
