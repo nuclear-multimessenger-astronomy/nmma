@@ -1651,8 +1651,8 @@ def get_knprops_from_LANLfilename(filename):
     }
     knprops = {}
     for prop in [
-        "morphology",
-        "Ye_wind",
+        # "morphology",
+        # "Ye_wind",
         "mej_dyn",
         "vej_dyn",
         "mej_wind",

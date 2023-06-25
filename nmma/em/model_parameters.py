@@ -264,7 +264,7 @@ def LANL2022(data):
         knprops["log10_mej_wind"] = np.log10(knprops["mej_wind"])
         del knprops["mej_dyn"]
         del knprops["mej_wind"]
-        del knprops["morphology"]
+        # del knprops["morphology"]
 
         data_out[key] = knprops
         data_out[key] = {**data_out[key], **data[key]}

@@ -53,7 +53,7 @@ model_parameters_dict = {
         "KNtheta",
     ],
     "LANL2022": [
-        "Ye_wind",
+        # "Ye_wind",
         "log10_mej_dyn",
         "vej_dyn",
         "log10_mej_wind",
@@ -186,13 +186,16 @@ class SVDLightCurveModel(object):
                 _, model_filters = get_model(
                     self.svd_path, f"{self.model}", filters=filters
                 )
-                if filters is None:
+                if filters is None and model_filters is not None:
                     self.filters = model_filters
 
             modelfile = os.path.join(self.svd_path, "{0}.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
+
+                if self.filters is None:
+                    self.filters = list(self.svd_mag_model.keys())
 
                 outdir = modelfile.replace(".pkl", "")
                 for filt in self.filters:
@@ -254,18 +257,31 @@ class SVDLightCurveModel(object):
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
+
+                if self.filters is None:
+                    self.filters = list(self.svd_mag_model.keys())
+
                 outdir = modelfile.replace(".pkl", "")
                 for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.h5")
                     self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
             else:
-                get_model(self.svd_path, f"{self.model}_mag_tf", filters=filters)
+                _, model_filters = get_model(
+                    self.svd_path, f"{self.model}_mag_tf", filters=filters
+                )
+                if filters is None and model_filters is not None:
+                    self.filters = model_filters
+
                 mag_modelfile = os.path.join(
                     self.svd_path, "{0}_mag_tf.pkl".format(model)
                 )
                 with open(mag_modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
+
+                if self.filters is None:
+                    self.filters = list(self.svd_mag_model.keys())
+
                 outdir = mag_modelfile.replace(".pkl", "")
                 for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.h5")
