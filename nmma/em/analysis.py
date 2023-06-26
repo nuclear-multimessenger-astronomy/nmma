@@ -317,7 +317,12 @@ def get_parser():
         default=False,
         help="Refresh the list of models available on Zenodo",
     )
-
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        default=False,
+        help="only look for local svdmodels (ignore Zenodo)",
+    )
     return parser
 
 
@@ -333,7 +338,9 @@ def main(args=None):
     except AttributeError:
         pass
     if refresh:
-        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
 
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)

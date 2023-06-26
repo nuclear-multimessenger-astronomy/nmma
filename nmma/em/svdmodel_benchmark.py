@@ -93,6 +93,12 @@ def main():
         default=True,
         help="ignore bolometric light curve files (ending in _Lbol.file_extension)",
     )
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        default=False,
+        help="only look for local svdmodels (ignore Zenodo)",
+    )
     args = parser.parse_args()
 
     # make the outdir
@@ -134,6 +140,7 @@ def main():
         svd_path=args.svd_path,
         mag_ncoeff=args.svd_ncoeff,
         interpolation_type=args.interpolation_type,
+        local_only=args.local_only,
     )
 
     # get the filts
