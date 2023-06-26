@@ -88,7 +88,7 @@ requirements = [
     "p_tqdm",
 ]
 
-VERSION = "0.0.11"
+VERSION = "0.0.13"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
