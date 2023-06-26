@@ -137,7 +137,8 @@ def load_models_list(doi=None):
 try:
     MODELS = load_models_list(DOI)
 except Exception as e:
-    raise ValueError(f"Could not load models list: {str(e)}")
+    print(f"Could not load models list: {str(e)}. Setting to empty.")
+    MODELS = []
 
 
 def refresh_models_list(models_home=None):

@@ -937,6 +937,11 @@ def create_light_curve_model_from_args(
             )
 
         else:
+            if hasattr(args, "local_only"):
+                local_only = args.local_only
+            else:
+                local_only = False
+
             lc_kwargs = dict(
                 model=model_name,
                 sample_times=sample_times,
@@ -946,6 +951,7 @@ def create_light_curve_model_from_args(
                 interpolation_type=args.interpolation_type,
                 parameter_conversion=parameter_conversion,
                 filters=filters,
+                local_only=local_only,
             )
             lc_model = SVDLightCurveModel(**lc_kwargs)
 
