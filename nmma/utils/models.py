@@ -136,6 +136,13 @@ def load_models_list(doi=None, models_home=None):
     return models
 
 
+try:
+    MODELS = load_models_list(DOI)
+except Exception as e:
+    print(f"Could not load models list: {str(e)}. Setting to empty.")
+    MODELS = []
+
+
 def refresh_models_list(models_home=None):
     global DOI
     global MODELS
