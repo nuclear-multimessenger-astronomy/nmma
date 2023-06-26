@@ -1,7 +1,9 @@
+import argparse
 import re
 import shutil
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
 from os import environ, makedirs
 from os.path import exists, expanduser, join
 from pathlib import Path
@@ -10,7 +12,6 @@ import requests
 from requests.exceptions import ConnectionError
 from tqdm.auto import tqdm
 from yaml import load
-from multiprocessing import cpu_count
 
 PERMANENT_DOI = "8039909"
 DOI = ""
@@ -95,9 +96,9 @@ def download(file_info):
     return filepath
 
 
-def download_models_list(doi=None):
+def download_models_list(doi=None, models_home=None):
     # first we load the models list from zenodo
-    models_home = get_models_home()
+    models_home = get_models_home(models_home)
     if not exists(models_home):
         makedirs(models_home)
     r = requests.get(
@@ -107,16 +108,17 @@ def download_models_list(doi=None):
         f.write(r.content)
 
 
-def load_models_list(doi=None):
+def load_models_list(doi=None, models_home=None):
     # if models.yaml doesn't exist, download it
     global DOI
-    models_home = get_models_home()
+    models_home = get_models_home(models_home)
     if not exists(Path(models_home, "models.yaml")):
+        print("Models list not found, downloading it from Zenodo")
         try:
             if doi in [None, ""]:
                 DOI = get_latest_zenodo_doi(PERMANENT_DOI)
                 doi = DOI
-            download_models_list(doi=DOI)
+            download_models_list(doi=DOI, models_home=models_home)
         except ConnectionError:
             print(
                 "Could not connect to Zenodo, models might not be available or up-to-date"
@@ -134,12 +136,6 @@ def load_models_list(doi=None):
     return models
 
 
-try:
-    MODELS = load_models_list(DOI)
-except Exception as e:
-    raise ValueError(f"Could not load models list: {str(e)}")
-
-
 def refresh_models_list(models_home=None):
     global DOI
     global MODELS
@@ -149,7 +145,7 @@ def refresh_models_list(models_home=None):
         Path(models_home, "models.yaml").unlink()
     models = MODELS
     try:
-        models = load_models_list(DOI)
+        models = load_models_list(DOI, models_home)
         MODELS = models
     except Exception as e:
         raise ValueError(f"Could not load models list: {str(e)}")
@@ -163,8 +159,18 @@ def get_model(
     download_if_missing=True,
 ):
     global DOI
+    global MODELS
+
+    models_home = get_models_home(models_home)
+
     if DOI in [None, ""]:
         DOI = get_latest_zenodo_doi(PERMANENT_DOI)
+    try:
+        MODELS = load_models_list(DOI, models_home)
+    except Exception as e:
+        raise ValueError(f"Could not load models list: {str(e)}")
+
+    print(f"Using models list found in {models_home}")
 
     base_url = f"https://zenodo.org/record/{DOI}/files"
     if model_name is None:
@@ -177,9 +183,7 @@ def get_model(
             None,
         )  # TODO: upload all the models on zenodo so we can throw an error here instead of returning an empty list
     model_info = MODELS[model_name]
-    models_home = get_models_home(models_home)
 
-    print(f"Using models found in {models_home}")
     if not exists(models_home):
         makedirs(models_home)
     if not exists(Path(models_home, model_name)):
@@ -227,6 +231,55 @@ def get_model(
 
 
 if __name__ == "__main__":
-    # TODO: remove, this is for testing only
-    refresh_models_list()
-    print(get_model("svdmodels", "Bu2022Ye_tf", filters=["sdssu"]))
+    parser = argparse.ArgumentParser(
+        description="Download SVD models from Zenodo",
+    )
+    parser.add_argument(
+        "--model", type=str, required=True, help="Name the model to be used"
+    )
+    parser.add_argument(
+        "--svd-path",
+        type=str,
+        help="Path to the SVD models directory. If not provided, will use the default path",
+    )
+    parser.add_argument(
+        "--filters",
+        type=str,
+        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
+    )
+    parser.add_argument(
+        "--refresh-models-list",
+        type=bool,
+        default=False,
+        help="Refresh the list of models available on Zenodo",
+    )
+    args = parser.parse_args()
+
+    refresh = False
+    try:
+        refresh = args.refresh_model_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
+
+    filters = []
+    if args.filters not in [None, ""]:
+        try:
+            filters = args.filters.split(",")
+        except AttributeError:
+            pass
+
+    if args.model in [None, ""]:
+        raise ValueError("a model must be specified with --model")
+
+    get_model(
+        models_home=args.svd_path if args.svd_path not in [None, ""] else None,
+        model_name=args.model,
+        filters=filters,
+    )
+
+    # example:
+    # python nmma/utils/models.py --model="Bu2019lm" --filters=ztfr,ztfg,ztfi --svd-path='./svdmodels'
