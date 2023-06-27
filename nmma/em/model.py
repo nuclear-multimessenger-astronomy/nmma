@@ -177,10 +177,7 @@ class SVDLightCurveModel(object):
         self.interpolation_type = interpolation_type
         self.filters = filters
 
-        if svd_path is None:
-            self.svd_path = get_models_home()
-        else:
-            self.svd_path = svd_path
+        self.svd_path = get_models_home(svd_path)
 
         if self.interpolation_type == "sklearn_gp":
             if not local_only:
