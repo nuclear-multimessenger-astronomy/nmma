@@ -444,7 +444,6 @@ class GRBLightCurveModel(object):
         grb_param_dict["thetaObs"] = new_parameters["inclination_EM"]
         grb_param_dict["E0"] = 10 ** new_parameters["log10_E0"]
         grb_param_dict["thetaCore"] = new_parameters["thetaCore"]
-        grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
         grb_param_dict["n0"] = 10 ** new_parameters["log10_n0"]
         grb_param_dict["p"] = new_parameters["p"]
         grb_param_dict["epsilon_e"] = 10 ** new_parameters["log10_epsilon_e"]
