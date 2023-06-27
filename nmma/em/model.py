@@ -451,11 +451,14 @@ class GRBLightCurveModel(object):
         grb_param_dict["epsilon_B"] = 10 ** new_parameters["log10_epsilon_B"]
         grb_param_dict["z"] = z
 
+        if self.jetType == 0:
+            grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
+            if new_parameters["thetaWing"] / new_parameters["thetaCore"] > self.resolution:
+                return np.zeros(len(sample_times)), {}
+        
         if self.jetType == 1 or self.jetType == 4:
             grb_param_dict["b"] = new_parameters["b"]
-
-        if new_parameters["thetaWing"] / new_parameters["thetaCore"] > self.resolution:
-            return np.zeros(len(sample_times)), {}
+            grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
 
         Ebv = new_parameters.get("Ebv", 0.0)
 
