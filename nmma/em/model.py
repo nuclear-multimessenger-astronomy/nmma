@@ -42,6 +42,7 @@ model_parameters_dict = {
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
     "CV": ["example_num"],
     "AnBa2022_sparse": ["mrp", "xmix"],
+    "AnBa2022": ["mtot", "mni", "vej", "mrp", "xmix"],
     "salt2": ["x0", "x1", "c"],
     "nugent-hyper": ["supernova_mag_boost"],
     "Bu2022Ye": [

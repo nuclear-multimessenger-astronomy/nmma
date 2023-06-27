@@ -15,7 +15,7 @@ from ..utils.models import refresh_models_list
 from .injection import create_light_curve_data
 from .likelihood import OpticalLightCurve
 from .model import create_light_curve_model_from_args, model_parameters_dict
-from .prior import ConditionalGaussianIotaGivenThetaCore
+from .prior import create_prior_from_args
 from .utils import getFilteredMag, loadEvent
 
 matplotlib.use("agg")
@@ -539,43 +539,6 @@ def main(args=None):
         )
 
     print("Running with filters {0}".format(filters_to_analyze))
-    # setup the prior
-    priors = bilby.gw.prior.PriorDict(args.prior)
-
-    # setup for Ebv
-    if args.Ebv_max > 0.0:
-        Ebv_c = 1.0 / (0.5 * args.Ebv_max)
-        priors["Ebv"] = bilby.core.prior.Interped(
-            name="Ebv",
-            minimum=0.0,
-            maximum=args.Ebv_max,
-            latex_label="$E(B-V)$",
-            xx=[0, args.Ebv_max],
-            yy=[Ebv_c, 0],
-        )
-    else:
-        priors["Ebv"] = bilby.core.prior.DeltaFunction(
-            name="Ebv", peak=0.0, latex_label="$E(B-V)$"
-        )
-
-    # re-setup the prior if the conditional prior for inclination is used
-
-    if args.conditional_gaussian_prior_thetaObs:
-        priors_dict = dict(priors)
-        original_iota_prior = priors_dict["inclination_EM"]
-        setup = dict(
-            minimum=original_iota_prior.minimum,
-            maximum=original_iota_prior.maximum,
-            name=original_iota_prior.name,
-            latex_label=original_iota_prior.latex_label,
-            unit=original_iota_prior.unit,
-            boundary=original_iota_prior.boundary,
-            N_sigma=args.conditional_gaussian_prior_N_sigma,
-        )
-
-        priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
-        priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
-
     model_names, models, light_curve_model = create_light_curve_model_from_args(
         args.model,
         args,
@@ -583,6 +546,9 @@ def main(args=None):
         filters=filters_to_analyze,
         sample_over_Hubble=args.sample_over_Hubble,
     )
+
+    # setup the prior
+    priors = create_prior_from_args(model_names, args)
 
     # setup the likelihood
     if args.detection_limit:
