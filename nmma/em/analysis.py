@@ -415,12 +415,12 @@ def main(args=None):
         if args.injection_outfile is not None:
             if filters is not None:
                 if args.injection_detection_limit is None:
-                    detection_limit = {x: np.inf for x in filters.split(",")}
+                    detection_limit = {x: np.inf for x in filters}
                 else:
                     detection_limit = {
                         x: float(y)
                         for x, y in zip(
-                            filters.split(","),
+                            filters,
                             args.injection_detection_limit.split(","),
                         )
                     }
@@ -428,16 +428,16 @@ def main(args=None):
                 detection_limit = {}
             data_out = np.empty((0, 6))
             for filt in data.keys():
-                if args.filters:
+                if filters:
                     if args.photometry_augmentation_filters:
                         filts = list(
                             set(
-                                args.filters.split(",")
+                                filters
                                 + args.photometry_augmentation_filters.split(",")
                             )
                         )
                     else:
-                        filts = args.filters.split(",")
+                        filts = filters
                     if filt not in filts:
                         continue
                 for row in data[filt]:
