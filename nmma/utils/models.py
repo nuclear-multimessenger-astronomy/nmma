@@ -136,6 +136,8 @@ def load_models_list(doi=None, models_home=None):
             downloaded_if_missing = False
             pass
 
+    models = {}
+
     if downloaded_if_missing:
         try:
             from yaml import CLoader as Loader
@@ -154,36 +156,39 @@ def load_models_list(doi=None, models_home=None):
 
     if not downloaded_if_missing:
         print("Attempting to retrieve local files...")
-        # try to get the list of models from the models_home directory
-        models = {}
 
-        files = [f for f in Path(models_home).glob("*") if f.is_file()]
-        files = [f.stem for f in files]
+    files = [f for f in Path(models_home).glob("*") if f.is_file()]
+    files = [f.stem for f in files]
 
-        for f in files:
-            name = f.split("/")[-1]
-            filters = []
-            if exists(Path(models_home, name)):
-                filter_files = [
-                    f.stem for f in Path(models_home, name).glob("*") if f.is_file()
-                ]
-                for ff in filter_files:
-                    ff = ff.split("/")[-1]
+    for f in files:
+        name = f.split("/")[-1]
+        filters = []
+        if exists(Path(models_home, name)):
+            filter_files = [
+                f.stem for f in Path(models_home, name).glob("*") if f.is_file()
+            ]
+            for ff in filter_files:
+                ff = ff.split("/")[-1]
 
-                    if name in ff:
-                        ff = ff.replace(name, "")
+                if name in ff:
+                    ff = ff.replace(name, "")
 
-                    if ff.startswith("_"):
-                        ff = ff[1:]
+                if ff.startswith("_"):
+                    ff = ff[1:]
 
-                    if ff.endswith("_"):
-                        ff = ff[:-1]
+                if ff.endswith("_"):
+                    ff = ff[:-1]
 
-                    if ff is not None and ff != "":
-                        filters.append(ff)
+                if ff is not None and ff != "":
+                    filters.append(ff)
 
-            filters = list(set(filters))
+        filters = list(set(filters))
+        if name not in models:
             models[name] = {"filters": filters}
+        elif "filters" not in models[name]:
+            models[name]["filters"] = filters
+        else:
+            models[name]["filters"] = list(set(filters + models[name]["filters"]))
 
     return models, downloaded_if_missing is False
 
