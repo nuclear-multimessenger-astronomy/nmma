@@ -111,48 +111,92 @@ def download_models_list(doi=None, models_home=None):
 def load_models_list(doi=None, models_home=None):
     # if models.yaml doesn't exist, download it
     global DOI
-    models_home = get_models_home(models_home)
-    if not exists(Path(models_home, "models.yaml")):
-        print("Models list not found, downloading it from Zenodo")
+    if DOI in [None, ""]:
         try:
-            if doi in [None, ""]:
-                DOI = get_latest_zenodo_doi(PERMANENT_DOI)
-                doi = DOI
-            download_models_list(doi=DOI, models_home=models_home)
-        except ConnectionError:
+            DOI = get_latest_zenodo_doi(PERMANENT_DOI)
+        except Exception:
             print(
-                "Could not connect to Zenodo, models might not be available or up-to-date"
+                "Could not retrieve latest DOI, models won't be downloaded or updated. Will try using existing list or local files available."
             )
             pass
-    try:
-        from yaml import CLoader as Loader
-    except ImportError:
-        from yaml import Loader
-    with open(Path(models_home, "models.yaml"), "r") as f:
-        models = load(f, Loader=Loader)
 
-    # temporary mapping
-    models["Bu2019lm"] = models["Bu2019bns"]
-    return models
+    if doi in [None, ""]:
+        doi = DOI
 
+    models_home = get_models_home(models_home)
 
-try:
-    MODELS = load_models_list(DOI)
-except Exception as e:
-    print(f"Could not load models list: {str(e)}. Setting to empty.")
-    MODELS = []
+    downloaded_if_missing = True
+    if not exists(Path(models_home, "models.yaml")):
+        try:
+            if doi not in [None, ""]:
+                download_models_list(doi=DOI, models_home=models_home)
+            else:
+                raise ConnectionError("No DOI provided")
+        except ConnectionError:
+            downloaded_if_missing = False
+            pass
+
+    if downloaded_if_missing:
+        try:
+            from yaml import CLoader as Loader
+        except ImportError:
+            from yaml import Loader
+        try:
+            with open(Path(models_home, "models.yaml"), "r") as f:
+                models = load(f, Loader=Loader)
+            # temporary mapping
+            models["Bu2019lm"] = models["Bu2019bns"]
+        except Exception as e:
+            downloaded_if_missing = False
+            print(
+                f"Could not open the download models list, using local files instead: {str(e)}"
+            )
+
+    if not downloaded_if_missing:
+        print("Attempting to retrieve local files...")
+        # try to get the list of models from the models_home directory
+        models = {}
+
+        files = [f for f in Path(models_home).glob("*") if f.is_file()]
+        files = [f.stem for f in files]
+
+        for f in files:
+            name = f.split("/")[-1]
+            filters = []
+            if exists(Path(models_home, name)):
+                filter_files = [
+                    f.stem for f in Path(models_home, name).glob("*") if f.is_file()
+                ]
+                for ff in filter_files:
+                    ff = ff.split("/")[-1]
+
+                    if name in ff:
+                        ff = ff.replace(name, "")
+
+                    if ff.startswith("_"):
+                        ff = ff[1:]
+
+                    if ff.endswith("_"):
+                        ff = ff[:-1]
+
+                    if ff is not None and ff != "":
+                        filters.append(ff)
+
+            filters = list(set(filters))
+            models[name] = {"filters": filters}
+
+    return models, downloaded_if_missing is False
 
 
 def refresh_models_list(models_home=None):
     global DOI
     global MODELS
-    DOI = get_latest_zenodo_doi(PERMANENT_DOI)
     models_home = get_models_home(models_home)
     if exists(Path(models_home, "models.yaml")):
         Path(models_home, "models.yaml").unlink()
     models = MODELS
     try:
-        models = load_models_list(DOI, models_home)
+        models = load_models_list(DOI, models_home)[0]
         MODELS = models
     except Exception as e:
         raise ValueError(f"Could not load models list: {str(e)}")
@@ -169,34 +213,30 @@ def get_model(
     global MODELS
 
     models_home = get_models_home(models_home)
-
-    if DOI in [None, ""]:
-        DOI = get_latest_zenodo_doi(PERMANENT_DOI)
+    used_local = False
     try:
-        MODELS = load_models_list(DOI, models_home)
+        MODELS, used_local = load_models_list(DOI, models_home)
     except Exception as e:
         raise ValueError(f"Could not load models list: {str(e)}")
 
-    print(f"Using models list found in {models_home}")
+    if used_local:
+        print("Could not access Zenodo, used local models list instead.")
 
     base_url = f"https://zenodo.org/record/{DOI}/files"
     if model_name is None:
         raise ValueError("model_name must be specified, got None")
     if model_name not in MODELS:
-        print(f"{model_name} not on Zenodo, trying local files")
-        # raise ValueError("model_name must be one of %s, got %s" % (MODELS.keys(), model_name))
+        print(f"{model_name} not on Zenodo, trying local files.")
         return (
             [],
             None,
-        )  # TODO: upload all the models on zenodo so we can throw an error here instead of returning an empty list
+        )  # return empty list of files and None for the model_info
     model_info = MODELS[model_name]
 
     if not exists(models_home):
         makedirs(models_home)
     if not exists(Path(models_home, model_name)):
         makedirs(Path(models_home, model_name))
-    if not exists(Path(models_home, model_name, "filters")):
-        makedirs(Path(models_home, model_name, "filters"))
 
     filter_synonyms = [filt.replace("_", ":") for filt in model_info["filters"]]
 
@@ -206,9 +246,14 @@ def get_model(
 
     missing_filters = list(set(filters).difference(set(all_filters)))
     if len(missing_filters) > 0:
-        raise ValueError(
-            f'Zenodo does not have filters {",".join(missing_filters)} for {model_name}'
-        )
+        if used_local:
+            raise ValueError(
+                f"local models list does not have filters {','.join(missing_filters)} for {model_name}"
+            )
+        else:
+            raise ValueError(
+                f'models list from zenodo does not have filters {",".join(missing_filters)} for {model_name}'
+            )
 
     core_format = "pkl"
     filter_format = "pkl"
@@ -226,6 +271,15 @@ def get_model(
     if len(missing) > 0:
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
+        if DOI in [None, ""]:
+            print(
+                f"Could not connect to ZENODO, and no local files found in `{models_home}`. Can't download missing models:"
+            )
+            for u, f in missing:
+                print(f"    - {f}")
+            raise OSError(
+                "Data not found locally and no access to Zenodo. Can't download missing models."
+            )
 
         print(f"downloading {len(missing)} files for model {model_name}:")
         with ThreadPoolExecutor(
@@ -233,7 +287,6 @@ def get_model(
         ) as executor:
             executor.map(download, missing)
 
-    # return the paths to the files and corresponding filters
     return [str(f) for f in filepaths], filters
 
 
@@ -299,3 +352,7 @@ def main(args=None):
 
     # example:
     # python nmma/utils/models.py --model="Bu2019lm" --filters=ztfr,ztfg,ztfi --svd-path='./svdmodels'
+
+
+if __name__ == "__main__":
+    main()
