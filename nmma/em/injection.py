@@ -29,9 +29,25 @@ def create_light_curve_data(
         lbol_ncoeff=args.injection_svd_lbol_ncoeff,
     )
 
-    #bands = {1: "g", 2: "r", 3: "i"}
-    bands = {i+1: b for i, b in enumerate(args.filters.split(","))}
-    inv_bands = {v: k for k, v in bands.items()}
+    if args.filters:
+        filters = args.filters.split(",")
+        bands = {i + 1: b for i, b in enumerate(filters)}
+        inv_bands = {v: k for k, v in bands.items()}
+        if args.injection_detection_limit is None:
+            detection_limit = {x: np.inf for x in filters}
+        else:
+            detection_limit = {
+                x: float(y)
+                for x, y in zip(
+                    args.filters.split(","), args.injection_detection_limit.split(",")
+                )
+            }
+        assert len(detection_limit) == len(args.filters.split(","))
+    else:
+        filters = None
+        bands = {}
+        inv_bands = {}
+        detection_limit = {}
 
     if ztf_sampling:
         with resources.open_binary(
@@ -74,17 +90,7 @@ def create_light_curve_data(
     tmin = args.kilonova_tmin
     tmax = args.kilonova_tmax
     tstep = args.kilonova_tstep
-    if args.injection_detection_limit is None:
-        detection_limit = {x: np.inf for x in args.filters.split(",")}
-    else:
-        detection_limit = {
-            x: float(y)
-            for x, y in zip(
-                args.filters.split(","), args.injection_detection_limit.split(",")
-            )
-        }
-    assert len(detection_limit) == len(args.filters.split(","))
-    
+
     seed = args.generation_seed
 
     np.random.seed(seed)

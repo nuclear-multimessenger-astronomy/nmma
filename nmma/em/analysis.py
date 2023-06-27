@@ -413,16 +413,19 @@ def main(args=None):
         print("Injection generated")
 
         if args.injection_outfile is not None:
-            if args.injection_detection_limit is None:
-                detection_limit = {x: np.inf for x in args.filters.split(",")}
+            if filters is not None:
+                if args.injection_detection_limit is None:
+                    detection_limit = {x: np.inf for x in filters.split(",")}
+                else:
+                    detection_limit = {
+                        x: float(y)
+                        for x, y in zip(
+                            filters.split(","),
+                            args.injection_detection_limit.split(","),
+                        )
+                    }
             else:
-                detection_limit = {
-                    x: float(y)
-                    for x, y in zip(
-                        args.filters.split(","),
-                        args.injection_detection_limit.split(","),
-                    )
-                }
+                detection_limit = {}
             data_out = np.empty((0, 6))
             for filt in data.keys():
                 if args.filters:
