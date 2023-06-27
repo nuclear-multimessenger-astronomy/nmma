@@ -226,11 +226,7 @@ def get_model(
     if model_name is None:
         raise ValueError("model_name must be specified, got None")
     if model_name not in MODELS:
-        print(f"{model_name} not on Zenodo, trying local files.")
-        return (
-            [],
-            None,
-        )  # return empty list of files and None for the model_info
+        raise ValueError(f"model_name {model_name} not found in models list")
     model_info = MODELS[model_name]
 
     if not exists(models_home):
