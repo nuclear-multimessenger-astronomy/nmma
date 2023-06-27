@@ -237,7 +237,8 @@ def get_model(
     return [str(f) for f in filepaths], filters
 
 
-if __name__ == "__main__":
+def get_parser():
+
     parser = argparse.ArgumentParser(
         description="Download SVD models from Zenodo",
     )
@@ -260,7 +261,15 @@ if __name__ == "__main__":
         default=False,
         help="Refresh the list of models available on Zenodo",
     )
-    args = parser.parse_args()
+
+    return parser
+
+
+def main(args=None):
+
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
 
     refresh = False
     try:

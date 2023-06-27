@@ -566,6 +566,11 @@ def calc_lc(
                 cAstd[i] = y_90_hi_test - y_90_lo_test
         else:
             gps = svd_mag_model[filt]["gps"]
+            if gps is None:
+                raise ValueError(
+                    f"Gaussian process model for filter {filt} unavailable."
+                )
+
             cAproj = np.zeros((n_coeff,))
             cAstd = np.zeros((n_coeff,))
             for i in range(n_coeff):

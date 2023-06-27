@@ -203,6 +203,7 @@ class SVDLightCurveModel(object):
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
                         print(f"Could not find model file for filter {filt}")
+                        self.svd_mag_model[filt]["gps"] = None
                     else:
                         print(f"Loaded filter {filt}")
                         with open(outfile, "rb") as handle:
