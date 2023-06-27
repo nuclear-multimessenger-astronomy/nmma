@@ -445,7 +445,6 @@ class GRBLightCurveModel(object):
         grb_param_dict["thetaObs"] = new_parameters["inclination_EM"]
         grb_param_dict["E0"] = 10 ** new_parameters["log10_E0"]
         grb_param_dict["thetaCore"] = new_parameters["thetaCore"]
-        grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
         grb_param_dict["n0"] = 10 ** new_parameters["log10_n0"]
         grb_param_dict["p"] = new_parameters["p"]
         grb_param_dict["epsilon_e"] = 10 ** new_parameters["log10_epsilon_e"]
@@ -453,13 +452,18 @@ class GRBLightCurveModel(object):
         grb_param_dict["z"] = z
 
         if self.jetType == 0:
-            grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
-            if new_parameters["thetaWing"] / new_parameters["thetaCore"] > self.resolution:
-                return np.zeros(len(sample_times)), {}
-        
+            if "thetaWing" in new_parameters:
+                grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
+                if (
+                    new_parameters["thetaWing"] / new_parameters["thetaCore"]
+                    > self.resolution
+                ):
+                    return np.zeros(len(sample_times)), {}
+
         if self.jetType == 1 or self.jetType == 4:
             grb_param_dict["b"] = new_parameters["b"]
-            grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
+            if "thetaWing" in new_parameters:
+                grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
 
         Ebv = new_parameters.get("Ebv", 0.0)
 
