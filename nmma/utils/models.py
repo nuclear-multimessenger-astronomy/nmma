@@ -152,8 +152,6 @@ def load_models_list(doi=None, models_home=None):
         try:
             with open(Path(models_home, "models.yaml"), "r") as f:
                 models = load(f, Loader=Loader)
-            # temporary mapping
-            models["Bu2019lm"] = models["Bu2019bns"]
         except Exception as e:
             downloaded_if_missing = False
             print(
@@ -274,17 +272,13 @@ def get_model(
         filter_format = "h5"
 
     filepaths = (
-        [Path(models_home, f"{model_name}.{core_format}")]
-        if not filters_only
-        else []
-        + [Path(models_home, model_name, f"{f}.{filter_format}") for f in filters]
-    )
+        [Path(models_home, f"{model_name}.{core_format}")] if not filters_only else []
+    ) + [Path(models_home, model_name, f"{f}.{filter_format}") for f in filters]
     urls = (
         [f"{base_url}/{model_name}.{core_format}?download=1"]
         if not filters_only
         else []
-        + [f"{base_url}/{model_name}_{f}.{filter_format}?download=1" for f in filters]
-    )
+    ) + [f"{base_url}/{model_name}_{f}.{filter_format}?download=1" for f in filters]
 
     missing = [(u, f) for u, f in zip(urls, filepaths) if not f.exists()]
     if len(missing) > 0:
