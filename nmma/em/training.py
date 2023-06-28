@@ -441,6 +441,11 @@ class SVDTrainingModel(object):
             modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
             if not os.path.isfile(modelfile):
                 model_exists = False
+            outdir = modelfile.replace(".pkl", "")
+            for filt in self.filters:
+                outfile = os.path.join(outdir, f"{filt}.pkl")
+                if not os.path.isfile(outfile):
+                    model_exists = False
         elif self.interpolation_type == "tensorflow":
             modelfile = os.path.join(self.svd_path, f"{self.model}_tf.pkl")
             if not os.path.isfile(modelfile):
