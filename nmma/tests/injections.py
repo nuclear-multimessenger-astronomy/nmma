@@ -141,7 +141,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         create_lightcurves.main(args)
 
         command_line_lightcurve_file = os.path.join(
-            output_directory, f"{injection_df['simulation_id']}.dat"
+            output_directory, f"{command_line_lightcurve_label}.dat"
         )
         assert os.path.exists(
             command_line_lightcurve_file
