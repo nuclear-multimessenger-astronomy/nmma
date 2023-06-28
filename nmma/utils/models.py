@@ -22,7 +22,7 @@ RemoteFileMetadata = namedtuple("RemoteFileMetadata", ["filename", "url", "check
 pbar = {}
 
 # X-ray and Radio data
-custom_filters = [
+SKIP_FILTERS = [
     "X-ray-1keV",
     "X-ray-5keV",
     "radio-5.5GHz",
@@ -214,6 +214,7 @@ def get_model(
     model_name=None,
     filters=[],
     download_if_missing=True,
+    filters_only=False,
 ):
     global DOI
     global MODELS
@@ -242,9 +243,14 @@ def get_model(
 
     filter_synonyms = [filt.replace("_", ":") for filt in model_info["filters"]]
 
-    all_filters = list(set(model_info["filters"] + filter_synonyms + custom_filters))
+    all_filters = list(set(model_info["filters"] + filter_synonyms))
     if filters in [[], None, ""] and "filters" in model_info:
         filters = model_info["filters"]
+
+    skipped_filters = [f for f in filters if f in SKIP_FILTERS]
+
+    # remove the skip_filters list from the filters
+    filters = [f for f in filters if f not in SKIP_FILTERS]
 
     missing_filters = list(set(filters).difference(set(all_filters)))
     if len(missing_filters) > 0:
@@ -262,12 +268,18 @@ def get_model(
     if "_tf" in model_name:
         filter_format = "h5"
 
-    filepaths = [Path(models_home, f"{model_name}.{core_format}")] + [
-        Path(models_home, model_name, f"{f}.{filter_format}") for f in filters
-    ]
-    urls = [f"{base_url}/{model_name}.{core_format}?download=1"] + [
-        f"{base_url}/{model_name}_{f}.{filter_format}?download=1" for f in filters
-    ]
+    filepaths = (
+        [Path(models_home, f"{model_name}.{core_format}")]
+        if not filters_only
+        else []
+        + [Path(models_home, model_name, f"{f}.{filter_format}") for f in filters]
+    )
+    urls = (
+        [f"{base_url}/{model_name}.{core_format}?download=1"]
+        if not filters_only
+        else []
+        + [f"{base_url}/{model_name}_{f}.{filter_format}?download=1" for f in filters]
+    )
 
     missing = [(u, f) for u, f in zip(urls, filepaths) if not f.exists()]
     if len(missing) > 0:
@@ -289,7 +301,7 @@ def get_model(
         ) as executor:
             executor.map(download, missing)
 
-    return [str(f) for f in filepaths], filters
+    return [str(f) for f in filepaths], filters + skipped_filters
 
 
 def get_parser():
