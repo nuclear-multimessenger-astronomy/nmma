@@ -202,7 +202,9 @@ def main(args=None):
     except AttributeError:
         pass
     if refresh:
-        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
 
     seed = args.generation_seed
     np.random.seed(seed)
