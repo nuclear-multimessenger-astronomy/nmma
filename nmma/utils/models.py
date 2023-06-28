@@ -91,6 +91,11 @@ def download(file_info):
             f"Downloaded file {filepath} is incomplete. "
             f"Only {len(file_content)} of {total} bytes were downloaded."
         )
+    if not exists(Path(filepath).parent):
+        try:
+            makedirs(Path(filepath).parent)
+        except Exception:
+            pass
     with open(filepath, "wb") as f:
         f.write(file_content)
 

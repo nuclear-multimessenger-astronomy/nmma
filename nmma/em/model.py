@@ -182,18 +182,20 @@ class SVDLightCurveModel(object):
         if self.interpolation_type == "sklearn_gp":
             if not local_only:
                 _, model_filters = get_model(
-                    self.svd_path, f"{self.model}", filters=filters, filters_only=True
+                    self.svd_path, f"{self.model}", filters=filters
                 )
                 if filters is None and model_filters is not None:
                     self.filters = model_filters
 
-            outdir = os.path.join(self.svd_path, model)
-            if os.path.isdir(outdir):
+            modelfile = os.path.join(self.svd_path, "{0}.pkl".format(model))
+            if os.path.isfile(modelfile):
+                with open(modelfile, "rb") as handle:
+                    self.svd_mag_model = pickle.load(handle)
+
                 if self.filters is None:
                     self.filters = list(self.svd_mag_model.keys())
 
-                if not isinstance(self.svd_mag_model, dict):
-                    self.svd_mag_model = {}
+                outdir = modelfile.replace(".pkl", "")
                 for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):

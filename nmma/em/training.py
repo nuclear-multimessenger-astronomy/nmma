@@ -438,9 +438,10 @@ class SVDTrainingModel(object):
         model_exists = True
 
         if self.interpolation_type == "sklearn_gp":
-            outdir = os.path.join(self.svd_path, self.model)
-            if not os.path.isdir(outdir):
+            modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+            if not os.path.isfile(modelfile):
                 model_exists = False
+            outdir = modelfile.replace(".pkl", "")
             for filt in self.filters:
                 outfile = os.path.join(outdir, f"{filt}.pkl")
                 if not os.path.isfile(outfile):
@@ -464,7 +465,8 @@ class SVDTrainingModel(object):
     def save_model(self):
 
         if self.interpolation_type == "sklearn_gp":
-            outdir = os.path.join(self.svd_path, self.model)
+            modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+            outdir = modelfile.replace(".pkl", "")
             if not os.path.isdir(outdir):
                 os.makedirs(outdir)
             for filt in self.svd_model.keys():
@@ -495,10 +497,12 @@ class SVDTrainingModel(object):
     def load_model(self):
 
         if self.interpolation_type == "sklearn_gp":
-            get_model(self.svd_path, f"{self.model}", self.filters, filters_only=True)
-            outdir = os.path.join(self.svd_path, self.model)
-            if not isinstance(self.svd_model, dict):
-                self.svd_model = {}
+            get_model(self.svd_path, f"{self.model}", self.filters)
+            modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+            with open(modelfile, "rb") as handle:
+                self.svd_model = pickle.load(handle)
+
+            outdir = modelfile.replace(".pkl", "")
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.pkl")
                 if not os.path.isfile(outfile):
