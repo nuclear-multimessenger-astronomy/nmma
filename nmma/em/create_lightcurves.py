@@ -252,7 +252,12 @@ def main(args=None):
     mag_ds = {}
     for index, row in injection_df.iterrows():
 
-        injection_outfile = os.path.join(args.outdir, "%d.dat" % simulation_id[index])
+        if len(injection_df) == 1:
+            injection_outfile = os.path.join(args.outdir, "%s.dat" % args.label)
+        else:
+            injection_outfile = os.path.join(
+                args.outdir, f"{args.label}_{simulation_id[index]}.dat"
+            )
         if os.path.isfile(injection_outfile):
             try:
                 mag_ds[index] = read_lightcurve_file(injection_outfile)
