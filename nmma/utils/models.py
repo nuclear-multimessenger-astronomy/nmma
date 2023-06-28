@@ -36,7 +36,8 @@ def get_models_home(models_home=None) -> str:
     if models_home is None:
         models_home = environ.get("NMMA_MODELS", join("~", "nmma_models"))
     models_home = expanduser(models_home)
-    makedirs(models_home, exist_ok=True)
+    if not exists(models_home):
+        makedirs(models_home)
     return models_home
 
 

@@ -92,10 +92,7 @@ class SVDTrainingModel(object):
             if not os.path.isdir(self.plotdir):
                 os.mkdir(self.plotdir)
 
-        if svd_path is None:
-            self.svd_path = get_models_home()
-        else:
-            self.svd_path = svd_path
+        self.svd_path = get_models_home(svd_path)
 
         self.interpolate_data()
 
@@ -282,7 +279,8 @@ class SVDTrainingModel(object):
 
             if self.ncpus > 1:
                 from p_tqdm import p_map
-                gps = p_map(gp_func, cAmat[:self.n_coeff, :], num_cpus=self.ncpus)
+
+                gps = p_map(gp_func, cAmat[: self.n_coeff, :], num_cpus=self.ncpus)
             else:
                 gps = []
                 for i in range(self.n_coeff):
