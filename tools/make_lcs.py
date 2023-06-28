@@ -77,7 +77,9 @@ if args.z is None:
     D_cm = dMpc * 3.0857e16 * 100  # 10 pc in cm
     H0 = cosmo.H0.value
     CLIGHT = 2.99792458e5
-    z = H0 * dMpc / CLIGHT
+    ztest = np.arange(0.0001,1,0.00001)
+    Dtest = np.array(cosmo.luminosity_distance(ztest).to("Mpc").value)
+    z = ztest[np.argmin(abs(dMpc-Dtest))] 
 else:
     z = args.z
     dMpc = cosmo.luminosity_distance(z).to("Mpc").value
