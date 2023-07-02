@@ -371,8 +371,14 @@ def main(args=None):
         parser = get_parser()
         args = parser.parse_args()
 
+    if len(args.outdir) > 64:
+        print("WARNING: output directory name is too long, it should not be longer than 64 characters")
+        exit()
+
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+    
+    
 
     # initialize light curve model
     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
