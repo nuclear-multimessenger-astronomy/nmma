@@ -331,6 +331,10 @@ def main(args=None):
     if args is None:
         parser = get_parser()
         args = parser.parse_args()
+    if args.sampler == "pymultinest":
+        if len(args.outdir) > 64:
+            print("WARNING: output directory name is too long, it should not be longer than 64 characters")
+            exit()
 
     refresh = False
     try:
