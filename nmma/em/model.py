@@ -265,7 +265,14 @@ class SVDLightCurveModel(object):
                 outdir = modelfile.replace(".pkl", "")
                 for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.h5")
-                    self.svd_mag_model[filt]["model"] = load_model(outfile)
+                    if not os.path.isfile(outfile):
+                        print(f"Could not find model file for filter {filt}")
+                        if filt not in self.svd_mag_model:
+                            self.svd_mag_model[filt] = {}
+                        self.svd_mag_model[filt]["model"] = None
+                    else:
+                        print(f"Loaded filter {filt}")
+                        self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
             else:
                 _, model_filters = get_model(
