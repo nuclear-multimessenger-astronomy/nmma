@@ -55,6 +55,7 @@ jobs:
           ${{ runner.os }}-pip-2-
     - name: Install dependencies
       run: |
+        sudo apt-get update
         # sudo apt-get install gfortran swig libhdf5-serial-dev libmpich-dev
         sudo apt install -y openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
         python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
