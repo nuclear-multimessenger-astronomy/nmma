@@ -29,8 +29,9 @@ from log import make_log
 matplotlib.use("Agg")
 rng = np.random.default_rng()
 
+ALLOWED_MODELS = ["Me2017", "Piro2021", "nugent-hyper", "TrPi2018", "Bu2022Ye"]
+
 default_analysis_parameters = {
-    "source": "Me2017",
     "fix_z": False,
     "tmin": 0.01,
     "tmax": 7,
@@ -174,42 +175,41 @@ def run_nmma_model(data_dict):
         local_temp_files.append(f.name)
 
         parser = get_parser()
-        args = parser.parse_args(
-            [
-                "--model",
-                source,
-                "--svd-path",
-                svdmodel_directory,
-                "--outdir",
-                plotdir,
-                "--label",
-                f"{cand_name}_{source}",
-                "--trigger-time",
-                str(t0),
-                "--data",
-                f.name,
-                "--prior",
-                prior,
-                "--tmin",
-                str(tmin),
-                "--tmax",
-                str(tmax),
-                "--dt",
-                str(dt),
-                "--error-budget",
-                str(error_budget),
-                "--nlive",
-                str(nlive),
-                "--Ebv-max",
-                str(Ebv_max),
-                "--interpolation_type",
-                interpolation_type,
-                "--sampler",
-                sampler,
-                "--plot",
-            ]
-        )
-        main(args=args)
+        args = [
+            "--model",
+            source,
+            "--svd-path",
+            svdmodel_directory,
+            "--outdir",
+            plotdir,
+            "--label",
+            f"{cand_name}_{source}",
+            "--trigger-time",
+            str(t0),
+            "--data",
+            f.name,
+            "--prior",
+            prior,
+            "--tmin",
+            str(tmin),
+            "--tmax",
+            str(tmax),
+            "--dt",
+            str(dt),
+            "--error-budget",
+            str(error_budget),
+            "--nlive",
+            str(nlive),
+            "--Ebv-max",
+            str(Ebv_max),
+            "--interpolation_type",
+            interpolation_type,
+            "--sampler",
+            sampler,
+            "--plot",
+        ]
+
+        main(args=parser.parse_args(args))
 
         posterior_file = os.path.join(
             plotdir, f"{cand_name}_{source}_posterior_samples.dat"
@@ -309,6 +309,18 @@ class MainHandler(tornado.web.RequestHandler):
             if key not in data_dict:
                 log(f"missing required key {key} in data_dict")
                 return self.error(400, f"missing required key {key} in data_dict")
+
+        source = data_dict["inputs"].get("analysis_parameters", {}).get("source", None)
+        if source is None:
+            log("model not specified in data_dict.inputs.analysis_parameters")
+            return self.error(
+                400, "model not specified in data_dict.inputs.analysis_parameters"
+            )
+        elif source not in ALLOWED_MODELS:
+            log(f"model {source} is not one of: {ALLOWED_MODELS}")
+            return self.error(
+                400, f"model {source} is not allowed, must be one of: {ALLOWED_MODELS}"
+            )
 
         def nmma_analysis_done_callback(
             future,
