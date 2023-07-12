@@ -2,7 +2,7 @@ name: CI to Docker Hub
 
 on:
   push:
-
+    branches: [ main ]
 env:
   REGISTRY_IMAGE: nmma/nmma_api
 

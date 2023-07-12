@@ -36,6 +36,11 @@ default_analysis_parameters = {
     "tmin": 0.01,
     "tmax": 7,
     "dt": 0.1,
+    "nlive": 512,
+    "error_budget": 1.0,
+    "Ebv_max": 0.5724,
+    "interpolation_type": "tensorflow",
+    "sampler": "pymultinest",
 }
 
 log = make_log("nmma")
@@ -87,6 +92,11 @@ def run_nmma_model(data_dict):
     tmin = analysis_parameters.get("tmin")
     tmax = analysis_parameters.get("tmax")
     dt = analysis_parameters.get("dt")
+    nlive = analysis_parameters.get("nlive")
+    error_budget = analysis_parameters.get("error_budget")
+    Ebv_max = analysis_parameters.get("Ebv_max")
+    interpolation_type = analysis_parameters.get("interpolation_type")
+    sampler = analysis_parameters.get("sampler")
 
     # this example analysis service expects the photometry to be in
     # a csv file (at data_dict["inputs"]["photometry"]) with the following columns
@@ -128,15 +138,9 @@ def run_nmma_model(data_dict):
         plotdir = tempfile.mkdtemp()
 
         # cpus = 2
-        nlive = 512
-        error_budget = 1.0
-
-        Ebv_max = 0.5724
 
         # Set t0 based on first detection
         t0 = np.min(data[data["mag"] != np.ma.masked]["mjd"])
-        interpolation_type = "tensorflow"
-        sampler = "pymultinest"
 
         prior = f"{prior_directory}/{source}.prior"
         if not os.path.isfile(prior):
