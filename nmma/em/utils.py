@@ -162,7 +162,7 @@ def getFilteredMag(mag, filt):
     # are kind of justifiable because the spectral
     # commonly goes as F_\nu \propto \nu^\alpha,
     # where \nu is the frequency.
-    if filt in unprocessed_filt:
+    if filt in unprocessed_filt or filt.startswith('radio') or filt.startswith('X-ray'):
         return mag[filt]
     elif filt in sncosmo_maps:
         return mag[sncosmo_maps[filt]]
@@ -479,14 +479,41 @@ def get_default_filts_lambdas(filters=None):
         lambdas_slice = []
 
         for filt in filters:
-            try:
-                ii = filts.index(filt)
-                filts_slice.append(filts[ii])
-                lambdas_slice.append(lambdas[ii])
-            except ValueError:
-                ii = filts.index(filt.replace("_", ":"))
-                filts_slice.append(filts[ii].replace(":", "_"))
-                lambdas_slice.append(lambdas[ii])
+            if filt.startswith('radio') and filt not in filts:
+                # for additional radio filters that not in the list
+                # calculate the lambdas based on the filter name
+                # split the filter name
+                freq_string = filt.replace('radio-', '')
+                freq_unit = freq_string[-3:]
+                freq_val = float(freq_string.replace(freq_unit, ''))
+                # make use of the astropy.units to be more flexible
+                freq = astropy.units.Quantity(freq_val, unit=freq_unit)
+                freq = freq.to('Hz').value
+                # adding to the list
+                filts_slice.append(filt)
+                lambdas_slice.append(scipy.constants.c / freq)
+            elif filt.startswith('X-ray-') and filt not in filts:
+                # for additional radio filters that not in the list
+                # calculate the lambdas based on the filter name
+                # split the filter name
+                energy_string = filt.replace('X-ray-', '')
+                energy_unit = energy_string[-3:]
+                energy_val = float(energy_string.replace(energy_unit, ''))
+                # make use of the astropy.units to be more flexible
+                energy = astropy.units.Quantity(energy_val, unit=energy_unit)
+                freq = energy.to('eV').value * scipy.constants.eV / scipy.constants.h
+                # adding to the list
+                filts_slice.append(filt)
+                lambdas_slice.append(scipy.constants.c / freq)
+            else:
+                try:
+                    ii = filts.index(filt)
+                    filts_slice.append(filts[ii])
+                    lambdas_slice.append(lambdas[ii])
+                except ValueError:
+                    ii = filts.index(filt.replace("_", ":"))
+                    filts_slice.append(filts[ii].replace(":", "_"))
+                    lambdas_slice.append(lambdas[ii])
 
         filts = filts_slice
         lambdas = np.array(lambdas_slice)
