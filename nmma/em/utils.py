@@ -162,7 +162,7 @@ def getFilteredMag(mag, filt):
     # are kind of justifiable because the spectral
     # commonly goes as F_\nu \propto \nu^\alpha,
     # where \nu is the frequency.
-    if filt in unprocessed_filt or filt.startswith('radio') or filt.startswith('X-ray'):
+    if filt in unprocessed_filt or filt.startswith(('radio', 'X-ray')):
         return mag[filt]
     elif filt in sncosmo_maps:
         return mag[sncosmo_maps[filt]]
@@ -493,7 +493,7 @@ def get_default_filts_lambdas(filters=None):
                 filts_slice.append(filt)
                 lambdas_slice.append(scipy.constants.c / freq)
             elif filt.startswith('X-ray-') and filt not in filts:
-                # for additional radio filters that not in the list
+                # for additional X-ray filters that not in the list
                 # calculate the lambdas based on the filter name
                 # split the filter name
                 energy_string = filt.replace('X-ray-', '')
@@ -532,17 +532,15 @@ def calc_lc(
     filters=None,
 ):
 
+    mAB = {}
+
     if filters is None:
         filters = list(svd_mag_model.keys())
-
-    mAB = {}
-    # fill radio and X-ray with null light curves
-    mAB["radio-5.5GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-1.25GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-3GHz"] = np.inf * np.ones(len(tt))
-    mAB["radio-6GHz"] = np.inf * np.ones(len(tt))
-    mAB["X-ray-1keV"] = np.inf * np.ones(len(tt))
-    mAB["X-ray-5keV"] = np.inf * np.ones(len(tt))
+    else:
+        # add null output for radio and X-ray filters
+        for filt in filters:
+            if filt.startswith(('radio', 'X-ray')):
+                mAB[filt] = np.inf * np.ones(len(tt))
 
     for jj, filt in enumerate(filters):
         if filt in mAB:
