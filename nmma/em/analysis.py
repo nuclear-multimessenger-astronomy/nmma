@@ -22,7 +22,6 @@ matplotlib.use("agg")
 
 
 def get_parser():
-
     parser = argparse.ArgumentParser(
         description="Inference on kilonova ejecta parameters."
     )
@@ -329,17 +328,25 @@ def get_parser():
         default=False,
         help="only look for local svdmodels (ignore Zenodo)",
     )
+
+    parser.add_argument(
+        "--bestfit",
+        help="Save the best fit parameters and magnitudes to JSON",
+        action="store_true",
+        default=False,
+    )
     return parser
 
 
 def main(args=None):
-
     if args is None:
         parser = get_parser()
         args = parser.parse_args()
     if args.sampler == "pymultinest":
         if len(args.outdir) > 64:
-            print("WARNING: output directory name is too long, it should not be longer than 64 characters")
+            print(
+                "WARNING: output directory name is too long, it should not be longer than 64 characters"
+            )
             exit()
 
     refresh = False
@@ -635,6 +642,40 @@ def main(args=None):
     else:
         result.plot_corner()
 
+    if args.bestfit:
+        posterior_file = os.path.join(
+            args.outdir, f"{args.label}_posterior_samples.dat"
+        )
+
+        posterior_samples = pd.read_csv(posterior_file, header=0, delimiter=" ")
+        bestfit_idx = np.argmax(posterior_samples.log_likelihood.to_numpy())
+        bestfit_params = posterior_samples.to_dict(orient="list")
+        for key in bestfit_params.keys():
+            bestfit_params[key] = bestfit_params[key][bestfit_idx]
+
+        _, mag = light_curve_model.generate_lightcurve(sample_times, bestfit_params)
+        for filt in mag.keys():
+            if bestfit_params["luminosity_distance"] > 0:
+                mag[filt] += 5.0 * np.log10(
+                    bestfit_params["luminosity_distance"] * 1e6 / 10.0
+                )
+        mag["bestfit_sample_times"] = sample_times
+
+        if "KNtimeshift" in bestfit_params:
+            mag["bestfit_sample_times"] = (
+                mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
+            )
+
+        bestfit_to_write = bestfit_params.copy()
+        bestfit_to_write["Best fit index"] = int(bestfit_idx)
+        bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
+        bestfit_file = os.path.join(args.outdir, "bestfit_params.json")
+
+        with open(bestfit_file, "w") as file:
+            json.dump(bestfit_to_write, file, indent=4)
+
+        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
+
     if args.plot:
         import matplotlib.pyplot as plt
         from matplotlib.pyplot import cm
@@ -651,7 +692,9 @@ def main(args=None):
         bestfit_params = posterior_samples.to_dict(orient="list")
         for key in bestfit_params.keys():
             bestfit_params[key] = bestfit_params[key][bestfit_idx]
-        print(f"Best fit parameters: {str(bestfit_params)}")
+        print(
+            f"Best fit parameters: {str(bestfit_params)}\nBest fit index: {bestfit_idx}"
+        )
 
         #########################
         # Generate the lightcurve
@@ -663,6 +706,7 @@ def main(args=None):
                     bestfit_params["luminosity_distance"] * 1e6 / 10.0
                 )
         mag["bestfit_sample_times"] = sample_times
+
         if "KNtimeshift" in bestfit_params:
             mag["bestfit_sample_times"] = (
                 mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
