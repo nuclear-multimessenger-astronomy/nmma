@@ -132,6 +132,12 @@ def get_parser():
         help="Sampler to be used (default: pymultinest)",
     )
     parser.add_argument(
+        "--soft-init",
+        action="store_true",
+        default=False,
+        help="To start the sampler softly (without any checking, default: False)",
+    )
+    parser.add_argument(
         "--cpus",
         type=int,
         default=1,
@@ -584,7 +590,7 @@ def main(args=None):
         label=args.label,
         nlive=args.nlive,
         seed=args.seed,
-        soft_init=False,
+        soft_init=args.soft_init,
         queue_size=args.cpus,
         check_point_delta_t=3600,
     )
