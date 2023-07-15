@@ -13,3 +13,8 @@ How to contribute: https://nuclear-multimessenger-astronomy.github.io/nmma/contr
 
 
 A tutorial about how to produce simulations of lightcurves is given in nmma/tutorials/tutorial-lightcurve_simulation.ipynb
+
+
+### Citing NMMA
+
+When utilizing this code for a publication, kindly make a reference to the package by its name and a citation to "NMMA: A nuclear-physics and multi-messenger astrophysics framework to analyze binary neutron star mergers", [arxiv link](https://arxiv.org/abs/2205.08513).
