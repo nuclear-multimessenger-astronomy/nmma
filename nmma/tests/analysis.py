@@ -21,6 +21,8 @@ def test_analysis():
         tmax=20.0,
         dt=0.5,
         photometric_error_budget=0.1,
+        soft_init=False,
+        bestfit=True,
         svd_mag_ncoeff=10,
         svd_lbol_ncoeff=10,
         filters="sdssu",
