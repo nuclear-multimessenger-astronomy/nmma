@@ -12,7 +12,7 @@ from nmma.em.model import (
 )
 
 from ..em import create_lightcurves
-from ..em.io import read_lightcurve_file
+from ..em.utils import read_lightcurve_file
 from ..eos import create_injection
 
 
@@ -101,6 +101,9 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         output_directory = test_directory
         command_line_lightcurve_label = model_name + "_command_line_lightcurve"
         time_series = np.arange(0.01, 20.0 + 0.5, 0.5)
+
+        # read injection file
+        injection_df = get_parameters_from_injection_file(injection_file)
 
         args = Namespace(
             injection=injection_file,

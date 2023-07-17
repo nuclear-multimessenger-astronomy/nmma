@@ -10,7 +10,7 @@ import bilby.core
 
 from .model import create_light_curve_model_from_args
 from .injection import create_light_curve_data
-from .io import read_lightcurve_file
+from .utils import read_lightcurve_file
 from ..utils.models import refresh_models_list
 
 
