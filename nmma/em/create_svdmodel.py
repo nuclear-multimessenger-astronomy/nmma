@@ -69,6 +69,12 @@ def main():
         help="Data type for interpolation [photometry or spectroscopy]",
     )
     parser.add_argument(
+        "--data-time-unit",
+        type=str,
+        default="days",
+        help="Time unit of input data (days, minutes, or seconds)",
+    )
+    parser.add_argument(
         "--tmin",
         type=float,
         default=0.0,
@@ -234,6 +240,7 @@ def main():
         svd_path=args.svd_path,
         interpolation_type=args.interpolation_type,
         data_type=args.data_type,
+        data_time_unit=args.data_time_unit,
         plot=args.plot,
         plotdir=args.outdir,
         ncpus=args.ncpus,
