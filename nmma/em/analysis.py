@@ -16,7 +16,8 @@ from .injection import create_light_curve_data
 from .likelihood import OpticalLightCurve
 from .model import create_light_curve_model_from_args, model_parameters_dict
 from .prior import create_prior_from_args
-from .utils import getFilteredMag, loadEvent
+from .utils import getFilteredMag
+from .io import loadEvent
 
 matplotlib.use("agg")
 
