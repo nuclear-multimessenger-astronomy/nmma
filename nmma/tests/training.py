@@ -3,7 +3,7 @@ import copy
 import glob
 import numpy as np
 
-from ..em import training, utils, model_parameters
+from ..em import training, model_parameters, io
 
 
 def test_training():
@@ -26,7 +26,7 @@ def test_training():
     ModelPath = "svdmodels"
     filenames = glob.glob("%s/*.dat" % dataDir)
 
-    data = utils.read_photometry_files(filenames, filters=filts)
+    data = io.read_photometry_files(filenames, filters=filts)
     # Loads the model data
     training_data, parameters = model_parameters.Bu2019lm_sparse(data)
 
