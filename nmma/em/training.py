@@ -398,16 +398,15 @@ class SVDTrainingModel(object):
 
             np.random.RandomState(42)
             model = Sequential()
+            # One/few layers of wide NN approximate GP
             model.add(
                 Dense(
-                    train_X.shape[1],
+                    2048,
                     activation="relu",
                     kernel_initializer="he_normal",
                     input_shape=(train_X.shape[1],),
                 )
             )
-            # One/few layers of wide NN approximate GP
-            model.add(Dense(2048, activation="relu", kernel_initializer="he_normal"))
             model.add(Dropout(dropout_rate))
             model.add(Dense(self.n_coeff))
 
