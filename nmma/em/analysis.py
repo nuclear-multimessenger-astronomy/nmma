@@ -79,6 +79,15 @@ def get_parser():
         "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
+        "--log-space-time",
+        action="store_true",
+        default=False,
+        help="Create the sample_times to be uniform in log-space",
+    )
+    parser.add_argument(
+        "--n-tstep", type=int, default=50, help="Number of time steps (used with --log-space-time, default: 50)"
+    )
+    parser.add_argument(
         "--photometric-error-budget",
         type=float,
         default=0.1,
@@ -364,7 +373,16 @@ def main(args=None):
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
     # initialize light curve model
-    sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    if args.log_space_time:
+        if args.n_tstep:
+            n_step = args.n_tstep
+        else:
+            n_step = int((args.tmax - args.tmin) / args.dt)
+        sample_times = np.logspace(np.log10(args.tmin),
+                                   np.log10(args.tmax + args.dt),
+                                   n_step)
+    else:
+        sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
     print("Creating light curve model for inference")
 
     if args.filters:
