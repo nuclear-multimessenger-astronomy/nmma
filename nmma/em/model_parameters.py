@@ -188,9 +188,9 @@ def Bu2022Ye(data):
 def Ka2017(data):
 
     parameters = [
-        "mej",
-        "vej",
-        "Xlan",
+        "log10_mej",
+        "log10_vej",
+        "log10_Xlan",
     ]
 
     data_out = {}
