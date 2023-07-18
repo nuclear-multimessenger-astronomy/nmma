@@ -63,6 +63,7 @@ def test_analysis():
         conditional_gaussian_prior_thetaObs=False,
         conditional_gaussian_prior_N_sigma=1,
         sample_over_Hubble=False,
+        sampler_kwargs="{}",
         verbose=False,
     )
 
