@@ -6,7 +6,7 @@ import inspect
 from p_tqdm import p_map
 
 from .model import SVDLightCurveModel
-from .utils import read_photometry_files
+from .io import read_photometry_files
 from . import model_parameters
 
 import matplotlib
