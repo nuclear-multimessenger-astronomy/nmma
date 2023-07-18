@@ -80,9 +80,9 @@ if args.z is None:
     H0 = cosmo.H0.value
     CLIGHT = 2.99792458e5
     CLIGHT_cm_s = 1e5 * CLIGHT
-    ztest = np.arange(0.0001,1,0.00001)
+    ztest = np.arange(0.0001, 1, 0.00001)
     Dtest = np.array(cosmo.luminosity_distance(ztest).to("Mpc").value)
-    z = ztest[np.argmin(abs(dMpc-Dtest))] 
+    z = ztest[np.argmin(abs(dMpc - Dtest))]
 else:
     z = args.z
     dMpc = cosmo.luminosity_distance(z).to("Mpc").value
@@ -100,11 +100,17 @@ for kk, filename in enumerate(files):
     Lnu[Lnu == 0.0] = 1e20
     Lnu = 10 ** gaussian_filter(np.log10(Lnu), 3.0)
 
-    Llam = Lnu * np.flipud(nu) ** 2.0 / CLIGHT_cm_s / 1e8  # ergs/s/Angstrom
+    nuS = np.tile(nu, (len(time), 1))
+
+    Llam = Lnu * nuS**2.0 / CLIGHT_cm_s / 1e8  # ergs/s/Angstrom
     Llam = Llam / (4 * np.pi * D_cm**2)  # ergs / s / cm^2 / Angstrom
 
     ph = np.array(time) / (60 * 60 * 24)  # get time in days
-    wave = 10 * np.flipud(CLIGHT_cm_s / nu * 1e8)  # AA
+    wave = CLIGHT_cm_s / nu * 1e8  # AA
+
+    # flip axes to make wavelength increasing
+    wave = np.flip(wave)
+    Llam = np.flip(Llam, axis=1)
 
     # extract photometric lightcurves
     if args.doAB:
