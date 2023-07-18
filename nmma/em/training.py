@@ -116,12 +116,16 @@ class SVDTrainingModel(object):
         # Before interpolation, convert input data time values to days
         if data_time_unit in ["days", "day", "d"]:
             time_scale_factor = 1.0
+        elif data_time_unit in ["hours", "hour", "hr", "h"]:
+            time_scale_factor = 24.0
         elif data_time_unit in ["minutes", "minute", "min", "m"]:
             time_scale_factor = 1440.0
         elif data_time_unit in ["seconds", "second", "sec", "s"]:
             time_scale_factor = 86400.0
         else:
-            raise ValueError("data_time_unit must be one of days, minutes, or seconds.")
+            raise ValueError(
+                "data_time_unit must be one of days, hours, minutes, or seconds."
+            )
         for jj, key in enumerate(magkeys):
 
             # Interpolate data onto grid
