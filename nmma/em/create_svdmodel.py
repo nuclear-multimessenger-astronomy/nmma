@@ -72,7 +72,7 @@ def main():
         "--data-time-unit",
         type=str,
         default="days",
-        help="Time unit of input data (days, minutes, or seconds)",
+        help="Time unit of input data (days, hours, minutes, or seconds)",
     )
     parser.add_argument(
         "--tmin",
