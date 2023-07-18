@@ -20,6 +20,7 @@ def test_analysis():
         tmin=0.1,
         tmax=20.0,
         dt=0.5,
+        log_space_time=False,
         photometric_error_budget=0.1,
         soft_init=False,
         bestfit=True,
