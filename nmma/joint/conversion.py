@@ -38,7 +38,17 @@ def source_frame_masses(converted_parameters, added_keys):
 
     if "redshift" not in converted_parameters.keys():
         distance = converted_parameters["luminosity_distance"]
-        converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
+        if hasattr(distance, '__len__') and len(distance)>50: #luminosity_distance_to_redshift gets really slow if too many distances are put in at once
+             from astropy import units
+             from astropy import cosmology as cosmo
+             cosmology = cosmo.Planck15
+             zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance.min() * units.Mpc)
+             zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
+             zgrid = np.geomspace(zmin, zmax, 50)
+             distance_grid = cosmology.luminosity_distance(zgrid).value
+             converted_parameters["redshift"] = np.interp(distance, distance_grid, zgrid)
+        else:
+             converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
         added_keys = added_keys + ["redshift"]
 
     if "mass_1_source" not in converted_parameters.keys():
