@@ -147,6 +147,12 @@ def get_parser():
         help="To start the sampler softly (without any checking, default: False)",
     )
     parser.add_argument(
+        "--sampler-kwargs",
+        default="{}",
+        type=str,
+        help="Additional kwargs (e.g. {'evidence_tolerance':0.5}) for bilby.run_sampler",
+    )
+    parser.add_argument(
         "--cpus",
         type=int,
         default=1,
@@ -608,6 +614,11 @@ def main(args=None):
     if args.bilby_zero_likelihood_mode:
         likelihood = ZeroLikelihood(likelihood)
 
+    # fetch the additional sampler kwargs
+    sampler_kwargs = literal_eval(args.sampler_kwargs)
+    print("Running with the following additional sampler_kwargs:")
+    print(sampler_kwargs)
+
     result = bilby.run_sampler(
         likelihood,
         priors,
@@ -619,6 +630,7 @@ def main(args=None):
         soft_init=args.soft_init,
         queue_size=args.cpus,
         check_point_delta_t=3600,
+        **sampler_kwargs
     )
 
     result.save_posterior_samples()
