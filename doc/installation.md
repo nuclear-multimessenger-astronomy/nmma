@@ -142,6 +142,18 @@ NOTE: there is an issue pip installing `pyfftw` on arm64 Mac systems; see the de
 * $ pip install python-ligo-lw
 
 
+* $ pip install sncosmo
+
+
+* $ pip install scikit-learn
+
+
+* $ pip install joblib
+
+
+* $ conda install -c conda-forge p-tqdm
+
+
 NOTE: If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies
 if not covered by python setup.py install. Also, if running python setup.py install shows something on the lines of "cannot cythonize without cython", do:
 
