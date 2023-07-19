@@ -1,0 +1,7 @@
+sphinx==4.4.0
+sphinx_math_dollar
+recommonmark
+numpydoc
+sphinx-rtd-theme
+notedown
+jsx-lexer

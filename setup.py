@@ -58,8 +58,12 @@ def get_long_description():
     return long_description
 
 
-def get_requirements():
-    with open("requirements.txt", "r") as ff:
+def get_requirements(kind=None):
+    if kind is None:
+        fname = "requirements.txt"
+    else:
+        fname = f"{kind}_requirements.txt"
+    with open(fname, "r") as ff:
         requirements = ff.readlines()
     return requirements
 
@@ -70,23 +74,6 @@ def readfile(filename):
         filecontents = fp.read()
     return filecontents
 
-
-requirements = [
-    "future",
-    "bilby>=2.1.1",
-    "bilby_pipe>=1.1.0",
-    "numpy>=1.9",
-    "matplotlib>=2.0",
-    "scipy>=1.7.1",
-    "pandas>=1.3.4",
-    "astropy>=4.3.1",
-    "scikit-learn>=1.0.2",
-    "pymultinest",
-    "sncosmo",
-    "dust_extinction",
-    "arviz",
-    "p_tqdm",
-]
 
 VERSION = "0.0.13"
 version_file = write_version_file(VERSION)
@@ -117,7 +104,17 @@ setup(
     package_dir={"nmma": "nmma"},
     package_data={"nmma": [version_file], "nmma.em.data": ["*.pkl", "*.joblib"]},
     python_requires=">=3.7",
-    install_requires=requirements,
+    install_requires=get_requirements(),
+    extras_require={
+        'production': get_requirements('production'),
+        'doc': get_requirements('doc'),
+        'grb': get_requirements('grb'),
+        'all': (
+            get_requirements('production')
+            + get_requirements('doc')
+            + get_requirements('grb')
+        ),
+    },
     entry_points={
         "console_scripts": [
             "nmma_generation=nmma.pbilby.generation:main_nmma",
@@ -152,23 +149,4 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    extras_require={
-        "doc": [
-            "sphinx==4.4.0",
-            "sphinx_math_dollar",
-            "recommonmark",
-            "numpydoc",
-            "sphinx-rtd-theme",
-            "notedown",
-            "jsx-lexer",
-        ],
-        "production": [
-            "parallel_bilby>=2.0.2",
-            "mpi4py",
-        ],
-        "afterglowpy": [
-            "afterglowpy>=0.7.3",
-            "wrapt_timeout_decorator",
-        ],
-    },
 )
