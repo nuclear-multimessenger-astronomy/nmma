@@ -710,7 +710,9 @@ def main(args=None):
         bestfit_to_write = bestfit_params.copy()
         bestfit_to_write["Best fit index"] = int(bestfit_idx)
         bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
-        bestfit_file = os.path.join(args.outdir, "bestfit_params.json")
+        bestfit_file = os.path.join(
+            args.outdir, f"{args.label}_bestfit_params.json"
+        )
 
         with open(bestfit_file, "w") as file:
             json.dump(bestfit_to_write, file, indent=4)
@@ -748,7 +750,9 @@ def main(args=None):
 
         colors = cm.Spectral(np.linspace(0, 1, len(filters_plot)))[::-1]
 
-        plotName = os.path.join(args.outdir, "lightcurves.png")
+        plotName = os.path.join(
+            args.outdir, f"{args.label}_lightcurves.png"
+        )
         plt.figure(figsize=(20, 16))
         color2 = "coral"
 
