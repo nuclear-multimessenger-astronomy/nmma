@@ -673,44 +673,7 @@ def main(args=None):
     else:
         result.plot_corner()
 
-    if args.bestfit:
-        posterior_file = os.path.join(
-            args.outdir, f"{args.label}_posterior_samples.dat"
-        )
-
-        posterior_samples = pd.read_csv(posterior_file, header=0, delimiter=" ")
-        bestfit_idx = np.argmax(posterior_samples.log_likelihood.to_numpy())
-        bestfit_params = posterior_samples.to_dict(orient="list")
-        for key in bestfit_params.keys():
-            bestfit_params[key] = bestfit_params[key][bestfit_idx]
-
-        _, mag = light_curve_model.generate_lightcurve(sample_times, bestfit_params)
-        for filt in mag.keys():
-            if bestfit_params["luminosity_distance"] > 0:
-                mag[filt] += 5.0 * np.log10(
-                    bestfit_params["luminosity_distance"] * 1e6 / 10.0
-                )
-        mag["bestfit_sample_times"] = sample_times
-
-        if "KNtimeshift" in bestfit_params:
-            mag["bestfit_sample_times"] = (
-                mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
-            )
-
-        bestfit_to_write = bestfit_params.copy()
-        bestfit_to_write["Best fit index"] = int(bestfit_idx)
-        bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
-        bestfit_file = os.path.join(args.outdir, "bestfit_params.json")
-
-        with open(bestfit_file, "w") as file:
-            json.dump(bestfit_to_write, file, indent=4)
-
-        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
-
-    if args.plot:
-        import matplotlib.pyplot as plt
-        from matplotlib.pyplot import cm
-
+    if args.bestfit or args.plot:
         posterior_file = os.path.join(
             args.outdir, f"{args.label}_posterior_samples.dat"
         )
@@ -742,6 +705,21 @@ def main(args=None):
             mag["bestfit_sample_times"] = (
                 mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
             )
+            
+    if args.bestfit:
+        bestfit_to_write = bestfit_params.copy()
+        bestfit_to_write["Best fit index"] = int(bestfit_idx)
+        bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
+        bestfit_file = os.path.join(args.outdir, "bestfit_params.json")
+
+        with open(bestfit_file, "w") as file:
+            json.dump(bestfit_to_write, file, indent=4)
+
+        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
+
+    if args.plot:
+        import matplotlib.pyplot as plt
+        from matplotlib.pyplot import cm
 
         if len(models) > 1:
             _, mag_all = light_curve_model.generate_lightcurve(
