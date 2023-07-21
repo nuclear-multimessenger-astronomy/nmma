@@ -5,6 +5,8 @@ __pycache__/
 nmma.egg-info/
 .DS_Store
 
+# development
+.vscode/
+
 # models
-svdmodels/Bu2019lm_lbol.pkl
-svdmodels/Bu2019lm_mag.pkl
+svdmodels/
