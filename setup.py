@@ -75,7 +75,7 @@ def readfile(filename):
     return filecontents
 
 
-VERSION = "0.0.14"
+VERSION = "0.0.15"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
@@ -106,13 +106,13 @@ setup(
     python_requires=">=3.7",
     install_requires=get_requirements(),
     extras_require={
-        'production': get_requirements('production'),
-        'doc': get_requirements('doc'),
-        'grb': get_requirements('grb'),
-        'all': (
-            get_requirements('production')
-            + get_requirements('doc')
-            + get_requirements('grb')
+        "production": get_requirements("production"),
+        "doc": get_requirements("doc"),
+        "grb": get_requirements("grb"),
+        "all": (
+            get_requirements("production")
+            + get_requirements("doc")
+            + get_requirements("grb")
         ),
     },
     entry_points={
