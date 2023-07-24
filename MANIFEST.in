@@ -1,0 +1,10 @@
+include AUTHORS
+include COPYING
+include MANIFEST.in
+include README.rst
+include TODO.rst
+include requirements.in
+include requirements.txt
+
+include doc/*.rst doc/*.md doc/images/*.png doc/images/*.svg
+include doc/conf.py doc/Makefile
