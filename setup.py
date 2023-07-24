@@ -7,9 +7,9 @@ import os
 
 # check that python version is 3.8 or above
 python_version = sys.version_info
-if python_version < (3, 7):
-    sys.exit("Python < 3.7 is not supported, aborting setup")
-print("Confirmed Python version {}.{}.{} >= 3.7.0".format(*python_version[:3]))
+if python_version < (3, 8):
+    sys.exit("Python < 3.8 is not supported, aborting setup")
+print("Confirmed Python version {}.{}.{} >= 3.8.0".format(*python_version[:3]))
 
 
 def write_version_file(version):
@@ -75,7 +75,7 @@ def readfile(filename):
     return filecontents
 
 
-VERSION = "0.0.13"
+VERSION = "0.0.14"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
@@ -143,9 +143,9 @@ setup(
         ]
     },
     classifiers=[
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
