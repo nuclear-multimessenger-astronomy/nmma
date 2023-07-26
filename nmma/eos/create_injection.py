@@ -292,12 +292,10 @@ def main(args=None):
 
     if not args.original_parameters:
         # load the EOS
-        radii, masses, lambdas = np.loadtxt(
+        radius_val, mass_val, Lambda_val= np.loadtxt(
             args.eos_file, usecols=[0, 1, 2], unpack=True
         )
-        interp_mass_radius = scipy.interpolate.interp1d(masses, radii)
-        interp_mass_lambda = scipy.interpolate.interp1d(masses, lambdas)
-
+        
     # load the injection json file
     if args.injection_file:
         if args.injection_file.endswith(".json"):
@@ -386,9 +384,10 @@ def main(args=None):
     radius_2 = []
 
     for injIdx in range(0, Ninj):
-        mMax, rMax, lam1, lam2, r1, r2 = EOS2Parameters(
-            interp_mass_radius,
-            interp_mass_lambda,
+         mMax, rMax, lam1, lam2, r1, r2, R_14, R_16 = EOS2Parameters(
+            mass_val, 
+            radius_val, 
+            Lambda_val,
             dataframe["mass_1_source"][injIdx],
             dataframe["mass_2_source"][injIdx],
         )
@@ -406,8 +405,8 @@ def main(args=None):
     dataframe["lambda_2"] = np.array(lambda_2)
     dataframe["radius_1"] = np.array(radius_1)
     dataframe["radius_2"] = np.array(radius_2)
-    dataframe["R_16"] = np.ones(len(dataframe)) * interp_mass_radius(1.6)
-    dataframe["R_14"] = np.ones(len(dataframe)) * interp_mass_radius(1.4)
+    dataframe["R_16"] = np.ones(len(dataframe)) * R_16
+    dataframe["R_14"] = np.ones(len(dataframe)) * R_14
 
     if args.eject:
         if args.binary_type == "BNS":
