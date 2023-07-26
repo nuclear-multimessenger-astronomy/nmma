@@ -384,13 +384,13 @@ def main(args=None):
     radius_2 = []
 
     for injIdx in range(0, Ninj):
-         mMax, rMax, lam1, lam2, r1, r2, R_14, R_16 = EOS2Parameters(
+        mMax, rMax, lam1, lam2, r1, r2, R_14, R_16 = EOS2Parameters(
             mass_val, 
             radius_val, 
             Lambda_val,
             dataframe["mass_1_source"][injIdx],
             dataframe["mass_2_source"][injIdx],
-         )
+        )
 
         TOV_mass.append(mMax)
         TOV_radius.append(rMax)
