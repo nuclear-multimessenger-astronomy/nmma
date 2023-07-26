@@ -390,7 +390,7 @@ def main(args=None):
             Lambda_val,
             dataframe["mass_1_source"][injIdx],
             dataframe["mass_2_source"][injIdx],
-        )
+         )
 
         TOV_mass.append(mMax)
         TOV_radius.append(rMax)
