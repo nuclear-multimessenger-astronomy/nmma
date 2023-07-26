@@ -251,19 +251,12 @@ def main():
     global EOS_data
     EOS_data, weights = {}, []
     for EOSIdx in range(0, Neos):
-        data = np.loadtxt("{0}/{1}.dat".format(args.eos_dir, EOSIdx + 1))
+        data = np.loadtxt("{0}/{1}.dat".format(args.eos_dir, EOSIdx + 1), usecols = [0,1,2])
         EOS_data[EOSIdx] = {}
         EOS_data[EOSIdx]["R"] = np.array(data[:, 0])
         EOS_data[EOSIdx]["M"] = np.array(data[:, 1])
         EOS_data[EOSIdx]["Lambda"] = np.array(data[:, 2])
         EOS_data[EOSIdx]["weight"] = EOS_GW170817[EOSIdx]
-
-        EOS_data[EOSIdx]["interp_mass_lambda"] = interp.interp1d(
-            EOS_data[EOSIdx]["M"], EOS_data[EOSIdx]["Lambda"]
-        )
-        EOS_data[EOSIdx]["interp_mass_radius"] = interp.interp1d(
-            EOS_data[EOSIdx]["M"], EOS_data[EOSIdx]["R"]
-        )
 
         weights.append(EOS_data[EOSIdx]["weight"])
 
@@ -359,12 +352,14 @@ def main():
         theta_jn = data_out["theta_jn"][idy]
         tilt1, tilt2 = data_out["tilt1"][idy], data_out["tilt2"][idy]
 
-        mMax, rMax, lam1, lam2, r1, r2 = EOS2Parameters(
-            EOS_data[idx]["interp_mass_radius"],
-            EOS_data[idx]["interp_mass_lambda"],
+        mMax, rMax, lam1, lam2, r1, r2, R_14, R_16 = EOS2Parameters(
+            EOS_data[idx]["M"],
+            EOS_data[idx]["R"],
+            EOS_data[idx]["Lambda"],
             m1,
             m2,
         )
+        
         params = {
             "luminosity_distance": dist,
             "chirp_mass": mchirp,

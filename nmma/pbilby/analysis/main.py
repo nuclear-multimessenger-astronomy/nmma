@@ -147,6 +147,7 @@ def analysis_runner(
                 # Reinstate the pool and map (not saved in the pickle)
                 logger.info(f"Read in resume file with sampling_time = {sampling_time}")
                 sampler.pool = pool
+                sampler.queue_size = pool.size
                 sampler.M = pool.map
                 sampler.loglikelihood.pool = pool
 
