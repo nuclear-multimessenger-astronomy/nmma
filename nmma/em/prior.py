@@ -63,6 +63,11 @@ def create_prior_from_args(model_names, args):
     if "AnBa2022" in model_names:
 
         def convert_mtot_mni(parameters):
+
+            for param in ["mni", "mtot", "mrp"]:
+                if param not in parameters:
+                    parameters[param] = 10**parameters[f"log10_{param}"]
+
             parameters["mni_c"] = parameters["mni"] / parameters["mtot"]
             parameters["mrp_c"] = (
                 parameters["xmix"] * (parameters["mtot"] - parameters["mni"])
