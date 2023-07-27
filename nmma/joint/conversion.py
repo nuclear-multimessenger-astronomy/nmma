@@ -65,30 +65,32 @@ def source_frame_masses(converted_parameters, added_keys):
 
 
 def EOS2Parameters(
-    interp_mass_radius, interp_mass_lambda, mass_1_source, mass_2_source
+    mass_val, radius_val, Lambda_val, mass_1_source, mass_2_source
 ):
 
-    TOV_mass = interp_mass_radius.x[-1]
-    TOV_radius = interp_mass_radius.y[-1]
+    TOV_mass = mass_val.max()
+    TOV_radius = radius_val[np.argmax(mass_val)]
+    minimum_mass = mass_val.min()
 
-    minimum_mass = interp_mass_radius.x[0]
-
+    
     if mass_1_source < minimum_mass or mass_1_source > TOV_mass:
         lambda_1 = np.array([0.0])
         radius_1 = np.array([2.0 * mass_1_source * lal.MRSUN_SI / 1e3])
     else:
-        lambda_1 = np.array([interp_mass_lambda(mass_1_source)])
-        radius_1 = np.array([interp_mass_radius(mass_1_source)])
-
+        lambda_1 = np.array(np.interp(mass_1_source, mass_val, Lambda_val)).reshape(1)
+        radius_1 = np.array(np.interp(mass_1_source, mass_val, radius_val)).reshape(1)
+        
     if mass_2_source < minimum_mass or mass_2_source > TOV_mass:
         lambda_2 = np.array([0.0])
         radius_2 = np.array([2.0 * mass_2_source * lal.MRSUN_SI / 1e3])
     else:
-        lambda_2 = np.array([interp_mass_lambda(mass_2_source)])
-        radius_2 = np.array([interp_mass_radius(mass_2_source)])
+        lambda_2 = np.array(np.interp(mass_2_source, mass_val, Lambda_val)).reshape(1)
+        radius_2 = np.array(np.interp(mass_2_source, mass_val, radius_val)).reshape(1)
 
-    return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2
+    R_14 = np.interp(1.4, mass_val, radius_val)
+    R_16 = np.interp(1.6, mass_val, radius_val)
 
+    return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
 
 class NSBHEjectaFitting(object):
     def __init__(self):
@@ -448,21 +450,8 @@ class MultimessengerConversion(object):
     def __init__(self, eos_data_path, Neos, binary_type, with_ejecta=True):
         self.eos_data_path = eos_data_path
         self.Neos = Neos
-        self.eos_interp_dict = {}
         self.binary_type = binary_type
         self.with_ejecta = with_ejecta
-
-        for EOSID in range(1, self.Neos + 1):
-            radius, mass, Lambda = np.loadtxt(
-                "{0}/{1}.dat".format(self.eos_data_path, EOSID),
-                unpack=True,
-                usecols=[0, 1, 2],
-            )
-
-            interp_mass_lambda = scipy.interpolate.interp1d(mass, Lambda)
-            interp_mass_radius = scipy.interpolate.interp1d(mass, radius)
-
-            self.eos_interp_dict[EOSID] = [interp_mass_lambda, interp_mass_radius]
 
         if self.binary_type == "BNS":
             ejectaFitting = BNSEjectaFitting()
@@ -507,12 +496,12 @@ class MultimessengerConversion(object):
                 R_14_list = []
                 R_16_list = []
                 EOSID = np.array(converted_parameters["EOS"]).astype(int) + 1
+                EOSdata = [None]*len(EOSID)
+                for j in EOSID:
+                    EOSdata[j-1] = np.loadtxt(f"{self.eos_data_path}/{j}.dat", usecols = [0,1,2]).T
 
                 for i in range(0, len(EOSID)):
-
-                    interp_mass_lambda, interp_mass_radius = self.eos_interp_dict[
-                        EOSID[i]
-                    ]
+                    radius_val, mass_val, Lambda_val = EOSdata[EOSID[i]-1]
 
                     (
                         TOV_mass,
@@ -521,21 +510,24 @@ class MultimessengerConversion(object):
                         lambda_2,
                         radius_1,
                         radius_2,
+                        R_14,
+                        R_16
                     ) = EOS2Parameters(
-                        interp_mass_radius,
-                        interp_mass_lambda,
+                        mass_val,
+                        radius_val,
+                        Lambda_val,
                         mass_1_source[i],
                         mass_2_source[i],
                     )
-
+                    
                     TOV_radius_list.append(TOV_radius)
                     TOV_mass_list.append(TOV_mass)
                     lambda_1_list.append(lambda_1[0])
                     lambda_2_list.append(lambda_2[0])
                     radius_1_list.append(radius_1[0])
                     radius_2_list.append(radius_2[0])
-                    R_14_list.append(interp_mass_radius(1.4))
-                    R_16_list.append(interp_mass_radius(1.6))
+                    R_14_list.append(R_14)
+                    R_16_list.append(R_16)
 
                 converted_parameters["TOV_mass"] = np.array(TOV_mass_list)
                 converted_parameters["TOV_radius"] = np.array(TOV_radius_list)
@@ -551,7 +543,7 @@ class MultimessengerConversion(object):
 
             else:
                 EOSID = int(converted_parameters["EOS"]) + 1
-                interp_mass_lambda, interp_mass_radius = self.eos_interp_dict[EOSID]
+                radius_val, mass_val, Lambda_val = np.loadtxt(f"{self.eos_data_path}/{EOSID}.dat", unpack = True, usecols=[0,1,2])
 
                 (
                     TOV_mass,
@@ -560,21 +552,27 @@ class MultimessengerConversion(object):
                     lambda_2,
                     radius_1,
                     radius_2,
+                    R_14,
+                    R_16
                 ) = EOS2Parameters(
-                    interp_mass_radius, interp_mass_lambda, mass_1_source, mass_2_source
+                    mass_val,
+                    radius_val,
+                    Lambda_val,
+                    mass_1_source,
+                    mass_2_source
                 )
-
+                
                 converted_parameters["TOV_radius"] = TOV_radius
                 converted_parameters["TOV_mass"] = TOV_mass
 
-                converted_parameters["radius_1"] = radius_1
-                converted_parameters["radius_2"] = radius_2
+                converted_parameters["radius_1"] = radius_1[0]
+                converted_parameters["radius_2"] = radius_2[0]
 
-                converted_parameters["lambda_1"] = lambda_1
-                converted_parameters["lambda_2"] = lambda_2
+                converted_parameters["lambda_1"] = lambda_1[0]
+                converted_parameters["lambda_2"] = lambda_2[0]
 
-                converted_parameters["R_14"] = interp_mass_radius(1.4)
-                converted_parameters["R_16"] = interp_mass_radius(1.6)
+                converted_parameters["R_14"] = R_14
+                converted_parameters["R_16"] = R_16
 
             added_keys = added_keys + [
                 "lambda_1",
@@ -602,12 +600,13 @@ class MultimessengerConversion(object):
                 )
 
                 added_keys = added_keys + ["KNtheta", "inclination_EM"]
-
+                
         added_keys = [
             key for key in converted_parameters.keys() if key not in original_keys
         ]
 
         return converted_parameters, added_keys
+    
 
     def generate_all_parameters(self, sample, likelihood=None, priors=None, npool=1):
         waveform_defaults = {

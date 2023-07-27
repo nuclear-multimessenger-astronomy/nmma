@@ -357,9 +357,7 @@ def main():
     c = 299792458.0 * 1e-3
 
     radius, mass, Lambda = np.loadtxt(args.eos_file, unpack=True, usecols=[0, 1, 2])
-    interp_mass_lambda = interp.interp1d(mass, Lambda)
-    interp_mass_radius = interp.interp1d(mass, radius)
-    R14_true = interp_mass_radius(1.4)
+    R14_true = np.interp(1.4, mass, radius)
 
     n_live_points = 1000
     evidence_tolerance = 0.5
@@ -468,9 +466,10 @@ def main():
                 if not os.path.isdir(EOSDir):
                     os.makedirs(EOSDir)
 
-                mMax, rMax, lam1, lam2, r1, r2 = EOS2Parameters(
-                    interp_mass_radius,
-                    interp_mass_lambda,
+                mMax, rMax, lam1, lam2, r1, r2, R_14, R_16 = EOS2Parameters(
+                    mass,
+                    radius,
+                    Lambda,
                     row["mass_1_source"],
                     row["mass_2_source"],
                 )
