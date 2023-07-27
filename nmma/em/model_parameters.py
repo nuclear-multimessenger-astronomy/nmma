@@ -20,11 +20,6 @@ def AnBa2022(data):
             )
         ]
 
-        # Best to interpolate mass in log10 space
-        rr[0] = np.log10(rr[0])
-        rr[2] = np.log10(rr[2])
-        rr[3] = np.log10(rr[3])
-
         data_out[key] = {
             param: rr[idx] for param, idx in zip(parameters, parameters_idx)
         }
