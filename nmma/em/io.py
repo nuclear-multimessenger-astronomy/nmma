@@ -219,6 +219,7 @@ def read_photometry_files(
                         "uvot_v": "uvot::v",
                         "uvot_uvm2": "uvot::uvm2",
                         "uvot_uvw1": "uvot::uvw1",
+                        "uvot_uvw2": "uvot::uvw2",
                         "uvot_white": "uvot::white",
                         "time": "t",
                     },
