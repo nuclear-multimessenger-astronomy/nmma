@@ -8,7 +8,7 @@ def AnBa2022(data):
 
     data_out = {}
 
-    parameters = ["mtot", "vej", "mni", "mrp", "xmix"]
+    parameters = ["log10_mtot", "vej", "log10_mni", "log10_mrp", "xmix"]
     parameters_idx = [0, 1, 2, 3, 4]
     magkeys = data.keys()
     for jj, key in enumerate(magkeys):
