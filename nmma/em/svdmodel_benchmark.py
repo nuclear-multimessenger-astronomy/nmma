@@ -50,6 +50,12 @@ def main():
         help="Type of interpolation performed",
     )
     parser.add_argument(
+        "--data-time-unit",
+        type=str,
+        default="days",
+        help="Time unit of input data (days, hours, minutes, or seconds)",
+    )
+    parser.add_argument(
         "--svd-ncoeff",
         type=int,
         default=10,
@@ -106,7 +112,7 @@ def main():
         os.makedirs(args.outdir)
 
     # get the grid data file path
-    file_extensions = ["dat", "csv", "dat.gz"]
+    file_extensions = ["dat", "csv", "dat.gz", "h5"]
     filenames = []
     for file_extension in file_extensions:
         if not args.ignore_bolometric:
@@ -154,10 +160,26 @@ def main():
 
     print(f"Benchmarking model {args.model} on filter {filts} with {args.ncpus} cpus")
 
-    def chi2_func(grid_entry_name):
+    def chi2_func(grid_entry_name, data_time_unit="days"):
         # fetch the grid data and parameter
         grid_entry = grid_training_data[grid_entry_name]
         grid_t = np.array(grid_entry["t"])
+
+        # Convert input data time values to days
+        if data_time_unit in ["days", "day", "d"]:
+            time_scale_factor = 1.0
+        elif data_time_unit in ["hours", "hour", "hr", "h"]:
+            time_scale_factor = 24.0
+        elif data_time_unit in ["minutes", "minute", "min", "m"]:
+            time_scale_factor = 1440.0
+        elif data_time_unit in ["seconds", "second", "sec", "s"]:
+            time_scale_factor = 86400.0
+        else:
+            raise ValueError(
+                "data_time_unit must be one of days, hours, minutes, or seconds."
+            )
+        grid_t = grid_t / time_scale_factor
+
         used_grid_t = grid_t[(grid_t > args.tmin) * (grid_t < args.tmax)]
         grid_mAB = {}
         for filt in filts:
@@ -180,10 +202,16 @@ def main():
     grid_entry_names = list(grid_training_data.keys())
     if args.ncpus == 1:
         chi2_dict_array = [
-            chi2_func(grid_entry_name) for grid_entry_name in grid_entry_names
+            chi2_func(grid_entry_name, data_time_unit=args.data_time_unit)
+            for grid_entry_name in grid_entry_names
         ]
     else:
-        chi2_dict_array = p_map(chi2_func, grid_entry_names, num_cpus=args.ncpus)
+        chi2_dict_array = p_map(
+            chi2_func,
+            grid_entry_names,
+            data_time_unit=args.data_time_unit,
+            num_cpus=args.ncpus,
+        )
 
     chi2_array_by_filt = {}
     for filt in chi2_dict_array[0].keys():
