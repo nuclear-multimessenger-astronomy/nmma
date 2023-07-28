@@ -72,23 +72,23 @@ Python 3.8 and above and Pip 21.2 and above is ideal for this installation. It i
 
 For the moment we advise Linux users to avoid using Python 3.9 and Python 3.10 in their nmma environment; this can generate major problems for the operation. Preferably, use Python 3.8.
 
+> [!WARNING] 
+> As of now we recommend everyone to stick with Python =<3.10. Because of dependecy issues with _PyMultiNest_, Python 3.11 is not supported. We are working on it and will update this section as soon as we have a solution.
+
 Install mpi4py:
 ```
 $ conda install mpi4py
 ```
-OR
-```
-$ pip install mpi4py
-```
+> [!WARNING] 
+> We discourage installing mpi4py with pip. The installation doesnot work properly due to issues with MPI header files, etc.
+
 
 Install parallel-bilby:
 ```
 $ conda install -c conda-forge parallel-bilby
 ```
-OR
-```
-$ pip install parallel-bilby
-```
+[!NOTE] 
+> **Note**
 
 Note: for those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
 This can be resolved by installing gcc with the following command:
@@ -104,11 +104,13 @@ Install pymultinest (note this line may not work for arm64 Macs; see specifc ins
 $ conda install -c conda-forge pymultinest
 ```
 
-NOTE: In case an error comes up during an NMMA analysis of the form:
+**NOTE**: In case an error comes up during an NMMA analysis of the form:
 
-ERROR:   Could not load MultiNest library "libmultinest.so"
-ERROR:   You have to build it first,
-ERROR:   and point the LD_LIBRARY_PATH environment variable to it!
+
+> ERROR:   Could not load MultiNest library "libmultinest.so"
+> ERROR:   You have to build it first,
+>ERROR:   and point the LD_LIBRARY_PATH environment variable to it!
+
 
 Then, for using the PyMultinest library, it is required to get and compile the Multinest library separately. Instructions for the same are given here:
 
