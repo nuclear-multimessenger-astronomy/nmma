@@ -150,7 +150,7 @@ def get_parser():
         "--sampler-kwargs",
         default="{}",
         type=str,
-        help="Additional kwargs (e.g. {'evidence_tolerance':0.5}) for bilby.run_sampler",
+        help="Additional kwargs (e.g. {'evidence_tolerance':0.5}) for bilby.run_sampler, put a double quotation marks around the dictionary",
     )
     parser.add_argument(
         "--cpus",
