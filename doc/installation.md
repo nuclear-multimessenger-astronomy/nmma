@@ -105,8 +105,12 @@ $ conda install -c conda-forge pymultinest
 ```
 
 > [!WARNING] 
-> In case an error comes up during an NMMA analysis of the form: `ERROR:   Could not load MultiNest library "libmultinest.so" ERROR:   You have to build it first ERROR:   and point the LD_LIBRARY_PATH environment variable to it!`
-
+> In case an error comes up during an NMMA analysis of the form: 
+```
+ERROR: Could not load MultiNest library "libmultinest.so" 
+ERROR: You have to build it first 
+ERROR: and point the LD_LIBRARY_PATH environment variable to it!
+```
 
 Then, for using the PyMultinest library, it is required to get and compile the Multinest library separately. Instructions for the same are given here:
 
