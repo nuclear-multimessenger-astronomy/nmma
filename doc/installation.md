@@ -87,8 +87,8 @@ Install parallel-bilby:
 ```
 $ conda install -c conda-forge parallel-bilby
 ```
-[!NOTE] 
-> **Note**
+> [!NOTE] 
+> Installing parallel-bilby takes quite some time. Please be patient. If you encounter any errors, please check the [parallel-bilby installation guide](https://lscsoft.docs.ligo.org/parallel_bilby/installation) for more details.
 
 Note: for those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
 This can be resolved by installing gcc with the following command:
@@ -104,9 +104,8 @@ Install pymultinest (note this line may not work for arm64 Macs; see specifc ins
 $ conda install -c conda-forge pymultinest
 ```
 
-**NOTE**: In case an error comes up during an NMMA analysis of the form:
-
-
+> [!WARNING]
+> In case an error comes up during an NMMA analysis of the form:
 > ERROR:   Could not load MultiNest library "libmultinest.so"
 > ERROR:   You have to build it first,
 >ERROR:   and point the LD_LIBRARY_PATH environment variable to it!
