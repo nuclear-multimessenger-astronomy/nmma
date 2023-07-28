@@ -72,14 +72,14 @@ Python 3.8 and above and Pip 21.2 and above is ideal for this installation. It i
 
 For the moment we advise Linux users to avoid using Python 3.9 and Python 3.10 in their nmma environment; this can generate major problems for the operation. Preferably, use Python 3.8.
 
-> [!WARNING] 
+> [!IMPORTANT] 
 > As of now we recommend everyone to stick with Python =<3.10. Because of dependecy issues with _PyMultiNest_, Python 3.11 is not supported. We are working on it and will update this section as soon as we have a solution.
 
 Install mpi4py:
 ```
 $ conda install mpi4py
 ```
-> [!WARNING] 
+> [!IMPORTANT] 
 > We discourage installing mpi4py with pip. The installation does not work properly due to issues with MPI header files, etc.
 
 
@@ -90,7 +90,8 @@ $ conda install -c conda-forge parallel-bilby
 > [!NOTE] 
 > Installing parallel-bilby takes quite some time. Please be patient. If you encounter any errors, please check the [parallel-bilby installation guide](https://lscsoft.docs.ligo.org/parallel_bilby/installation) for more details.
 
-Note: for those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
+> [!NOTE]  
+> for those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
 This can be resolved by installing gcc with the following command:
 
 ```
@@ -124,7 +125,8 @@ $ pip install -r requirements.txt
 $ python setup.py install
 ```
 
-NOTE: there is an issue pip installing `pyfftw` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
+> [!NOTE] 
+>  There is an issue pip installing `pyfftw` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
 * $ pip install importlib_resources
 
@@ -156,7 +158,8 @@ NOTE: there is an issue pip installing `pyfftw` on arm64 Mac systems; see the de
 * $ conda install -c conda-forge p-tqdm
 
 
-NOTE: If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies
+> [!NOTE] 
+>  If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies
 if not covered by python setup.py install. Also, if running python setup.py install shows something on the lines of "cannot cythonize without cython", do:
 
 * $ conda install -c anaconda cython==0.29.24
