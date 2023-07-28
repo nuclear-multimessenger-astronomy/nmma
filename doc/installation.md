@@ -80,7 +80,7 @@ Install mpi4py:
 $ conda install mpi4py
 ```
 > [!WARNING] 
-> We discourage installing mpi4py with pip. The installation doesnot work properly due to issues with MPI header files, etc.
+> We discourage installing mpi4py with pip. The installation does not work properly due to issues with MPI header files, etc.
 
 
 Install parallel-bilby:
