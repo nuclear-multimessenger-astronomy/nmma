@@ -104,7 +104,8 @@ Install pymultinest (note this line may not work for arm64 Macs; see specifc ins
 $ conda install -c conda-forge pymultinest
 ```
 
-> [!WARNING] In case an error comes up during an NMMA analysis of the form:
+> [!WARNING] 
+> In case an error comes up during an NMMA analysis of the form:
 
 
 > ERROR:   Could not load MultiNest library "libmultinest.so"
