@@ -162,6 +162,12 @@ def get_parser():
         "--nlive", type=int, default=2048, help="Number of live points (default: 2048)"
     )
     parser.add_argument(
+        "--reactive-sampling",
+        action="store_true",
+        default=False,
+        help="To use reactive sampling in ultranest (default: False)",
+    )
+    parser.add_argument(
         "--seed",
         metavar="seed",
         type=int,
@@ -618,6 +624,15 @@ def main(args=None):
     sampler_kwargs = literal_eval(args.sampler_kwargs)
     print("Running with the following additional sampler_kwargs:")
     print(sampler_kwargs)
+    # check if it is running with reactive sampler
+    if args.reactive_sampling:
+        if args.sampler != 'ultranest':
+            print("Reactive sampling is only available in ultranest")
+        else:
+            print("Running with reactive-sampling in ultranest")
+            nlive = None
+    else:
+        nlive = args.nlive
 
     result = bilby.run_sampler(
         likelihood,
@@ -625,7 +640,7 @@ def main(args=None):
         sampler=args.sampler,
         outdir=args.outdir,
         label=args.label,
-        nlive=args.nlive,
+        nlive=nlive,
         seed=args.seed,
         soft_init=args.soft_init,
         queue_size=args.cpus,
@@ -705,7 +720,7 @@ def main(args=None):
             mag["bestfit_sample_times"] = (
                 mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
             )
-            
+
     if args.bestfit:
         bestfit_to_write = bestfit_params.copy()
         bestfit_to_write["Best fit index"] = int(bestfit_idx)

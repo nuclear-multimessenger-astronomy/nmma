@@ -34,6 +34,7 @@ def test_analysis():
         sampler="pymultinest",
         cpus=1,
         nlive=512,
+        reactive_sampling=False,
         seed=42,
         injection=f"{dataDir}/injection.json",
         injection_num=0,
