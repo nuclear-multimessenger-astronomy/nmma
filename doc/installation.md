@@ -75,10 +75,8 @@ $ pip --version
 
 Python 3.8 and above and Pip 21.2 and above is ideal for this installation. It is recommended to update these for your installation.
 
-For the moment we advise Linux users to avoid using Python 3.9 and Python 3.10 in their nmma environment; this can generate major problems for the operation. Preferably, use Python 3.8.
+**Python 3.11 is now supported by NMMA!**
 
-> [!IMPORTANT]
-> As of now we recommend everyone to stick with Python =<3.10. Because of dependecy issues with _PyMultiNest_, Python 3.11 is not supported. We are working on it and will update this section as soon as we have a solution.
 
 Install mpi4py:
 
@@ -137,9 +135,9 @@ $ python setup.py install
 > [!NOTE]
 > There is an issue pip installing `pyfftw` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
-` $ pip install importlib_resources`
+`$ pip install importlib_resources`
 
-` $ pip install  extinction`
+`$ pip install  extinction`
 
 `$ pip install dill`
 
