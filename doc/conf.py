@@ -335,9 +335,6 @@ texinfo_documents = [
         "Miscellaneous",
     ),
 ]
-html_css_files = [
-    'css/custom.css',
-]
 # Documents to append as an appendix to all manuals.
 # texinfo_appendices = []
 

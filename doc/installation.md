@@ -226,7 +226,9 @@ export LD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$LD_LIBRARY_PATH
 export DYLD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH
 ```
 
-(NOTE: Modify these paths as appropriate for the location of your `MultiNest` installation. You can also combine the `DYLD_LIBRARY_PATH` lines for `MultiNest` and `fftw` (above) into a single line)
+```{note} 
+Modify these paths as appropriate for the location of your `MultiNest` installation. You can also combine the `DYLD_LIBRARY_PATH` lines for `MultiNest` and `fftw` (above) into a single line
+```
 
 3. There are also issues with `tensorflow` and arm64 Macs. If using `tensorflow`, install it with the following commands:
 
@@ -246,8 +248,10 @@ import nmma.em.analysis
 import nmma.eos.create_injection
 ```
 
-NOTE (Okay, last one!): if everything is ok, it's the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
+```{tip} 
+(Okay, last one!): if everything is ok, it's the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
 those with their given commands. In case modules like afterglowpy and dust_extinction are needed, don't hesitate to do it with pip (normally it shouldn't happen), but some modules may not install correctly in case of disturbance.
+```
 
 Please pay special attention to the `import nmma.em.analysis` and make sure that it does not generate any errors.
 
@@ -270,16 +274,17 @@ For example, on XSEDE's Expanse cluster, one can start a terminal session with:
 
 and follow the instructions above.
 
-NOTE: If "module load openmpi" does not execute directly and it asks for dependencies, one can proceed with:
-
-        module load sdsc
-        module load cpu/0.15.4
-        module load gcc/9.2.0
-        module load openmpi/4.1.1
+```{note}
+If `module load openmpi` does not execute directly and it asks for dependencies, one can proceed with:
+```
+    module load sdsc
+    module load cpu/0.15.4
+    module load gcc/9.2.0
+    module load openmpi/4.1.1
 
 ## Matplotlib fonts
 
-On new Linux installations, we sometimes come across the warning: "findfont: Font family ['Times New Roman'] not found. Falling back to DejaVu Sans". If you do prefer to use 'Times New Roman' for all of your plotting needs, you can install msttcorefonts with:
+On new Linux installations, we sometimes come across the warning: `findfont: Font family ['Times New Roman'] not found. Falling back to DejaVu Sans`. If you do prefer to use 'Times New Roman' for all of your plotting needs, you can install `msttcorefonts` with:
 
     sudo apt install msttcorefonts -qq
 
