@@ -75,7 +75,7 @@ def readfile(filename):
     return filecontents
 
 
-VERSION = "0.0.18"
+VERSION = "0.0.19"
 version_file = write_version_file(VERSION)
 long_description = get_long_description()
 
@@ -146,6 +146,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
