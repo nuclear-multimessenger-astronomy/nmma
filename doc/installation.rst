@@ -47,7 +47,7 @@ Change directory to the nmma folder:
 
 .. code-block::
 
-   * $ cd nmma
+   * $ cd nmma 
 
 Main Installation
 -----------------
