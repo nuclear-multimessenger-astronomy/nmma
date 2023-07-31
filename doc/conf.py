@@ -31,17 +31,41 @@ sys.path.insert(0, os.path.abspath(".."))
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = [
-    "recommonmark",
-    "sphinx_math_dollar",
-    #    'sphinx.ext.autodoc',
-    "sphinx.ext.autosummary",
-    #    'sphinx.ext.pngmath',
-    "numpydoc",
-    #    'plot2rst',
-    "sphinx.ext.intersphinx",
-    #    'sphinx.ext.linkcode',
-    #    'sphinx_gallery.gen_gallery'
+# extensions = [
+#     "recommonmark",
+#     "sphinx_math_dollar",
+#     #    'sphinx.ext.autodoc',
+#     "sphinx.ext.autosummary",
+#     #    'sphinx.ext.pngmath',
+#     "numpydoc",
+#     #    'plot2rst',
+#     "sphinx.ext.intersphinx",
+
+#     "sphinx.ext.autodoc",
+#     "sphinx.ext.mathjax",
+#     "sphinx.ext.napoleon",
+    
+#     #    'sphinx.ext.linkcode',
+#     #    'sphinx_gallery.gen_gallery'
+# ]
+
+extensions = ["myst_parser"]
+myst_enable_extensions = [
+    "amsmath",
+    "attrs_inline",
+    "attrs_block",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "linkify",
+    "replacements",
+    "smartquotes",
+    "strikethrough",
+    "substitution",
+    "tasklist",
 ]
 
 mathjax_config = {
@@ -55,8 +79,8 @@ mathjax_config = {
 templates_path = ["_templates"]
 
 source_suffix = {
-    ".rst": "restructuredtext",
-    ".md": "markdown",
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
 }
 
 # The encoding of source files.
@@ -105,6 +129,8 @@ language = None
 # directories to ignore when looking for source files.
 exclude_patterns = ["_build"]
 
+
+
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
 # default_role = None
@@ -121,7 +147,7 @@ exclude_patterns = ["_build"]
 # show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = "sphinx"
+# pygments_style = "sphinx"
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
@@ -137,11 +163,9 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 # Per https://github.com/snide/sphinx_rtd_theme: specify theme if not on RTD
-on_rtd = os.environ.get("READTHEDOCS", None) == "True"
-if not on_rtd:  # only import and set the theme if we're building docs locally
-    import sphinx_rtd_theme  # noqa
+html_theme = "sphinx_book_theme"
 
-    html_theme = "sphinx_rtd_theme"
+
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -165,12 +189,15 @@ if not on_rtd:  # only import and set the theme if we're building docs locally
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-# html_favicon = None
+html_favicon = "_static/light-logo.svg"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+
+html_logo = "_static/light-logo.svg"
+
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
@@ -308,7 +335,6 @@ texinfo_documents = [
         "Miscellaneous",
     ),
 ]
-
 # Documents to append as an appendix to all manuals.
 # texinfo_appendices = []
 
@@ -328,3 +354,14 @@ texinfo_documents = [
 
 def setup(app):
     app.add_css_file("nmma-docs.css")
+
+
+
+
+
+
+    
+
+
+
+

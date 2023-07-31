@@ -3,6 +3,8 @@
 import os
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
+from scipy.signal import savgol_filter
+import scipy.interpolate as interp
 import sncosmo
 import argparse
 import h5py
@@ -42,7 +44,12 @@ def parse():
         action="store_true",
         default=False,
     )
-    # parser.add_argument('--doSmoothing',help='Employ Savitzky-Golay filter for smoothing',action="store_true",default=False)
+    parser.add_argument(
+        '--doSmoothing',
+        help='Employ Savitzky-Golay filter for smoothing',
+        action="store_true",
+        default=False
+    )
     parser.add_argument(
         "--dMpc",
         type=float,
@@ -80,9 +87,9 @@ if args.z is None:
     H0 = cosmo.H0.value
     CLIGHT = 2.99792458e5
     CLIGHT_cm_s = 1e5 * CLIGHT
-    ztest = np.arange(0.0001,1,0.00001)
+    ztest = np.arange(0.0001, 1, 0.00001)
     Dtest = np.array(cosmo.luminosity_distance(ztest).to("Mpc").value)
-    z = ztest[np.argmin(abs(dMpc-Dtest))] 
+    z = ztest[np.argmin(abs(dMpc - Dtest))]
 else:
     z = args.z
     dMpc = cosmo.luminosity_distance(z).to("Mpc").value
@@ -100,11 +107,17 @@ for kk, filename in enumerate(files):
     Lnu[Lnu == 0.0] = 1e20
     Lnu = 10 ** gaussian_filter(np.log10(Lnu), 3.0)
 
-    Llam = Lnu * np.flipud(nu) ** 2.0 / CLIGHT_cm_s / 1e8  # ergs/s/Angstrom
+    nuS = np.tile(nu, (len(time), 1))
+
+    Llam = Lnu * nuS**2.0 / CLIGHT_cm_s / 1e8  # ergs/s/Angstrom
     Llam = Llam / (4 * np.pi * D_cm**2)  # ergs / s / cm^2 / Angstrom
 
     ph = np.array(time) / (60 * 60 * 24)  # get time in days
-    wave = 10 * np.flipud(CLIGHT_cm_s / nu * 1e8)  # AA
+    wave = CLIGHT_cm_s / nu * 1e8  # AA
+
+    # flip axes to make wavelength increasing
+    wave = np.flip(wave)
+    Llam = np.flip(Llam, axis=1)
 
     # extract photometric lightcurves
     if args.doAB:
@@ -127,6 +140,15 @@ for kk, filename in enumerate(files):
         for filt in filters:
             source = sncosmo.TimeSeriesSource(ph, wave, Llam)
             m = source.bandmag(filt, "ab", ph)
+
+            #apply smoothing filter
+            if args.doSmoothing:
+                ii = np.where(~np.isnan(m))[0]
+                if len(ii) > 1:
+                    f = interp.interp1d(ph[ii], m[ii], fill_value='extrapolate')
+                    m = f(ph)
+                m = savgol_filter(m,window_length=17,polyorder=3)
+
             m_tot.append(m)
 
         for i, t in enumerate(ph):
@@ -159,6 +181,12 @@ for kk, filename in enumerate(files):
             Lnu * np.flipud(nu) ** 2.0 / CLIGHT_cm_s / 1e8 * (4 * np.pi * D_cm**2),
             x=wave,
         )
+
+        if args.doSmoothing:
+            ii = np.where(np.isfinite(np.log10(Lbol)))[0]
+            f = interp.interp1d(ph[ii], np.log10(Lbol[ii]), fill_value='extrapolate')
+            Lbol = 10**f(ph)
+            Lbol = savgol_filter(Lbol,window_length=17,polyorder=3)
 
         for i, t in enumerate(ph):
             if t < 0:

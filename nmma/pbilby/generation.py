@@ -26,7 +26,7 @@ from .parser import (
     create_nmma_gw_generation_parser,
     parse_generation_args
 )
-from ..em.utils import loadEvent
+from ..em.io import loadEvent
 from ..em.injection import create_light_curve_data
 
 from .._version import __version__

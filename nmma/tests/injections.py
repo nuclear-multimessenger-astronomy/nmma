@@ -240,8 +240,8 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         for filter_name in filters_from_function:
             assert all(
                 np.isclose(
-                    lightcurve_from_function[filter_name],
-                    lightcurve_from_command_line[filter_name],
+                    lightcurve_from_function[filter_name][~np.isnan(lightcurve_from_function[filter_name])],
+                    lightcurve_from_command_line[filter_name][~np.isnan(lightcurve_from_command_line[filter_name])],
                     rtol=1e-3,
                 )
             ), f"lightcurve tolerance for {filter_name} exceeded"

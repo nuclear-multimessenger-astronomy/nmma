@@ -8,8 +8,13 @@ def AnBa2022(data):
 
     data_out = {}
 
+<<<<<<< HEAD
     parameters = ["v", "mrp", "xmix"]
     parameters_idx = [1, 3, 4]
+=======
+    parameters = ["log10_mtot", "vej", "log10_mni", "log10_mrp", "xmix"]
+    parameters_idx = [0, 1, 2, 3, 4]
+>>>>>>> origin/main
     magkeys = data.keys()
     for jj, key in enumerate(magkeys):
         rr = [
@@ -18,11 +23,6 @@ def AnBa2022(data):
                 r"[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", key
             )
         ]
-
-        # Best to interpolate mass in log10 space
-        rr[0] = np.log10(rr[0])
-        rr[2] = np.log10(rr[2])
-        rr[3] = np.log10(rr[3])
 
         data_out[key] = {
             param: rr[idx] for param, idx in zip(parameters, parameters_idx)
@@ -214,9 +214,9 @@ def Bu2022Ye(data):
 def Ka2017(data):
 
     parameters = [
-        "mej",
-        "vej",
-        "Xlan",
+        "log10_mej",
+        "log10_vej",
+        "log10_Xlan",
     ]
 
     data_out = {}
@@ -232,7 +232,9 @@ def Ka2017(data):
         ]
 
         # Best to interpolate mass in log10 space
-        rr[0] = np.log10(rr[0])
+        rr[2] = np.log10(rr[2])
+        rr[3] = np.log10(rr[3])
+        rr[5] = np.log10(rr[5])
 
         data_out[key] = {
             param: rr[idx] for param, idx in zip(parameters, parameters_idx)

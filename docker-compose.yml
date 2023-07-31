@@ -1,0 +1,7 @@
+version: "3.9"
+services:
+  nmma:
+    build:
+      dockerfile: ./api/Dockerfile
+    ports:
+      - "6901:6901"

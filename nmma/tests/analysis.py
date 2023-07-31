@@ -20,6 +20,7 @@ def test_analysis():
         tmin=0.1,
         tmax=20.0,
         dt=0.5,
+        log_space_time=False,
         photometric_error_budget=0.1,
         svd_mag_ncoeff=10,
         svd_lbol_ncoeff=10,
@@ -31,6 +32,7 @@ def test_analysis():
         sampler="pymultinest",
         cpus=1,
         nlive=512,
+        reactive_sampling=False,
         seed=42,
         injection=f"{dataDir}/injection.json",
         injection_num=0,
@@ -60,6 +62,7 @@ def test_analysis():
         conditional_gaussian_prior_thetaObs=False,
         conditional_gaussian_prior_N_sigma=1,
         sample_over_Hubble=False,
+        sampler_kwargs="{}",
         verbose=False,
     )
 

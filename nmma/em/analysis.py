@@ -78,6 +78,15 @@ def get_parser():
         "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
+        "--log-space-time",
+        action="store_true",
+        default=False,
+        help="Create the sample_times to be uniform in log-space",
+    )
+    parser.add_argument(
+        "--n-tstep", type=int, default=50, help="Number of time steps (used with --log-space-time, default: 50)"
+    )
+    parser.add_argument(
         "--photometric-error-budget",
         type=float,
         default=0.1,
@@ -137,6 +146,12 @@ def get_parser():
         help="To start the sampler softly (without any checking, default: False)",
     )
     parser.add_argument(
+        "--sampler-kwargs",
+        default="{}",
+        type=str,
+        help="Additional kwargs (e.g. {'evidence_tolerance':0.5}) for bilby.run_sampler, put a double quotation marks around the dictionary",
+    )
+    parser.add_argument(
         "--cpus",
         type=int,
         default=1,
@@ -144,6 +159,12 @@ def get_parser():
     )
     parser.add_argument(
         "--nlive", type=int, default=2048, help="Number of live points (default: 2048)"
+    )
+    parser.add_argument(
+        "--reactive-sampling",
+        action="store_true",
+        default=False,
+        help="To use reactive sampling in ultranest (default: False)",
     )
     parser.add_argument(
         "--seed",
@@ -363,7 +384,16 @@ def main(args=None):
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
     # initialize light curve model
-    sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    if args.log_space_time:
+        if args.n_tstep:
+            n_step = args.n_tstep
+        else:
+            n_step = int((args.tmax - args.tmin) / args.dt)
+        sample_times = np.logspace(np.log10(args.tmin),
+                                   np.log10(args.tmax + args.dt),
+                                   n_step)
+    else:
+        sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
     print("Creating light curve model for inference")
 
     if args.filters:
@@ -589,17 +619,32 @@ def main(args=None):
     if args.bilby_zero_likelihood_mode:
         likelihood = ZeroLikelihood(likelihood)
 
+    # fetch the additional sampler kwargs
+    sampler_kwargs = literal_eval(args.sampler_kwargs)
+    print("Running with the following additional sampler_kwargs:")
+    print(sampler_kwargs)
+    # check if it is running with reactive sampler
+    if args.reactive_sampling:
+        if args.sampler != 'ultranest':
+            print("Reactive sampling is only available in ultranest")
+        else:
+            print("Running with reactive-sampling in ultranest")
+            nlive = None
+    else:
+        nlive = args.nlive
+
     result = bilby.run_sampler(
         likelihood,
         priors,
         sampler=args.sampler,
         outdir=args.outdir,
         label=args.label,
-        nlive=args.nlive,
+        nlive=nlive,
         seed=args.seed,
         soft_init=args.soft_init,
         queue_size=args.cpus,
         check_point_delta_t=3600,
+        **sampler_kwargs
     )
 
     result.save_posterior_samples()
@@ -642,44 +687,7 @@ def main(args=None):
     else:
         result.plot_corner()
 
-    if args.bestfit:
-        posterior_file = os.path.join(
-            args.outdir, f"{args.label}_posterior_samples.dat"
-        )
-
-        posterior_samples = pd.read_csv(posterior_file, header=0, delimiter=" ")
-        bestfit_idx = np.argmax(posterior_samples.log_likelihood.to_numpy())
-        bestfit_params = posterior_samples.to_dict(orient="list")
-        for key in bestfit_params.keys():
-            bestfit_params[key] = bestfit_params[key][bestfit_idx]
-
-        _, mag = light_curve_model.generate_lightcurve(sample_times, bestfit_params)
-        for filt in mag.keys():
-            if bestfit_params["luminosity_distance"] > 0:
-                mag[filt] += 5.0 * np.log10(
-                    bestfit_params["luminosity_distance"] * 1e6 / 10.0
-                )
-        mag["bestfit_sample_times"] = sample_times
-
-        if "KNtimeshift" in bestfit_params:
-            mag["bestfit_sample_times"] = (
-                mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
-            )
-
-        bestfit_to_write = bestfit_params.copy()
-        bestfit_to_write["Best fit index"] = int(bestfit_idx)
-        bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
-        bestfit_file = os.path.join(args.outdir, "bestfit_params.json")
-
-        with open(bestfit_file, "w") as file:
-            json.dump(bestfit_to_write, file, indent=4)
-
-        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
-
-    if args.plot:
-        import matplotlib.pyplot as plt
-        from matplotlib.pyplot import cm
-
+    if args.bestfit or args.plot:
         posterior_file = os.path.join(
             args.outdir, f"{args.label}_posterior_samples.dat"
         )
@@ -712,6 +720,23 @@ def main(args=None):
                 mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
             )
 
+    if args.bestfit:
+        bestfit_to_write = bestfit_params.copy()
+        bestfit_to_write["Best fit index"] = int(bestfit_idx)
+        bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
+        bestfit_file = os.path.join(
+            args.outdir, f"{args.label}_bestfit_params.json"
+        )
+
+        with open(bestfit_file, "w") as file:
+            json.dump(bestfit_to_write, file, indent=4)
+
+        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
+
+    if args.plot:
+        import matplotlib.pyplot as plt
+        from matplotlib.pyplot import cm
+
         if len(models) > 1:
             _, mag_all = light_curve_model.generate_lightcurve(
                 sample_times, bestfit_params, return_all=True
@@ -739,7 +764,9 @@ def main(args=None):
 
         colors = cm.Spectral(np.linspace(0, 1, len(filters_plot)))[::-1]
 
-        plotName = os.path.join(args.outdir, "lightcurves.png")
+        plotName = os.path.join(
+            args.outdir, f"{args.label}_lightcurves.png"
+        )
         plt.figure(figsize=(20, 16))
         color2 = "coral"
 

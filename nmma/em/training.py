@@ -54,6 +54,7 @@ class SVDTrainingModel(object):
         n_epochs=15,
         interpolation_type="sklearn_gp",
         data_type="photometry",
+        data_time_unit="days",
         plot=False,
         plotdir=os.path.join(os.getcwd(), "plot"),
         ncpus=1,
@@ -75,6 +76,7 @@ class SVDTrainingModel(object):
         self.n_epochs = n_epochs
         self.interpolation_type = interpolation_type
         self.data_type = data_type
+        self.data_time_unit = data_time_unit
         self.plot = plot
         self.plotdir = plotdir
         self.ncpus = ncpus
@@ -94,7 +96,7 @@ class SVDTrainingModel(object):
 
         self.svd_path = get_models_home(svd_path)
 
-        self.interpolate_data()
+        self.interpolate_data(data_time_unit=data_time_unit)
 
         # Only want to train if we must, so check if the model exists
         model_exists = self.check_model()
@@ -108,9 +110,22 @@ class SVDTrainingModel(object):
 
         self.load_model()
 
-    def interpolate_data(self):
+    def interpolate_data(self, data_time_unit="days"):
 
         magkeys = self.data.keys()
+        # Before interpolation, convert input data time values to days
+        if data_time_unit in ["days", "day", "d"]:
+            time_scale_factor = 1.0
+        elif data_time_unit in ["hours", "hour", "hr", "h"]:
+            time_scale_factor = 24.0
+        elif data_time_unit in ["minutes", "minute", "min", "m"]:
+            time_scale_factor = 1440.0
+        elif data_time_unit in ["seconds", "second", "sec", "s"]:
+            time_scale_factor = 86400.0
+        else:
+            raise ValueError(
+                "data_time_unit must be one of days, hours, minutes, or seconds."
+            )
         for jj, key in enumerate(magkeys):
 
             # Interpolate data onto grid
@@ -124,13 +139,13 @@ class SVDTrainingModel(object):
                         continue
                     if self.univariate_spline:
                         f = UnivariateSpline(
-                            self.data[key]["t"][ii],
+                            self.data[key]["t"][ii] / time_scale_factor,
                             self.data[key][filt][ii],
                             s=self.univariate_spline_s,
                         )
                     else:
                         f = interp.interp1d(
-                            self.data[key]["t"][ii],
+                            self.data[key]["t"][ii] / time_scale_factor,
                             self.data[key][filt][ii],
                             fill_value="extrapolate",
                         )
@@ -148,7 +163,7 @@ class SVDTrainingModel(object):
                     if len(ii) < 2:
                         continue
                     f = interp.interp1d(
-                        self.data[key]["t"][ii],
+                        self.data[key]["t"][ii] / time_scale_factor,
                         np.log10(self.data[key]["fnu"][ii, jj]),
                         fill_value="extrapolate",
                     )
@@ -387,16 +402,15 @@ class SVDTrainingModel(object):
 
             np.random.RandomState(42)
             model = Sequential()
+            # One/few layers of wide NN approximate GP
             model.add(
                 Dense(
-                    train_X.shape[1],
+                    2048,
                     activation="relu",
                     kernel_initializer="he_normal",
                     input_shape=(train_X.shape[1],),
                 )
             )
-            # One/few layers of wide NN approximate GP
-            model.add(Dense(2048, activation="relu", kernel_initializer="he_normal"))
             model.add(Dropout(dropout_rate))
             model.add(Dense(self.n_coeff))
 
