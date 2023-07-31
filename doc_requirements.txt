@@ -5,3 +5,7 @@ numpydoc
 sphinx-rtd-theme
 notedown
 jsx-lexer
+linkify-it-py
+linkify
+myst-parser
+sphinx-book-theme
