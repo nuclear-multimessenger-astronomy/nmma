@@ -42,7 +42,8 @@ model_parameters_dict = {
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
     "CV": ["example_num"],
     "AnBa2022_sparse": ["mrp", "xmix"],
-    "AnBa2022": ["log10_mtot", "log10_mni", "vej", "log10_mrp", "xmix"],
+    "AnBa2022_log": ["log10_mtot", "log10_mni", "vej", "log10_mrp", "xmix"],
+    "AnBa2022_linear": ["mtot", "mni", "vej", "mrp", "xmix"],
     "salt2": ["x0", "x1", "c"],
     "nugent-hyper": ["supernova_mag_boost"],
     "Bu2022Ye": [
@@ -362,7 +363,10 @@ class SVDLightCurveModel(object):
 
         parameters_list = []
         for parameter_name in self.model_parameters:
-            parameters_list.append(new_parameters[parameter_name])
+            try:
+                parameters_list.append(new_parameters[parameter_name])
+            except KeyError:
+                parameters_list.append(10**new_parameters[f'log10_{parameter_name}'])
 
         z = utils.getRedShift(new_parameters)
 
@@ -393,7 +397,10 @@ class SVDLightCurveModel(object):
 
         parameters_list = []
         for parameter_name in self.model_parameters:
-            parameters_list.append(new_parameters[parameter_name])
+            try:
+                parameters_list.append(new_parameters[parameter_name])
+            except KeyError:
+                parameters_list.append(10**new_parameters[f'log10_{parameter_name}'])
 
         z = utils.getRedShift(new_parameters)
 

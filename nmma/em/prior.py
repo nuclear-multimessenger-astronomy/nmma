@@ -60,7 +60,10 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
 
 def create_prior_from_args(model_names, args):
 
-    if "AnBa2022" in model_names:
+    AnBa2022_intersect = list(set(['AnBa2022_linear', 'AnBa2022_log']) &
+                              set(model_names))
+
+    if len(AnBa2022_intersect) > 0:
 
         def convert_mtot_mni(parameters):
 

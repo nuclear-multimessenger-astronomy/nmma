@@ -3,8 +3,31 @@ import numpy as np
 
 from .utils import get_knprops_from_LANLfilename
 
+def AnBa2022_linear(data):
 
-def AnBa2022(data):
+    data_out = {}
+
+    parameters = ["mtot", "vej", "mni", "mrp", "xmix"]
+    parameters_idx = [0, 1, 2, 3, 4]
+    magkeys = data.keys()
+    for jj, key in enumerate(magkeys):
+        rr = [
+            np.abs(float(x))
+            for x in re.findall(
+                r"[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?",
+                key.replace("m56", "mni"),
+            )
+        ]
+
+        data_out[key] = {
+            param: rr[idx] for param, idx in zip(parameters, parameters_idx)
+        }
+        data_out[key] = {**data_out[key], **data[key]}
+
+    return data_out, parameters
+
+
+def AnBa2022_log(data):
 
     data_out = {}
 
