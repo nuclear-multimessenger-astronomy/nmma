@@ -366,7 +366,10 @@ class SVDLightCurveModel(object):
             try:
                 parameters_list.append(new_parameters[parameter_name])
             except KeyError:
-                parameters_list.append(10**new_parameters[f'log10_{parameter_name}'])
+                if 'log10' in parameter_name:
+                    parameters_list.append(np.log10(new_parameters[parameter_name.replace('log10', '')]))
+                else:
+                    parameters_list.append(10**new_parameters[f'log10_{parameter_name}'])
 
         z = utils.getRedShift(new_parameters)
 
