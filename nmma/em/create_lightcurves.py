@@ -11,6 +11,7 @@ import bilby.core
 from .model import create_light_curve_model_from_args
 from .injection import create_light_curve_data
 from .io import read_lightcurve_file
+from .utils import NumpyEncoder
 from ..utils.models import refresh_models_list
 
 
@@ -30,6 +31,12 @@ def get_parser():
     )
     parser.add_argument(
         "--outdir", type=str, required=True, help="Path to the output directory"
+    )
+    parser.add_argument(
+        "--outfile-type",
+        type=str,
+        default="csv",
+        help="Type of output files, json or csv.",
     )
     parser.add_argument("--label", type=str, required=True, help="Label for the run")
     parser.add_argument(
@@ -186,6 +193,18 @@ def get_parser():
         default=False,
         help="Refresh the list of models available on Zenodo",
     )
+    parser.add_argument(
+        "--xlim",
+        type=str,
+        default="0,14",
+        help="Start and end time for light curve plot (default: 0-14)",
+    )
+    parser.add_argument(
+        "--ylim",
+        type=str,
+        default="22,16",
+        help="Upper and lower magnitude limit for light curve plot (default: 22-16)",
+    )
 
     return parser
 
@@ -260,7 +279,11 @@ def main(args=None):
             )
         if os.path.isfile(injection_outfile):
             try:
-                mag_ds[index] = read_lightcurve_file(injection_outfile)
+                if args.outfile_type == "json":
+                    with open(injection_outfile) as f:
+                        mag_ds[index] = json.load(f)
+                elif args.outfile_type == "csv":
+                    mag_ds[index] = read_lightcurve_file(injection_outfile)
                 continue
 
             except ValueError:
@@ -294,38 +317,46 @@ def main(args=None):
         )
         print("Injection generated")
 
-        try:
-            fid = open(injection_outfile, "w")
-            # fid.write('# t[days] u g r i z y J H K\n')
-            # fid.write(str(" ".join(('# t[days]'," ".join(args.filters.split(',')),"\n"))))
-            fid.write("# t[days] ")
-            fid.write(str(" ".join(args.filters.split(","))))
-            fid.write("\n")
-
-            for ii, tt in enumerate(sample_times):
-                fid.write("%.5f " % sample_times[ii])
-                for filt in data.keys():
-                    if args.filters:
-                        if filt not in args.filters.split(","):
-                            continue
-                    fid.write("%.3f " % data[filt][ii, 1])
+        if args.outfile_type == "json":
+            with open(injection_outfile, "w") as f:
+                json.dump(data, f, cls=NumpyEncoder)
+            with open(injection_outfile) as f:
+                mag_ds[index] = json.load(f)
+        elif args.outfile_type == "csv":
+            try:
+                fid = open(injection_outfile, "w")
+                # fid.write('# t[days] u g r i z y J H K\n')
+                # fid.write(str(" ".join(('# t[days]'," ".join(args.filters.split(',')),"\n"))))
+                fid.write("# t[days] ")
+                fid.write(str(" ".join(args.filters.split(","))))
                 fid.write("\n")
-            fid.close()
 
-        except IndexError:
-            print(
-                "\n==================================================================="
-            )
-            print(
-                "Sorry we could not use ZTF or Rubin flags to generate those statistics\n"
-            )
-            print("Please remove all flags rely on with ZTF or Rubin then retry again")
-            print(
-                "===================================================================\n"
-            )
-            exit()
+                for ii, tt in enumerate(sample_times):
+                    fid.write("%.5f " % sample_times[ii])
+                    for filt in data.keys():
+                        if args.filters:
+                            if filt not in args.filters.split(","):
+                                continue
+                        fid.write("%.3f " % data[filt][ii, 1])
+                    fid.write("\n")
+                fid.close()
 
-        mag_ds[index] = read_lightcurve_file(injection_outfile)
+            except IndexError:
+                print(
+                    "\n==================================================================="
+                )
+                print(
+                    "Sorry we could not use ZTF or Rubin flags to generate those statistics\n"
+                )
+                print(
+                    "Please remove all flags rely on with ZTF or Rubin then retry again"
+                )
+                print(
+                    "===================================================================\n"
+                )
+                exit()
+
+            mag_ds[index] = read_lightcurve_file(injection_outfile)
 
     if args.plot:
         import matplotlib.pyplot as plt
@@ -363,10 +394,14 @@ def main(args=None):
 
             data_out = []
             for jj, key in enumerate(list(mag_ds.keys())):
-                data_out.append(mag_ds[key][filt])
+                data_vec = np.array(mag_ds[key][filt])
+                if data_vec.ndim == 2:
+                    data_out.append(data_vec[:, 1].tolist())
+                else:
+                    data_out.append(data_vec.tolist())
             data_out = np.vstack(data_out)
 
-            bins = np.linspace(-20, 1, 50)
+            bins = np.linspace(-20, 30, 100)
 
             def return_hist(x):
                 hist, bin_edges = np.histogram(x, bins=bins)
@@ -387,15 +422,17 @@ def main(args=None):
             ax.plot(sample_times, np.nanpercentile(data_out, 90, axis=0), "k--")
             ax.plot(sample_times, np.nanpercentile(data_out, 10, axis=0), "k--")
 
-            ax.set_xlim([0, 14])
-            ax.set_ylim([-12, -18])
+            plt.xlim([float(x) for x in args.xlim.split(",")])
+            plt.ylim([float(x) for x in args.ylim.split(",")])
+
             ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
 
             if ii == len(filts) - 1:
                 ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
             else:
                 plt.setp(ax.get_xticklabels(), visible=False)
-            ax.set_yticks([-18, -16, -14, -12])
+
+            ax.set_yticks([26, 22, 18, 14])
             ax.tick_params(axis="x", labelsize=42)
             ax.tick_params(axis="y", labelsize=42)
             ax.grid(which="both", alpha=0.5)

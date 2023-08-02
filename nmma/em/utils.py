@@ -161,7 +161,7 @@ def getFilteredMag(mag, filt):
     # are kind of justifiable because the spectral
     # commonly goes as F_\nu \propto \nu^\alpha,
     # where \nu is the frequency.
-    if filt in unprocessed_filt or filt.startswith(('radio', 'X-ray')):
+    if filt in unprocessed_filt or filt.startswith(("radio", "X-ray")):
         return mag[filt]
     elif filt in sncosmo_maps:
         return mag[sncosmo_maps[filt]]
@@ -194,6 +194,7 @@ def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
         mag = processedData[filt][:, 1]
         dmag = processedData[filt][:, 2]
         # shift the time by the triggerTime
+        print(time, triggerTime)
         time -= triggerTime
 
         # filter the out of range data
@@ -286,7 +287,7 @@ def get_default_filts_lambdas(filters=None):
                 # adding to the list
                 filts_slice.append(filt)
                 lambdas_slice.append(scipy.constants.c / freq)
-            elif filt.startswith('X-ray-') and filt not in filts:
+            elif filt.startswith("X-ray-") and filt not in filts:
                 # for additional X-ray filters that not in the list
                 # calculate the lambdas based on the filter name
                 # split the filter name
@@ -333,7 +334,7 @@ def calc_lc(
     else:
         # add null output for radio and X-ray filters
         for filt in filters:
-            if filt.startswith(('radio', 'X-ray')):
+            if filt.startswith(("radio", "X-ray")):
                 mAB[filt] = np.inf * np.ones(len(tt))
 
     for jj, filt in enumerate(filters):

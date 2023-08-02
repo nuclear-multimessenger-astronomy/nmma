@@ -85,7 +85,10 @@ def get_parser():
         help="Create the sample_times to be uniform in log-space",
     )
     parser.add_argument(
-        "--n-tstep", type=int, default=50, help="Number of time steps (used with --log-space-time, default: 50)"
+        "--n-tstep",
+        type=int,
+        default=50,
+        help="Number of time steps (used with --log-space-time, default: 50)",
     )
     parser.add_argument(
         "--photometric-error-budget",
@@ -390,9 +393,9 @@ def main(args=None):
             n_step = args.n_tstep
         else:
             n_step = int((args.tmax - args.tmin) / args.dt)
-        sample_times = np.logspace(np.log10(args.tmin),
-                                   np.log10(args.tmax + args.dt),
-                                   n_step)
+        sample_times = np.logspace(
+            np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
+        )
     else:
         sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
     print("Creating light curve model for inference")
@@ -529,7 +532,13 @@ def main(args=None):
 
     else:
         # load the kilonova afterglow data
-        data = loadEvent(args.data)
+        try:
+            data = loadEvent(args.data)
+        except ValueError:
+            with open(args.data) as f:
+                data = json.load(f)
+                for key in data.keys():
+                    data[key] = np.array(data[key])
 
         trigger_time = args.trigger_time
 
@@ -626,7 +635,7 @@ def main(args=None):
     print(sampler_kwargs)
     # check if it is running with reactive sampler
     if args.reactive_sampling:
-        if args.sampler != 'ultranest':
+        if args.sampler != "ultranest":
             print("Reactive sampling is only available in ultranest")
         else:
             print("Running with reactive-sampling in ultranest")
@@ -645,7 +654,7 @@ def main(args=None):
         soft_init=args.soft_init,
         queue_size=args.cpus,
         check_point_delta_t=3600,
-        **sampler_kwargs
+        **sampler_kwargs,
     )
 
     result.save_posterior_samples()
@@ -725,9 +734,7 @@ def main(args=None):
         bestfit_to_write = bestfit_params.copy()
         bestfit_to_write["Best fit index"] = int(bestfit_idx)
         bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
-        bestfit_file = os.path.join(
-            args.outdir, f"{args.label}_bestfit_params.json"
-        )
+        bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
 
         with open(bestfit_file, "w") as file:
             json.dump(bestfit_to_write, file, indent=4)
@@ -765,9 +772,7 @@ def main(args=None):
 
         colors = cm.Spectral(np.linspace(0, 1, len(filters_plot)))[::-1]
 
-        plotName = os.path.join(
-            args.outdir, f"{args.label}_lightcurves.png"
-        )
+        plotName = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
         plt.figure(figsize=(20, 16))
         color2 = "coral"
 
