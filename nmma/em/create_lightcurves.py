@@ -277,7 +277,7 @@ def main(args=None):
             ext = "dat"
 
         if len(injection_df) == 1:
-            injection_outfile = os.path.join(args.outdir, "%s.{ext}" % args.label)
+            injection_outfile = os.path.join(args.outdir, f"{args.label}.{ext}")
         else:
             injection_outfile = os.path.join(
                 args.outdir, f"{args.label}_{simulation_id[index]}.{ext}"
