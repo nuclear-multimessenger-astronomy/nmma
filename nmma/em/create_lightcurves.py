@@ -271,11 +271,16 @@ def main(args=None):
     mag_ds = {}
     for index, row in injection_df.iterrows():
 
+        if args.outfile_type == "json":
+            ext = "json"
+        elif args.outfile_type == "csv":
+            ext = "dat"
+
         if len(injection_df) == 1:
-            injection_outfile = os.path.join(args.outdir, "%s.dat" % args.label)
+            injection_outfile = os.path.join(args.outdir, "%s.{ext}" % args.label)
         else:
             injection_outfile = os.path.join(
-                args.outdir, f"{args.label}_{simulation_id[index]}.dat"
+                args.outdir, f"{args.label}_{simulation_id[index]}.{ext}"
             )
         if os.path.isfile(injection_outfile):
             try:
@@ -293,7 +298,7 @@ def main(args=None):
                 print(
                     "The previous run generated light curves with unreadable content.\n"
                 )
-                print("Please remove all output files in .dat format then retry.")
+                print(f"Please remove all output files in .{ext} format then retry.")
                 print(
                     "===================================================================\n"
                 )
