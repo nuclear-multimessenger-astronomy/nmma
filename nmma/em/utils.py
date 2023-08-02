@@ -194,7 +194,6 @@ def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
         mag = processedData[filt][:, 1]
         dmag = processedData[filt][:, 2]
         # shift the time by the triggerTime
-        print(time, triggerTime)
         time -= triggerTime
 
         # filter the out of range data
