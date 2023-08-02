@@ -540,6 +540,9 @@ def main(args=None):
                 for key in data.keys():
                     data[key] = np.array(data[key])
 
+        if args.trigger_time is None:
+            raise ValueError("trigger_time required if using a data file.")
+
         trigger_time = args.trigger_time
 
     if args.remove_nondetections:
