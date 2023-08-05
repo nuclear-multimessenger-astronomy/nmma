@@ -1,5 +1,5 @@
 The Nuclear Multimessenger Astronomy (NMMA) framework
------------------------------------------------------
+=====================================================
 
 nmma is a fully featured, Bayesian multi-messenger pipeline targeting
 joint analyses of gravitational-wave and electromagnetic data (focusing
@@ -8,44 +8,358 @@ sampling these data sets using a variety of samplers. It uses chiral
 effective field theory based neutron star equation of states when
 performing inference, and is also capable of estimating the Hubble Constant.
 
-Quick Start
------------
 
-nmma provides a number of example models to compare to: kilonovae,
-gamma-ray burst afterglows, shock cooling supernovae, core-collapse
-supernovae, etc.
+Instructions For NMMA Installation
+----------------------------------
 
-We can demonstrate the functionality of the pipeline using a quick example. Taking the Metzger (2017) blue kilonova model as an example, we can generate a set of injections simply using the prior file (all are found in priors/).
+For science users
+^^^^^^^^^^^^^^^^^
 
-.. code-block:: bash
+If you are a science user and want to use NMMA for your analysis, you
+can install NMMA using conda as follows:
 
-  nmma_create_injection --prior-file priors/Me2017.prior --eos-file example_files/eos/ALF2.dat --binary-type BNS --n-injection 100 --original-parameters --extension json
+.. code:: 
 
-This generates a file called injection.json that includes an injection file drawn from the prior file with a number of injections specified by --n-injection.
+   conda create --name nmma_env python=3.10
+   conda install -c conda-forge nmma
 
-It is this file that is used for the Bayesian inference analysis. An example analysis is as follows:
+If you are a developer or you want to build NMMA from source, please
+refer to the developer section below.
 
-.. code-block:: bash
+.. note:: 
 
-  light_curve_analysis --model Me2017 --outdir outdir --label injection --prior priors/Me2017.prior --tmin 0.1 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection ./injection.json --injection-num 0 --injection-outfile outdir/lc.csv --generation-seed 42 --filters u,g,r,i,z,y,J,H,K --plot --remove-nondetections
+   The above may not work for arm64 Macs; see specifc instructions below. However, we are still working on getting NMMA to work on arm64 Macs.
 
-Here, the time array is specified by a minimum, maximum, and delta t (in days) as specified by --tmin, --tmax, and --dt. The particular injection chosen is drawn from an index specified by --injection-num. The --filters available are specified with --filters u,g,r,i,z,y,J,H,K. Summary plots are available in outdir/.
+For developers and contributors
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Please note that Me2017 is a non-SVD model which means it does not need the --svd-path option to be specified. 
-An SVD model example is as follows:
+The steps highlighted below are primarily for Linux systems and Windows
+users are advised to use WSL (preferrably Ubuntu 20.04) for smooth
+installation. Ubuntu 20.04 is available for free download on Microsoft
+Store.
 
-.. code-block:: bash
+**Installing Anaconda3**
 
-  nmma_create_injection --prior-file priors/Bu2019lm.prior --eos-file example_files/eos/ALF2.dat --binary-type BNS --n-injection 100 --original-parameters --extension json --aligned-spin
+On your Linux/WSL terminal, run the following commands to install
+anaconda (replace 5.3.1 by the latest version):
 
-.. code-block:: bash
+.. code:: 
 
-  light_curve_analysis --model Bu2019lm --svd-path ./svdmodels --outdir outdir --label injection --prior priors/Bu2019lm.prior --tmin 0.1 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection ./injection.json --injection-num 0 --injection-outfile outdir/lc.csv --generation-seed 42 --filters ztfg,ztfr,ztfi --plot --remove-nondetections --ztf-uncertainties --ztf-sampling --ztf-ToO 180
+   wget https://repo.anaconda.com/archive/Anaconda3-5.3.1-Linux-x86_64.sh
+   bash Anaconda3-5.3.1-Linux-x86_64.sh
+
+(For 32-bit installation, skip the ``\_64`` in both commands)
+
+.. note:: 
+
+   If you already have Anaconda3 installed, please make sure that it is updated to the latest version using `conda update --all`. Also check that you do not have multiple versions of Python installed in `usr/lib/` directory as it can cause version conflicts while installing dependencies.
+
+Now do:
+
+.. code:: 
+
+   conda update --all
+
+**Cloning the NMMA repository**
+
+Fork the NMMA repository given below:
+
+`NMMA Github
+Repo <https://github.com/nuclear-multimessenger-astronomy/nmma>`__
+
+Note that we link above to the main branch, but suggest making changes
+on your own fork (please also see our `contributing
+guide <./contributing.html>`__). Now, after forking, run the following
+command to clone the repository into your currently directory (by
+default, in your home directory):
+
+.. code:: 
+
+   git clone https://github.com/your_github_username/nmma
+
+Change directory to the nmma folder:
+
+.. code::
+
+   cd nmma
+
+Create a new environment using this command (environment name is
+nmma_env in this case):
+
+.. code:: 
+
+   conda create --name nmma_env python=3.8
+   conda activate nmma_env
+
+.. note::
+
+   If this gives an error like: ``CommandNotFoundError: Your shell has not been properly configured to use 'conda activate'``, then run:
+
+.. code:: 
+   
+   source ~/anaconda3/etc/profile.d/conda.sh
+
+then proceed with ``conda activate nmma_env``.
+
+Get the latest pip version
+
+.. code:: 
+
+   pip install --upgrade pip
+
+Check python and pip version like this:
+
+.. code:: 
+
+   python --version
+   pip --version
+
+Python 3.8 and above and Pip 21.2 and above is ideal for this
+installation. It is recommended to update these for your installation.
+
+.. important:: 
+
+   Python 3.11 is now supported by NMMA!
+
+Install mpi4py:
+
+.. code::
+
+   conda install mpi4py
+
+.. warning:: 
+
+   We discourage installing mpi4py with pip. The installation does not work properly due to issues with MPI header files, etc.
+
+Install parallel-bilby:
+
+.. code:: 
+
+   conda install -c conda-forge parallel-bilby
+
+.. note:: 
+
+   Installing parallel-bilby takes quite some time. Please be patient. If you encounter any errors, please check the `parallel-bilby installation guide <https://lscsoft.docs.ligo.org/parallel_bilby/installation>`__ for more details.
 
 
+.. note:: 
 
-.. image:: images/injection_corner.png
-.. image:: images/injection_lightcurves.png
+   For those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
+   This can be resolved by installing gcc with the following command:
+
+.. code:: 
+
+   sudo apt-get install gcc
+
+and attempting to install parallel-bilby again.
+
+Install pymultinest (note this line may not work for arm64 Macs; see
+specifc instructions below)
+
+.. code:: 
+
+   conda install -c conda-forge pymultinest
+
+.. warning:: 
+
+   In case an error comes up during an NMMA analysis of the form:
+   
+   .. code::
+
+      ERROR: Could not load MultiNest library "libmultinest.so"
+      ERROR: You have to build it first
+      ERROR: and point the LD_LIBRARY_PATH environment variable to it!
+
+Then, for using the PyMultinest library, it is required to get and
+compile the Multinest library separately. Instructions for the same are
+given here:
+
+`<https://johannesbuchner.github.io/PyMultiNest/install.html>`__
+
+Use the commands below to install the dependencies given in
+requirements.txt file which are necessary for NMMA:
+
+.. code:: 
+
+   pip install -r requirements.txt
+   python setup.py install
+
+.. note:: 
+
+   There is an issue pip installing ``pyfftw`` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
+
+``$ pip install importlib_resources``
+
+``$ pip install  extinction``
+
+``$ pip install dill``
+
+``$ pip install multiprocess``
+
+``$ pip install lalsuite``
+
+``$ pip install python-ligo-lw``
+
+``$ pip install sncosmo``
+
+``$ pip install scikit-learn``
+
+``$ pip install joblib``
+
+``$ conda install -c conda-forge p-tqdm``
+
+.. note:: 
+
+   If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies if not covered by ``python setup.py install``. Also, if running ``python setup.py install`` shows something on the lines of "cannot cythonize without cython", do:
+
+`` conda install -c anaconda cython==0.29.24``
+
+and redo ``python setup.py install``.
+
+**Known arm64 Mac issues**
+
+1. For arm64 Macs (e.g. M1, M2), there is an issue installing ``pyfftw``
+   with pip (see
+   https://github.com/pyFFTW/pyFFTW/issues/349#issuecomment-1468638458).
+   To address, use ``Homebrew`` to run
+
+.. code:: 
+
+   brew install fftw
+
+then add the following lines to your ``.zprofile`` or ``.bash_profile``:
+
+.. code::
+
+   export PATH="/opt/homebrew/bin:PATH"
+   export DYLD_LIBRARY_PATH=/opt/homebrew/opt/fftw/lib
+   export LDFLAGS="-Wl,-S,-rpath,/opt/homebrew/opt/fftw/lib -L/opt/homebrew/opt/fftw/lib"
+   export CFLAGS="-Wno-implicit-function-declaration -I/opt/homebrew/opt/fftw/include"
+
+Close and reopen your terminal and run
+
+.. code:: 
+
+   pip install pyfftw
+
+You may then need to rerun ``pip install -r requirements.txt`` to
+complete the dependency installations.
+
+2. The ``osx-arm64`` conda-forge channel does not include
+   ``pymultinest``. Running ``pip install -r requirements.txt`` should
+   have installed ``pymultinest``, but you will still need to install
+   and compile ``Multinest`` from the source. Within the ``nmma``
+   directory, run:
+
+.. code:: 
+
+   git clone https://github.com/JohannesBuchner/MultiNest
+   cd MultiNest/build
+   cmake ..
+   make
+
+Next, add the following lines to your ``.zprofile`` or
+``.bash_profile``:
+
+.. code:: 
+
+   export LD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$LD_LIBRARY_PATH
+   export DYLD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH
+
+.. note:: 
+
+   Modify these paths as appropriate for the location of your ``MultiNest`` installation. You can also combine the ``DYLD_LIBRARY_PATH`` lines for ``MultiNest`` and ``fftw`` (above) into a single line
+
+3. There are also issues with ``tensorflow`` and arm64 Macs. If using
+   ``tensorflow``, install it with the following commands:
+
+.. code:: 
+
+   pip install tensorflow-macos
+   pip install tensorflow-metal
+
+**First Test for NMMA**
+
+Run the following commands:
+
+.. code:: 
+
+   ipython
+   import nmma
+   import nmma.em.analysis
+   import nmma.eos.create_injection
+
+.. tip:: 
+
+   (Okay, last one!): if everything is ok, it's the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
+   those with their given commands. In case modules like afterglowpy and dust_extinction are needed, don't hesitate to do it with pip (normally it shouldn't happen), but some modules may not install correctly in case of disturbance.
+
+Please pay special attention to the ``import nmma.em.analysis`` and make
+sure that it does not generate any errors.
+
+Unfortunately, due to the web of package requirements that NMMA depends
+on, running setup.py does not typically finish without errors the first
+time through. Experience has shown that in the vast majority of cases,
+simply pinning versions such as:
+
+.. code:: 
+
+   pip install astropy==4.3.1
+
+and then trying again is sufficient for completion of the installation.
+This instruction file will likely cover the issues you might face during
+your installation. However, please open issues on GitHub if there appear
+to be unresolvable conflicts.
+
+Installation on expanse and other cluster resources
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When installation on cluster resources, it is common that all modules
+required for installing NMMA out of the box are not available. However,
+most will make it possible to import the required modules (most
+commonly, these are software like gfortran or mpi).
+
+For example, on XSEDE’s Expanse cluster, one can start a terminal
+session with:
+
+.. code:: 
+
+   module load sdsc
+   module load openmpi
+
+and follow the instructions above.
+
+.. note:: 
+
+   If ``module load openmpi`` does not execute directly and it asks for dependencies, one can proceed with:
+
+.. code:: 
+
+   module load sdsc
+   module load cpu/0.15.4
+   module load gcc/9.2.0
+   module load openmpi/4.1.1
+
+Matplotlib fonts
+^^^^^^^^^^^^^^^^
+
+On new Linux installations, we sometimes come across the warning:
+``findfont: Font family ['Times New Roman'] not found. Falling back to DejaVu Sans``.
+If you do prefer to use ‘Times New Roman’ for all of your plotting
+needs, you can install ``msttcorefonts`` with:
+
+.. code:: 
+
+   sudo apt install msttcorefonts -qq
+
+After removing the matplotlib cache:
+
+.. code:: 
+
+   rm ~/.cache/matplotlib -rf
+
+Beautiful fonts should be yours.
+
 
 
 Contributing
@@ -64,7 +378,7 @@ User Guide
 .. toctree::
    :maxdepth: 1
 
-   installation
+   quick-start-guide
    models
    training
    data_inj_obs
