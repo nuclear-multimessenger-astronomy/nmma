@@ -49,11 +49,9 @@ sys.path.insert(0, os.path.abspath(".."))
 #     #    'sphinx_gallery.gen_gallery'
 # ]
 
-extensions = ["myst_parser"]
+extensions = ["myst_parser","sphinx_copybutton"]
 myst_enable_extensions = [
     "amsmath",
-    "attrs_inline",
-    "attrs_block",
     "colon_fence",
     "deflist",
     "dollarmath",
@@ -83,6 +81,15 @@ source_suffix = {
     '.md': 'markdown',
 }
 
+html_theme_options = {
+    "path_to_docs": "doc",
+    "repository_url": "https://github.com/nuclear-multimessenger-astronomy/nmma",
+    "repository_branch": "main",
+    "use_edit_page_button": True,
+    "use_issues_button": True,
+    "use_repository_button": True,
+    "use_download_button": True,
+}
 # The encoding of source files.
 # source_encoding = 'utf-8-sig'
 
@@ -189,7 +196,7 @@ html_theme = "sphinx_book_theme"
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = "_static/light-logo.svg"
+html_favicon = "_static/favicon-light.png"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
