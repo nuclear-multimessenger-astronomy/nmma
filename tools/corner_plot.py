@@ -7,6 +7,10 @@ import os
 import seaborn as sns
 import matplotlib.patches as mpatches
 import re
+import matplotlib
+from ast import literal_eval
+
+matplotlib.use("Agg")
 
 params = {
     # latex
@@ -87,9 +91,7 @@ def load_csv(filename_with_fullpath, prior_filename):
     numpy.ndarray
         A 2D numpy array representing the posterior samples.
     """
-    df = pd.read_csv(
-        filename_with_fullpath + "/injection_posterior_samples.dat", sep=" "
-    )
+    df = pd.read_csv(filename_with_fullpath, sep=" ")
     columns = plotting_parameters(prior_filename).keys()
     df = df[[col for col in columns if col in df.columns]]
     samples = np.vstack(df.values)
@@ -177,8 +179,8 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, **kwargs):
 
     color_array = sns.color_palette("deep", n_colors=len(data), desat=0.8)
 
-    # print(np.array([np.min(data[0],axis=0),np.max(data[0],axis=0)]).reshape(data[0].shape[1],2))
-    # fix this
+    _limit = np.concatenate(data, axis=0)
+    limit = np.array([np.min(_limit, axis=0), np.max(_limit, axis=0)]).T
 
     fig = corner.corner(
         data[0],
@@ -186,7 +188,7 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, **kwargs):
         quantiles=[0.16, 0.84],
         title_quantiles=[[0.16, 0.5, 0.84] if len(data) == 1 else None][0],
         show_titles=[True if len(data) == 1 else False][0],
-        range=[0.99] * (data[0].shape[1]),
+        range=limit,
         bins=40,
         truths=truth_values,
         color=color_array[0],
@@ -206,8 +208,7 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, **kwargs):
             data[i],
             labels=list(labels.values()),
             quantiles=[0.16, 0.84],
-            # range=limits,
-            range=[0.999] * (data[i].shape[1]),
+            range=limit,
             bins=40,
             max_n_ticks=3,
             fig=fig,
@@ -236,7 +237,7 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, **kwargs):
                 lw=2,
             )
         )
-    axes[2 * int(np.sqrt(len(axes))) - 2].legend(
+    axes[2 * int(np.sqrt(len(axes))) - 3].legend(
         lines, legendlabel, loc=3, frameon=True, fancybox=True
     )
     if len(data) == 2:
@@ -271,6 +272,7 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, **kwargs):
                 color=color_array[1],
                 transform=axes[i].transAxes,
             )
+    plt.show()
     fig.savefig(filename, format=ext, bbox_inches="tight", dpi=300)
     print("Saved corner plot:", filename)
 
@@ -282,10 +284,15 @@ if __name__ == "__main__":
         "--posterior-files",
         type=str,
         nargs="+",
+        required=True,
         help="CSV file path for posteriors",
     )
     parser.add_argument(
-        "-p", "--prior-filename", type=str, help="Prior file path for axes labels"
+        "-p",
+        "--prior-filename",
+        type=str,
+        required=True,
+        help="Prior file path for axes labels",
     )
     parser.add_argument(
         "-l",
@@ -324,9 +331,17 @@ if __name__ == "__main__":
         "-o",
         "--output",
         default=None,
+        required=True,
         type=str,
-        help="output file name. If not provided, will be concatenation of input file names",
+        help="output file name.",
     )
+    parser.add_argument(
+        "--kwargs",
+        default="{}",
+        type=str,
+        help="kwargs to be passed to corner.corner. Eg: {'plot_datapoints': False}, enclose {} in double quotes",
+    )
+
     args = parser.parse_args()
     posterior_files = args.posterior_files
     prior_filename = args.prior_filename
@@ -336,6 +351,10 @@ if __name__ == "__main__":
     output = args.output
     injection_num = args.injection_num
     bestfit_json = args.bestfit_params
+    additional_kwargs = literal_eval(args.kwargs)
+    print("Running with the following additional kwargs:")
+    for key, value in additional_kwargs.items():
+        print(f"{key}: {value}")
     # Generate legend labels from input file names
     legendlabel = []
     if label_name is not None:
@@ -359,13 +378,8 @@ if __name__ == "__main__":
     print(f"\nTruths = {truths}\n")
 
     labels = plotting_parameters(prior_filename)
-    _filename = [file for file in posterior_files]
-    name = "_VS_".join([j for j in _filename])
-    if len(posterior_files) == 1:
-        output_prefix = output if output is not None else name
-    else:
-        output_prefix = "multi_" + (output if output is not None else name)
-    output_filename = output_prefix + "." + ext
+    output_filename = output + "." + ext
+
     kwargs = dict(
         plot_datapoints=False,
         plot_density=False,
@@ -374,6 +388,12 @@ if __name__ == "__main__":
         truth_color="black",
         label_kwargs={"fontsize": 16},
         levels=[0.16, 0.5, 0.84],
-        smooth=0.9,
+        smooth=1,
     )
+
+    kwargs.update(additional_kwargs)
+
     corner_plot(posteriors, labels, output_filename, truths, legendlabel, ext, **kwargs)
+
+## Example usage
+# python corner_plot.py -f GRB_res12_linear2dp/injection_posterior_samples.dat GRB_res12_linear4dp/injection_posterior_samples.dat -p GRB170817A_emsys_4dp.prior -o linear2d_vs_linear4dp --kwargs "{'levels':[0.05,0.5,0.95]}"
