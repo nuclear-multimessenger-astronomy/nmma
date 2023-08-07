@@ -46,9 +46,9 @@ def source_frame_masses(converted_parameters, added_keys):
              zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
              zgrid = np.geomspace(zmin, zmax, 50)
              distance_grid = cosmology.luminosity_distance(zgrid).value
-             converted_parameters["redshift"] = np.interp(distance, distance_grid, zgrid)
+             converted_parameters["redshift"] = np.interp(distance, distance_grid, zgrid).value
         else:
-             converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
+             converted_parameters["redshift"] = luminosity_distance_to_redshift(distance).value
         added_keys = added_keys + ["redshift"]
 
     if "mass_1_source" not in converted_parameters.keys():
@@ -496,9 +496,10 @@ class MultimessengerConversion(object):
                 R_14_list = []
                 R_16_list = []
                 EOSID = np.array(converted_parameters["EOS"]).astype(int) + 1
-                EOSdata = [None]*len(EOSID)
-                for j in EOSID:
+                EOSdata = [None]*self.Neos
+                for j in np.unique(EOSID):
                     EOSdata[j-1] = np.loadtxt(f"{self.eos_data_path}/{j}.dat", usecols = [0,1,2]).T
+
 
                 for i in range(0, len(EOSID)):
                     radius_val, mass_val, Lambda_val = EOSdata[EOSID[i]-1]
