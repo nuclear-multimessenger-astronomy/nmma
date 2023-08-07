@@ -79,7 +79,7 @@ jobs:
       run: |
         pwd
         ls
-        python -m coverage run --source nmma -m py.test nmma/tests/*
+        python -m coverage run --source nmma -m pytest nmma/tests/*
       env:
         LD_LIBRARY_PATH: .:/home/runner/work/nmma/nmma/MultiNest/lib # for Linux
     - name: Combine and upload coverage
