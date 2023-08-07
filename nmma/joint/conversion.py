@@ -48,7 +48,7 @@ def source_frame_masses(converted_parameters, added_keys):
              distance_grid = cosmology.luminosity_distance(zgrid).value
              converted_parameters["redshift"] = np.interp(distance, distance_grid, zgrid).value
         else:
-             converted_parameters["redshift"] = luminosity_distance_to_redshift(distance).value
+             converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
         added_keys = added_keys + ["redshift"]
 
     if "mass_1_source" not in converted_parameters.keys():
