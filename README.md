@@ -5,9 +5,10 @@
    <br/><br/>
 </div>
 
+[![Coverage Status](https://coveralls.io/repos/github/nuclear-multimessenger-astronomy/nmma/badge.svg?branch=main)](https://coveralls.io/github/nuclear-multimessenger-astronomy/nmma?branch=main)
+
 
 Please check our official documentation here: https://nuclear-multimessenger-astronomy.github.io/nmma/
-
 
 How to contribute: https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html
 
