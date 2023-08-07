@@ -83,13 +83,13 @@ jobs:
       env:
         LD_LIBRARY_PATH: .:/home/runner/work/nmma/nmma/MultiNest/lib # for Linux
     - name: Combine and upload coverage
-        run: |
-          python -m coverage combine
-          python -m coverage xml -i
-          python -m coveralls --service=github
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_PARALLEL: true
+      run: |
+        python -m coverage combine
+        python -m coverage xml -i
+        python -m coveralls --service=github
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COVERALLS_PARALLEL: true
 
   coverage:
     needs: build
