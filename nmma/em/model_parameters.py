@@ -7,7 +7,7 @@ def AnBa2022_linear(data):
 
     data_out = {}
 
-    parameters = ["mtot", "min", "vej", "mrp", "xmix"]
+    parameters = ["mtot", "mni", "vej", "mrp", "xmix"]
     parameters_idx = [0, 2, 1, 3, 4]
     magkeys = data.keys()
     for jj, key in enumerate(magkeys):
