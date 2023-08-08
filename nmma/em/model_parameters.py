@@ -7,8 +7,8 @@ def AnBa2022_linear(data):
 
     data_out = {}
 
-    parameters = ["mtot", "vej", "mni", "mrp", "xmix"]
-    parameters_idx = [0, 1, 2, 3, 4]
+    parameters = ["mtot", "min", "vej", "mrp", "xmix"]
+    parameters_idx = [0, 2, 1, 3, 4]
     magkeys = data.keys()
     for jj, key in enumerate(magkeys):
         rr = [
@@ -31,8 +31,8 @@ def AnBa2022_log(data):
 
     data_out = {}
 
-    parameters = ["log10_mtot", "vej", "log10_mni", "log10_mrp", "xmix"]
-    parameters_idx = [0, 1, 2, 3, 4]
+    parameters = ["log10_mtot", "log10_mni", "vej", "log10_mrp", "xmix"]
+    parameters_idx = [0, 2, 1, 3, 4]
     magkeys = data.keys()
     for jj, key in enumerate(magkeys):
         rr = [
@@ -42,6 +42,11 @@ def AnBa2022_log(data):
                 key.replace("m56", "mni"),
             )
         ]
+
+        # Best to interpolate mass in log10 space
+        rr[0] = np.log10(rr[0])
+        rr[2] = np.log10(rr[2])
+        rr[3] = np.log10(rr[3])
 
         data_out[key] = {
             param: rr[idx] for param, idx in zip(parameters, parameters_idx)
