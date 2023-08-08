@@ -23,6 +23,15 @@ can install NMMA using conda as follows:
    conda create --name nmma_env python=3.10
    conda install -c conda-forge nmma
 
+If you have an issue, such as 'Solving environment: failed with initial frozen solve', an option could be:
+
+.. code::
+
+   conda create --name nmma_env python=3.10
+   conda install mamba -c conda-forge
+   mamba install nmma -c conda-forge
+   
+
 If you are a developer or you want to build NMMA from source, please
 refer to the developer section below.
 
