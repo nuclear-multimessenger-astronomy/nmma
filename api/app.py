@@ -171,7 +171,7 @@ def run_nmma_model(data_dict):
         ]
         for row in data:
             tt = Time(row["mjd"], format="mjd").isot
-            filt = row["filter"]  # [-1]
+            filt = row["filter"]
             mag = row["mag"]
             magerr = row["magerr"]
             f.write(f"{tt} {filt} {mag} {magerr}\n")
