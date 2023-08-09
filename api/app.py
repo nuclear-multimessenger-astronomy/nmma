@@ -171,7 +171,7 @@ def run_nmma_model(data_dict):
         ]
         for row in data:
             tt = Time(row["mjd"], format="mjd").isot
-            filt = row["filter"][-1]
+            filt = row["filter"]
             mag = row["mag"]
             magerr = row["magerr"]
             f.write(f"{tt} {filt} {mag} {magerr}\n")
@@ -241,7 +241,7 @@ def run_nmma_model(data_dict):
                 suffix=".png", prefix="nmmaplot_", delete=False
             )
             f.close()
-            plot_file = os.path.join(plotdir, "lightcurves.png")
+            plot_file = os.path.join(plotdir, f"{cand_name}_{source}_lightcurves.png")
             plot_data = base64.b64encode(open(plot_file, "rb").read()).decode()
             local_temp_files.append(f.name)
 
