@@ -367,7 +367,7 @@ class SVDLightCurveModel(object):
                 parameters_list.append(new_parameters[parameter_name])
             except KeyError:
                 if 'log10' in parameter_name:
-                    parameters_list.append(np.log10(new_parameters[parameter_name.replace('log10', '')]))
+                    parameters_list.append(np.log10(new_parameters[parameter_name.replace('log10_', '')]))
                 else:
                     parameters_list.append(10**new_parameters[f'log10_{parameter_name}'])
 
