@@ -45,7 +45,7 @@ model_parameters_dict = {
     "AnBa2022_log": ["log10_mtot", "log10_mni", "vej", "log10_mrp", "xmix"],
     "AnBa2022_linear": ["mtot", "mni", "vej", "mrp", "xmix"],
     "salt2": ["x0", "x1", "c"],
-    "nugent-hyper": ["supernova_mag_boost"],
+    "nugent-hyper": ["supernova_mag_boost", "supernova_mag_stretch"],
     "Bu2022Ye": [
         "log10_mej_dyn",
         "vej_dyn",
@@ -653,9 +653,10 @@ class SupernovaLightCurveModel(object):
         z = utils.getRedShift(new_parameters)
 
         Ebv = new_parameters.get("Ebv", 0.0)
+        sketch = new_parameters.get("supernova_mag_stretch", 1)
 
         tt, lbol, mag = utils.sn_lc(
-            sample_times,
+            sample_times / sketch,
             z,
             Ebv,
             model_name=self.model,
