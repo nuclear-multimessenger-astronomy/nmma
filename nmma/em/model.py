@@ -46,6 +46,8 @@ model_parameters_dict = {
     "AnBa2022_linear": ["mtot", "mni", "vej", "mrp", "xmix"],
     "salt2": ["x0", "x1", "c"],
     "nugent-hyper": ["supernova_mag_boost", "supernova_mag_stretch"],
+    # for Sr_host_galaxy, the following array is not used
+    "Sr_host_galaxy": ["a_AG", "alpha_AG", "f_nu_host"],
     "Bu2022Ye": [
         "log10_mej_dyn",
         "vej_dyn",
@@ -607,6 +609,61 @@ class KilonovaGRBLightCurveModel(object):
         total_lbol = grb_lbol + kilonova_lbol
 
         return total_lbol, total_mag
+
+
+class HostGalaxyLightCurveModel(object):
+    def __init__(
+        self,
+        sample_times,
+        parameter_conversion=None,
+        filters=None,
+    ):
+        """A light curve model object
+
+        An object to evaluted the host galaxy light curve across filters
+        with a set of parameters given
+
+        Based on arxiv:2303.12849
+
+        Parameters
+        ----------
+        sample_times: np.array
+            An arry of time for the light curve to be evaluted on
+
+        Returns
+        -------
+        LightCurveModel: `nmma.em.model.HostGalaxyLightCurveModel`
+            A light curve model onject, able to evaluted the light curve
+            give a set of parameters
+        """
+
+        self.sample_times = sample_times
+        self.parameter_conversion = parameter_conversion
+        self.filters = filters
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(model={self.model})"
+
+    def generate_lightcurve(self, sample_times, parameters):
+
+        if self.parameter_conversion:
+            new_parameters = parameters.copy()
+            new_parameters, _ = self.parameter_conversion(new_parameters, [])
+        else:
+            new_parameters = parameters.copy()
+
+        mag = {}
+        lbol = 0.  # just a random number
+        alpha = new_parameters['alpha_AG']
+        for filt in self.filters:
+            # assumed to be in unit of muJy
+            a_AG = new_parameters[f'a_AG_{filt}']
+            f_nu_filt = new_parameters[f'f_nu_{filt}']
+            flux_per_filt = a_AG * np.power(sample_times, -alpha) + f_nu_filt
+
+            mag[filt] = -2.5 * np.log10(flux_per_filt * 1e6) + 8.9
+
+        return lbol, mag
 
 
 class SupernovaLightCurveModel(object):
