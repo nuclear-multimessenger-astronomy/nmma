@@ -46,8 +46,8 @@ model_parameters_dict = {
     "AnBa2022_linear": ["mtot", "mni", "vej", "mrp", "xmix"],
     "salt2": ["x0", "x1", "c"],
     "nugent-hyper": ["supernova_mag_boost", "supernova_mag_stretch"],
-    # for Sr_host_galaxy, the following array is not used
-    "Sr_host_galaxy": ["a_AG", "alpha_AG", "f_nu_host"],
+    # for Sr2023, the following array is not used
+    "Sr2023": ["a_AG", "alpha_AG", "f_nu_host"],
     "Bu2022Ye": [
         "log10_mej_dyn",
         "vej_dyn",
@@ -1042,6 +1042,13 @@ def create_light_curve_model_from_args(
             lc_model = SimpleKilonovaLightCurveModel(
                 sample_times=sample_times,
                 model=model_name,
+                parameter_conversion=parameter_conversion,
+                filters=filters,
+            )
+
+        elif model_name == 'Sr2023':
+            lc_model = HostGalaxyLightCurveModel(
+                sample_times=sample_times,
                 parameter_conversion=parameter_conversion,
                 filters=filters,
             )
