@@ -661,7 +661,7 @@ class HostGalaxyLightCurveModel(object):
             f_nu_filt = new_parameters[f'f_nu_{filt}']
             flux_per_filt = a_AG * np.power(sample_times, -alpha) + f_nu_filt
 
-            mag[filt] = -2.5 * np.log10(flux_per_filt * 1e6) + 8.9
+            mag[filt] = -2.5 * np.log10(flux_per_filt) + 23.9
 
         return lbol, mag
 
