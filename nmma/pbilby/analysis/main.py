@@ -270,7 +270,7 @@ def analysis_runner(
                     nested_samples,
                     sampler_kwargs,
                     sampling_time,
-                    rejection_sample_posterior=True
+                    rejection_sample_posterior=rejection_sample_posterior
                 )
 
                 posterior = conversion.fill_from_fixed_priors(
