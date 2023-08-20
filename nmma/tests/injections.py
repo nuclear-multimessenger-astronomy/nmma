@@ -136,6 +136,8 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             outfile_type="csv",
             xlim="0,14",
             ylim="22,16",
+            photometric_error_budget=0.0,
+            increment_seeds=False,
         )
 
         create_lightcurves.main(args)

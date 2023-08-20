@@ -87,6 +87,10 @@ def create_light_curve_data(
             ztftoolimr = load(f)
 
     tc = injection_parameters["kilonova_trigger_time"]
+
+    if "KNtimeshift" in injection_parameters:
+        tc = tc + injection_parameters["KNtimeshift"]
+
     tmin = args.kilonova_tmin
     tmax = args.kilonova_tmax
     tstep = args.kilonova_tstep
@@ -145,24 +149,32 @@ def create_light_curve_data(
             if mag_per_filt[tidx] >= det_lim:
                 data_per_filt[tidx] = [sample_times[tidx] + tc, det_lim, np.inf]
             else:
-                noise = np.random.normal(scale=dmag)
-                if ztf_uncertainties and filt in ["g", "r", "i"]:
-                    df = pd.DataFrame.from_dict(
-                        {
-                            "passband": [inv_bands[filt]],
-                            "mag": [mag_per_filt[tidx] + noise],
-                        }
-                    )
-                    df = estimate_mag_err(ztfuncer, df)
-                    if not df["mag_err"].values:
-                        data_per_filt[tidx] = [sample_times[tidx] + tc, det_lim, np.inf]
-                    else:
-                        data_per_filt[tidx] = [
-                            sample_times[tidx] + tc,
-                            mag_per_filt[tidx] + noise,
-                            df["mag_err"].values[0],
-                        ]
+                if ztf_uncertainties:
+                    if filt in ["g", "r", "i"] or filt in ["ztfg", "ztfr", "ztfi"]:
+                        df = pd.DataFrame.from_dict(
+                            {
+                                "passband": [inv_bands[filt]],
+                                "mag": [mag_per_filt[tidx]],
+                            }
+                        )
+                        df = estimate_mag_err(ztfuncer, df)
+                        if not df["mag_err"].values:
+                            data_per_filt[tidx] = [
+                                sample_times[tidx] + tc,
+                                det_lim,
+                                np.inf,
+                            ]
+                        else:
+                            noise = np.random.normal(
+                                scale=np.sqrt(dmag**2 + df["mag_err"].values[0] ** 2)
+                            )
+                            data_per_filt[tidx] = [
+                                sample_times[tidx] + tc,
+                                mag_per_filt[tidx] + noise,
+                                df["mag_err"].values[0],
+                            ]
                 else:
+                    noise = np.random.normal(scale=dmag)
                     data_per_filt[tidx] = [
                         sample_times[tidx] + tc,
                         mag_per_filt[tidx] + noise,

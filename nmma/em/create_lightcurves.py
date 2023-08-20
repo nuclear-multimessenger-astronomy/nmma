@@ -197,13 +197,26 @@ def get_parser():
         "--xlim",
         type=str,
         default="0,14",
+        nargs="*",
         help="Start and end time for light curve plot (default: 0-14)",
     )
     parser.add_argument(
         "--ylim",
         type=str,
         default="22,16",
+        nargs="*",
         help="Upper and lower magnitude limit for light curve plot (default: 22-16)",
+    )
+    parser.add_argument(
+        "--photometric-error-budget",
+        type=float,
+        default=0.0,
+        help="Photometric error (mag) (default: 0.0)",
+    )
+    parser.add_argument(
+        "--increment-seeds",
+        help="Change seed for every injection",
+        action="store_true",
     )
 
     return parser
@@ -259,7 +272,7 @@ def main(args=None):
     args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
 
     # args.injection_detection_limit = np.inf
-    args.kilonova_error = 0
+    args.kilonova_error = args.photometric_error_budget
 
     injection_df = injection_dict["injections"]
 
@@ -314,6 +327,9 @@ def main(args=None):
 
         injection_parameters["kilonova_trigger_time"] = trigger_time
 
+        if args.increment_seeds:
+            args.generation_seed = args.generation_seed + 1
+
         data = create_light_curve_data(
             injection_parameters,
             args,
@@ -324,7 +340,7 @@ def main(args=None):
 
         if args.outfile_type == "json":
             with open(injection_outfile, "w") as f:
-                json.dump(data, f, cls=NumpyEncoder)
+                json.dump(data, f, cls=NumpyEncoder, indent=4)
             with open(injection_outfile) as f:
                 mag_ds[index] = json.load(f)
         elif args.outfile_type == "csv":
@@ -381,7 +397,7 @@ def main(args=None):
         matplotlib.rcParams.update(params)
 
         plotName = os.path.join(
-            args.outdir, "injection_" + args.model + "_lightcurves.pdf"
+            args.outdir, f"injection_{args.model}_{args.label}_lightcurves.pdf"
         )
 
         fig = plt.figure()
@@ -392,6 +408,7 @@ def main(args=None):
         nrows = int(np.ceil(len(filts) / ncols))
         gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
 
+        axs = []
         for ii, filt in enumerate(filts):
             loc_x, loc_y = np.divmod(ii, nrows)
             loc_x, loc_y = int(loc_x), int(loc_y)
@@ -427,22 +444,35 @@ def main(args=None):
             ax.plot(sample_times, np.nanpercentile(data_out, 90, axis=0), "k--")
             ax.plot(sample_times, np.nanpercentile(data_out, 10, axis=0), "k--")
 
-            plt.xlim([float(x) for x in args.xlim.split(",")])
-            plt.ylim([float(x) for x in args.ylim.split(",")])
+            if type(args.xlim) is not list:
+                xlim = args.xlim.split(",")
+            else:
+                xlim = args.xlim
+            xlim = [float(x) for x in xlim]
+            plt.xlim(xlim)
+
+            if type(args.ylim) is not list:
+                ylim = args.ylim.split(",")
+            else:
+                ylim = args.ylim
+            ylim = [float(x) for x in ylim]
+            plt.ylim(ylim)
 
             ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
 
             if ii == len(filts) - 1:
-                ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
+                ax.set_xticks([np.ceil(x) for x in np.linspace(xlim[0], xlim[1], 8)])
             else:
                 plt.setp(ax.get_xticklabels(), visible=False)
 
-            ax.set_yticks([26, 22, 18, 14])
+            ax.set_yticks([np.ceil(x) for x in np.linspace(ylim[0], ylim[1], 8)])
             ax.tick_params(axis="x", labelsize=42)
             ax.tick_params(axis="y", labelsize=42)
             ax.grid(which="both", alpha=0.5)
 
-        fig.colorbar(c, ax=ax)
+            axs.append(ax)
+
+        fig.colorbar(c, ax=axs, location="right", shrink=0.6)
         fig.text(0.4, 0.05, r"Time [days]", fontsize=42)
         fig.text(
             0.01,
