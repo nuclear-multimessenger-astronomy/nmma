@@ -1,0 +1,7 @@
+a_AG_ztfi = Uniform(name='a_AG_ztfi', minimum=250, maximum=450)
+a_AG_ztfr = Uniform(name='a_AG_ztfr', minimum=100, maximum=200)
+alpha = Uniform(name='alpha', minimum=1.01, maximum=2)
+f_nu_ztfi = Uniform(name='f_nu_ztfi', minimum=1, maximum=2)
+f_nu_ztfr = Uniform(name='f_nu_ztfr', minimum=0, maximum=1)
+supernova_mag_boost = Gaussian(mu=-0.14, sigma=0.58)
+supernova_mag_stretch = TruncatedNormal(mu=0.9, sigma=0.3, minimum=0., maximum=10.)
