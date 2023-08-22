@@ -287,6 +287,42 @@ Next, add the following lines to your ``.zprofile`` or
    pip install tensorflow-macos
    pip install tensorflow-metal
 
+**Building custom lalsuite from source**
+
+If you want to install a custom lalsuite version (e.g. with a certain GW template model), then lalsuite needs to be build from scratch. This requires setting up the conda environment through conda-forge
+
+.. code::
+
+   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.8
+   conda activate YOUR_PREFIX
+
+and then installing mpi4py first before installing the required packages for the build process (here the second line):
+
+.. code::
+
+   pip install mpi4py
+   conda install -c conda-forge "astropy>=1.1.1" autoconf automake bc cfitsio doxygen fftw freezegun c-compiler gsl h5py hdf5 healpy "help2man>=1.37" "ldas-tools-framecpp<3.0.0a0" "libframel<9.0.0a0" ligo-gracedb ligo-segments "lscsoft-glue>=2.0.0" make matplotlib-base metaio "mpmath>=1.0.0" numpy pillow "pkg-config>=0.18.0" pytest "scipy>=0.9.0" six "swig>=3.0.10" zlib
+
+When this is done, you can proceed installing nmma as above (i.e. via requirements.txt etc.) but note that from the dependencies lalsuite is then installed via pip. This installation needs to be removed
+
+.. code::
+   pip uninstall lalsuite
+
+Then the build process for the custom lalsuite can be started
+
+.. code::
+
+   cd YOUR_CUSTOM_LALSUITE 
+   ./00boot
+   ./configure --prefix=YOUR_PREFIX --disable-all-lal --enable-swig-python  --enable-lalsimulation --enable-lalframe
+   make; make install
+
+It might happen that in the course of this some packages will be downgraded. You can just update them afterwards to a sufficient version, e.g.
+
+.. code::
+
+   pip install astropy>=5.2.2
+
 **First Test for NMMA**
 
 Run the following commands:
