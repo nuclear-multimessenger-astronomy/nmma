@@ -423,7 +423,6 @@ User Guide
 .. toctree::
    :maxdepth: 1
 
-   index
    quick-start-guide
    models
    training
