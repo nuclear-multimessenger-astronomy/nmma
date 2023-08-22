@@ -18,7 +18,7 @@ For science users
 If you are a science user and want to use NMMA for your analysis, you
 can install NMMA using conda as follows:
 
-.. code:: 
+.. code::
 
    conda create --name nmma_env python=3.10
    conda install -c conda-forge nmma
@@ -30,12 +30,12 @@ If you have an issue, such as 'Solving environment: failed with initial frozen s
    conda create --name nmma_env python=3.10
    conda install mamba -c conda-forge
    mamba install nmma -c conda-forge
-   
+
 
 If you are a developer or you want to build NMMA from source, please
 refer to the developer section below.
 
-.. note:: 
+.. note::
 
    The above may not work for arm64 Macs; see specifc instructions below. However, we are still working on getting NMMA to work on arm64 Macs.
 
@@ -52,20 +52,20 @@ Store.
 On your Linux/WSL terminal, run the following commands to install
 anaconda (replace 5.3.1 by the latest version):
 
-.. code:: 
+.. code::
 
    wget https://repo.anaconda.com/archive/Anaconda3-5.3.1-Linux-x86_64.sh
    bash Anaconda3-5.3.1-Linux-x86_64.sh
 
 (For 32-bit installation, skip the ``\_64`` in both commands)
 
-.. note:: 
+.. note::
 
    If you already have Anaconda3 installed, please make sure that it is updated to the latest version using `conda update --all`. Also check that you do not have multiple versions of Python installed in `usr/lib/` directory as it can cause version conflicts while installing dependencies.
 
 Now do:
 
-.. code:: 
+.. code::
 
    conda update --all
 
@@ -82,7 +82,7 @@ guide <./contributing.html>`__). Now, after forking, run the following
 command to clone the repository into your currently directory (by
 default, in your home directory):
 
-.. code:: 
+.. code::
 
    git clone https://github.com/your_github_username/nmma
 
@@ -95,7 +95,7 @@ Change directory to the nmma folder:
 Create a new environment using this command (environment name is
 nmma_env in this case):
 
-.. code:: 
+.. code::
 
    conda create --name nmma_env python=3.8
    conda activate nmma_env
@@ -104,21 +104,21 @@ nmma_env in this case):
 
    If this gives an error like: ``CommandNotFoundError: Your shell has not been properly configured to use 'conda activate'``, then run:
 
-.. code:: 
-   
+.. code::
+
    source ~/anaconda3/etc/profile.d/conda.sh
 
 then proceed with ``conda activate nmma_env``.
 
 Get the latest pip version
 
-.. code:: 
+.. code::
 
    pip install --upgrade pip
 
 Check python and pip version like this:
 
-.. code:: 
+.. code::
 
    python --version
    pip --version
@@ -126,7 +126,7 @@ Check python and pip version like this:
 Python 3.8 and above and Pip 21.2 and above is ideal for this
 installation. It is recommended to update these for your installation.
 
-.. important:: 
+.. important::
 
    Python 3.11 is now supported by NMMA!
 
@@ -136,27 +136,27 @@ Install mpi4py:
 
    conda install mpi4py
 
-.. warning:: 
+.. warning::
 
    We discourage installing mpi4py with pip. The installation does not work properly due to issues with MPI header files, etc.
 
 Install parallel-bilby:
 
-.. code:: 
+.. code::
 
    conda install -c conda-forge parallel-bilby
 
-.. note:: 
+.. note::
 
    Installing parallel-bilby takes quite some time. Please be patient. If you encounter any errors, please check the `parallel-bilby installation guide <https://lscsoft.docs.ligo.org/parallel_bilby/installation>`__ for more details.
 
 
-.. note:: 
+.. note::
 
    For those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
    This can be resolved by installing gcc with the following command:
 
-.. code:: 
+.. code::
 
    sudo apt-get install gcc
 
@@ -165,14 +165,14 @@ and attempting to install parallel-bilby again.
 Install pymultinest (note this line may not work for arm64 Macs; see
 specifc instructions below)
 
-.. code:: 
+.. code::
 
    conda install -c conda-forge pymultinest
 
-.. warning:: 
+.. warning::
 
    In case an error comes up during an NMMA analysis of the form:
-   
+
    .. code::
 
       ERROR: Could not load MultiNest library "libmultinest.so"
@@ -188,12 +188,12 @@ given here:
 Use the commands below to install the dependencies given in
 requirements.txt file which are necessary for NMMA:
 
-.. code:: 
+.. code::
 
    pip install -r requirements.txt
    python setup.py install
 
-.. note:: 
+.. note::
 
    There is an issue pip installing ``pyfftw`` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
@@ -217,7 +217,7 @@ requirements.txt file which are necessary for NMMA:
 
 ``$ conda install -c conda-forge p-tqdm``
 
-.. note:: 
+.. note::
 
    If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies if not covered by ``python setup.py install``. Also, if running ``python setup.py install`` shows something on the lines of "cannot cythonize without cython", do:
 
@@ -232,7 +232,7 @@ and redo ``python setup.py install``.
    https://github.com/pyFFTW/pyFFTW/issues/349#issuecomment-1468638458).
    To address, use ``Homebrew`` to run
 
-.. code:: 
+.. code::
 
    brew install fftw
 
@@ -247,7 +247,7 @@ then add the following lines to your ``.zprofile`` or ``.bash_profile``:
 
 Close and reopen your terminal and run
 
-.. code:: 
+.. code::
 
    pip install pyfftw
 
@@ -260,7 +260,7 @@ complete the dependency installations.
    and compile ``Multinest`` from the source. Within the ``nmma``
    directory, run:
 
-.. code:: 
+.. code::
 
    git clone https://github.com/JohannesBuchner/MultiNest
    cd MultiNest/build
@@ -270,19 +270,19 @@ complete the dependency installations.
 Next, add the following lines to your ``.zprofile`` or
 ``.bash_profile``:
 
-.. code:: 
+.. code::
 
    export LD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$LD_LIBRARY_PATH
    export DYLD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH
 
-.. note:: 
+.. note::
 
    Modify these paths as appropriate for the location of your ``MultiNest`` installation. You can also combine the ``DYLD_LIBRARY_PATH`` lines for ``MultiNest`` and ``fftw`` (above) into a single line
 
 3. There are also issues with ``tensorflow`` and arm64 Macs. If using
    ``tensorflow``, install it with the following commands:
 
-.. code:: 
+.. code::
 
    pip install tensorflow-macos
    pip install tensorflow-metal
@@ -312,7 +312,7 @@ Then the build process for the custom lalsuite can be started
 
 .. code::
 
-   cd YOUR_CUSTOM_LALSUITE 
+   cd YOUR_CUSTOM_LALSUITE
    ./00boot
    ./configure --prefix=YOUR_PREFIX --disable-all-lal --enable-swig-python  --enable-lalsimulation --enable-lalframe
    make; make install
@@ -327,14 +327,14 @@ It might happen that in the course of this some packages will be downgraded. You
 
 Run the following commands:
 
-.. code:: 
+.. code::
 
    ipython
    import nmma
    import nmma.em.analysis
    import nmma.eos.create_injection
 
-.. tip:: 
+.. tip::
 
    (Okay, last one!): if everything is ok, it's the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
    those with their given commands. In case modules like afterglowpy and dust_extinction are needed, don't hesitate to do it with pip (normally it shouldn't happen), but some modules may not install correctly in case of disturbance.
@@ -347,7 +347,7 @@ on, running setup.py does not typically finish without errors the first
 time through. Experience has shown that in the vast majority of cases,
 simply pinning versions such as:
 
-.. code:: 
+.. code::
 
    pip install astropy==4.3.1
 
@@ -367,18 +367,18 @@ commonly, these are software like gfortran or mpi).
 For example, on XSEDE’s Expanse cluster, one can start a terminal
 session with:
 
-.. code:: 
+.. code::
 
    module load sdsc
    module load openmpi
 
 and follow the instructions above.
 
-.. note:: 
+.. note::
 
    If ``module load openmpi`` does not execute directly and it asks for dependencies, one can proceed with:
 
-.. code:: 
+.. code::
 
    module load sdsc
    module load cpu/0.15.4
@@ -393,13 +393,13 @@ On new Linux installations, we sometimes come across the warning:
 If you do prefer to use ‘Times New Roman’ for all of your plotting
 needs, you can install ``msttcorefonts`` with:
 
-.. code:: 
+.. code::
 
    sudo apt install msttcorefonts -qq
 
 After removing the matplotlib cache:
 
-.. code:: 
+.. code::
 
    rm ~/.cache/matplotlib -rf
 
@@ -423,6 +423,7 @@ User Guide
 .. toctree::
    :maxdepth: 1
 
+   index
    quick-start-guide
    models
    training
