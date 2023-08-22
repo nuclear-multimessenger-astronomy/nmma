@@ -23,10 +23,10 @@ The original light curves are available on GitHub [here](https://github.com/dnka
 
 We use a model from [Dietrich et al. 2020](https://arxiv.org/abs/2002.11355), which is derived from [POSSIS](https://arxiv.org/abs/1906.04205), spanning the plausible binary neutron star parameter space. The model is named Bu2019lm in the code. The model parameters are:
 
-* dynamical ejecta mass $$M^{\rm dyn}_{\rm ej}$$
-* disk wind ejecta mass $$M_{\rm ej}^{\mathrm{wind}}$$
-* half opening angle $$\Phi$$
-* observation angle $$\Theta_{\rm{obs}}$$
+* dynamical ejecta mass $M^{\rm dyn}_{\rm ej}$
+* disk wind ejecta mass $M_{\rm ej}^{\mathrm{wind}}$
+* half opening angle $\Phi$
+* observation angle $\Theta_{\rm{obs}}$
 
 The original light curves are available on GitHub
 [here](https://github.com/mbulla/kilonova_models/tree/master/bns/bns_grids/bns_m3_3comp).
@@ -35,21 +35,21 @@ The original light curves are available on GitHub
 
 We use a model from [Anand & Coughlin et al. 2021](https://arxiv.org/abs/2009.07210), which is derived from [POSSIS](https://arxiv.org/abs/1906.04205), spanning the plausible neutron star - black hole space. The model is named Bu2019nsbh in the code. The model parameters are:
 
-* the dynamical ejecta $$M^{\rm dyn}_{\rm ej}$$
-* disk wind ejecta $$M_{\rm ej}^{\mathrm{wind}}$$
-* observation angle $$\Theta_{\rm{obs}}$$
+* the dynamical ejecta $M^{\rm dyn}_{\rm ej}$
+* disk wind ejecta $M_{\rm ej}^{\mathrm{wind}}$
+* observation angle $\Theta_{\rm{obs}}$
 
-The half opening angle $$\Phi$$ is fixed to 30 deg. The original light curves are available on GitHub [here](https://github.com/mbulla/kilonova_models/tree/master/bhns/bhns_grids/bhns_m1_2comp).
+The half opening angle $\Phi$ is fixed to 30 deg. The original light curves are available on GitHub [here](https://github.com/mbulla/kilonova_models/tree/master/bhns/bhns_grids/bhns_m1_2comp).
 
 #### Anand et al. 2023
 
 We use a model from [Anand et al. 2023](https://arxiv.org/abs/2307.11080), which is derived from [POSSIS](https://arxiv.org/abs/1906.04205), spanning the plausible binary neutron star parameter space. The model is named Bu2022mv in the code. The model parameters are:
 
-* dynamical ejecta mass $$M^{\rm dyn}_{\rm ej}$$
-* dynamical ejecta velocity $$v^{\rm dyn}_{\rm ej}$$
-* disk wind ejecta mass $$M^{\rm wind}_{\rm ej}$$
-* disk wind ejecta velocity $$v^{\rm wind}_{\rm ej}$$
-* observation angle $$\Theta_{\rm{obs}}$$
+* dynamical ejecta mass $M^{\rm dyn}_{\rm ej}$
+* dynamical ejecta velocity $$v^{\rm dyn}_{\rm ej}$
+* disk wind ejecta mass $M^{\rm wind}_{\rm ej}$$
+* disk wind ejecta velocity $$v^{\rm wind}_{\rm ej}$
+* observation angle $\Theta_{\rm{obs}}$$
 
 The original light curves are available on GitHub [here](https://github.com/mbulla/kilonova_models).
 
@@ -57,11 +57,11 @@ The original light curves are available on GitHub [here](https://github.com/mbul
 
 We use a model from [Wollaeger et al. 2021](https://arxiv.org/abs/2105.11543) spanning the plausible binary neutron star parameter space. The model is named LANL2022 in the code, and there are a number of geometries to choose from (see [here](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/em/model.py#L59) for LANL list). The model parameters are:
 
-* dynamical ejecta mass $$M^{\rm dyn}_{\rm ej}$$
-* dynamical ejecta velocity $$v^{\rm dyn}_{\rm ej}$$
-* disk wind ejecta mass $$M^{\rm wind}_{\rm ej}$$
-* disk wind ejecta velocity $$v^{\rm wind}_{\rm ej}$$
-* observation angle $$\Theta_{\rm{obs}}$$
+* dynamical ejecta mass $M^{\rm dyn}_{\rm ej}$
+* dynamical ejecta velocity $v^{\rm dyn}_{\rm ej}$
+* disk wind ejecta mass $M^{\rm wind}_{\rm ej}$
+* disk wind ejecta velocity $v^{\rm wind}_{\rm ej}$
+* observation angle $\Theta_{\rm{obs}}$
 
 The original light curves are available on Zenodo [here](https://zenodo.org/record/5745556#.YaaNH8ZlBBw).
 
@@ -69,32 +69,32 @@ The original light curves are available on Zenodo [here](https://zenodo.org/reco
 
 We use a model from [Anand et al. 2023](https://arxiv.org/abs/2302.09226), which is derived from the model presented in [Barnes & Metzger 2022](https://arxiv.org/abs/2205.10421), studying r-process generation in broadlined stripped-envelope (Ic-BL) supernovae associated with collapsars. The model is named AnBa2022 in the code. The model parameters are:
 
-* total mass $$M_{\rm ej}$$
-* Nickel 56 mass $$M_{\rm 56}$$
-* ejecta velocity $$v_{\rm ej}$$
-* r-process mass $$M_{\rm rp}$$
-* fraction of r-process material mixed into the ejecta $$x_{\rm mix}$$
+* total mass $M_{\rm ej}$
+* Nickel 56 mass $M_{\rm 56}$
+* ejecta velocity $v_{\rm ej}$
+* r-process mass $M_{\rm rp}$
+* fraction of r-process material mixed into the ejecta $x_{\rm mix}$
 
 ### Gamma-ray burst afterglows
 
 We use [afterglowpy](https://github.com/geoffryan/afterglowpy) [(Ryan et al. 2020)](https://arxiv.org/abs/1909.11691), an open-source computational tool modeling forward shock synchrotron emission from relativistic blast waves as a function of jet structure and viewing angle. The
  model is named TrPi2018 in the code. The model parameters are:
 
-* isotropic kinetic energy $$E_{\mathrm{K,iso}}$$
-* jet collimation angle $$\theta_c$$
-* viewing angle $$\theta_v$$
-* circumburst constant density $$n$$
-* spectral slope of the electron distribution $$p$$
-* fraction of energy imparted to the electrons by the shock $$\epsilon_e$$
-* fraction of energy imparted to the magnetic field $$\epsilon_B$$
+* isotropic kinetic energy $E_{\mathrm{K,iso}}$
+* jet collimation angle $\theta_c$
+* viewing angle $\theta_v$
+* circumburst constant density $n$
+* spectral slope of the electron distribution $p$
+* fraction of energy imparted to the electrons by the shock $\epsilon_e$
+* fraction of energy imparted to the magnetic field $\epsilon_B$
 
 ### Shock Cooling supernovae
 
 We use a model from [Piro et al. 2021](https://arxiv.org/abs/2007.08543). Following shock breakout, the radiation of shock heated material expands and cools, known as shock cooling emission. The model parameters are:
 
-* mass of extended material $$M_e$$
-* radius of extended material $$R_e$$
-* energy of material as the shock passes through it $$E_e$$
+* mass of extended material $M_e$
+* radius of extended material $R_e$
+* energy of material as the shock passes through it $E_e$
 
 ### Supernovae
 
