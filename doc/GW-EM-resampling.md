@@ -13,6 +13,11 @@ For estimating the source properties, the following input files are required:
 * `GWsamples` - some fiducial randomly generated posterior samples for masses, chirp mass, mass ratio, luminosity distance, and EOS samples,
 * `GWprior` - a prior file for gravitational wave sources
 
+The prior file from the EM inference needs to be supplemented by two additional parameters $\alpha$ and $\zeta$ that are used in the numerical fit expressions that link the disk, wind and total ejecta masses:
+
+    alpha = Gaussian(mu=0., sigma=4e-4, name='alpha',latex_label='$\\alpha$')
+    zeta = Uniform(minimum=0., maximum=1.0, name='ratio_zeta',latex_label='$\\zeta$')
+
 **Estimating BNS properties**
 
 Here, we take the observed gamma-ray burst [GRB211211A](https://arxiv.org/abs/2204.10864) as an example and assume that associated electromagnetic signals 
