@@ -75,6 +75,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             detections_file=None,
             indices_file=None,
             original_parameters=True,
+            repeated_simulations=0,
         )
 
         create_injection.main(args)
@@ -138,7 +139,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             ylim="22,16",
             photometric_error_budget=0.0,
             increment_seeds=False,
-            repeated_simulations=0,
         )
 
         create_lightcurves.main(args)
