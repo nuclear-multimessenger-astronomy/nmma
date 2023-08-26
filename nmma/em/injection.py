@@ -88,8 +88,8 @@ def create_light_curve_data(
 
     tc = injection_parameters["kilonova_trigger_time"]
 
-    if "KNtimeshift" in injection_parameters:
-        tc = tc + injection_parameters["KNtimeshift"]
+    if "timeshift" in injection_parameters:
+        tc = tc + injection_parameters["timeshift"]
 
     tmin = args.kilonova_tmin
     tmax = args.kilonova_tmax

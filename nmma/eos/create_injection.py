@@ -350,13 +350,13 @@ def main(args=None):
         for index, row in dataframe_from_prior.iterrows():
             timeshift_frame = injection_creator.get_injection_dataframe()
             for ii in range(args.repeated_simulations):
-                timeshifts.append(timeshift_frame["KNtimeshift"][ii])
+                timeshifts.append(timeshift_frame["timeshift"][ii])
                 repeats.append(row)
         dataframe_from_prior = pd.concat(repeats, axis=1).transpose().reset_index()
         dataframe_from_prior.drop(
-            labels=["index", "KNtimeshift"], axis="columns", inplace=True
+            labels=["index", "timeshift"], axis="columns", inplace=True
         )
-        dataframe_from_prior["KNtimeshift"] = timeshifts
+        dataframe_from_prior["timeshift"] = timeshifts
 
     inj_columns = set(dataframe_from_inj.columns.tolist())
     prior_columns = set(dataframe_from_prior.columns.tolist())

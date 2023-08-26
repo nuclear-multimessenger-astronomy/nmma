@@ -128,7 +128,7 @@ class OpticalLightCurve(Likelihood):
             usedIdx = np.where(np.isfinite(mag_app_filt))[0]
             sample_times_used = self.sample_times[usedIdx]
             mag_app_used = mag_app_filt[usedIdx]
-            t0 = self.parameters["KNtimeshift"]
+            t0 = self.parameters["timeshift"]
             if len(mag_app_used) > 0:
                 mag_app_interp[filt] = interp1d(
                     sample_times_used + t0,
@@ -154,7 +154,7 @@ class OpticalLightCurve(Likelihood):
             data_sigma = self.light_curve_data[filt][:, 2]
 
             # include the error budget into calculation
-            data_sigma = np.sqrt(data_sigma ** 2 + self.error_budget[filt] ** 2)
+            data_sigma = np.sqrt(data_sigma**2 + self.error_budget[filt] ** 2)
 
             # evaluate the light curve magnitude at the data points
             mag_est = mag_app_interp[filt](data_time)

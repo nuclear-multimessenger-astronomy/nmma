@@ -2,7 +2,7 @@
 KNphi = Uniform(name='KNphi', minimum=15., maximum=75., latex_label='$\Phi$')
 # incl_EM with i = 60 deg >> pi/3 assumed that it is smaller than inclination of GW170817&GRB170817A
 inclination_EM = Sine(name='inclination_EM', minimum=0., maximum=np.pi/4., latex_label='$\\iota$')
-KNtimeshift = 0.0
+timeshift = 0.0
 log10_mej_dyn  = Uniform(name='log10_mej_dyn', minimum=-3., maximum=-1., latex_label='$\\log_{10}M^{\\rm{dyn}}_{\\rm{ej}}$')
 log10_mej_wind = Uniform(name='log10_mej_wind', minimum=-3., maximum=-0.5, latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$')
 
@@ -17,4 +17,3 @@ log10_epsilon_B = Uniform(name='log10_epsilon_B', minimum=-10, maximum=0, latex_
 
 alpha = Gaussian(mu=0., sigma=4e-4, name='alpha',latex_label='$\\alpha$')
 zeta = Uniform(minimum=0., maximum=1.0, name='ratio_zeta',latex_label='$\\zeta$')
-

@@ -26,7 +26,7 @@ Click here: **[split_CBC_data_for_nmma.py]**
 
 4 **- Then use ``BNS`` or ``NSBH``**  injections.dat  to create injection file with nmma.
 
-To generate a json file (``injection.json``)  with the BILBY processing of compact binary merging events. This injection contents a simulation set of parameters : luminosity_distance, log10_mej_wind, KNphi, inclination_EM, KNtimeshift, geocent_time for the KNe (`Bu2019lm` - BNS or `Bu2019nsbh` - NSBH) model.
+To generate a json file (``injection.json``)  with the BILBY processing of compact binary merging events. This injection contents a simulation set of parameters : luminosity_distance, log10_mej_wind, KNphi, inclination_EM, timeshift, geocent_time for the KNe (`Bu2019lm` - BNS or `Bu2019nsbh` - NSBH) model.
 
 **`BNS` type**
 
