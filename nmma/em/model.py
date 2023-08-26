@@ -368,10 +368,14 @@ class SVDLightCurveModel(object):
             try:
                 parameters_list.append(new_parameters[parameter_name])
             except KeyError:
-                if 'log10' in parameter_name:
-                    parameters_list.append(np.log10(new_parameters[parameter_name.replace('log10_', '')]))
+                if "log10" in parameter_name:
+                    parameters_list.append(
+                        np.log10(new_parameters[parameter_name.replace("log10_", "")])
+                    )
                 else:
-                    parameters_list.append(10**new_parameters[f'log10_{parameter_name}'])
+                    parameters_list.append(
+                        10 ** new_parameters[f"log10_{parameter_name}"]
+                    )
 
         z = utils.getRedShift(new_parameters)
 
@@ -405,7 +409,7 @@ class SVDLightCurveModel(object):
             try:
                 parameters_list.append(new_parameters[parameter_name])
             except KeyError:
-                parameters_list.append(10**new_parameters[f'log10_{parameter_name}'])
+                parameters_list.append(10 ** new_parameters[f"log10_{parameter_name}"])
 
         z = utils.getRedShift(new_parameters)
 
@@ -653,12 +657,12 @@ class HostGalaxyLightCurveModel(object):
             new_parameters = parameters.copy()
 
         mag = {}
-        lbol = 0.  # just a random number
-        alpha = new_parameters['alpha_AG']
+        lbol = [1e33]  # just a random number
+        alpha = new_parameters["alpha_AG"]
         for filt in self.filters:
             # assumed to be in unit of muJy
-            a_AG = new_parameters[f'a_AG_{filt}']
-            f_nu_filt = new_parameters[f'f_nu_{filt}']
+            a_AG = new_parameters[f"a_AG_{filt}"]
+            f_nu_filt = new_parameters[f"f_nu_{filt}"]
             flux_per_filt = a_AG * np.power(sample_times, -alpha) + f_nu_filt
 
             mag[filt] = -2.5 * np.log10(flux_per_filt) + 23.9
@@ -1046,7 +1050,7 @@ def create_light_curve_model_from_args(
                 filters=filters,
             )
 
-        elif model_name == 'Sr2023':
+        elif model_name == "Sr2023":
             lc_model = HostGalaxyLightCurveModel(
                 sample_times=sample_times,
                 parameter_conversion=parameter_conversion,
