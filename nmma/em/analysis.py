@@ -728,9 +728,9 @@ def main(args=None):
                 )
         mag["bestfit_sample_times"] = sample_times
 
-        if "KNtimeshift" in bestfit_params:
+        if "timeshift" in bestfit_params:
             mag["bestfit_sample_times"] = (
-                mag["bestfit_sample_times"] + bestfit_params["KNtimeshift"]
+                mag["bestfit_sample_times"] + bestfit_params["timeshift"]
             )
 
     if args.bestfit:

@@ -11,9 +11,14 @@ from astropy import time
 
 from ..utils.models import refresh_models_list
 from .injection import create_light_curve_data
-from .model import (GenericCombineLightCurveModel, GRBLightCurveModel,
-                    ShockCoolingLightCurveModel, SimpleKilonovaLightCurveModel,
-                    SupernovaLightCurveModel, SVDLightCurveModel)
+from .model import (
+    GenericCombineLightCurveModel,
+    GRBLightCurveModel,
+    ShockCoolingLightCurveModel,
+    SimpleKilonovaLightCurveModel,
+    SupernovaLightCurveModel,
+    SVDLightCurveModel,
+)
 from .utils import getFilteredMag, loadEvent
 
 matplotlib.use("agg")
@@ -303,7 +308,9 @@ def main(args=None):
     except AttributeError:
         pass
     if refresh:
-        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
 
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
@@ -564,9 +571,9 @@ def main(args=None):
                         params["luminosity_distance"] * 1e6 / 10.0
                     )
             mag["bestfit_sample_times"] = sample_times
-            if "KNtimeshift" in params:
+            if "timeshift" in params:
                 mag["bestfit_sample_times"] = (
-                    mag["bestfit_sample_times"] + params["KNtimeshift"]
+                    mag["bestfit_sample_times"] + params["timeshift"]
                 )
 
             if len(models) > 1:

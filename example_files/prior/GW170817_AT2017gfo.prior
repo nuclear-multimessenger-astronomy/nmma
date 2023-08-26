@@ -17,7 +17,7 @@ phase = Uniform(name='phase', minimum=0, maximum=2 * np.pi, boundary='periodic')
 lambda_1 = Constraint(name='lambda_1', minimum=0., maximum=np.inf)
 lambda_2 = Constraint(name='lambda_2', minimum=0., maximum=np.inf)
 KNphi = Uniform(name='KNphi', minimum=15., maximum=75., latex_label='$\\Phi$')
-KNtimeshift = 0.
+timeshift = 0.
 alpha = Gaussian(mu=0., sigma=4e-4, name='alpha',latex_label='$\\alpha$')
 ratio_zeta = Uniform(minimum=0., maximum=1.0, name='ratio_zeta',latex_label='$\\zeta$')
 log10_mej_dyn  = Constraint(name='log10_mej_dyn', minimum=-3.5, maximum=-0.5)
