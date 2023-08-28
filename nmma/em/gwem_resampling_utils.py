@@ -4,11 +4,26 @@ import scipy.special
 import scipy.interpolate
 import lal
 from bilby.gw.prior import PriorDict
-from bilby.gw.conversion import luminosity_distance_to_redshift
 from bilby.core.prior import Uniform
 
 from ..joint.conversion import BNSEjectaFitting, NSBHEjectaFitting
 from pymultinest.solve import Solver
+
+
+
+def luminosity_distance_to_redshift(distance):
+        from astropy import units
+        from astropy import cosmology as cosmo
+        cosmology = cosmo.Planck15
+
+        if hasattr(distance, '__len__') and len(distance)>50: #luminosity_distance_to_redshift gets really slow if too many distances are put in at once
+             zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance.min() * units.Mpc)
+             zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
+             zgrid = np.geomspace(zmin, zmax, 50)
+             distance_grid = cosmology.luminosity_distance(zgrid).value
+             return np.interp(distance, distance_grid, zgrid).value
+        else:
+             return cosmo.z_at_value(cosmology.luminosity_distance, distance *units.Mpc)
 
 
 def construct_EM_KDE_seperate(EMsamples):
@@ -304,7 +319,7 @@ class EjectaMassInference(Solver):
         return self.priors.rescale(self._search_parameter_keys, x)
 
     def LogLikelihood(self, x):
-        
+
         if self.withNSBH:
             mc, q, EOS, alpha, zeta, chi_1, chi_2 = x 
             chi_eff = (chi_1 + q*chi_2)/(1+q)
