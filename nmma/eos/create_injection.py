@@ -286,6 +286,9 @@ def main(args=None):
         # check the binary type
         assert args.binary_type in ["BNS", "NSBH"], "Unknown binary type"
 
+    seed = args.generation_seed
+    np.random.seed(seed)
+
     # check injection file format
     if args.injection_file:
         assert (
