@@ -621,9 +621,7 @@ def sn_lc(
     nus = scipy.constants.c / (1e-10 * lambdas)
 
     model = sncosmo.Model(source=model_name)
-    if model_name == "nugent-hyper":
-        model.set(z=z)
-    elif model_name == "salt2":
+    if model_name in ["salt2", "salt3"]:
         model.set(
             z=z,
             t0=np.median(tt),
@@ -631,6 +629,8 @@ def sn_lc(
             x1=parameters["x1"],
             c=parameters["c"],
         )
+    else:
+        model.set(z=z)
 
     # regularize the absolute magnitude
     abs_mag -= Planck18.distmod(z).value
