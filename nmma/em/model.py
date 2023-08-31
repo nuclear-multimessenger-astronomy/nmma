@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 from scipy.special import logsumexp
 import scipy.constants
+from sncosmo.models import _SOURCES
 
 from . import utils
 
@@ -725,7 +726,7 @@ class SupernovaLightCurveModel(object):
             filters=self.filters,
         )
 
-        if self.model == "nugent-hyper":
+        if "supernova_mag_boost" in parameters:
             for filt in mag.keys():
                 mag[filt] += parameters["supernova_mag_boost"]
 
@@ -1009,6 +1010,8 @@ def create_light_curve_model_from_args(
     else:
         model_names = [model_name_arg]
 
+    sncosmo_names = [val["name"] for val in _SOURCES.get_loaders_metadata()]
+
     for model_name in model_names:
         if model_name == "TrPi2018":
             lc_model = GRBLightCurveModel(
@@ -1019,18 +1022,10 @@ def create_light_curve_model_from_args(
                 filters=filters,
             )
 
-        elif model_name == "nugent-hyper":
+        elif model_name in sncosmo_names:
             lc_model = SupernovaLightCurveModel(
                 sample_times=sample_times,
-                model="nugent-hyper",
-                parameter_conversion=parameter_conversion,
-                filters=filters,
-            )
-
-        elif model_name == "salt2":
-            lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times,
-                model="salt2",
+                model=model_name,
                 parameter_conversion=parameter_conversion,
                 filters=filters,
             )

@@ -98,4 +98,12 @@ We use a model from [Piro et al. 2021](https://arxiv.org/abs/2007.08543). Follow
 
 ### Supernovae
 
-We rely on a few different models for supernovae from [sncosmo](https://github.com/sncosmo/sncosmo). For example, the nugent-hyper model [(Levan et al. 2005)](https://arxiv.org/abs/astro-ph/0403450) used for SN Ib/c supernovae with the stretch and scale set to match the intrinsic (dereddened, rest frame) $R$-band luminosity of SN 1998bw at maximum light. The main free parameter is the absolute magnitude.
+We rely on models for supernovae from [sncosmo](https://github.com/sncosmo/sncosmo). For example, the nugent-hyper model [(Levan et al. 2005)](https://arxiv.org/abs/astro-ph/0403450) used for SN Ib/c supernovae with the stretch and scale set to match the intrinsic (dereddened, rest frame) $R$-band luminosity of SN 1998bw at maximum light. The main free parameter is the absolute magnitude.
+
+All models listed [here](https://sncosmo.readthedocs.io/en/stable/source-list.html) can be used. We provide a prior file called sncosmo-generic.prior that only provides:
+
+* luminosity distance
+* timeshift
+* supernova_mag_boost
+
+The latter parameter shifts the absolute magnitude up and down.

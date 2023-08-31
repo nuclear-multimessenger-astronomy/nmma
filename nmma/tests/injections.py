@@ -50,7 +50,10 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         path to the injection file created by nmma_create_injection
         """
 
-        prior_path = os.path.join("./priors/", model_name + ".prior")
+        if model_name == "nugent-hyper":
+            prior_path = os.path.join("./priors/", "sncosmo-generic" + ".prior")
+        else:
+            prior_path = os.path.join("./priors/", model_name + ".prior")
         assert os.path.exists(prior_path), "prior file does not exist"
         injection_name = os.path.join(test_directory, model_name + "_injection.json")
 
