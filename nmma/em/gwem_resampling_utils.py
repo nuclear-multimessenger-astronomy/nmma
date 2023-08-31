@@ -34,9 +34,16 @@ def construct_EM_KDE_seperate(EMsamples):
 
 
 def construct_EM_KDE(EMsamples):
-    total_eject_mass = 10**EMsamples.log10_mej_dyn.to_numpy() + 10**EMsamples.log10_mej_wind.to_numpy()
 
-    kde = scipy.stats.gaussian_kde(total_eject_mass)
+    if "log10_mej" in EMsamples.columns:
+        kde = scipy.stats.gaussian_kde(10**EMsamples.log10_mej.to_numpy())
+
+    elif "log10_mej_dyn" in EMsamples.columns and "log10_mej_wind" in EMsamples.columns:
+        total_eject_mass = 10**EMsamples.log10_mej_dyn.to_numpy() + 10**EMsamples.log10_mej_wind.to_numpy()
+        kde = scipy.stats.gaussian_kde(total_eject_mass)
+
+    else:
+        raise ValueError("EM samples must either contain total ejecta mass as 'log10_mej' or seperate ejecta masses as 'log10_mej_dyn' and 'log10_mej_wind'.")
 
     return kde
 
