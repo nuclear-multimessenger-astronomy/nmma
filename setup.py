@@ -140,6 +140,7 @@ setup(
             "gwem_resampling_condor=nmma.em.gwem_resampling_condor:main",
             "gwem_Hubble_estimate=nmma.em.gwem_Hubble_estimate:main",
             "light_curve_analysis_condor=nmma.em.analysis_condor:main",
+            "multi_model_analysis=nmma.em.multi_model_analysis:main",
         ]
     },
     classifiers=[
