@@ -227,7 +227,7 @@ def create_light_curve_data(
             .sort_values(by=["mjd"])
             .reset_index(drop=True)
         )
-        sim["passband"] = sim["passband"].map({1: "g", 2: "r", 3: "i"})
+        sim["passband"] = sim["passband"].map({1: "ztfg", 2: "ztfr", 3: "ztfi"})
         sim["mag"] = np.nan
         sim["mag_err"] = np.nan
 
@@ -255,26 +255,26 @@ def create_light_curve_data(
         for filt, group in sim.groupby("passband"):
             if filt not in args.filters.split(","):
                 continue
-            if ztf_uncertainties and filt in ["g", "r", "i"]:
+            if ztf_uncertainties and filt in ["ztfg", "ztfr", "ztfi"]:
                 mag_err = []
                 for idx, row in group.iterrows():
                     upperlimit = False
-                    if filt == "g" and row["ToO"] is False:
+                    if filt == "ztfg" and row["ToO"] is False:
                         limg = float(ztflimg.sample())
                         if row["mag"] > limg:
                             sim.loc[row.name, "mag"] = limg
                             sim.loc[row.name, "mag_err"] = np.inf
-                    elif filt == "g" and row["ToO"] is True:
+                    elif filt == "ztfg" and row["ToO"] is True:
                         toolimg = float(ztftoolimg.sample())
                         if row["mag"] > toolimg:
                             sim.loc[row.name, "mag"] = toolimg
                             sim.loc[row.name, "mag_err"] = np.inf
-                    elif filt == "r" and row["ToO"] is False:
+                    elif filt == "ztfr" and row["ToO"] is False:
                         limr = float(ztflimr.sample())
                         if row["mag"] > limr:
                             sim.loc[row.name, "mag"] = limr
                             sim.loc[row.name, "mag_err"] = np.inf
-                    elif filt == "r" and row["ToO"] is True:
+                    elif filt == "ztfr" and row["ToO"] is True:
                         toolimr = float(ztftoolimr.sample())
                         if row["mag"] > toolimr:
                             sim.loc[row.name, "mag"] = toolimr
@@ -293,7 +293,7 @@ def create_light_curve_data(
                             {"passband": [filt], "mag": [sim.loc[row.name, "mag"]]}
                         )
                         df["passband"] = df["passband"].map(
-                            {"g": 1, "r": 2, "i": 3}
+                            {"ztfg": 1, "ztfr": 2, "ztfi": 3}
                         )  # estimate_mag_err maps filter numbers
                         df = estimate_mag_err(ztfuncer, df)
                         sim.loc[row.name, "mag_err"] = float(df["mag_err"])
@@ -324,17 +324,17 @@ def create_light_curve_data(
         start = tmin + tc
         if args.rubin_ToO_type == "BNS":
             strategy = [
-                [1 / 24.0, ["u", "g", "r", "i", "z", "y"]],
-                [2 / 24.0, ["u", "g", "r", "i", "z", "y"]],
-                [4 / 24.0, ["u", "g", "r", "i", "z", "y"]],
-                [1.0, ["g", "z", "i"]],
+                [1 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [2 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [4 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [1.0, ["ps1__g", "ps1__z", "ps1__i"]],
             ]
         elif args.rubin_ToO_type == "NSBH":
             strategy = [
-                [1 / 24.0, ["u", "g", "r", "i", "z", "y"]],
-                [4 / 24.0, ["u", "g", "r", "i", "z", "y"]],
-                [1.0, ["u", "g", "r", "i", "z", "y"]],
-                [2.0, ["g", "z", "i"]],
+                [1 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [4 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [1.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [2.0, ["ps1__g", "ps1__z", "ps1__i"]],
             ]
         else:
             raise ValueError("args.rubin_ToO_type should be either BNS or NSBH")
