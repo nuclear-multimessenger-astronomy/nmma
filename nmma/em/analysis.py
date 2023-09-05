@@ -1,6 +1,8 @@
 import argparse
 import json
 import os
+from pathlib import Path
+import yaml
 from ast import literal_eval
 
 import bilby
@@ -27,7 +29,12 @@ def get_parser():
         description="Inference on kilonova ejecta parameters."
     )
     parser.add_argument(
-        "--model", type=str, required=True, help="Name of the kilonova model to be used"
+        "--config",
+        type=str,
+        help="Name of the configuration file containing parameter values.",
+    )
+    parser.add_argument(
+        "--model", type=str, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
         "--interpolation_type",
@@ -60,9 +67,7 @@ def get_parser():
         type=str,
         help="Path to the data file in [time(isot) filter magnitude error] format",
     )
-    parser.add_argument(
-        "--prior", type=str, required=True, help="Path to the prior file"
-    )
+    parser.add_argument("--prior", type=str, help="Path to the prior file")
     parser.add_argument(
         "--tmin",
         type=float,
@@ -363,10 +368,8 @@ def get_parser():
     return parser
 
 
-def main(args=None):
-    if args is None:
-        parser = get_parser()
-        args = parser.parse_args()
+def analysis(args):
+
     if args.sampler == "pymultinest":
         if len(args.outdir) > 64:
             print(
@@ -568,7 +571,10 @@ def main(args=None):
     if (not detection) or (not notallnan):
         raise ValueError("Need at least one detection to do fitting.")
 
-    error_budget = [float(x) for x in args.error_budget.split(",")]
+    if type(args.error_budget) in [float, int]:
+        error_budget = [args.error_budget]
+    else:
+        error_budget = [float(x) for x in args.error_budget.split(",")]
     if args.filters:
         if args.photometry_augmentation_filters:
             filters = list(
@@ -882,3 +888,24 @@ def main(args=None):
         plt.tight_layout()
         plt.savefig(plotName)
         plt.close()
+
+
+def main(args=None):
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
+        if args.config is not None:
+            yaml_dict = yaml.safe_load(Path(args.config).read_text())
+            for analysis_set in yaml_dict.keys():
+                params = yaml_dict[analysis_set]
+                for key, value in params.items():
+                    key = key.replace("-", "_")
+                    if key not in args:
+                        print(f"{key} not a known argument... please remove")
+                        exit()
+                    setattr(args, key, value)
+                analysis(args)
+        else:
+            analysis(args)
+    else:
+        analysis(args)

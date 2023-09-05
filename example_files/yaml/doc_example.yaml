@@ -1,0 +1,45 @@
+Me2017_1:
+  model: Me2017
+  svd-path: ./svdmodels
+  outdir: outdir_1
+  label: injection
+  prior: priors/Me2017.prior
+  tmin: 0.1
+  tmax: 20
+  dt: 0.5
+  error-budget: 1
+  nlive: 512
+  Ebv-max: 0
+  injection: ./injection.json
+  injection-num: 0
+  injection-outfile: outdir_1/lc.csv
+  generation-seed: 42
+  filters: ztfg,ztfr,ztfi
+  plot: True
+  remove-nondetections: True
+  ztf-uncertainties: True
+  ztf-sampling: True
+  ztf-ToO: 180
+
+Me2017_2:
+  model: Me2017
+  svd-path: ./svdmodels
+  outdir: outdir_2
+  label: injection
+  prior: priors/Me2017.prior
+  tmin: 0.1
+  tmax: 20
+  dt: 0.5
+  error-budget: 1
+  nlive: 512
+  Ebv-max: 0
+  injection: ./injection.json
+  injection-num: 0
+  injection-outfile: outdir_2/lc.csv
+  generation-seed: 42
+  filters: ztfg,ztfr,ztfi
+  plot: True
+  remove-nondetections: True
+  ztf-uncertainties: True
+  ztf-sampling: True
+  ztf-ToO: 180
