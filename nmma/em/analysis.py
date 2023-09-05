@@ -368,22 +368,7 @@ def get_parser():
     return parser
 
 
-def main(args=None):
-    if args is None:
-        parser = get_parser()
-        args = parser.parse_args()
-        if args.config is not None:
-            yaml_dict = yaml.safe_load(Path(args.config).read_text())
-            if not len(yaml_dict.keys()) == 1:
-                print("WARNING: yaml file can only contain one model for now.")
-                exit()
-            params = yaml_dict[list(yaml_dict.keys())[0]]
-            for key, value in params.items():
-                key = key.replace("-", "_")
-                if key not in args:
-                    print(f"{key} not a known argument... please remove")
-                    exit()
-                setattr(args, key, value)
+def analysis(args):
 
     if args.sampler == "pymultinest":
         if len(args.outdir) > 64:
@@ -903,3 +888,24 @@ def main(args=None):
         plt.tight_layout()
         plt.savefig(plotName)
         plt.close()
+
+
+def main(args=None):
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
+        if args.config is not None:
+            yaml_dict = yaml.safe_load(Path(args.config).read_text())
+            for analysis_set in yaml_dict.keys():
+                params = yaml_dict[analysis_set]
+                for key, value in params.items():
+                    key = key.replace("-", "_")
+                    if key not in args:
+                        print(f"{key} not a known argument... please remove")
+                        exit()
+                    setattr(args, key, value)
+                analysis(args)
+        else:
+            analysis(args)
+    else:
+        analysis(args)
