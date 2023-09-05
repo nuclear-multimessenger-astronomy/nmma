@@ -72,17 +72,18 @@ def create_light_curve_data(
     if ztf_uncertainties:
         with resources.open_binary(__package__ + ".data", "ZTF_uncer_params.pkl") as f:
             ztfuncer = load(f)
+
     if ztf_ToO:
         with resources.open_binary(
-            __package__ + ".data", "sampling_ToO_" + ztf_ToO + ".pkl"
+            __package__ + ".data", f"sampling_ToO_{ztf_ToO}.pkl"
         ) as f:
             ztftoo = load(f)
         with resources.open_binary(
-            __package__ + ".data", "lims_ToO_" + ztf_ToO + "_g.joblib"
+            __package__ + ".data", f"lims_ToO_{ztf_ToO}_g.joblib"
         ) as f:
             ztftoolimg = load(f)
         with resources.open_binary(
-            __package__ + ".data", "lims_ToO_" + ztf_ToO + "_r.joblib"
+            __package__ + ".data", f"lims_ToO_{ztf_ToO}_r.joblib"
         ) as f:
             ztftoolimr = load(f)
 
