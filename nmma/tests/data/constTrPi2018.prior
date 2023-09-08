@@ -1,0 +1,16 @@
+luminosity_distance = 6942.0
+timeshift = 0
+inclination_EM = 0.7
+log10_E0 =  50
+thetaCore = 0.7
+thetaWing = 0.7
+log10_n0 = 10
+p = 7
+log10_epsilon_e = -9
+log10_epsilon_B = -3
+ksiN=1.0
+L0=0.0
+dL = 3.09e19
+b = 6
+q = 0.0
+ts = 0.0
