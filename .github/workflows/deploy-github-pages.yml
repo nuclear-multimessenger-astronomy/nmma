@@ -14,10 +14,10 @@ jobs:
         python-version: [3.9]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - uses: mpi4py/setup-mpi@v1
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Get pip cache dir
@@ -26,12 +26,12 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         echo "::set-output name=dir::$(pip cache dir)"
     - name: pip cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py', '**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-2-${{ hashFiles('**/setup.py', '**/requirements.txt') }}
         restore-keys: |
-          ${{ runner.os }}-pip-
+          ${{ runner.os }}-pip-2-
     - name: Install dependencies
       run: |
         #sudo apt-get install gfortran swig libhdf5-serial-dev libmpich-dev
