@@ -9,13 +9,12 @@
 [![CI](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/continous_integration.yml/badge.svg)](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/continous_integration.yml)
 [![PyPI version](https://badge.fury.io/py/nmma.svg)](https://badge.fury.io/py/nmma)
 
-Please check our official documentation here: https://nuclear-multimessenger-astronomy.github.io/nmma/
+Read our official documentation: [NMMA Documentation](https://nuclear-multimessenger-astronomy.github.io/nmma/)
+
+Check out our contribution guide: [For contributors](https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html)
 
 
-How to contribute: https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html
-
-
-A tutorial about how to produce simulations of lightcurves is given in nmma/tutorials/tutorial-lightcurve_simulation.ipynb
+A tutorial on how to produce simulations of lightcurves is given here [tutorial-lightcurve_simulation.ipynb](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/tutorials/tutorial-lightcurve_simulation.ipynb)
 
 
 ### Citing NMMA
