@@ -60,7 +60,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         if model_name == "nugent-hyper":
             prior_path = os.path.join( priorDir, "sncosmo-generic" + ".prior")
         elif model_name == "TrPi2018":
-            prior_path = os.path.join( dataDir, "constTrPi2018" + ".prior") #pinning the parameter svalues in the prior file
+            prior_path = os.path.join( dataDir, "TrPi2018_pinned_parameters" + ".prior") #pinning the parameter svalues in the prior file
         else:
             prior_path = os.path.join( priorDir, model_name + ".prior")
         assert os.path.exists(prior_path), "prior file does not exist"
