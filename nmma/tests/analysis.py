@@ -3,22 +3,24 @@ import os
 
 from ..em import analysis
 
-
 def test_analysis():
 
-    dataDir = f"{os.path.dirname(__file__)}/data"
+    workingDir=os.path.dirname(__file__)
+    
+    dataDir = os.path.join(workingDir, 'data')
+    svdmodels=os.path.join(workingDir, '../../svdmodels/')
 
     args = Namespace(
-        model="Me2017",
+        model="Bu2019lm",
         interpolation_type="sklearn_gp",
-        svd_path="svdmodels",
+        svd_path=svdmodels,
         outdir="outdir",
         label="injection",
         trigger_time=None,
         data=None,
-        prior="priors/Me2017.prior",
+        prior="priors/Bu2019lm.prior",
         tmin=0.1,
-        tmax=20.0,
+        tmax=10.0,
         dt=0.5,
         log_space_time=False,
         photometric_error_budget=0.1,
@@ -30,13 +32,13 @@ def test_analysis():
         Ebv_max=0.0,
         grb_resolution=5,
         jet_type=0,
-        error_budget="1",
+        error_budget="0",
         sampler="pymultinest",
         cpus=1,
-        nlive=512,
+        nlive=64,
         reactive_sampling=False,
         seed=42,
-        injection=f"{dataDir}/injection.json",
+        injection=f"{dataDir}/Bu2019lm_injection.json",
         injection_num=0,
         injection_detection_limit=None,
         injection_outfile="outdir/lc.csv",
@@ -66,6 +68,7 @@ def test_analysis():
         sample_over_Hubble=False,
         sampler_kwargs="{}",
         verbose=False,
+        local_only=True
     )
 
     analysis.main(args)
