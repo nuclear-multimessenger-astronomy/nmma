@@ -4,7 +4,7 @@ import json
 import numpy as np
 import os
 import pandas as pd
-from scipy.interpolate import interpolate as interp
+import scipy.interpolate as interp
 import scipy.signal
 import scipy.constants
 import scipy.stats

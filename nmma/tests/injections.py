@@ -37,6 +37,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
     dataDir = os.path.join(workingDir, 'data')
     test_directory = os.path.join(dataDir, model_name)
     priorDir=os.path.join(workingDir, '../../priors/')
+    svdmodels=os.path.join(workingDir, '../../svdmodels/')
     
     if os.path.isdir(test_directory):
         shutil.rmtree(test_directory)
@@ -116,7 +117,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             injection=injection_file,
             label=command_line_lightcurve_label,
             model=model_name,
-            svd_path="svdmodels",
+            svd_path=svdmodels,
             tmin=time_series[0],
             tmax=time_series[-1],
             dt=time_series[1] - time_series[0],
@@ -291,8 +292,7 @@ def test_injections():
         "salt2": SupernovaLightCurveModel,
         "Me2017": SimpleKilonovaLightCurveModel,
         "Piro2021": ShockCoolingLightCurveModel,
-        # "PL_BB_fixedT": SimpleKilonovaLightCurveModel, # prior file doesnot exist
-        "TrPi2018": GRBLightCurveModel,
+        # "TrPi2018": GRBLightCurveModel,
         "Ka2017": SVDLightCurveModel,
     }
     for model_name, model_lightcurve_function in lightcurve_models.items():
