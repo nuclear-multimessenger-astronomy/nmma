@@ -9,6 +9,8 @@ from nmma.em.model import (
     SimpleKilonovaLightCurveModel,
     SupernovaLightCurveModel,
     ShockCoolingLightCurveModel,
+    GRBLightCurveModel,
+    SVDLightCurveModel,
 )
 
 from ..em import create_lightcurves
@@ -30,8 +32,13 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
     print(
         "current working directory: ", os.getcwd()
     )  # assumes run in root nmma folder, will need to modify if this is not true
-    data_directory = "./nmma/tests/data/"
-    test_directory = os.path.join(data_directory, model_name)
+
+    workingDir=os.path.dirname(__file__)
+    dataDir = os.path.join(workingDir, 'data')
+    test_directory = os.path.join(dataDir, model_name)
+    priorDir=os.path.join(workingDir, '../../priors/')
+    svdmodels=os.path.join(workingDir, '../../svdmodels/')
+    
     if os.path.isdir(test_directory):
         shutil.rmtree(test_directory)
     os.makedirs(test_directory, exist_ok=True)
@@ -51,9 +58,9 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         """
 
         if model_name == "nugent-hyper":
-            prior_path = os.path.join("./priors/", "sncosmo-generic" + ".prior")
+            prior_path = os.path.join( priorDir, "sncosmo-generic" + ".prior")
         else:
-            prior_path = os.path.join("./priors/", model_name + ".prior")
+            prior_path = os.path.join( priorDir, model_name + ".prior")
         assert os.path.exists(prior_path), "prior file does not exist"
         injection_name = os.path.join(test_directory, model_name + "_injection.json")
 
@@ -110,7 +117,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             injection=injection_file,
             label=command_line_lightcurve_label,
             model=model_name,
-            svd_path="svdmodels",
+            svd_path=svdmodels,
             tmin=time_series[0],
             tmax=time_series[-1],
             dt=time_series[1] - time_series[0],
@@ -285,9 +292,8 @@ def test_injections():
         "salt2": SupernovaLightCurveModel,
         "Me2017": SimpleKilonovaLightCurveModel,
         "Piro2021": ShockCoolingLightCurveModel,
-        # "PL_BB_fixedT": SimpleKilonovaLightCurveModel,
         # "TrPi2018": GRBLightCurveModel,
-        # "Ka2017": SVDLightCurveModel,
+        "Ka2017": SVDLightCurveModel,
     }
     for model_name, model_lightcurve_function in lightcurve_models.items():
         lightcurveInjectionTest(model_name, model_lightcurve_function)
