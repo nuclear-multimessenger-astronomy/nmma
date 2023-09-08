@@ -128,7 +128,12 @@ class OpticalLightCurve(Likelihood):
             usedIdx = np.where(np.isfinite(mag_app_filt))[0]
             sample_times_used = self.sample_times[usedIdx]
             mag_app_used = mag_app_filt[usedIdx]
-            t0 = self.parameters["timeshift"]
+            try:
+                t0 = self.parameters["timeshift"]
+            except KeyError:
+                print("Warning: the 'KNtimeshift' parameter is deprecated as of nmma 0.0.19, please update your prior to use 'timeshift' instead")
+                t0 = self.parameters["KNtimeshift"]
+                continue
             if len(mag_app_used) > 0:
                 mag_app_interp[filt] = interp1d(
                     sample_times_used + t0,
