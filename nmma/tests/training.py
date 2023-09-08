@@ -22,9 +22,11 @@ def test_training():
         "r",
     ]  # We will focus on these two bands; all available: ["u","g","r","i","z","y","J","H","K"]
 
-    dataDir = f"{os.path.dirname(__file__)}/data/bulla"
-    ModelPath = "svdmodels"
-    filenames = glob.glob("%s/*.dat" % dataDir)
+    workingDir = os.path.dirname(__file__)
+
+    dataDir = os.path.join(workingDir, 'data/bulla')
+    ModelPath = "svdrainingmodel"
+    filenames = glob.glob(f"{dataDir}/*.dat")
 
     data = io.read_photometry_files(filenames, filters=filts)
     # Loads the model data
