@@ -2,7 +2,7 @@ Me2017_1:
   model: Me2017
   outdir: outdir_1
   label: injection
-  prior: ../project/nmma/priors/Me2017.prior
+  prior: priors/Me2017.prior
   tmin: 0.1
   tmax: 20
   dt: 0.5
@@ -20,7 +20,7 @@ Me2017_2:
   model: Me2017
   outdir: outdir_2
   label: injection
-  prior: ../project/nmma/priors/Me2017.prior
+  prior: priors/Me2017.prior
   tmin: 0.1
   tmax: 20
   dt: 0.5
