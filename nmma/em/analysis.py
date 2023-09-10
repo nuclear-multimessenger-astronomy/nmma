@@ -34,6 +34,12 @@ def get_parser():
         help="Name of the configuration file containing parameter values.",
     )
     parser.add_argument(
+        "--parallel",
+        help="Whether to run the multiple analysis in parallel.",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--model", type=str, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
@@ -890,22 +896,53 @@ def analysis(args):
         plt.close()
 
 
+def yaml_parser(args, yaml_dict, analysis_set):
+    params = yaml_dict[analysis_set]
+    for key, value in params.items():
+        key = key.replace("-", "_")
+        if key not in args:
+            print(f"{key} not a known argument... please remove")
+            exit()
+        setattr(args, key, value)
+
+def run_parallel(args):
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
+    yaml_dict = yaml.safe_load(Path(args.config).read_text())
+    analysis_sets = list(yaml_dict.keys())
+    total_configs = len(analysis_sets)
+
+    processes_per_config = size // total_configs
+    config_idx = rank // processes_per_config
+
+    if config_idx < total_configs:
+        analysis_set = analysis_sets[config_idx]
+        yaml_parser(args, yaml_dict, analysis_set)
+        analysis(args)
+
+    # comm.Barrier()
+    # MPI.Finalize()
+
 def main(args=None):
     if args is None:
         parser = get_parser()
         args = parser.parse_args()
+
+        if args.parallel:
+            run_parallel(args)
+            return
+
         if args.config is not None:
             yaml_dict = yaml.safe_load(Path(args.config).read_text())
             for analysis_set in yaml_dict.keys():
-                params = yaml_dict[analysis_set]
-                for key, value in params.items():
-                    key = key.replace("-", "_")
-                    if key not in args:
-                        print(f"{key} not a known argument... please remove")
-                        exit()
-                    setattr(args, key, value)
+                yaml_parser(args, yaml_dict, analysis_set)
                 analysis(args)
         else:
             analysis(args)
     else:
         analysis(args)
+
+
