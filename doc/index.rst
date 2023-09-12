@@ -23,7 +23,7 @@ can install NMMA using conda as follows:
    conda create --name nmma_env python=3.10
    conda install -c conda-forge nmma
 
-If you have an issue, such as 'Solving environment: failed with initial frozen solve', an option could be:
+If you have an issue, such as ``Solving environment: failed with initial frozen solve``, an option could be:
 
 .. code::
 
@@ -37,7 +37,7 @@ refer to the developer section below.
 
 .. note::
 
-   The above may not work for arm64 Macs; see specifc instructions below. However, we are still working on getting NMMA to work on arm64 Macs.
+   The above may not work for arm64 Macs; see specifc instructions `below <#arm64mac>`_. 
 
 For developers and contributors
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -71,10 +71,7 @@ Now do:
 
 **Cloning the NMMA repository**
 
-Fork the NMMA repository given below:
-
-`NMMA Github
-Repo <https://github.com/nuclear-multimessenger-astronomy/nmma>`__
+Fork the NMMA repository: `NMMA Github Repo <https://github.com/nuclear-multimessenger-astronomy/nmma>`__
 
 Note that we link above to the main branch, but suggest making changes
 on your own fork (please also see our `contributing
@@ -97,7 +94,7 @@ nmma_env in this case):
 
 .. code::
 
-   conda create --name nmma_env python=3.8
+   conda create --name nmma_env python=3.10
    conda activate nmma_env
 
 .. note::
@@ -223,103 +220,84 @@ requirements.txt file which are necessary for NMMA:
 
 ``conda install -c anaconda cython==0.29.24`` and redo ``python setup.py install``.
 
+.. _arm64mac:
+
+For arm64 Macs
+^^^^^^^^^^^^^^
+Follow the instructions above, but with the following modifications:
+
+Install C compiler and cmake:
+
+.. code::
+
+   conda install -c conda-forge c-compiler
+   brew install cmake
+
+
 **Known arm64 Mac issues**
 
-1. For arm64 Macs (e.g. M1, M2), there is an issue installing ``pyfftw``
+
+#. For arm64 Macs (e.g. M1, M2), there is an issue installing ``pyfftw``
    with pip (see
    https://github.com/pyFFTW/pyFFTW/issues/349#issuecomment-1468638458).
    To address, use ``Homebrew`` to run
 
-.. code::
+   .. code::
 
-   brew install fftw
+      brew install fftw
 
-then add the following lines to your ``.zprofile`` or ``.bash_profile``:
+   then add the following lines to your ``.zprofile`` or ``.bash_profile``:
 
-.. code::
+   .. code::
 
-   export PATH="/opt/homebrew/bin:PATH"
-   export DYLD_LIBRARY_PATH=/opt/homebrew/opt/fftw/lib
-   export LDFLAGS="-Wl,-S,-rpath,/opt/homebrew/opt/fftw/lib -L/opt/homebrew/opt/fftw/lib"
-   export CFLAGS="-Wno-implicit-function-declaration -I/opt/homebrew/opt/fftw/include"
+      export PATH="/opt/homebrew/bin:$PATH"
+      export DYLD_LIBRARY_PATH=/opt/homebrew/opt/fftw/lib
+      export LDFLAGS="-Wl,-S,-rpath,/opt/homebrew/opt/fftw/lib -L/opt/homebrew/opt/fftw/lib"
+      export CFLAGS="-Wno-implicit-function-declaration -I/opt/homebrew/opt/fftw/include"
 
-Close and reopen your terminal and run
+   Close and reopen your terminal and run
 
-.. code::
+   .. code::
 
-   pip install pyfftw
+      pip install pyfftw
 
-You may then need to rerun ``pip install -r requirements.txt`` to
-complete the dependency installations.
+   You may then need to rerun ``pip install -r requirements.txt`` to
+   complete the dependency installations.
 
-2. The ``osx-arm64`` conda-forge channel does not include
+#. The ``osx-arm64`` conda-forge channel does not include
    ``pymultinest``. Running ``pip install -r requirements.txt`` should
    have installed ``pymultinest``, but you will still need to install
    and compile ``Multinest`` from the source. Within the ``nmma``
    directory, run:
 
-.. code::
+   .. code::
 
-   git clone https://github.com/JohannesBuchner/MultiNest
-   cd MultiNest/build
-   cmake ..
-   make
+      git clone https://github.com/JohannesBuchner/MultiNest
+      cd MultiNest/build
+      cmake ..
+      make
 
-Next, add the following lines to your ``.zprofile`` or
-``.bash_profile``:
+   Next, add the following lines to your ``.zprofile`` or
+   ``.bash_profile``:
 
-.. code::
+   .. code::
 
-   export LD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$LD_LIBRARY_PATH
-   export DYLD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH
+      export LD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$LD_LIBRARY_PATH
+      export DYLD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH
 
-.. note::
+   .. note::
 
-   Modify these paths as appropriate for the location of your ``MultiNest`` installation. You can also combine the ``DYLD_LIBRARY_PATH`` lines for ``MultiNest`` and ``fftw`` (above) into a single line
+      Modify these paths as appropriate for the location of your ``MultiNest`` installation. You can also combine the ``DYLD_LIBRARY_PATH`` lines for ``MultiNest`` and ``fftw`` (above) into a single line
 
-3. There are also issues with ``tensorflow`` and arm64 Macs. If using
+#. There are also issues with ``tensorflow`` and arm64 Macs. If using
    ``tensorflow``, install it with the following commands:
 
-.. code::
+   .. code::
 
-   pip install tensorflow-macos
-   pip install tensorflow-metal
+      pip install tensorflow-macos
+      pip install tensorflow-metal
 
-**Building custom lalsuite from source**
 
-If you want to install a custom lalsuite version (e.g. with a certain GW template model), then lalsuite needs to be build from scratch. This requires setting up the conda environment through conda-forge
-
-.. code::
-
-   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.8
-   conda activate YOUR_PREFIX
-
-and then installing mpi4py first before installing the required packages for the build process (here the second line):
-
-.. code::
-
-   pip install mpi4py
-   conda install -c conda-forge "astropy>=1.1.1" autoconf automake bc cfitsio doxygen fftw freezegun c-compiler gsl h5py hdf5 healpy "help2man>=1.37" "ldas-tools-framecpp<3.0.0a0" "libframel<9.0.0a0" ligo-gracedb ligo-segments "lscsoft-glue>=2.0.0" make matplotlib-base metaio "mpmath>=1.0.0" numpy pillow "pkg-config>=0.18.0" pytest "scipy>=0.9.0" six "swig>=3.0.10" zlib
-
-When this is done, you can proceed installing nmma as above (i.e. via requirements.txt etc.) but note that from the dependencies lalsuite is then installed via pip. This installation needs to be removed
-
-.. code::
-   pip uninstall lalsuite
-
-Then the build process for the custom lalsuite can be started
-
-.. code::
-
-   cd YOUR_CUSTOM_LALSUITE
-   ./00boot
-   ./configure --prefix=YOUR_PREFIX --disable-all-lal --enable-swig-python  --enable-lalsimulation --enable-lalframe
-   make; make install
-
-It might happen that in the course of this some packages will be downgraded. You can just update them afterwards to a sufficient version, e.g.
-
-.. code::
-
-   pip install astropy>=5.2.2
 
 **First Test for NMMA**
 
@@ -353,6 +331,46 @@ and then trying again is sufficient for completion of the installation.
 This instruction file will likely cover the issues you might face during
 your installation. However, please open issues on GitHub if there appear
 to be unresolvable conflicts.
+
+Building custom lalsuite from source
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you want to install a custom lalsuite version (e.g. with a certain GW template model), then lalsuite needs to be build from scratch. This requires setting up the conda environment through conda-forge
+
+.. code::
+
+   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.8
+   conda activate YOUR_PREFIX
+
+and then installing mpi4py first before installing the required packages for the build process (here the second line):
+
+.. code::
+
+   conda install mpi4py
+   conda install -c conda-forge "astropy>=1.1.1" autoconf automake bc cfitsio doxygen fftw freezegun c-compiler gsl h5py hdf5 healpy "help2man>=1.37" "ldas-tools-framecpp<3.0.0a0" "libframel<9.0.0a0" ligo-gracedb ligo-segments "lscsoft-glue>=2.0.0" make matplotlib-base metaio "mpmath>=1.0.0" numpy pillow "pkg-config>=0.18.0" pytest "scipy>=0.9.0" six "swig>=3.0.10" zlib
+
+When this is done, you can proceed installing nmma as above (i.e. via requirements.txt etc.) but note that from the dependencies lalsuite is then installed via pip. This installation needs to be removed
+
+.. code::
+
+   pip uninstall lalsuite
+
+Then the build process for the custom lalsuite can be started
+
+.. code::
+
+   cd YOUR_CUSTOM_LALSUITE
+   ./00boot
+   ./configure --prefix=YOUR_PREFIX --disable-all-lal --enable-swig-python  --enable-lalsimulation --enable-lalframe
+   make; make install
+
+It might happen that in the course of this some packages will be downgraded. You can just update them afterwards to a sufficient version, e.g.
+
+.. code::
+
+   pip install astropy>=5.2.2
+
+
 
 Installation on expanse and other cluster resources
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
