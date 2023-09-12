@@ -264,6 +264,17 @@ Install C compiler and cmake:
    You may then need to rerun ``pip install -r requirements.txt`` to
    complete the dependency installations.
 
+   .. tip::
+
+      FFTW installation can also be attempted using conda as follows
+   
+      .. code::
+   
+         conda install -c conda-forge fftw
+         DYLD_LIBRARY_PATH=$HOME/anaconda3/envs/nmma_env
+         pip install pyfftw
+      Replace ``DYLD_LIBRARY`` path by your NMMA virtual environment path if it is not same as give here
+
 #. The ``osx-arm64`` conda-forge channel does not include
    ``pymultinest``. Running ``pip install -r requirements.txt`` should
    have installed ``pymultinest``, but you will still need to install
