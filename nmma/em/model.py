@@ -620,6 +620,7 @@ class HostGalaxyLightCurveModel(object):
     def __init__(
         self,
         sample_times,
+        model="Sr2023",
         parameter_conversion=None,
         filters=None,
     ):
@@ -644,6 +645,7 @@ class HostGalaxyLightCurveModel(object):
 
         self.sample_times = sample_times
         self.parameter_conversion = parameter_conversion
+        self.model = model
         self.filters = filters
 
     def __repr__(self):
