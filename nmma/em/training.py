@@ -400,7 +400,7 @@ class SVDTrainingModel(object):
                 random_state=8581,
             )
 
-            np.random.RandomState(42)
+            tf.keras.utils.set_random_seed(42)
             model = Sequential()
             # One/few layers of wide NN approximate GP
             model.add(
