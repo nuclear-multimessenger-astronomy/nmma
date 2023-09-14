@@ -165,6 +165,12 @@ def main():
         default=False,
         help="Refresh the list of models available on Zenodo",
     )
+    parser.add_argument(
+        "--random-seed",
+        type=int,
+        default=42,
+        help="random seed to set during training",
+    )
     args = parser.parse_args()
 
     refresh = False
@@ -246,6 +252,7 @@ def main():
         ncpus=args.ncpus,
         univariate_spline=args.use_UnivariateSpline,
         univariate_spline_s=args.UnivariateSpline_s,
+        random_seed=args.random_seed,
     )
 
     light_curve_model = SVDLightCurveModel(

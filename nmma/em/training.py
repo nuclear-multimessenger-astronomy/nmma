@@ -60,6 +60,7 @@ class SVDTrainingModel(object):
         ncpus=1,
         univariate_spline=False,
         univariate_spline_s=2,
+        random_seed=42,
     ):
 
         if interpolation_type not in ["sklearn_gp", "tensorflow", "api_gp"]:
@@ -82,6 +83,7 @@ class SVDTrainingModel(object):
         self.ncpus = ncpus
         self.univariate_spline = univariate_spline
         self.univariate_spline_s = univariate_spline_s
+        self.random_seed = random_seed
         if self.univariate_spline:
             print("The grid will be interpolated to sample_time with UnivariateSpline")
         else:
@@ -397,10 +399,10 @@ class SVDTrainingModel(object):
                 cAmat.T,
                 shuffle=True,
                 test_size=0.1,
-                random_state=8581,
+                random_state=self.random_seed,
             )
 
-            tf.keras.utils.set_random_seed(42)
+            tf.keras.utils.set_random_seed(self.random_seed)
             model = Sequential()
             # One/few layers of wide NN approximate GP
             model.add(
