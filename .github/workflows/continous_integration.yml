@@ -40,7 +40,7 @@ jobs:
       - name: Download SVD models
         if: steps.check-artifact-download.outputs.exists == 'false'
         run: |
-          wget --show-progress -O svdmodels.tar https://enlil.gw.physik.uni-potsdam.de/~jhawar/svdmodels/svdmodels.tar
+          wget --show-progress -O svdmodels.tar https://enlil.gw.physik.uni-potsdam.de/~jhawar/svdmodels/svdmodels.tar.gz
           mkdir -p svdmodels
           tar -xvf svdmodels.tar -C svdmodels/
           rm svdmodels.tar
