@@ -367,7 +367,7 @@ def main(args=None):
 
     refresh = False
     try:
-        refresh = args.refresh_model_list
+        refresh = args.refresh_models_list
     except AttributeError:
         pass
     if refresh:
