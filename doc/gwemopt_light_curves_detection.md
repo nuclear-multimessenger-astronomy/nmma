@@ -30,11 +30,11 @@ To generate a json file (``injection.json``)  with the BILBY processing of compa
 
 **`BNS` type**
 
-    nmma_create_injection --prior-file ./priors/Bu2019lm.prior --injection-file ./injections.dat --eos-file  ./example_files/eos/ALF2.dat --binary-type BNS --original-parameters --extension json --aligned-spin --binary-type BNS --filename ./outdir_BNS/injection_Bu2019lm.json
+    nmma-create-injection --prior-file ./priors/Bu2019lm.prior --injection-file ./injections.dat --eos-file  ./example_files/eos/ALF2.dat --binary-type BNS --original-parameters --extension json --aligned-spin --binary-type BNS --filename ./outdir_BNS/injection_Bu2019lm.json
 
 **`NSBH` type**
 
-    nmma_create_injection --prior-file ./priors/Bu2019nsbh.prior --injection-file ./injections.dat --eos-file  ./example_files/eos/ALF2.dat --binary-type NSBH  --original-parameters --extension json --aligned-spin --filename ./outdir_NSBH/injection_Bu2019nsbh.json
+    nmma-create-injection --prior-file ./priors/Bu2019nsbh.prior --injection-file ./injections.dat --eos-file  ./example_files/eos/ALF2.dat --binary-type NSBH  --original-parameters --extension json --aligned-spin --filename ./outdir_NSBH/injection_Bu2019nsbh.json
 
 5 **- Generate lightcurve **
 
@@ -42,12 +42,12 @@ This command line concern the ``ZTF`` for ``Rubin`` please replace `--injection-
 
 **`BNS`**
 
-    light_curve_generation --model  Bu2019lm --svd-path ./svdmodels --outdir ./outdir_BNS --label injection_Bu2019lm --dt 0.5 --injection ./outdir_BNS/injection_Bu2019lm.json --injection-detection-limit 24.1,21.7,21.4,20.9,24.5,23.0,23.2,22.6,22.6 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y,2massj,2massh,2massks  --absolute --plot --generation-seed 42
+    lightcurve-generation --model  Bu2019lm --svd-path ./svdmodels --outdir ./outdir_BNS --label injection_Bu2019lm --dt 0.5 --injection ./outdir_BNS/injection_Bu2019lm.json --injection-detection-limit 24.1,21.7,21.4,20.9,24.5,23.0,23.2,22.6,22.6 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y,2massj,2massh,2massks  --absolute --plot --generation-seed 42
 
 **`NSBH`**
 
 
-light_curve_generation --model  Bu2019lm --svd-path ./svdmodels --outdir ./outdir_NSBH --label injection_Bu2019nsbh --dt 0.5 --injection ./outdir_NSBH/injection_Bu2019nsbh.json --injection-detection-limit 24.1,21.7,21.4,20.9,24.5,23.0,23.2,22.6,22.6 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y,2massj,2massh,2massks --absolute --plot --generation-seed 42
+    lightcurve-generation --model  Bu2019lm --svd-path ./svdmodels --outdir ./outdir_NSBH --label injection_Bu2019nsbh --dt 0.5 --injection ./outdir_NSBH/injection_Bu2019nsbh.json --injection-detection-limit 24.1,21.7,21.4,20.9,24.5,23.0,23.2,22.6,22.6 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y,2massj,2massh,2massks --absolute --plot --generation-seed 42
 
 6 **- KNe detection process using ``gwemopt``**
 
@@ -61,11 +61,11 @@ light_curve_generation --model  Bu2019lm --svd-path ./svdmodels --outdir ./outdi
 
 **`BNS`**
 
-    light_curve_detection --configDirectory ./gwemopt/config --outdir ./ztf_detection/outdir_BNS --injection-file  ./outdir_BNS/injection_Bu2019lm.json  --skymap-dir ./runs/O4/farah/allsky --lightcurve-dir ./outdir_BNS --binary-type BNS --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y,2massj,2massh,2massks --exposuretime 300 --detections-file ./ztf_detection/bns_lc_skymap_detection.txt --telescope ZTF --tmin 0 --tmax 14 --dt 0.5  --parallel --number-of-cores 10 --generation-seed 42
+    lightcurve-detection --configDirectory ./gwemopt/config --outdir ./ztf_detection/outdir_BNS --injection-file  ./outdir_BNS/injection_Bu2019lm.json  --skymap-dir ./runs/O4/farah/allsky --lightcurve-dir ./outdir_BNS --binary-type BNS --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y,2massj,2massh,2massks --exposuretime 300 --detections-file ./ztf_detection/bns_lc_skymap_detection.txt --telescope ZTF --tmin 0 --tmax 14 --dt 0.5  --parallel --number-of-cores 10 --generation-seed 42
 
 **`NSBH`**
 
-    light_curve_detection --configDirectory ./gwemopt/config --outdir ./ztf_detection/outdir_NSBH --injection-file  ./outdir_NSBH/injection_Bu2019nsbh.json  --skymap-dir ./runs/O4/farah/allsky --lightcurve-dir ./outdir_NSBH --binary-type NSBH --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y,2massj,2massh,2massks --exposuretime 300 --detections-file ./ztf_detection/nsbh_lc_skymap_detection.txt --telescope ZTF --tmin 0 --tmax 14 --dt 0.5  --parallel --number-of-cores 10 --generation-seed 42
+    lightcurve-detection --configDirectory ./gwemopt/config --outdir ./ztf_detection/outdir_NSBH --injection-file  ./outdir_NSBH/injection_Bu2019nsbh.json  --skymap-dir ./runs/O4/farah/allsky --lightcurve-dir ./outdir_NSBH --binary-type NSBH --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y,2massj,2massh,2massks --exposuretime 300 --detections-file ./ztf_detection/nsbh_lc_skymap_detection.txt --telescope ZTF --tmin 0 --tmax 14 --dt 0.5  --parallel --number-of-cores 10 --generation-seed 42
 
 
 

@@ -21,7 +21,7 @@ EMdata will house the posteriors of the electromagnetic data you will produce: i
 
 	do
 	  mkdir -p ./output/EMdata/outdir/$macroeventID/
-	  light_curve_analysis --model Bu2019lm --svd-path ./svdmodels --interpolation_type tensorflow --outdir ./output/EMdata/outdir/$macroeventID --label injection_Bu2019lm --prior ./priors/Bu2019lm.prior --tmin 0 --tmax 7 --dt 0.5 --error-budget 1.0 --nlive 256 --Ebv-max 0 --injection ./output/injection.json --injection-num $macroeventID --injection-detection-limit 22,22,22 --injection-outfile ./output/EMdata/outdir/$macroeventID/lc.csv --generation-seed 42 --filters g,r,i --ztf-sampling --ztf-uncertainties --plot --remove-nondetections --photometry-augmentation --photometry-augmentation-filters u,g,r,i,z,y,J,H,K --photometry-augmentation-N-points 100
+	  lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --interpolation_type tensorflow --outdir ./output/EMdata/outdir/$macroeventID --label injection_Bu2019lm --prior ./priors/Bu2019lm.prior --tmin 0 --tmax 7 --dt 0.5 --error-budget 1.0 --nlive 256 --Ebv-max 0 --injection ./output/injection.json --injection-num $macroeventID --injection-detection-limit 22,22,22 --injection-outfile ./output/EMdata/outdir/$macroeventID/lc.csv --generation-seed 42 --filters g,r,i --ztf-sampling --ztf-uncertainties --plot --remove-nondetections --photometry-augmentation --photometry-augmentation-filters u,g,r,i,z,y,J,H,K --photometry-augmentation-N-points 100
 	done
 
 
@@ -70,7 +70,7 @@ This command line combines the EOS measurements for each simulation. As stated a
 
 	do
 	  mkdir -p ./output/GW_EMdata/$macroeventID/
-	  gwem_resampling --outdir ./output/GW_EMdata/$macroeventID --EMsamples ./output/EMdata/outdir/$macroeventID/injection_Bu2019lm_posterior_samples.dat --GWsamples  ./output/GWdata/outdir/inj_PhD_posterior_samples_$macroeventID.dat --EOS ./example_files/eos/eos_sorted --nlive 8192 --GWprior ./priors/aligned_spin.priors --EMprior ./priors/EM.prior --total-ejecta-mass --Neos 5000
+	  gwem-resampling --outdir ./output/GW_EMdata/$macroeventID --EMsamples ./output/EMdata/outdir/$macroeventID/injection_Bu2019lm_posterior_samples.dat --GWsamples  ./output/GWdata/outdir/inj_PhD_posterior_samples_$macroeventID.dat --EOS ./example_files/eos/eos_sorted --nlive 8192 --GWprior ./priors/aligned_spin.priors --EMprior ./priors/EM.prior --total-ejecta-mass --Neos 5000
 
 	done
 
@@ -85,7 +85,7 @@ First of all create a foder to put the final data about EoS:
 
 Then run the last one command line
 
-	 combined_EOS --outdir ./output/Figures --label ZTF --gwR14trend ./example_files/ --GWEMsamples ./output/GW_EMdata --detections-file ./example_files/csv_lightcurve/detectable.txt --EOS-prior ./example_files/eos/EOS_sorted_weight.dat --EOSpath ./example_files/eos/eos_sorted  --pdet ./example_files/eos/pdet_of_Mmax.dat --R14_true 11.55 --Neos 5000 --seed 42  --cred-interval 0.95
+	 combined-EOS --outdir ./output/Figures --label ZTF --gwR14trend ./example_files/ --GWEMsamples ./output/GW_EMdata --detections-file ./example_files/csv_lightcurve/detectable.txt --EOS-prior ./example_files/eos/EOS_sorted_weight.dat --EOSpath ./example_files/eos/eos_sorted  --pdet ./example_files/eos/pdet_of_Mmax.dat --R14_true 11.55 --Neos 5000 --seed 42  --cred-interval 0.95
 
 
 This should return a EoS plot, R14_trend_GW_EM_ZTF.pdf, and  GW_EM_R14trend_ZTF.dat  at  ./output/Figures.

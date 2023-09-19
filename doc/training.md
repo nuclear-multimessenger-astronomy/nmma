@@ -45,7 +45,7 @@ Typically, the file parameter values are encoded in the file header name. Theref
 
 A new function will need to be added to nmma/em/model_parameters.py to each model grid that is desired. Once this is done, training can begin:
 
-	create_svdmodel --model Bu2022mv --svd-path svdmodels --interpolation_type tensorflow --tmin 0.0 --tmax 21.0 --dt 0.1 --data-path output/bulla_2Comp_mv --plot --tensorflow-nepochs 100
+	create-svdmodel --model Bu2022mv --svd-path svdmodels --interpolation_type tensorflow --tmin 0.0 --tmax 21.0 --dt 0.1 --data-path output/bulla_2Comp_mv --plot --tensorflow-nepochs 100
 
 The output will look something like:
 
@@ -75,7 +75,7 @@ and so on. The model files are then written to the path given by --svd-path. As 
 
 This model is then ready to use in an analysis.
 
-	light_curve_analysis --model Bu2022mv --interpolation_type tensorflow --svd-path svdmodels --outdir outdir --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2022mv.prior
+	lightcurve-analysis --model Bu2022mv --interpolation_type tensorflow --svd-path svdmodels --outdir outdir --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2022mv.prior
 
 
 ### Spectral grids
@@ -94,4 +94,4 @@ with columns of wavelength, time in days, and flux.
 
 These can be trained in a similar form to the light curves with:
 
-    create_svdmodel --model Bu2019lm --data-type spectroscopy --svd-path svdmodels --interpolation_type tensorflow --tmin 0.0 --tmax 21.0 --dt 0.1 --data-path output/m3_spectra --plot --tensorflow-nepochs 20
+    create-svdmodel --model Bu2019lm --data-type spectroscopy --svd-path svdmodels --interpolation_type tensorflow --tmin 0.0 --tmax 21.0 --dt 0.1 --data-path output/m3_spectra --plot --tensorflow-nepochs 20
