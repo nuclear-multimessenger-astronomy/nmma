@@ -1,0 +1,132 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nmma"
+authors = [
+    {name = "Michael Coughlin", email = "michael.coughlin@ligo.org"},
+]
+description = "A nuclear physics multi-messenger Bayesian inference library"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "GPLv3"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Intended Audience :: Science/Research',
+    'Intended Audience :: End Users/Desktop',
+    'Intended Audience :: Developers',
+    'Natural Language :: English',
+    'Topic :: Scientific/Engineering',
+    'Topic :: Scientific/Engineering :: Astronomy',
+    'Topic :: Scientific/Engineering :: Physics',
+    'Operating System :: POSIX',
+    'Operating System :: Unix',
+    'Operating System :: MacOS',
+    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+]
+dynamic = ["version", "dependencies", "optional-dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+optional-dependencies.doc = { file = ["doc_requirements.txt"] }
+optional-dependencies.grb = { file = ["grb_requirements.txt"] }
+optional-dependencies.production = { file = ["production_requirements.txt"] }
+
+[project.scripts]
+nmma-generation = "nmma.pbilby.generation:main_nmma"
+nmma-gw-generation = "nmma.pbilby.generation:main_nmma_gw"
+nmma-analysis = "nmma.pbilby.analysis:main_nmma"
+nmma-gw-analysis = "nmma.pbilby.analysis:main_nmma_gw"
+lightcurve-analysis = "nmma.em.analysis:main"
+lightcurve-analysis-condor = "nmma.em.analysis_condor:main"
+lightcurve-injection-summary = "nmma.em.injection_summary:main"
+lightcurve-injection-slurm-setup = "nmma.em.create_injection_slurm:main"
+lightcurve-injection-condor-setup = "nmma.em.create_injection_condor:main"
+lightcurve-manual = "nmma.em.manual:main"
+lightcurve-marginalization = "nmma.em.lightcurve_marginalization:main"
+combine-EOS = "nmma.em.combine_EOS:main"
+create-lightcurve-slurm = "nmma.em.create_lightcurves_slurm:main"
+create-lightcurve-condor = "nmma.em.create_lightcurves_condor:main"
+create-svdmodel = "nmma.em.create_svdmodel:main"
+svdmodel-benchmark = "nmma.em.svdmodel_benchmark:main"
+svdmodel-download = "nmma.utils.models:main"
+lightcurve-generation = "nmma.em.create_lightcurves:main"
+lightcurve-detection = "nmma.em.detect_lightcurves:main"
+nmma-create-injection = "nmma.eos.create_injection:main"
+gwem-resampling = "nmma.em.gwem_resampling:main"
+gwem-resampling-condor = "nmma.em.gwem_resampling_condor:main"
+gwem-Hubble-estimate = "nmma.em.gwem_Hubble_estimate:main"
+
+[tool.setuptools_scm]
+write_to  =  "nmma/_version.py"
+
+[tool.setuptools]
+packages = ["nmma"]
+
+[tool.setuptools.package-data]
+gwemopt = ['data/*/*']
+
+[tool.coverage.run]
+source = ["nmma"]
+omit = [
+    "nmma/tests/*",
+    "nmma/__main__.py",
+    "nmma/_version.py",
+]
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_lines = [
+    # Have to re-enable the standard pragma
+    "pragma: no cover",
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "raise KeyError",
+    "except KeyError",
+    "raise ValueError",
+    "except JSONDecodeError:",
+    "raise requests.exceptions.RequestException",
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if False:",
+    'if __name__ == "__main__":',
+    "err =",
+    "logger.error",
+    "raise"
+    ]
+ignore_errors = true
+
+[tool.isort]
+profile = "black"
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "nmma/_version.py"
+versionfile_build = "nmma/_version.py"
+tag_prefix = "v"
+parentdir_prefix = "nmma-"
+
+[tool.pytest.ini_options]
+addopts = "--verbose -r s"
+
+[tool.bumpver]
+current_version = "0.0.19"
+version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
+commit_message = "bump version {old_version} -> {new_version}"
+commit = true
+tag = true
+push = true
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = [
+    'current_version = "{version}"',
+]
