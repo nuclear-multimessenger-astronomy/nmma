@@ -270,7 +270,7 @@ def get_model(
     filter_format = "pkl"
     if "_tf" in model_name:
         filter_format = "h5"
-    core_model_name = model_name.split("_")[0]
+    core_model_name = model_name.split("_")[:-1]
 
     filepaths = (
         [Path(models_home, f"{core_model_name}.{core_format}")]
