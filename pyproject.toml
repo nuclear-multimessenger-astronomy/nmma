@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nmma"
 authors = [
-    {name = "Michael Coughlin", email = "michael.coughlin@ligo.org"},
+    {name = "Peter Tsun Ho Pang, Michael Coughlin, Tim Dietrich, Ingo Tews", email = "nuclear_multimessenger_astronomy@googlegroups.com"}
 ]
 description = "A nuclear physics multi-messenger Bayesian inference library"
 readme = "README.md"
