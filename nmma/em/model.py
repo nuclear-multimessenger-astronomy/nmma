@@ -210,6 +210,14 @@ class SVDLightCurveModel(object):
 
         self.svd_path = get_models_home(svd_path)
 
+        # Some models have underscores. Keep those, but drop '_tf' if it exists
+        model_name_components = model.split("_")
+        if "tf" in model_name_components:
+            model_name_components.remove("tf")
+        core_model_name = "_".join(model_name_components)
+
+        modelfile = os.path.join(self.svd_path, f"{core_model_name}.pkl")
+
         if self.interpolation_type == "sklearn_gp":
             if not local_only:
                 _, model_filters = get_model(
@@ -218,7 +226,6 @@ class SVDLightCurveModel(object):
                 if filters is None and model_filters is not None:
                     self.filters = model_filters
 
-            modelfile = os.path.join(self.svd_path, "{0}.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
@@ -226,7 +233,7 @@ class SVDLightCurveModel(object):
                 if self.filters is None:
                     self.filters = list(self.svd_mag_model.keys())
 
-                outdir = modelfile.replace(".pkl", "")
+                outdir = os.path.join(self.svd_path, f"{model}")
                 for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.pkl")
                     if not os.path.isfile(outfile):
@@ -262,7 +269,6 @@ class SVDLightCurveModel(object):
         elif self.interpolation_type == "api_gp":
             from .training import load_api_gp_model
 
-            modelfile = os.path.join(self.svd_path, "{0}_api.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
@@ -285,7 +291,6 @@ class SVDLightCurveModel(object):
                 if filters is None:
                     self.filters = model_filters
 
-            modelfile = os.path.join(self.svd_path, "{0}_tf.pkl".format(model))
             if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
@@ -293,7 +298,7 @@ class SVDLightCurveModel(object):
                 if self.filters is None:
                     self.filters = list(self.svd_mag_model.keys())
 
-                outdir = modelfile.replace(".pkl", "")
+                outdir = os.path.join(self.svd_path, f"{model}_tf")
                 for filt in self.filters:
                     outfile = os.path.join(outdir, f"{filt}.h5")
                     if not os.path.isfile(outfile):

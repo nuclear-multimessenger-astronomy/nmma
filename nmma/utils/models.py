@@ -161,7 +161,7 @@ def load_models_list(doi=None, models_home=None):
     if not downloaded_if_missing:
         print("Attempting to retrieve local files...")
 
-    files = [f for f in Path(models_home).glob("*") if f.is_file()]
+    files = [f for f in Path(models_home).glob("*") if f.is_dir()]
     files = [f.stem for f in files]
 
     for f in files:
@@ -271,11 +271,19 @@ def get_model(
     if "_tf" in model_name:
         filter_format = "h5"
 
+    # Some models have underscores. Keep those, but drop '_tf' if it exists
+    model_name_components = model_name.split("_")
+    if "tf" in model_name_components:
+        model_name_components.remove("tf")
+    core_model_name = "_".join(model_name_components)
+
     filepaths = (
-        [Path(models_home, f"{model_name}.{core_format}")] if not filters_only else []
+        [Path(models_home, f"{core_model_name}.{core_format}")]
+        if not filters_only
+        else []
     ) + [Path(models_home, model_name, f"{f}.{filter_format}") for f in filters]
     urls = (
-        [f"{base_url}/{model_name}.{core_format}?download=1"]
+        [f"{base_url}/{core_model_name}.{core_format}?download=1"]
         if not filters_only
         else []
     ) + [f"{base_url}/{model_name}_{f}.{filter_format}?download=1" for f in filters]
