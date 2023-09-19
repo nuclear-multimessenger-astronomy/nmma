@@ -119,7 +119,7 @@ parentdir_prefix = "nmma-"
 addopts = "--verbose -r s"
 
 [tool.bumpver]
-current_version = "0.0.19"
+current_version = "0.1.0"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
 commit_message = "bump version {old_version} -> {new_version}"
 commit = true
