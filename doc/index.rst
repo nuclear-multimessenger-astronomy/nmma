@@ -187,8 +187,7 @@ requirements.txt file which are necessary for NMMA:
 
 .. code::
 
-   pip install -r requirements.txt
-   python setup.py install
+   pip install .
 
 .. note::
 
@@ -216,9 +215,9 @@ requirements.txt file which are necessary for NMMA:
 
 .. note::
 
-   If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies if not covered by ``python setup.py install``. Also, if running ``python setup.py install`` shows something on the lines of "cannot cythonize without cython", do:
+   If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies if not covered by ``pip install .``. Also, if running ``pip install .`` shows something on the lines of "cannot cythonize without cython", do:
 
-``conda install -c anaconda cython==0.29.24`` and redo ``python setup.py install``.
+``conda install -c anaconda cython==0.29.24`` and redo ``pip install .``.
 
 .. _arm64mac:
 
