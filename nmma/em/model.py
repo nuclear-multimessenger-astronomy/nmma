@@ -210,7 +210,12 @@ class SVDLightCurveModel(object):
 
         self.svd_path = get_models_home(svd_path)
 
-        core_model_name = model.split("_")[0]
+        # Some models have underscores. Keep those, but drop '_tf' if it exists
+        model_name_components = model.split("_")
+        if "tf" in model_name_components:
+            model_name_components.remove("tf")
+        core_model_name = "_".join(model_name_components)
+
         modelfile = os.path.join(self.svd_path, f"{core_model_name}.pkl")
 
         if self.interpolation_type == "sklearn_gp":
