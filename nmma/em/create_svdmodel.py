@@ -57,7 +57,7 @@ def main():
         default="bulla",
     )
     parser.add_argument(
-        "--interpolation_type",
+        "--interpolation-type",
         type=str,
         required=True,
         help="Type of interpolation to perform",

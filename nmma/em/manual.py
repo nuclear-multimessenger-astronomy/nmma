@@ -33,7 +33,7 @@ def get_parser():
         "--model", type=str, required=True, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
-        "--interpolation_type",
+        "--interpolation-type",
         type=str,
         help="SVD interpolation scheme.",
         default="sklearn_gp",
