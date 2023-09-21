@@ -344,9 +344,7 @@ class SVDLightCurveModel(object):
                 outfile = os.path.join(outdir, "model.h5")
                 self.svd_lbol_model["model"] = load_model(outfile)
         else:
-            return ValueError(
-                "self.interpolation_type must be sklearn_gp or tensorflow"
-            )
+            return ValueError("--interpolation-type must be sklearn_gp or tensorflow")
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0}, svd_path={1})".format(

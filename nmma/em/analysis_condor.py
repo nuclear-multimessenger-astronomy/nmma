@@ -11,16 +11,13 @@ def main():
         description="Inference on kilonova ejecta parameters."
     )
     parser.add_argument(
-        "--binary-type", 
-        type=str, 
-        required=False,
-        help="Either BNS or NSBH"
+        "--binary-type", type=str, required=False, help="Either BNS or NSBH"
     )
     parser.add_argument(
         "--model", type=str, required=True, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
-        "--interpolation_type",
+        "--interpolation-type",
         type=str,
         help="SVD interpolation scheme.",
         default="sklearn_gp",
@@ -47,7 +44,7 @@ def main():
     parser.add_argument(
         "--prior",
         type=str,
-        required= True,
+        required=True,
         help="The prior file from which to generate injections",
     )
     parser.add_argument(
@@ -188,8 +185,8 @@ def main():
     )
     parser.add_argument(
         "--ztf-ToO",
-        type=str, 
-        nargs='+',
+        type=str,
+        nargs="+",
         choices=["180", "300"],
         help="Adds realistic ToO observations during the first one or two days. Sampling depends on exposure time specified. Valid values are 180 (<1000sq deg) or 300 (>1000sq deg). Won't work w/o --ztf-sampling",
     )
@@ -197,7 +194,7 @@ def main():
         "--train-stats",
         help="Creates a file too.csv to derive statistics",
         action="store_true",
-    )    
+    )
     parser.add_argument(
         "--rubin-ToO",
         help="Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.",
@@ -225,15 +222,15 @@ def main():
         "--generation-seed",
         metavar="seed",
         type=int,
-        nargs='+', 
-        default=42, 
+        nargs="+",
+        default=42,
         help="Injection generation seed (default: 42), this can take a list",
     )
     parser.add_argument(
         "--plot", action="store_true", default=False, help="add best fit plot"
     )
     parser.add_argument(
-        "--bilby_zero_likelihood_mode",
+        "--bilby-zero-likelihood-mode",
         action="store_true",
         default=False,
         help="enable prior run",
@@ -260,7 +257,7 @@ def main():
         "--photometry-augmentation-times",
         type=str,
         help="A comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax",
-    ) 
+    )
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -271,13 +268,13 @@ def main():
         "--condor-dag-file",
         type=str,
         required=True,
-        help="The condor dag file to be created"
+        help="The condor dag file to be created",
     )
     parser.add_argument(
         "--condor-sub-file",
         type=str,
         required=True,
-        help="The condor sub file to be created"
+        help="The condor sub file to be created",
     )
     parser.add_argument(
         "--bash-file", type=str, required=True, help="The bash file to be created"
@@ -296,56 +293,62 @@ def main():
     except AttributeError:
         pass
     if refresh:
-        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
-    
-    binary_type_str = {'Bu2019lm':'BNS', 'Bu2019nsbh': 'NSBH'}
-    prior_str = {'BNS':'Bu2019lm.prior', 'NSBH':'Bu2019nsbh.prior'}
-    
-    inject_file = (args.injection) 
-    binary_type= binary_type_str[args.model]
-    prior_file = args.prior #prior_str[binary_type]
-        
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
+
+    binary_type_str = {"Bu2019lm": "BNS", "Bu2019nsbh": "NSBH"}
+    # prior_str = {"BNS": "Bu2019lm.prior", "NSBH": "Bu2019nsbh.prior"}
+
+    inject_file = args.injection
+    binary_type = binary_type_str[args.model]
+    prior_file = args.prior  # prior_str[binary_type]
+
     logdir = os.path.join(args.outdir, f"{binary_type}/logs".format())
     if not os.path.isdir(logdir):
-        os.makedirs(logdir)  
-    
+        os.makedirs(logdir)
+
     light_curve_analysis = (
         check_output(["which", "light_curve_analysis"]).decode().replace("\n", "")
     )
     seed_list = args.generation_seed
-    injection_num     = args.injection_num 
+    injection_num = args.injection_num
     seed_list = args.generation_seed
-    
+
     # determine --train-stats stage or not
-    
-    if args.train_stats :
-        train_stats = '--train-stats'
+
+    if args.train_stats:
+        train_stats = "--train-stats"
     else:
-        train_stats =''
-        
+        train_stats = ""
+
     # When using ZTF flags
 
-    if args.ztf_ToO :
-        exposure  = args.ztf_ToO
+    if args.ztf_ToO:
+        exposure = args.ztf_ToO
 
-        number_jobs = injection_num*len(seed_list)*len(exposure)
-        
+        # number_jobs = injection_num * len(seed_list) * len(exposure)
+
         job_number = 0
-        fid =  open(args.condor_dag_file, "w")
+        fid = open(args.condor_dag_file, "w")
         fid1 = open(args.bash_file, "w")
-        
-        for ii in range(1, int(injection_num)+1):
+
+        for ii in range(1, int(injection_num) + 1):
             for exp in exposure:
-                for seed  in seed_list:
-                
-                    outdir = os.path.join(args.outdir, f"{binary_type}/{ii}_{exp}_{seed}".format())
+                for seed in seed_list:
+
+                    outdir = os.path.join(
+                        args.outdir, f"{binary_type}/{ii}_{exp}_{seed}".format()
+                    )
                     if not os.path.isdir(outdir):
                         os.makedirs(outdir)
-                
-                    inject_outdir = os.path.join(args.outdir, f"{binary_type}/{ii}_{exp}_{seed}".format())
+
+                    inject_outdir = os.path.join(
+                        args.outdir, f"{binary_type}/{ii}_{exp}_{seed}".format()
+                    )
                     if not os.path.isdir(inject_outdir):
                         os.makedirs(inject_outdir)
-                
+
                     fid.write("JOB %d %s\n" % (job_number, args.condor_sub_file))
                     fid.write("RETRY %d 3\n" % (job_number))
                     fid.write(
@@ -354,37 +357,37 @@ def main():
                     )
                     fid.write("\n\n")
                     job_number = job_number + 1
-                
+
                     if args.interpolation_type:
                         fid1.write(
                             f"{light_curve_analysis} --model {args.model} --svd-path {args.svd_path} --interpolation_type {args.interpolation_type} --outdir {outdir} --label {args.label} --prior {prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection {inject_file} --injection-num {ii} --injection-detection-limit 25.0,25.0,25.3 --injection-outfile {inject_outdir}/lc.csv --generation-seed {seed} --filters g,r,i --plot --remove-nondetections --ztf-uncertainties --ztf-sampling --ztf-ToO {exp} {train_stats}\n".format()
                         )
-                        
+
                     else:
                         fid1.write(
                             f"{light_curve_analysis} --model {args.model} --svd-path {args.svd_path} --outdir {outdir} --label {args.label} --prior {prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection {inject_file} --injection-num {ii} --injection-detection-limit 25.0,25.0,25.3 --injection-outfile {inject_outdir}/lc.csv --generation-seed {seed} --filters g,r,i --plot --remove-nondetections --ztf-uncertainties --ztf-sampling --ztf-ToO {exp} {train_stats}\n".format()
                         )
         fid.close()
         fid1.close()
-        
+
         fid = open(args.condor_sub_file, "w")
-        fid.write("executable = %s\n"%light_curve_analysis)
+        fid.write("executable = %s\n" % light_curve_analysis)
         fid.write(f"output = {logdir}/out.$(jobNumber)\n")
         fid.write(f"error = {logdir}/err.$(jobNumber)\n")
-        
+
         if args.interpolation_type:
             fid.write(
                 f"arguments = --model {args.model} --svd-path {args.svd_path} --interpolation_type {args.interpolation_type} --outdir $(OUTDIR) --label {args.label} --prior {prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection {inject_file} --injection-num $(INJNUM) --injection-detection-limit 25.0,25.0,25.3 --injection-outfile $(INJOUT)/lc.csv --generation-seed $(SEED) --filters g,r,i --plot --remove-nondetections --ztf-uncertainties --ztf-sampling --ztf-ToO $(EXPOSURE) {train_stats}\n".format()
-            ) 
+            )
         else:
             fid.write(
                 f"arguments = --model {args.model} --svd-path {args.svd_path} --outdir $(OUTDIR) --label {args.label} --prior {prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection {inject_file} --injection-num $(INJNUM) --injection-detection-limit 25.0,25.0,25.3 --injection-outfile $(INJOUT)/lc.csv --generation-seed $(SEED) --filters g,r,i --plot --remove-nondetections --ztf-uncertainties --ztf-sampling --ztf-ToO $(EXPOSURE) {train_stats}\n".format()
-        )
+            )
         fid.write('requirements = OpSys == "LINUX"\n')
         fid.write("request_memory = 8192\n")
         fid.write("request_disk = 500 MB\n")
         fid.write("request_cpus = 1\n")
-        fid.write("accounting_group = ligo.dev.o3.burst.allsky.stamp\n") 
+        fid.write("accounting_group = ligo.dev.o3.burst.allsky.stamp\n")
         fid.write("notification = nevers\n")
         fid.write("getenv = true\n")
         fid.write("log = /local/%s/light_curve_analysis.log\n" % os.environ["USER"])
@@ -393,20 +396,24 @@ def main():
         fid.write("queue 1\n")
 
     else:
-        number_jobs = injection_num*len(seed_list)
-         
-        job_number = 0 
-        fid =  open(args.condor_dag_file, "w")
+        # number_jobs = injection_num * len(seed_list)
+
+        job_number = 0
+        fid = open(args.condor_dag_file, "w")
         fid1 = open(args.bash_file, "w")
 
-        for ii in range(1, int(injection_num)+1):
-            for seed  in seed_list:
-                
-                outdir = os.path.join(args.outdir, f"{binary_type}/{ii}_{seed}".format())
+        for ii in range(1, int(injection_num) + 1):
+            for seed in seed_list:
+
+                outdir = os.path.join(
+                    args.outdir, f"{binary_type}/{ii}_{seed}".format()
+                )
                 if not os.path.isdir(outdir):
                     os.makedirs(outdir)
 
-                inject_outdir = os.path.join(args.outdir, f"{binary_type}/{ii}_{seed}".format())
+                inject_outdir = os.path.join(
+                    args.outdir, f"{binary_type}/{ii}_{seed}".format()
+                )
                 if not os.path.isdir(inject_outdir):
                     os.makedirs(inject_outdir)
 
@@ -414,7 +421,7 @@ def main():
                 fid.write("RETRY %d 3\n" % (job_number))
                 fid.write(
                     'VARS %d jobNumber="%d" OUTDIR="%s" INJOUT="%s" INJNUM="%d"  SEED="%d"\n'
-                    % (job_number, job_number, outdir, inject_outdir, ii,  seed)
+                    % (job_number, job_number, outdir, inject_outdir, ii, seed)
                 )
                 fid.write("\n\n")
                 job_number = job_number + 1
@@ -430,25 +437,25 @@ def main():
                     )
         fid.close()
         fid1.close()
-        
+
         fid = open(args.condor_sub_file, "w")
-        fid.write("executable = %s\n"%light_curve_analysis)
+        fid.write("executable = %s\n" % light_curve_analysis)
         fid.write(f"output = {logdir}/out.$(jobNumber)\n")
         fid.write(f"error = {logdir}/err.$(jobNumber)\n")
-        
+
         if args.interpolation_type:
             fid.write(
                 f"arguments = --model {args.model} --svd-path {args.svd_path} --interpolation_type {args.interpolation_type} --outdir $(OUTDIR) --label {args.label} --prior {prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection {inject_file} --injection-num $(INJNUM) --injection-detection-limit 23.9,25.0,24.7,24.0,23.3,22.1 --injection-outfile $(INJOUT)/lc.csv --generation-seed $(SEED) --filters u,g,r,i,z,y --plot --remove-nondetections --rubin-ToO-type {binary_type} --rubin-ToO {train_stats}\n".format()
-            ) 
+            )
         else:
             fid.write(
                 f"arguments = --model {args.model} --svd-path {args.svd_path} --outdir $(OUTDIR) --label {args.label} --prior {prior_file} --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection {inject_file} --injection-num $(INJNUM) --injection-detection-limit 23.9,25.0,24.7,24.0,23.3,22.1  --injection-outfile $(INJOUT)/lc.csv --generation-seed $(SEED) --filters u,g,r,i,z,y --plot --remove-nondetections --rubin-ToO-type {binary_type} --rubin-ToO {train_stats}".format()
-        )
+            )
         fid.write('requirements = OpSys == "LINUX"\n')
         fid.write("request_memory = 8192\n")
         fid.write("request_disk = 500 MB\n")
         fid.write("request_cpus = 1\n")
-        fid.write("accounting_group = ligo.dev.o3.burst.allsky.stamp\n") 
+        fid.write("accounting_group = ligo.dev.o3.burst.allsky.stamp\n")
         fid.write("notification = nevers\n")
         fid.write("getenv = true\n")
         fid.write("log = /local/%s/light_curve_analysis.log\n" % os.environ["USER"])
@@ -458,4 +465,4 @@ def main():
 
 
 if __name__ == "__main__":
-   main()
+    main()

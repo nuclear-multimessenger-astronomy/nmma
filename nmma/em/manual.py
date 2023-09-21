@@ -33,7 +33,7 @@ def get_parser():
         "--model", type=str, required=True, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
-        "--interpolation_type",
+        "--interpolation-type",
         type=str,
         help="SVD interpolation scheme.",
         default="sklearn_gp",
@@ -247,7 +247,7 @@ def get_parser():
         "--plot", action="store_true", default=False, help="add best fit plot"
     )
     parser.add_argument(
-        "--bilby_zero_likelihood_mode",
+        "--bilby-zero-likelihood-mode",
         action="store_true",
         default=False,
         help="enable prior run",
