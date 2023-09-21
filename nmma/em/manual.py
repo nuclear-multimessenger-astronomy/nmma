@@ -247,7 +247,7 @@ def get_parser():
         "--plot", action="store_true", default=False, help="add best fit plot"
     )
     parser.add_argument(
-        "--bilby_zero_likelihood_mode",
+        "--bilby-zero-likelihood-mode",
         action="store_true",
         default=False,
         help="enable prior run",

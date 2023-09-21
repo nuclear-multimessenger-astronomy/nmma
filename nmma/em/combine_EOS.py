@@ -52,7 +52,7 @@ def main():
     parser.add_argument("--outdir", metavar="PATH", type=str, required=True)
     parser.add_argument("--label", metavar="NAME", type=str, required=True)
     parser.add_argument(
-        "--R14_true",
+        "--R14-true",
         type=float,
         default=11.55,
         help="The true value of Neutron stars's raduis (default:11.55)",
