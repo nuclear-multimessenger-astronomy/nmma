@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    # Beginning of analysis.py inputs. Keep this up to date as analysis.py changes (along with the two lists below).
+    # Beginning of analysis.py inputs. Keep this up to date as analysis.py changes (along with nmma_arg_list below).
     parser.add_argument(
         "--config",
         type=str,
@@ -451,8 +451,27 @@ if __name__ == "__main__":
 
     args_vars = vars(args)
 
-    # List of non-boolean arguments for analysis.py
-    non_bool_arg_list = [
+    # List nmma-specific args
+    nmma_arg_list = [
+        "log_space_time",
+        "soft_init",
+        "reactive_sampling",
+        "remove_nondetections",
+        "with_grb_injection",
+        "prompt_collapse",
+        "ztf_sampling",
+        "ztf_uncertainties",
+        "train_stats",
+        "rubin_ToO",
+        "plot",
+        "bilby_zero_likelihood_mode",
+        "photometry_augmentation",
+        "conditional_gaussian_prior_thetaObs",
+        "sample_over_Hubble",
+        "verbose",
+        "refresh_models_list",
+        "local_only",
+        "bestfit",
         "config",
         "model",
         "interpolation_type",
@@ -496,43 +515,20 @@ if __name__ == "__main__":
         "conditional_gaussian_prior_N_sigma",
     ]
 
-    # List of boolean arguments for analysis.py
-    bool_arg_list = [
-        "log_space_time",
-        "soft_init",
-        "reactive_sampling",
-        "remove_nondetections",
-        "with_grb_injection",
-        "prompt_collapse",
-        "ztf_sampling",
-        "ztf_uncertainties",
-        "train_stats",
-        "rubin_ToO",
-        "plot",
-        "bilby_zero_likelihood_mode",
-        "photometry_augmentation",
-        "conditional_gaussian_prior_thetaObs",
-        "sample_over_Hubble",
-        "verbose",
-        "refresh_models_list",
-        "local_only",
-        "bestfit",
-    ]
-
     # Manipulate args for easy inclusion in slurm script
-    bool_args_to_add = []
-    non_bool_args_to_add = []
+    args_to_add = []
     for arg in args_vars.keys():
-        if arg in bool_arg_list:
-            if args_vars[arg]:
+        if arg in nmma_arg_list:
+            arg_value = args_vars[arg]
+            if type(arg_value) == bool:
+                if arg_value:
+                    hyphen_arg = arg.replace("_", "-")
+                    args_to_add.append(f"--{hyphen_arg}")
+            else:
                 hyphen_arg = arg.replace("_", "-")
-                bool_args_to_add.append(f"--{hyphen_arg}")
-        elif arg in non_bool_arg_list:
-            hyphen_arg = arg.replace("_", "-")
-            non_bool_args_to_add.append(f"--{hyphen_arg} {args_vars[arg]}")
+                args_to_add.append(f"--{hyphen_arg} {args_vars[arg]}")
 
-    bool_args = " ".join(bool_args_to_add)
-    non_bool_args = " ".join(non_bool_args_to_add)
+    all_args = " ".join(args_to_add)
 
     scriptName = args.script_name
     script_path = BASE_DIR / scriptName
@@ -574,7 +570,7 @@ if __name__ == "__main__":
         fid.write(f"source activate {args.python_env_name}\n")
 
     fid.write(
-        f"mpiexec -n {args.Ncore} -hosts=$(hostname) lightcurve-analysis {non_bool_args} {bool_args}"
+        f"mpiexec -n {args.Ncore} -hosts=$(hostname) lightcurve-analysis {all_args}"
     )
 
     fid.close()
