@@ -19,7 +19,7 @@ if __name__ == "__main__":
         "--model",
         type=str,
         help="Name of the kilonova model to be used",
-        default="$MOD",
+        default="$MODEL",
     )
     parser.add_argument(
         "--interpolation-type",
@@ -58,7 +58,10 @@ if __name__ == "__main__":
         default="$DATA",
     )
     parser.add_argument(
-        "--prior", type=str, help="Path to the prior file", default="priors/$MOD.prior"
+        "--prior",
+        type=str,
+        help="Path to the prior file",
+        default="priors/$MODEL.prior",
     )
     parser.add_argument(
         "--tmin",
@@ -582,10 +585,10 @@ if __name__ == "__main__":
     )
     print()
     print(
-        "Default wildcard inputs are --model ($MOD), --label ($LABEL), --trigger-time ($TT), and --data ($DATA).\nNote that the default prior is priors/$MOD.prior."
+        "Default wildcard inputs are --model ($MODEL), --label ($LABEL), --trigger-time ($TT), and --data ($DATA).\nNote that the default prior is priors/$MODEL.prior."
     )
     print()
     print(
-        f'To queue this script, run e.g. "sbatch --export=MOD=Bu2019lm,LABEL=test,TT=59361.0,DATA=example_files/candidate_data/ZTF21abdpqpq.dat {scriptName}" on your HPC.'
+        f'To queue this script, run e.g. "sbatch --export=MODEL=Bu2019lm,LABEL=test,TT=59361.0,DATA=example_files/candidate_data/ZTF21abdpqpq.dat {scriptName}" on your HPC.'
     )
     print()
