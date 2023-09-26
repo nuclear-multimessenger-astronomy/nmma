@@ -105,6 +105,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args_vars = vars(args)
 
+    wildcard_mapper = {
+        "model": "$MODEL",
+        "label": "$LABEL",
+        "trigger_time": "$TT",
+        "data": "$DATA",
+        "prior": "priors/$MODEL.prior",
+    }
+
+    for key in ["model", "label", "trigger_time", "data", "prior"]:
+        if args_vars[key] is None:
+            args_vars[key] = wildcard_mapper[key]
+
     # Manipulate args for easy inclusion in slurm script
     args_to_add = []
     for arg in args_vars.keys():
@@ -114,9 +126,11 @@ if __name__ == "__main__":
                 if arg_value:
                     hyphen_arg = arg.replace("_", "-")
                     args_to_add.append(f"--{hyphen_arg}")
-            else:
+            elif (arg_value is not None) & (arg_value != "None"):
                 hyphen_arg = arg.replace("_", "-")
                 args_to_add.append(f"--{hyphen_arg} {args_vars[arg]}")
+            else:
+                continue
 
     all_args = " ".join(args_to_add)
 
@@ -153,7 +167,6 @@ if __name__ == "__main__":
         fid.write(f"#SBATCH --mail-user={args.mail_user}\n")
 
     if args.cluster_name in ["Expanse", "expanse", "EXPANSE"]:
-        fid.write("module purge\n")
         if args.gpus > 0:
             fid.write("module add gpu/0.15.4\n")
             fid.write("module add cuda\n")
