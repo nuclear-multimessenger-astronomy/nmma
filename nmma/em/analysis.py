@@ -24,9 +24,12 @@ from .io import loadEvent
 matplotlib.use("agg")
 
 
-def get_parser():
+def get_parser(**kwargs):
+    add_help = kwargs.get("add_help", True)
+
     parser = argparse.ArgumentParser(
-        description="Inference on kilonova ejecta parameters."
+        description="Inference on kilonova ejecta parameters.",
+        add_help=add_help,
     )
     parser.add_argument(
         "--config",
