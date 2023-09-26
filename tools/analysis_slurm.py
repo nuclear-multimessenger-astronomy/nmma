@@ -10,8 +10,12 @@ if __name__ == "__main__":
 
     # Get analysis.py parser
     nmma_parser = get_parser(add_help=False)
-    nmma_args = nmma_parser.parse_args()
-    nmma_arg_list = [x for x in vars(nmma_args).keys()]
+
+    # Get argument names from nmma_parser
+    nmma_arg_list = []
+    for action in nmma_parser._actions:
+        arg_name = action.option_strings[0]
+        nmma_arg_list.append(arg_name[2:].replace("-", "_"))
 
     # Create new parser that inherits analysis.py arguments
     parser = argparse.ArgumentParser(parents=[nmma_parser])
