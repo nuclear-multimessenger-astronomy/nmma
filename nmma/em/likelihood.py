@@ -154,7 +154,10 @@ class OpticalLightCurve(Likelihood):
             data_sigma = self.light_curve_data[filt][:, 2]
 
             # include the error budget into calculation
-            data_sigma = np.sqrt(data_sigma**2 + self.error_budget[filt] ** 2)
+            if 'em_syserr' in self.parameters:
+                data_sigma = np.sqrt(data_sigma**2 + self.parameters['em_syserr']**2)
+            else:
+                data_sigma = np.sqrt(data_sigma**2 + self.error_budget[filt]**2)
 
             # evaluate the light curve magnitude at the data points
             mag_est = mag_app_interp[filt](data_time)
@@ -183,9 +186,15 @@ class OpticalLightCurve(Likelihood):
 
             # evaluate the data with infinite error
             if len(infIdx) > 0:
-                gausslogsf = scipy.stats.norm.logsf(
-                    data_mag[infIdx], mag_est[infIdx], self.error_budget[filt]
-                )
+                if 'em_syserr' in self.parameters:
+                    upperlim_sigma = self.parameters['em_syserr']
+                    gausslogsf = scipy.stats.norm.logsf(
+                        data_mag[infIdx], mag_est[infIdx], upperlim_sigma
+                    )
+                else:
+                    gausslogsf = scipy.stats.norm.logsf(
+                        data_mag[infIdx], mag_est[infIdx], self.error_budget[filt]
+                    )
                 gaussprob_total += np.sum(gausslogsf)
 
         log_prob = minus_chisquare_total + gaussprob_total
