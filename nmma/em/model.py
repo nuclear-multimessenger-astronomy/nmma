@@ -291,7 +291,7 @@ class SVDLightCurveModel(object):
                 if filters is None:
                     self.filters = model_filters
 
-            if os.path.isfile(modelfile):
+            elif os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
 
