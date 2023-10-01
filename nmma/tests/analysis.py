@@ -68,7 +68,8 @@ def test_analysis():
         sample_over_Hubble=False,
         sampler_kwargs="{}",
         verbose=False,
-        local_only=True
+        local_only=True,
+        systematics_file="{dataDir}/systematic.yaml",
     )
 
     analysis.main(args)
