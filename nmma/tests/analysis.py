@@ -69,7 +69,7 @@ def test_analysis():
         sampler_kwargs="{}",
         verbose=False,
         local_only=True,
-        systematics_file="{dataDir}/systematic.yaml",
+        systematics_file=None,
     )
 
     analysis.main(args)
