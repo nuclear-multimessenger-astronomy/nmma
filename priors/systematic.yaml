@@ -1,0 +1,13 @@
+config:
+  withTime:
+    value: true
+    filters: ["u", "g", null] # null means filter independent
+    time_nodes: 2
+    type: "Uniform"
+    min: 0
+    max: 2
+  withoutTime:
+    value: false
+    type: "Uniform"
+    min: 0
+    max: 2

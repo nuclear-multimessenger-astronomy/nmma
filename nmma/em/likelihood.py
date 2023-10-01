@@ -1,16 +1,18 @@
 from __future__ import division
 
+from pathlib import Path
+
 import numpy as np
 import scipy.stats
+import yaml
+from bilby.core.likelihood import Likelihood
 from scipy.interpolate import interp1d
 from scipy.stats import truncnorm
 
-from bilby.core.likelihood import Likelihood
-from . import utils
+from . import systematicsprior, utils
 
 
 def truncated_gaussian(m_det, m_err, m_est, lim):
-
     a, b = (-np.inf - m_est) / m_err, (lim - m_est) / m_err
     logpdf = truncnorm.logpdf(m_det, a, b, loc=m_est, scale=m_err)
 
@@ -55,10 +57,12 @@ class OpticalLightCurve(Likelihood):
         filters,
         light_curve_data,
         trigger_time,
+        systematics_file,
         detection_limit=None,
         error_budget=1.0,
         tmin=0.0,
         tmax=14.0,
+        dt=0.1,
         verbose=False,
     ):
         self.light_curve_model = light_curve_model
@@ -67,6 +71,7 @@ class OpticalLightCurve(Likelihood):
         self.trigger_time = trigger_time
         self.tmin = tmin
         self.tmax = tmax
+        self.dt = dt
         if isinstance(error_budget, (int, float, complex)) and not isinstance(
             error_budget, bool
         ):
@@ -81,6 +86,7 @@ class OpticalLightCurve(Likelihood):
             light_curve_data, self.filters, self.trigger_time, self.tmin, self.tmax
         )
         self.light_curve_data = processedData
+        self.systematics_file = systematics_file
 
         self.detection_limit = {}
         if detection_limit:
@@ -144,6 +150,29 @@ class OpticalLightCurve(Likelihood):
                     bounds_error=False,
                 )
 
+        if self.systematics_file is not None:    
+
+            yaml_dict = yaml.safe_load(Path(self.systematics_file).read_text())
+            systematicsprior.validate_only_one_true(yaml_dict)
+
+            if yaml_dict["config"]["withTime"]["value"]:
+                n = yaml_dict["config"]["withTime"]["time_nodes"]
+                time_array = np.linspace(self.tmin, self.tmax + self.dt, n)
+
+                for filt in yaml_dict["config"]["withTime"]["filters"]:
+                    if filt is None:
+                        filt = "all"
+                    globals()[f"sys_err_{filt}_array"] = np.array([])
+                    
+                    for i in range(1, n + 1):
+                        value = self.parameters.get(f"sys_err_{filt}{i}")
+                        globals()[f"sys_err_{filt}_array"] = np.append(globals()[f"sys_err_{filt}_array"], value)
+
+                for yaml_filt in yaml_dict["config"]["withTime"]["filters"]:
+                    if yaml_filt is None:
+                        yaml_filt = "all"
+                    globals()[f"sys_err_{yaml_filt}_interped"] = interp1d(time_array,globals()[f"sys_err_{yaml_filt}_array"],fill_value="extrapolate",bounds_error=False)
+
         # compare the estimated light curve and the measured data
         minus_chisquare_total = 0.0
         gaussprob_total = 0.0
@@ -152,12 +181,18 @@ class OpticalLightCurve(Likelihood):
             data_time = self.light_curve_data[filt][:, 0]
             data_mag = self.light_curve_data[filt][:, 1]
             data_sigma = self.light_curve_data[filt][:, 2]
+        
+            if self.systematics_file is not None:
+                if yaml_dict["config"]["withTime"]["value"]:
+                    for yaml_filt in yaml_dict["config"]["withTime"]["filters"]:
+                        if yaml_filt is None:
+                            yaml_filt = "all"
+                        data_sigma = np.sqrt(data_sigma**2 + (globals()[f"sys_err_{yaml_filt}_interped"](data_time)) ** 2)
 
-            # include the error budget into calculation
-            if 'em_syserr' in self.parameters:
-                data_sigma = np.sqrt(data_sigma**2 + self.parameters['em_syserr']**2)
+                elif yaml_dict["config"]["withoutTime"]["value"]:
+                    data_sigma = np.sqrt(data_sigma**2 + self.parameters["sys_err"] ** 2)
             else:
-                data_sigma = np.sqrt(data_sigma**2 + self.error_budget[filt]**2)
+                data_sigma = np.sqrt(data_sigma**2 + self.error_budget[filt] ** 2)
 
             # evaluate the light curve magnitude at the data points
             mag_est = mag_app_interp[filt](data_time)
@@ -166,7 +201,7 @@ class OpticalLightCurve(Likelihood):
             infIdx = np.where(~np.isfinite(data_sigma))[0]
             finiteIdx = np.where(np.isfinite(data_sigma))[0]
 
-            # evaluate the chisuquare
+            # evaluate the chisuquares
             if len(finiteIdx) >= 1:
                 minus_chisquare = np.sum(
                     truncated_gaussian(
@@ -186,11 +221,22 @@ class OpticalLightCurve(Likelihood):
 
             # evaluate the data with infinite error
             if len(infIdx) > 0:
-                if 'em_syserr' in self.parameters:
-                    upperlim_sigma = self.parameters['em_syserr']
-                    gausslogsf = scipy.stats.norm.logsf(
-                        data_mag[infIdx], mag_est[infIdx], upperlim_sigma
-                    )
+                if self.systematics_file is not None:
+
+                    if yaml_dict["config"]["withTime"]["value"]:
+                        for yaml_filt in yaml_dict["config"]["withTime"]["filters"]:
+                            if yaml_filt is None:
+                                yaml_filt = "all"
+                            upperlim_sigma = globals()[f"sys_err_{yaml_filt}_interped"](data_time[infIdx])
+                            gausslogsf = scipy.stats.norm.logsf(
+                                data_mag[infIdx], mag_est[infIdx], upperlim_sigma
+                            )
+
+                    elif yaml_dict["config"]["withoutTime"]["value"]:
+                        upperlim_sigma = self.parameters["sys_err"]
+                        gausslogsf = scipy.stats.norm.logsf(
+                            data_mag[infIdx], mag_est[infIdx], upperlim_sigma
+                        )
                 else:
                     gausslogsf = scipy.stats.norm.logsf(
                         data_mag[infIdx], mag_est[infIdx], self.error_budget[filt]

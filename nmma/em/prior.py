@@ -2,6 +2,10 @@ import bilby
 import bilby.core
 from bilby.core.prior import Prior
 from bilby.core.prior.conditional import ConditionalTruncatedGaussian
+import tempfile
+import os
+
+from . import systematicsprior
 
 
 class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
@@ -26,7 +30,6 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
         unit=None,
         boundary=None,
     ):
-
         super(ConditionalTruncatedGaussian, self).__init__(
             mu=0,
             sigma=1,
@@ -66,7 +69,6 @@ def create_prior_from_args(model_names, args):
     if len(AnBa2022_intersect) > 0:
 
         def convert_mtot_mni(parameters):
-
             for param in ["mni", "mtot", "mrp"]:
                 if param not in parameters:
                     parameters[param] = 10**parameters[f"log10_{param}"]
@@ -117,5 +119,15 @@ def create_prior_from_args(model_names, args):
 
         priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
+
+    if args.systematics_file is not None:
+        systematics = systematicsprior.main(args.systematics_file)
+
+        with tempfile.NamedTemporaryFile(delete=False, mode="w") as tempf:
+            for line in systematics:
+                tempf.write(line + "\n")
+
+        priors.from_file(tempf.name)
+        os.remove(tempf.name)
 
     return priors
