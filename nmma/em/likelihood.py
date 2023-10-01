@@ -157,7 +157,7 @@ class OpticalLightCurve(Likelihood):
 
             if yaml_dict["config"]["withTime"]["value"]:
                 n = yaml_dict["config"]["withTime"]["time_nodes"]
-                time_array = np.linspace(self.tmin, self.tmax + self.dt, n)
+                time_array = np.round(np.linspace(self.tmin, self.tmax, n),2)
 
                 for filt in yaml_dict["config"]["withTime"]["filters"]:
                     if filt is None:

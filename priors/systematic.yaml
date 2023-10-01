@@ -1,8 +1,8 @@
 config:
   withTime:
     value: true
-    filters: ["u", "g", null] # null means filter independent
-    time_nodes: 2
+    filters: ["u", "K", null] # null means filter independent
+    time_nodes: 16
     type: "Uniform"
     min: 0
     max: 2
