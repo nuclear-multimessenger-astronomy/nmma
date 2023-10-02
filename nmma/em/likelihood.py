@@ -185,7 +185,7 @@ class OpticalLightCurve(Likelihood):
             if self.systematics_file is not None:
                 if yaml_dict["config"]["withTime"]["value"]:
                     for yaml_filt in yaml_dict["config"]["withTime"]["filters"]:
-                        if yaml_filt is None:
+                        if yaml_filt != filt:
                             yaml_filt = "all"
                         data_sigma = np.sqrt(data_sigma**2 + (globals()[f"sys_err_{yaml_filt}_interped"](data_time)) ** 2)
 
@@ -225,7 +225,7 @@ class OpticalLightCurve(Likelihood):
 
                     if yaml_dict["config"]["withTime"]["value"]:
                         for yaml_filt in yaml_dict["config"]["withTime"]["filters"]:
-                            if yaml_filt is None:
+                            if yaml_filt != filt:
                                 yaml_filt = "all"
                             upperlim_sigma = globals()[f"sys_err_{yaml_filt}_interped"](data_time[infIdx])
                             gausslogsf = scipy.stats.norm.logsf(
