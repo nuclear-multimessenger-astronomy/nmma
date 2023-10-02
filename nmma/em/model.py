@@ -7,6 +7,7 @@ import numpy as np
 from scipy.special import logsumexp
 import scipy.constants
 from sncosmo.models import _SOURCES
+import warnings
 
 from . import utils
 
@@ -280,7 +281,14 @@ class SVDLightCurveModel(object):
                 self.svd_lbol_model = None
         elif self.interpolation_type == "tensorflow":
             import tensorflow as tf
-            modelfile = os.path.join(self.svd_path, f"{core_model_name}_tf.pkl")
+
+            # TODO: remove below 3 lines once <model>_tf.pkl files on Zenodo are updated to <model>.pkl
+            if not os.path.exists(modelfile):
+                warnings.warn(
+                    f"Attempting to load {core_model_name}_tf.pkl. In the future, all model files will have the format <model>.pkl, regardless of --interpolation-type."
+                )
+                modelfile = os.path.join(self.svd_path, f"{core_model_name}_tf.pkl")
+
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
 
