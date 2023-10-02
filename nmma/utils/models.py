@@ -124,6 +124,7 @@ def load_models_list(doi=None, models_home=None):
             print(
                 "Could not retrieve latest DOI, models won't be downloaded or updated. Will try using existing list or local files available."
             )
+            DOI = PERMANENT_DOI
             pass
 
     if doi in [None, ""]:
