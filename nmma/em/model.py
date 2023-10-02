@@ -280,7 +280,7 @@ class SVDLightCurveModel(object):
                 self.svd_lbol_model = None
         elif self.interpolation_type == "tensorflow":
             import tensorflow as tf
-
+            modelfile = os.path.join(self.svd_path, f"{core_model_name}_tf.pkl")
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
 
@@ -291,7 +291,7 @@ class SVDLightCurveModel(object):
                 if filters is None:
                     self.filters = model_filters
 
-            elif os.path.isfile(modelfile):
+            if os.path.isfile(modelfile):
                 with open(modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
 
@@ -569,7 +569,7 @@ class KilonovaGRBLightCurveModel(object):
 
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters, [])
+            new_parameters, _ = self.parameter_conversion(new_parameters)
         else:
             new_parameters = parameters.copy()
 
