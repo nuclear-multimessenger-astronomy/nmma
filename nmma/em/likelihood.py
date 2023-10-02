@@ -184,10 +184,11 @@ class OpticalLightCurve(Likelihood):
         
             if self.systematics_file is not None:
                 if yaml_dict["config"]["withTime"]["value"]:
-                    for yaml_filt in yaml_dict["config"]["withTime"]["filters"]:
-                        if yaml_filt != filt:
-                            yaml_filt = "all"
-                        data_sigma = np.sqrt(data_sigma**2 + (globals()[f"sys_err_{yaml_filt}_interped"](data_time)) ** 2)
+                    if filt in yaml_dict["config"]["withTime"]["filters"]:
+                        yaml_filt = filt
+                    else:
+                        yaml_filt = "all"
+                    data_sigma = np.sqrt(data_sigma**2 + (globals()[f"sys_err_{yaml_filt}_interped"](data_time)) ** 2)
 
                 elif yaml_dict["config"]["withoutTime"]["value"]:
                     data_sigma = np.sqrt(data_sigma**2 + self.parameters["sys_err"] ** 2)
@@ -224,13 +225,14 @@ class OpticalLightCurve(Likelihood):
                 if self.systematics_file is not None:
 
                     if yaml_dict["config"]["withTime"]["value"]:
-                        for yaml_filt in yaml_dict["config"]["withTime"]["filters"]:
-                            if yaml_filt != filt:
-                                yaml_filt = "all"
-                            upperlim_sigma = globals()[f"sys_err_{yaml_filt}_interped"](data_time[infIdx])
-                            gausslogsf = scipy.stats.norm.logsf(
-                                data_mag[infIdx], mag_est[infIdx], upperlim_sigma
-                            )
+                        if filt in yaml_dict["config"]["withTime"]["filters"]:
+                            yaml_filt = filt
+                        else:
+                            yaml_filt = "all"
+                        upperlim_sigma = globals()[f"sys_err_{yaml_filt}_interped"](data_time[infIdx])
+                        gausslogsf = scipy.stats.norm.logsf(
+                            data_mag[infIdx], mag_est[infIdx], upperlim_sigma
+                        )
 
                     elif yaml_dict["config"]["withoutTime"]["value"]:
                         upperlim_sigma = self.parameters["sys_err"]
