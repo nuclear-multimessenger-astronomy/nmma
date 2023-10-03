@@ -744,8 +744,8 @@ def analysis(args):
 
     if args.bestfit:
         bestfit_to_write = bestfit_params.copy()
-        bestfit_to_write["ln_bayes_factor"] = round(result.log_bayes_factor, 3)
-        bestfit_to_write["ln_bayes_factor_err"] = round(result.log_evidence_err, 3)
+        bestfit_to_write["ln_bayes_factor"] = result.log_bayes_factor
+        bestfit_to_write["ln_bayes_factor_err"] = result.log_evidence_err
         bestfit_to_write["Best fit index"] = int(bestfit_idx)
         bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
         bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
