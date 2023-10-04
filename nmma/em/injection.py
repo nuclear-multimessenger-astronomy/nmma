@@ -424,4 +424,12 @@ def create_light_curve_data(
         for filt in passbands_to_lose:
             del data[filt]
 
+    filters_to_check = list(data.keys())
+    for filt in filters_to_check:
+        idx = np.union1d(
+            np.where(np.isfinite(data[filt][:, 1]))[0],
+            np.where(np.isfinite(data[filt][:, 2]))[0],
+        )
+        data[filt] = data[filt][idx, :]
+
     return data
