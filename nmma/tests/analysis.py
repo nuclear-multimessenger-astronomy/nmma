@@ -2,13 +2,15 @@ from argparse import Namespace
 import os
 
 from ..em import analysis
+from tools import analysis_slurm
+
 
 def test_analysis():
 
-    workingDir=os.path.dirname(__file__)
-    
-    dataDir = os.path.join(workingDir, 'data')
-    svdmodels=os.path.join(workingDir, '../../svdmodels/')
+    workingDir = os.path.dirname(__file__)
+
+    dataDir = os.path.join(workingDir, "data")
+    svdmodels = os.path.join(workingDir, "../../svdmodels/")
 
     args = Namespace(
         model="Bu2019lm",
@@ -68,7 +70,12 @@ def test_analysis():
         sample_over_Hubble=False,
         sampler_kwargs="{}",
         verbose=False,
-        local_only=True
+        local_only=True,
     )
 
     analysis.main(args)
+
+
+def test_analysis_slurm():
+
+    analysis_slurm.main()
