@@ -1,12 +1,31 @@
 import bilby
 import bilby.core
 from bilby.core.prior import Prior
+from bilby.core.prior import PriorDict as _PriorDict
 from bilby.core.prior.conditional import ConditionalTruncatedGaussian
-import tempfile
-import os
 
 from . import systematicsprior
 
+
+def from_list(self, systematics):
+    """
+    Similar to `from_file` but instead of file buffer, takes a list of Prior strings
+    See `from_file` for more details
+    """
+    
+    comments = ["#", "\n"]
+    prior = dict()
+    for line in systematics:
+        if line[0] in comments:
+            continue
+        line.replace(" ", "")
+        elements = line.split("=")
+        key = elements[0].replace(" ", "")
+        val = "=".join(elements[1:]).strip()
+        prior[key] = val
+    self.from_dictionary(prior)
+
+setattr(_PriorDict, "from_list", from_list)
 
 class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
     """
@@ -122,12 +141,6 @@ def create_prior_from_args(model_names, args):
 
     if args.systematics_file is not None:
         systematics = systematicsprior.main(args.systematics_file)
-
-        with tempfile.NamedTemporaryFile(delete=False, mode="w") as tempf:
-            for line in systematics:
-                tempf.write(line + "\n")
-
-        priors.from_file(tempf.name)
-        os.remove(tempf.name)
+        priors.from_list(systematics)
 
     return priors

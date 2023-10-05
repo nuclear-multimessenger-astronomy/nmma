@@ -1,8 +1,12 @@
 config:
   withTime:
     value: true
-    filters: ["u", "K", null] # null means filter independent
-    time_nodes: 12
+    filters: 
+      - ["u","r","y"]
+      - ["g","i","z","K"]
+      - "J"
+      - null # null means filter independent
+    time_nodes: 2
     type: "Uniform"
     min: 0
     max: 2
