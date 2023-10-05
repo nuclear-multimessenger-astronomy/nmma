@@ -3,11 +3,12 @@ import argparse
 import pathlib
 import os
 from nmma.em.analysis import get_parser
+import numpy as np
 
 BASE_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
-if __name__ == "__main__":
 
+def main():
     # Get analysis.py parser
     nmma_parser = get_parser(add_help=False)
 
@@ -34,10 +35,10 @@ if __name__ == "__main__":
         help="job name",
     )
     parser.add_argument(
-        "--slurm-dir-name",
+        "--logs-dir-name",
         type=str,
-        default="hpc",
-        help="directory name for logs/slurm scripts",
+        default="slurm_logs",
+        help="directory name for slurm logs",
     )
     parser.add_argument(
         "--cluster-name",
@@ -115,10 +116,27 @@ if __name__ == "__main__":
         "trigger_time": "$TT",
         "data": "$DATA",
         "prior": "priors/$MODEL.prior",
+        "tmin": "$TMIN",
+        "tmax": "$TMAX",
+        "dt": "$DT",
     }
 
-    for key in ["model", "label", "trigger_time", "data", "prior"]:
-        if args_vars[key] is None:
+    args.outdir = f"{args.outdir}/$LABEL"
+
+    for key in [
+        "model",
+        "label",
+        "trigger_time",
+        "data",
+        "prior",
+        "tmin",
+        "tmax",
+        "dt",
+    ]:
+        if type(args_vars[key]) in [float, int]:
+            if np.isnan(args_vars[key]):
+                args_vars[key] = wildcard_mapper[key]
+        elif (args_vars[key] is None) | (args_vars[key] == "None"):
             args_vars[key] = wildcard_mapper[key]
 
     # Manipulate args for easy inclusion in slurm script
@@ -139,26 +157,19 @@ if __name__ == "__main__":
     all_args = " ".join(args_to_add)
 
     scriptName = args.script_name
-    script_path = BASE_DIR / scriptName
 
-    dirname = f"{args.slurm_dir_name}"
+    logsDirName = args.logs_dir_name
     jobname = f"{args.job_name}"
 
-    dirpath = BASE_DIR / dirname
-    os.makedirs(dirpath, exist_ok=True)
-
-    slurmDir = os.path.join(dirpath, "slurm")
-    os.makedirs(slurmDir, exist_ok=True)
-
-    logsDir = os.path.join(dirpath, "logs")
+    logsDir = os.path.join(BASE_DIR, logsDirName)
     os.makedirs(logsDir, exist_ok=True)
 
     # Write slurm script based on inputs
-    fid = open(os.path.join(slurmDir, scriptName), "w")
+    fid = open(os.path.join(BASE_DIR, scriptName), "w")
     fid.write("#!/bin/bash\n")
     fid.write(f"#SBATCH --job-name={jobname}.job\n")
-    fid.write(f"#SBATCH --output=../logs/{jobname}_%A_%a.out\n")
-    fid.write(f"#SBATCH --error=../logs/{jobname}_%A_%a.err\n")
+    fid.write(f"#SBATCH --output={logsDirName}/{jobname}_%A_%a.out\n")
+    fid.write(f"#SBATCH --error={logsDirName}/{jobname}_%A_%a.err\n")
     fid.write(f"#SBATCH -p {args.partition_type}\n")
     fid.write(f"#SBATCH --nodes {args.nodes}\n")
     fid.write(f"#SBATCH --ntasks-per-node {args.Ncore}\n")
@@ -184,14 +195,22 @@ if __name__ == "__main__":
 
     print()
     print(
-        f'Wrote {slurmDir}/{scriptName} and created "logs" and "slurm" directories within "{args.slurm_dir_name}".'
+        f'Wrote {scriptName} and created {logsDirName} directory within "{BASE_DIR}".'
     )
     print()
     print(
-        "Default wildcard inputs are --model ($MODEL), --label ($LABEL), --trigger-time ($TT), and --data ($DATA).\nNote that the default prior is priors/$MODEL.prior."
+        "Default wildcard inputs are --model ($MODEL), --trigger-time ($TT), and --data ($DATA).\nNote that the default prior is priors/$MODEL.prior."
     )
     print()
     print(
-        f'To queue this script, run e.g. "sbatch --export=MODEL=Bu2019lm,LABEL=test,TT=59361.0,DATA=example_files/candidate_data/ZTF21abdpqpq.dat {scriptName}" on your HPC.'
+        "It is also recommended to set the following keywords to 'None' when running this script to allow them to be customized: --label ($LABEL), --tmin ($TMIN), --tmax ($TMAX), and --dt ($DT)"
     )
     print()
+    print(
+        f'To queue this script, run e.g. "sbatch --export=MODEL=Bu2019lm,TT=59361.0,DATA=example_files/candidate_data/ZTF21abdpqpq.dat {scriptName}" on your HPC.'
+    )
+    print()
+
+
+if __name__ == "__main__":
+    main()
