@@ -119,6 +119,7 @@ addopts = "--verbose -r s"
 [tool.bumpver]
 current_version = "0.1.2"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
+commit_message = "bump version {old_version} -> {new_version}"
 commit = true
 tag = true
 push = true
