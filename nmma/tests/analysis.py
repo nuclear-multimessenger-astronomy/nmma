@@ -1,18 +1,18 @@
 from argparse import Namespace
 import os
+import pytest
+
 
 from ..em import analysis
 from tools import analysis_slurm
 
 
-def test_analysis():
-
+@pytest.fixture(scope="module")
+def args():
     workingDir = os.path.dirname(__file__)
-
     dataDir = os.path.join(workingDir, "data")
     svdmodels = os.path.join(workingDir, "../../svdmodels/")
-
-    global args
+    
     args = Namespace(
         model="Bu2019lm",
         interpolation_type="sklearn_gp",
@@ -74,6 +74,11 @@ def test_analysis():
         local_only=True,
     )
 
+    return args
+
+
+def test_analysis(args):
+    
     analysis.main(args)
 
 
