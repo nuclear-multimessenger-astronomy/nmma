@@ -75,7 +75,7 @@ def get_parser(**kwargs):
         "--tmin",
         type=float,
         default=0.05,
-        help="Days to start analysing from the trigger time (default: 0)",
+        help="Days to start analysing from the trigger time (default: 0.05)",
     )
     parser.add_argument(
         "--tmax",

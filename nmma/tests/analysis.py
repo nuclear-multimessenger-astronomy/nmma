@@ -1,15 +1,18 @@
 from argparse import Namespace
 import os
+import pytest
+
 
 from ..em import analysis
+from tools import analysis_slurm
 
-def test_analysis():
 
-    workingDir=os.path.dirname(__file__)
+@pytest.fixture(scope="module")
+def args():
+    workingDir = os.path.dirname(__file__)
+    dataDir = os.path.join(workingDir, "data")
+    svdmodels = os.path.join(workingDir, "../../svdmodels/")
     
-    dataDir = os.path.join(workingDir, 'data')
-    svdmodels=os.path.join(workingDir, '../../svdmodels/')
-
     args = Namespace(
         model="Bu2019lm",
         interpolation_type="sklearn_gp",
@@ -68,7 +71,36 @@ def test_analysis():
         sample_over_Hubble=False,
         sampler_kwargs="{}",
         verbose=False,
-        local_only=True
+        local_only=True,
     )
 
+    return args
+
+
+def test_analysis(args):
+    
     analysis.main(args)
+
+
+def test_analysis_slurm(args):
+
+    args_slurm = Namespace(
+        Ncore=8,
+        job_name="lightcurve-analysis",
+        logs_dir_name="slurm_logs",
+        cluster_name="Expanse",
+        partition_type="shared",
+        nodes=1,
+        gpus=0,
+        memory_GB=64,
+        time="24:00:00",
+        mail_type="NONE",
+        mail_user="",
+        account_name="umn131",
+        python_env_name="nmma_env",
+        script_name="slurm.sub",
+    )
+
+    args.__dict__.update(args_slurm.__dict__)
+
+    analysis_slurm.main(args)
