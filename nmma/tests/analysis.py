@@ -101,6 +101,6 @@ def test_analysis_slurm(args):
         script_name="slurm.sub",
     )
 
-    args = args.__dict__.update(args_slurm.__dict__)
+    args.__dict__.update(args_slurm.__dict__)
 
     analysis_slurm.main(args)
