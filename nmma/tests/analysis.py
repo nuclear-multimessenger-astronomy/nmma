@@ -77,7 +77,7 @@ def test_analysis():
     analysis.main(args)
 
 
-def test_analysis_slurm(args=args):
+def test_analysis_slurm(args):
 
     args_slurm = Namespace(
         Ncore=8,
