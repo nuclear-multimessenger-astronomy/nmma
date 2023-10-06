@@ -74,7 +74,6 @@ source = ["nmma"]
 omit = [
     "nmma/tests/*",
     "nmma/__main__.py",
-    "nmma/_version.py",
 ]
 
 [tool.coverage.report]
@@ -108,8 +107,8 @@ profile = "black"
 [tool.versioneer]
 VCS = "git"
 style = "pep440"
-versionfile_source = "nmma/_version.py"
-versionfile_build = "nmma/_version.py"
+versionfile_source = "nmma/__init__.py"
+versionfile_build = "nmma/__init__.py"
 tag_prefix = "v"
 parentdir_prefix = "nmma-"
 
@@ -126,4 +125,4 @@ push = true
 
 [tool.bumpver.file_patterns]
 "pyproject.toml" = ['current_version = "{version}"','version = "{version}"']
-"nmma/_version.py" = ['__version__ = "{version}"']
+"nmma/__init__.py" = ['__version__ = "{version}"']
