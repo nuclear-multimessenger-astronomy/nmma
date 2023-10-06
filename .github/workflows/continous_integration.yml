@@ -1,3 +1,5 @@
+name: Unit Test nmma
+
 on:
   push:
     branches: [main]
