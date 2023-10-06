@@ -556,7 +556,7 @@ def analysis(args):
 
         if args.trigger_time is None:
             trigger_time=min_time #For now this will only work if data file is not in JSON or try block is executed successfully.
-            print(f"trigger_time = {trigger_time}")
+            print(f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}") 
             
         else:
             trigger_time = args.trigger_time
