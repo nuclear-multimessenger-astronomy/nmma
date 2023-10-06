@@ -74,7 +74,6 @@ source = ["nmma"]
 omit = [
     "nmma/tests/*",
     "nmma/__main__.py",
-    "nmma/_version.py",
 ]
 
 [tool.coverage.report]
