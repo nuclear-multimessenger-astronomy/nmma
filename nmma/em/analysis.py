@@ -541,23 +541,19 @@ def analysis(args):
         try:
             data = loadEvent(args.data)
             
-            #load the minimum time to use if args.trigger is None
-            #TODO: this code will be moved below, once the structue of json is identified
-            
-            min_time = np.inf
-            for key, array in data.items():
-                min_time = np.minimum(min_time, np.min(array[:, 0]))
-
         except ValueError:
             with open(args.data) as f:
                 data = json.load(f)
                 for key in data.keys():
                     data[key] = np.array(data[key])
-
+    
         if args.trigger_time is None:
-            trigger_time=min_time #For now this will only work if data file is not in JSON or try block is executed successfully.
+            #load the minimum time as trigger time
+            min_time = np.inf
+            for key, array in data.items():
+                min_time = np.minimum(min_time, np.min(array[:, 0]))
+            trigger_time=min_time
             print(f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}") 
-            
         else:
             trigger_time = args.trigger_time
 
