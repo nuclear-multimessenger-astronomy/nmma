@@ -95,7 +95,7 @@ Once the `config.ini` file is set, the genertation can be run with `nmma_gw_gene
 	#SBATCH --mail-user=<email>
 
 	module load slurm_setup
-	module load python/3.8
+	module load python/3.9
 	source <path_to_environment>/bin/activate
 
 	export SLURM_EAR_LOAD_MPI_VERSION="intel"    #for Intel MPI
