@@ -7,17 +7,17 @@ import numpy as np
 
 BASE_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
+# Get analysis.py parser
+nmma_parser = get_parser(add_help=False)
 
-def main():
-    # Get analysis.py parser
-    nmma_parser = get_parser(add_help=False)
+# Get argument names from nmma_parser
+nmma_arg_list = []
+for action in nmma_parser._actions:
+    arg_name = action.option_strings[0]
+    nmma_arg_list.append(arg_name[2:].replace("-", "_"))
 
-    # Get argument names from nmma_parser
-    nmma_arg_list = []
-    for action in nmma_parser._actions:
-        arg_name = action.option_strings[0]
-        nmma_arg_list.append(arg_name[2:].replace("-", "_"))
 
+def get_slurm_parser():
     # Create new parser that inherits analysis.py arguments
     parser = argparse.ArgumentParser(parents=[nmma_parser])
 
@@ -106,8 +106,13 @@ def main():
         default="slurm.sub",
         help="script name",
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main(args=None):
+    if args is None:
+        parser = get_slurm_parser()
+        args = parser.parse_args()
     args_vars = vars(args)
 
     wildcard_mapper = {
