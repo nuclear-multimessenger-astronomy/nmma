@@ -120,12 +120,12 @@ Check python and pip version like this:
    python --version
    pip --version
 
-Python 3.8 and above and Pip 21.2 and above is ideal for this
+Python 3.9 and above and Pip 21.2 and above is ideal for this
 installation. It is recommended to update these for your installation.
 
 .. important::
 
-   Python 3.11 is now supported by NMMA!
+   Python 3.12 is now supported by NMMA!
 
 Install mpi4py:
 
@@ -355,7 +355,7 @@ If you want to install a custom lalsuite version (e.g. with a certain GW templat
 
 .. code::
 
-   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.8
+   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.9
    conda activate YOUR_PREFIX
 
 and then installing mpi4py first before installing the required packages for the build process (here the second line):

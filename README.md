@@ -8,6 +8,8 @@
 [![Coverage Status](https://coveralls.io/repos/github/nuclear-multimessenger-astronomy/nmma/badge.svg?branch=main)](https://coveralls.io/github/nuclear-multimessenger-astronomy/nmma?branch=main)
 [![CI](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/continous_integration.yml/badge.svg)](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/continous_integration.yml)
 [![PyPI version](https://badge.fury.io/py/nmma.svg)](https://badge.fury.io/py/nmma)
+[![Python version](https://img.shields.io/pypi/pyversions/nmma.svg)](https://badge.fury.io/py/nmma)
+
 
 Read our official documentation: [NMMA Documentation](https://nuclear-multimessenger-astronomy.github.io/nmma/)
 
