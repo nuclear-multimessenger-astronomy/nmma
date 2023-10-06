@@ -540,6 +540,14 @@ def analysis(args):
         # load the kilonova afterglow data
         try:
             data = loadEvent(args.data)
+            
+            #load the minimum time to use if args.trigger is None
+            #TODO: this code will be moved below, once the structue of json is identified
+            
+            min_time = np.inf
+            for key, array in data.items():
+                min_time = np.minimum(min_time, np.min(array[:, 0]))
+
         except ValueError:
             with open(args.data) as f:
                 data = json.load(f)
@@ -547,9 +555,12 @@ def analysis(args):
                     data[key] = np.array(data[key])
 
         if args.trigger_time is None:
-            raise ValueError("trigger_time required if using a data file.")
-
-        trigger_time = args.trigger_time
+            print("trigger_time is not provided, analysis will done using the time of first data point")
+            trigger_time=min_time #For now this will only if data file is not in JSON or try block is executed successfully.
+            print(f"trigger_time = {trigger_time}")
+            
+        else:
+            trigger_time = args.trigger_time
 
     if args.remove_nondetections:
         filters_to_check = list(data.keys())
