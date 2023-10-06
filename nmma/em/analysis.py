@@ -555,8 +555,8 @@ def analysis(args):
                     data[key] = np.array(data[key])
 
         if args.trigger_time is None:
-            print("trigger_time is not provided, analysis will done using the time of first data point")
-            trigger_time=min_time #For now this will only if data file is not in JSON or try block is executed successfully.
+            print("trigger_time is not provided, analysis will continue using the time of first data point") #maybe change it to warning instead of print
+            trigger_time=min_time #For now this will only work if data file is not in JSON or try block is executed successfully.
             print(f"trigger_time = {trigger_time}")
             
         else:
