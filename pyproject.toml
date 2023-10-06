@@ -108,8 +108,8 @@ profile = "black"
 [tool.versioneer]
 VCS = "git"
 style = "pep440"
-versionfile_source = "nmma/_version.py"
-versionfile_build = "nmma/_version.py"
+versionfile_source = "nmma/__init__.py"
+versionfile_build = "nmma/__init__.py"
 tag_prefix = "v"
 parentdir_prefix = "nmma-"
 
@@ -119,11 +119,10 @@ addopts = "--verbose -r s"
 [tool.bumpver]
 current_version = "0.1.2"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
-commit_message = "bump version {old_version} -> {new_version}"
 commit = true
 tag = true
 push = true
 
 [tool.bumpver.file_patterns]
 "pyproject.toml" = ['current_version = "{version}"','version = "{version}"']
-"nmma/_version.py" = ['__version__ = "{version}"']
+"nmma/__init__.py" = ['__version__ = "{version}"']
