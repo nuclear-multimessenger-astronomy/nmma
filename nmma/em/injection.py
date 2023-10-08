@@ -10,7 +10,11 @@ from .utils import estimate_mag_err, check_default_attr
 
 
 def create_light_curve_data(
-    injection_parameters, args, doAbsolute=False, light_curve_model=None
+    injection_parameters,
+    args,
+    doAbsolute=False,
+    light_curve_model=None,
+    keep_infinite_data=False,
 ):
 
     train_stats = check_default_attr(args, "train_stats")
@@ -423,5 +427,14 @@ def create_light_curve_data(
         passbands_to_lose = set(list(data.keys())) - set(passbands_to_keep)
         for filt in passbands_to_lose:
             del data[filt]
+
+    if not keep_infinite_data:
+        filters_to_check = list(data.keys())
+        for filt in filters_to_check:
+            idx = np.union1d(
+                np.where(np.isfinite(data[filt][:, 1]))[0],
+                np.where(np.isfinite(data[filt][:, 2]))[0],
+            )
+            data[filt] = data[filt][idx, :]
 
     return data

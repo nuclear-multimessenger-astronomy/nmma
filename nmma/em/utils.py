@@ -546,13 +546,12 @@ def fluxDensity(t, nu, **params):
 
 
 def grb_lc(t_day, Ebv, param_dict, filters=None):
-
     day = 86400.0  # in seconds
     tStart = (np.amin(t_day)) * day
+    tStart = max(10**(-5), tStart)
     tEnd = (np.amax(t_day) + 1) * day
     tnode = min(len(t_day), 201)
-    default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
-
+    default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode-1)
     filts, lambdas = get_default_filts_lambdas(filters=filters)
 
     nu_0s = scipy.constants.c / lambdas

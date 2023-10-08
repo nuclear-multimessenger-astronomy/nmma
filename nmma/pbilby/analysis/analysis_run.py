@@ -354,6 +354,7 @@ class AnalysisRun(object):
         The `log_likelihood_function` often converts infinite values to large
         finite values so we catch those.
         """
+
         (
             prior_transform_function,
             log_prior_function,
