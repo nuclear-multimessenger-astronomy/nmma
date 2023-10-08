@@ -2,10 +2,10 @@ config:
   withTime:
     value: true
     filters: 
-      - ["u","r","y"]
-      - ["g","i","z","K"]
-      - "J"
-      - null # null means filter independent
+      - u
+      - K
+      - [J,H]
+      - null # you can keep it or remove it, it will still be parsed as None (filter independent)
     time_nodes: 2
     type: "Uniform"
     min: 0

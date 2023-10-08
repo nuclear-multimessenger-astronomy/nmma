@@ -1,5 +1,8 @@
 import yaml
 from pathlib import Path
+import warnings
+
+warnings.simplefilter("module", DeprecationWarning)
 
 
 class ValidationError(ValueError):
@@ -17,7 +20,33 @@ ALLOWED_FILTERS = [
     "J",
     "H",
     "K",
-]  # only optical and IR right now, case sensitive
+    "2massh",
+    "2massj",
+    "2massks",
+    "atlasc",
+    "atlaso",
+    "bessellb",
+    "besselli",
+    "bessellr",
+    "bessellux",
+    "bessellv",
+    "ps1__g",
+    "ps1__i",
+    "ps1__r",
+    "ps1__y",
+    "ps1__z",
+    "sdssu",
+    "uvot__b",
+    "uvot__u",
+    "uvot__uvm2",
+    "uvot__uvw1",
+    "uvot__uvw2",
+    "uvot__v",
+    "uvot__white",
+    "ztfg",
+    "ztfi",
+    "ztfr",
+]
 
 
 def load_yaml(file_path):
@@ -27,7 +56,9 @@ def load_yaml(file_path):
 def validate_only_one_true(yaml_dict):
     for key, values in yaml_dict["config"].items():
         if "value" not in values or type(values["value"]) is not bool:
-            raise ValidationError(key, "'value' key must be present and be a boolean")
+            raise ValidationError(
+                key, "'value' key must be present and be a boolean"
+            )
     true_count = sum(value["value"] for value in yaml_dict["config"].values())
     if true_count > 1:
         raise ValidationError(
@@ -37,6 +68,7 @@ def validate_only_one_true(yaml_dict):
         raise ValidationError(
             "config", "At least one configuration key must be set to True"
         )
+
 
 def validate_filters(filter_groups):
     used_filters = set()
@@ -60,7 +92,8 @@ def validate_filters(filter_groups):
                         f"Duplicate filter value '{filt}'. A filter can only be used in one group.",
                     )
                 used_filters.add(filt)
-                filters_in_group.add(filt)  # Add the filter to the set of used filters within this group
+                filters_in_group.add(filt)
+                # Add the filter to the set of used filters within this group
         elif filter_group is not None and filter_group not in ALLOWED_FILTERS:
             raise ValidationError(
                 "filters",
@@ -84,12 +117,18 @@ def validate_distribution(distribution):
 
 
 def validate_fields(key, values, required_fields):
-    missing_fields = [field for field in required_fields if values.get(field) is None]
+    missing_fields = [
+        field for field in required_fields if values.get(field) is None
+    ]
     if missing_fields:
-        raise ValidationError(key, f"Missing fields: {', '.join(missing_fields)}")
+        raise ValidationError(
+            key, f"Missing fields: {', '.join(missing_fields)}"
+        )
     for field, expected_type in required_fields.items():
         if not isinstance(values[field], expected_type):
-            raise ValidationError(key, f"'{field}' must be of type {expected_type}")
+            raise ValidationError(
+                key, f"'{field}' must be of type {expected_type}"
+            )
 
 
 def handle_withTime(key, values):
@@ -100,12 +139,28 @@ def handle_withTime(key, values):
         "time_nodes": int,
         "filters": list,
     }
+
+    DEPRECATED_FILTERS = {"u", "g", "r", "i", "z", "y", "J", "H", "K"}
+
     validate_fields(key, values, required_fields)
     filter_groups = values.get("filters", [])
     validate_filters(filter_groups)
     distribution = values.get("type")
     validate_distribution(distribution)
     result = []
+
+    flat_filters_list = [
+        item
+        for sublist in filter_groups
+        for item in (sublist if isinstance(sublist, list) else [sublist])
+    ]
+
+    for filt in flat_filters_list:
+        if filt in DEPRECATED_FILTERS:
+            warnings.warn(
+                f"The use of filter '{filt}' is discouraged and soon will be removed in a future version",
+                DeprecationWarning,
+            )
 
     for filter_group in filter_groups:
         if isinstance(filter_group, list):
@@ -119,7 +174,6 @@ def handle_withTime(key, values):
             )
 
     return result
-
 
 
 def handle_withoutTime(key, values):

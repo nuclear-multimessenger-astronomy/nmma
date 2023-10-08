@@ -62,7 +62,6 @@ class OpticalLightCurve(Likelihood):
         error_budget=1.0,
         tmin=0.0,
         tmax=14.0,
-        dt=0.1,
         verbose=False,
     ):
         self.light_curve_model = light_curve_model
@@ -71,7 +70,6 @@ class OpticalLightCurve(Likelihood):
         self.trigger_time = trigger_time
         self.tmin = tmin
         self.tmax = tmax
-        self.dt = dt
         if isinstance(error_budget, (int, float, complex)) and not isinstance(error_budget, bool):
             self.error_budget = dict(zip(filters, [error_budget] * len(filters)))
         elif isinstance(error_budget, dict):
