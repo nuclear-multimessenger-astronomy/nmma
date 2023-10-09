@@ -1,8 +1,9 @@
 import sys
 import os
 
-
 sys.path.insert(0, os.path.abspath(".."))
+
+import nmma
 
 extensions = ["myst_parser", "sphinx_copybutton"]
 myst_enable_extensions = [
@@ -55,17 +56,8 @@ copyright = "2023, The NMMA Team"
 author = "The NMMA Team"
 
 
-version = "vUndefined"
-setup_lines = open("../nmma/_version.py").readlines()
-for line in setup_lines:
-    if line.startswith("__version__ = "):
-        try:
-            version = line.split('"')[1]
-        except IndexError:
-            version = line.split("'")[1]
-        break
 
-
+version = nmma.__version__
 release = version
 
 
