@@ -124,6 +124,7 @@ def load_models_list(doi=None, models_home=None):
             print(
                 "Could not retrieve latest DOI, models won't be downloaded or updated. Will try using existing list or local files available."
             )
+            DOI = PERMANENT_DOI
             pass
 
     if doi in [None, ""]:
@@ -276,6 +277,9 @@ def get_model(
     if "tf" in model_name_components:
         model_name_components.remove("tf")
     core_model_name = "_".join(model_name_components)
+
+    # TODO: remove the line below once <model>_tf.pkl files on Zenodo are updated to <model>.pkl
+    core_model_name = model_name
 
     filepaths = (
         [Path(models_home, f"{core_model_name}.{core_format}")]

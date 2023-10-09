@@ -75,7 +75,7 @@ def get_parser(**kwargs):
         "--tmin",
         type=float,
         default=0.05,
-        help="Days to start analysing from the trigger time (default: 0)",
+        help="Days to start analysing from the trigger time (default: 0.05)",
     )
     parser.add_argument(
         "--tmax",
@@ -540,16 +540,22 @@ def analysis(args):
         # load the kilonova afterglow data
         try:
             data = loadEvent(args.data)
+            
         except ValueError:
             with open(args.data) as f:
                 data = json.load(f)
                 for key in data.keys():
                     data[key] = np.array(data[key])
-
+    
         if args.trigger_time is None:
-            raise ValueError("trigger_time required if using a data file.")
-
-        trigger_time = args.trigger_time
+            #load the minimum time as trigger time
+            min_time = np.inf
+            for key, array in data.items():
+                min_time = np.minimum(min_time, np.min(array[:, 0]))
+            trigger_time=min_time
+            print(f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}") 
+        else:
+            trigger_time = args.trigger_time
 
     if args.remove_nondetections:
         filters_to_check = list(data.keys())
@@ -744,6 +750,8 @@ def analysis(args):
 
     if args.bestfit:
         bestfit_to_write = bestfit_params.copy()
+        bestfit_to_write["log_bayes_factor"] = result.log_bayes_factor
+        bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
         bestfit_to_write["Best fit index"] = int(bestfit_idx)
         bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
         bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")

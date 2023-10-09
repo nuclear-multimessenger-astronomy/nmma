@@ -335,6 +335,7 @@ def main(args=None):
             args,
             doAbsolute=args.absolute,
             light_curve_model=light_curve_model,
+            keep_infinite_data=True,
         )
         print("Injection generated")
 
