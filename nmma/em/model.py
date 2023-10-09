@@ -281,6 +281,8 @@ class SVDLightCurveModel(object):
                 self.svd_lbol_model = None
         elif self.interpolation_type == "tensorflow":
             import tensorflow as tf
+            tf.get_logger().setLevel("ERROR")
+            from tensorflow.keras.models import load_model
 
             # TODO: remove below 3 lines once <model>_tf.pkl files on Zenodo are updated to <model>.pkl
             if not os.path.exists(modelfile):
@@ -288,10 +290,7 @@ class SVDLightCurveModel(object):
                     f"Attempting to load {core_model_name}_tf.pkl. In the future, all model files will have the format <model>.pkl, regardless of --interpolation-type."
                 )
                 modelfile = os.path.join(self.svd_path, f"{core_model_name}_tf.pkl")
-
-            tf.get_logger().setLevel("ERROR")
-            from tensorflow.keras.models import load_model
-
+    
             if not local_only:
                 _, model_filters = get_model(
                     self.svd_path, f"{self.model}_tf", filters=filters
@@ -369,7 +368,7 @@ class SVDLightCurveModel(object):
     def generate_lightcurve(self, sample_times, parameters):
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters, [])
+            new_parameters, _ = self.parameter_conversion(new_parameters)
         else:
             new_parameters = parameters.copy()
 
@@ -481,10 +480,9 @@ class GRBLightCurveModel(object):
         return self.__class__.__name__ + "(model={0})".format(self.model)
 
     def generate_lightcurve(self, sample_times, parameters):
-
         if self.parameter_conversion:
             new_parameters = parameters.copy()
-            new_parameters, _ = self.parameter_conversion(new_parameters, [])
+            new_parameters, _ = self.parameter_conversion(new_parameters)
         else:
             new_parameters = parameters.copy()
 
@@ -571,7 +569,6 @@ class KilonovaGRBLightCurveModel(object):
         return parameters
 
     def generate_lightcurve(self, sample_times, parameters):
-
         total_lbol = np.zeros(len(sample_times))
         total_mag = {}
 
