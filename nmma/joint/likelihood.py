@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 
-from ..em.model import SVDLightCurveModel, KilonovaGRBLightCurveModel
+from ..em.model import SVDLightCurveModel, GRBLightCurveModel, GenericCombineLightCurveModel
 from ..em.likelihood import OpticalLightCurve
 from .conversion import MultimessengerConversion, MultimessengerConversionWithLambdas
 
@@ -124,7 +124,6 @@ class MultiMessengerLikelihood(Likelihood):
                  time_marginalization=False, distance_marginalization=False,
                  phase_marginalization=False, distance_marginalization_lookup_table=None,
                  jitter_time=True, reference_frame="sky", time_reference="geocenter"):
-
         # construct the eos prior
         if with_eos:
             xx = np.arange(0, Neos + 1)
@@ -170,20 +169,23 @@ class MultiMessengerLikelihood(Likelihood):
             GWLikelihood = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         # initialize the EM likelihood
+        if not filters:
+            filters = list(light_curve_data.keys())
         sample_times = np.arange(tmin, tmax, 0.1)
         light_curve_model_kwargs = dict(model=light_curve_model_name, sample_times=sample_times,
                                         svd_path=light_curve_SVD_path,
                                         parameter_conversion=parameter_conversion,
                                         mag_ncoeff=mag_ncoeff, lbol_ncoeff=lbol_ncoeff,
-                                        interpolation_type=light_curve_interpolation_type)
+                                        interpolation_type=light_curve_interpolation_type, filters=filters)
+
         if with_grb:
-            light_curve_model = KilonovaGRBLightCurveModel(sample_times=sample_times,
-                                                           kilonova_kwargs=light_curve_model_kwargs,
-                                                           GRB_resolution=grb_resolution)
+            models = []
+            models.append(SVDLightCurveModel(**light_curve_model_kwargs))
+            models.append(GRBLightCurveModel(sample_times = sample_times, resolution = grb_resolution, filters = filters, parameter_conversion = parameter_conversion))
+            light_curve_model = GenericCombineLightCurveModel(models = models, sample_times=sample_times)
         else:
             light_curve_model = SVDLightCurveModel(**light_curve_model_kwargs)
-        if not filters:
-            filters = list(light_curve_data.keys())
+
         em_likelihood_kwargs = dict(light_curve_model=light_curve_model, filters=filters,
                                     light_curve_data=light_curve_data, trigger_time=em_trigger_time,
                                     error_budget=error_budget, tmin=tmin, tmax=tmax)
