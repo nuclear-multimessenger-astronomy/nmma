@@ -8,7 +8,7 @@ from .conversion import MultimessengerConversion, MultimessengerConversionWithLa
 
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient
 from bilby.core.likelihood import Likelihood
-from bilby.core.prior import Interped
+from bilby.core.prior import Interped, DeltaFunction
 
 
 class MultiMessengerLikelihood(Likelihood):
@@ -142,6 +142,10 @@ class MultiMessengerLikelihood(Likelihood):
         priors.conversion_function = parameter_conversion_class.priors_conversion_function
         parameter_conversion = parameter_conversion_class.convert_to_multimessenger_parameters
         waveform_generator.parameter_conversion = parameter_conversion
+
+        # add the ratio_epsilon in case it is not present for no-grb case
+        if not with_grb and 'ratio_epsilon' not in priors:
+            priors['ratio_epsilon'] = DeltaFunction(0.01, name='ratio_epsilon')
 
         # initialize the GW likelihood
         gw_likelihood_kwargs = dict(
