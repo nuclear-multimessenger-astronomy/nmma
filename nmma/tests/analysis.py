@@ -72,7 +72,7 @@ def args():
         sampler_kwargs="{}",
         verbose=False,
         local_only=True,
-        systematics_file=None,
+        systematics_file=f"{dataDir}/systematic.yaml",
     )
 
     return args
