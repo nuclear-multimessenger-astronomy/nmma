@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 
-from ..em.model import SVDLightCurveModel, KilonovaGRBLightCurveModel, GRBLightCurveModel, GenericCombineLightCurveModel
+from ..em.model import SVDLightCurveModel, GRBLightCurveModel, GenericCombineLightCurveModel
 from ..em.likelihood import OpticalLightCurve
 from .conversion import MultimessengerConversion, MultimessengerConversionWithLambdas
 
