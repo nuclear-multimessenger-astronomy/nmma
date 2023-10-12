@@ -609,8 +609,9 @@ def sn_lc(
     tt,
     z,
     Ebv,
-    abs_mag=-19.0,
-    regularize_band="sdssu",
+    abs_mag=-19.35,
+    regularize_band="bessellv",
+    regularize_system="vega",
     model_name="nugent-hyper",
     parameters={},
     filters=None,
@@ -634,7 +635,8 @@ def sn_lc(
 
     # regularize the absolute magnitude
     abs_mag -= Planck18.distmod(z).value
-    model.set_source_peakabsmag(abs_mag, regularize_band, "ab", cosmo=Planck18)
+    model.set_source_peakabsmag(abs_mag, regularize_band,
+                                regularize_system, cosmo=Planck18)
 
     if Ebv != 0.0:
         ext = extinctionFactorP92SMC(nus, Ebv, z)
