@@ -518,6 +518,9 @@ class GRBLightCurveModel(object):
             ):
                 return np.zeros(len(sample_times)), {}
 
+        if grb_param_dict["epsilon_e"] + grb_param_dict["epsilon_B"] > 1.:
+            return np.zeros(len(sample_times)), {}
+
         if self.jetType == 1 or self.jetType == 4:
             grb_param_dict["b"] = new_parameters["b"]
             if "thetaWing" in new_parameters:
