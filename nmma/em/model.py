@@ -290,7 +290,7 @@ class SVDLightCurveModel(object):
                     f"Attempting to load {core_model_name}_tf.pkl. In the future, all model files will have the format <model>.pkl, regardless of --interpolation-type."
                 )
                 modelfile = os.path.join(self.svd_path, f"{core_model_name}_tf.pkl")
-    
+
             if not local_only:
                 _, model_filters = get_model(
                     self.svd_path, f"{self.model}_tf", filters=filters
@@ -510,14 +510,13 @@ class GRBLightCurveModel(object):
         grb_param_dict["epsilon_B"] = 10 ** new_parameters["log10_epsilon_B"]
         grb_param_dict["z"] = z
 
-        if self.jetType == 0:
-            if "thetaWing" in new_parameters:
-                grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
-                if (
-                    new_parameters["thetaWing"] / new_parameters["thetaCore"]
-                    > self.resolution
-                ):
-                    return np.zeros(len(sample_times)), {}
+        if "thetaWing" in new_parameters:
+            grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
+            if (
+                new_parameters["thetaWing"] / new_parameters["thetaCore"]
+                > self.resolution
+            ):
+                return np.zeros(len(sample_times)), {}
 
         if self.jetType == 1 or self.jetType == 4:
             grb_param_dict["b"] = new_parameters["b"]
