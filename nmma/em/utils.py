@@ -38,7 +38,12 @@ except ImportError:
             return func
 
         return inner
-
+    
+try:
+    import jax
+    import jax.numpy as jnp
+except ImportError:
+    print("Need to install Jax for flax KN surrogate models")
 
 import warnings
 
@@ -327,6 +332,9 @@ def calc_lc(
 ):
 
     mAB = {}
+    
+    if interpolation_type == "flax":
+        return calc_lc_flax(tt, param_list, svd_mag_model, svd_lbol_model, mag_ncoeff, lbol_ncoeff, filters)
 
     if filters is None:
         filters = list(svd_mag_model.keys())
@@ -464,6 +472,126 @@ def calc_lc(
         lbol = np.inf * np.ones(len(tt))
 
     return np.squeeze(tt), np.squeeze(lbol), mAB
+
+def calc_lc_flax(
+    tt,
+    param_list: np.array,
+    svd_mag_model=None,
+    svd_lbol_model=None,
+    mag_ncoeff=None,
+    lbol_ncoeff=None,
+    filters=None,
+):
+    mAB = {}
+
+    if filters is None:
+        filters = list(svd_mag_model.keys())
+    else:
+        # add null output for radio and X-ray filters
+        for filt in filters:
+            if filt.startswith(("radio", "X-ray")):
+                mAB[filt] = jnp.inf * jnp.ones(len(tt))
+
+    for jj, filt in enumerate(filters):
+        if filt in mAB:
+            continue
+
+        if mag_ncoeff:
+            n_coeff = min(mag_ncoeff, svd_mag_model[filt]["n_coeff"])
+        else:
+            n_coeff = svd_mag_model[filt]["n_coeff"]
+        # param_array = svd_mag_model[filt]["param_array"]
+        # cAmat = svd_mag_model[filt]["cAmat"]
+        VA = svd_mag_model[filt]["VA"]
+        param_mins = svd_mag_model[filt]["param_mins"]
+        param_maxs = svd_mag_model[filt]["param_maxs"]
+        mins = svd_mag_model[filt]["mins"]
+        maxs = svd_mag_model[filt]["maxs"]
+        tt_interp = svd_mag_model[filt]["tt"]
+
+        # Simply rename
+        param_list_postprocess = param_list
+
+        for i in range(len(param_mins)):
+            param_list_postprocess.at[i].set((param_list_postprocess[i] - param_mins[i]) / (
+                param_maxs[i] - param_mins[i]
+            ))
+
+        # Watch out for possible confusion with names here
+        state = svd_mag_model[filt]["model"]
+
+        # Apply the model to the given parameters
+        cAproj = state.apply_fn({'params': state.params}, param_list_postprocess)
+        cAstd = jnp.ones((n_coeff,))
+
+        # coverrors = np.dot(VA[:, :n_coeff], np.dot(np.power(np.diag(cAstd[:n_coeff]), 2), VA[:, :n_coeff].T))
+        # errors = np.diag(coverrors)
+
+        # Go from SVD coefficients to original lightcurve data
+
+        mag_back = jnp.dot(VA[:, :n_coeff], cAproj)
+        mag_back = mag_back * (maxs - mins) + mins
+        # mag_back = scipy.signal.medfilt(mag_back, kernel_size=3)
+
+        ## TODO how to solve this in jax?
+        # ii = jnp.where((~jnp.isnan(mag_back)) * (tt_interp < 20.0))[0]
+        # if len(ii) < 2:
+        #     maginterp = jnp.nan * jnp.ones(tt.shape)
+        # else:
+        #     # TODO change to jax scipy
+        #     f = interp.interp1d(tt_interp[ii], mag_back[ii], fill_value="extrapolate")
+        #     maginterp = f(tt)
+
+        # f = interp.interp1d(tt, mag_back, fill_value="extrapolate")
+        # maginterp = f(tt)
+
+        maginterp = mag_back
+
+        # Save end result
+        mAB[filt] = maginterp
+
+    if svd_lbol_model is not None:
+        if lbol_ncoeff:
+            n_coeff = min(lbol_ncoeff, svd_lbol_model["n_coeff"])
+        else:
+            n_coeff = svd_lbol_model["n_coeff"]
+        # param_array = svd_lbol_model["param_array"]
+        # cAmat = svd_lbol_model["cAmat"]
+        VA = svd_lbol_model["VA"]
+        param_mins = svd_lbol_model["param_mins"]
+        param_maxs = svd_lbol_model["param_maxs"]
+        mins = svd_lbol_model["mins"]
+        maxs = svd_lbol_model["maxs"]
+        gps = svd_lbol_model["gps"]
+        tt_interp = svd_lbol_model["tt"]
+
+        param_list_postprocess = param_list
+        for i in range(len(param_mins)):
+            param_list_postprocess.at[i].set((param_list_postprocess[i] - param_mins[i]) / (
+                param_maxs[i] - param_mins[i]
+            ))
+
+        # TODO add this for flax?
+        # ...
+        # ...
+
+        lbol_back = jnp.dot(VA[:, :n_coeff], cAproj)
+        lbol_back = lbol_back * (maxs - mins) + mins
+        # lbol_back = scipy.signal.medfilt(lbol_back, kernel_size=3)
+
+        ii = jnp.where(~jnp.isnan(lbol_back))[0]
+        if len(ii) < 2:
+            lbolinterp = jnp.nan * jnp.ones(tt.shape)
+        else:
+            f = interp.interp1d(tt_interp[ii], lbol_back[ii], fill_value="extrapolate")
+            lbolinterp = 10 ** f(tt)
+        lbol = lbolinterp
+    else:
+        lbol = np.inf * np.ones(len(tt))
+
+    return np.squeeze(tt), np.squeeze(lbol), mAB
+
+
 
 
 def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=None):

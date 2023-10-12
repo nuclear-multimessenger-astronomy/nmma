@@ -40,6 +40,8 @@ class SVDTrainingModel(object):
         Whether to show plots or not
     plotdir: str
         Directory for plotting
+    start_training: bool
+        Indicating whether we want to already train during __init__ (default) or not (for developing purposes)
     """
 
     def __init__(
@@ -61,9 +63,10 @@ class SVDTrainingModel(object):
         univariate_spline=False,
         univariate_spline_s=2,
         random_seed=42,
+        start_training=True
     ):
 
-        if interpolation_type not in ["sklearn_gp", "tensorflow", "api_gp"]:
+        if interpolation_type not in ["sklearn_gp", "tensorflow", "api_gp", "flax"]:
             raise ValueError(
                 "interpolation_type must be sklearn_gp, api_gp or tensorflow"
             )
@@ -101,16 +104,17 @@ class SVDTrainingModel(object):
         self.interpolate_data(data_time_unit=data_time_unit)
 
         # Only want to train if we must, so check if the model exists
-        model_exists = self.check_model()
-        if not model_exists:
-            print("Training new model")
-            self.svd_model = self.generate_svd_model()
-            self.train_model()
-            self.save_model()
-        else:
-            print("Model exists... will load that model.")
+        if start_training:
+            model_exists = self.check_model()
+            if not model_exists:
+                print("Training new model")
+                self.svd_model = self.generate_svd_model()
+                self.train_model()
+                self.save_model()
+            else:
+                print("Model exists... will load that model.")
 
-        self.load_model()
+            self.load_model()
 
     def interpolate_data(self, data_time_unit="days"):
 
@@ -220,6 +224,7 @@ class SVDTrainingModel(object):
             svd_model[filt]["param_maxs"] = param_maxs
             svd_model[filt]["mins"] = mins
             svd_model[filt]["maxs"] = maxs
+            svd_model[filt]["data_postprocess"] = data_array_postprocess
             svd_model[filt]["tt"] = self.sample_times
 
             UA, sA, VA = np.linalg.svd(data_array_postprocess, full_matrices=True)
@@ -258,6 +263,8 @@ class SVDTrainingModel(object):
             self.train_api_gp_model()
         elif self.interpolation_type == "tensorflow":
             self.train_tensorflow_model()
+        elif self.interpolation_type == "flax":
+            self.train_flax_model()
         else:
             raise (f"{self.interpolation_type} unknown interpolation type")
 
@@ -448,6 +455,69 @@ class SVDTrainingModel(object):
             print(f"{filt} MSE:", error)
 
             self.svd_model[filt]["model"] = model
+            
+    def train_flax_model(self):
+
+        # Get the flax utils file
+        try:
+            # TODO this has to be changed to relative path?
+            from nmma.em import utils_flax
+            import jax
+            import jax.numpy as jnp
+
+            from sklearn.model_selection import train_test_split
+            # Get JAX random key
+            key = jax.random.PRNGKey(0)
+
+        except ImportError as e:
+            print("Problem with loading the flax utils & train test split...")
+            print(e)
+            return
+
+        # Loop through filters
+        for jj, filt in enumerate(self.filters):
+            # Split the random key to get a PRNG key for initialization of the network parameters
+            key, init_key = jax.random.split(key)
+            print("Computing NN (using flax) for filter %s..." % filt)
+
+            param_array_postprocess = self.svd_model[filt]["param_array_postprocess"]
+            cAmat = self.svd_model[filt]["cAmat"]
+
+            train_X, val_X, train_y, val_y = train_test_split(
+                param_array_postprocess,
+                cAmat.T,
+                shuffle=True,
+                test_size=0.25,
+                random_state=self.random_seed,
+            )
+
+            # Config holds everything for the training setup
+            config = utils_flax.get_default_config()
+            # Input dimension can be found inside param array postprocess TODO can this be done more elegantly?
+            input_ndim = self.svd_model[filt]["param_array_postprocess"].shape[1]
+
+            # TODO - make architecture also part of config, if changed later on?
+            # Create neural network and initialize the state
+            net = utils_flax.MLP(layer_sizes=config.layer_sizes, act_func=config.act_func)
+            state = utils_flax.create_train_state(net, jnp.ones(input_ndim), init_key, config)
+
+            # Perform training loop
+            state, train_losses, val_losses = utils_flax.train_loop(state, train_X, train_y, val_X, val_y, config)
+
+            if self.plot:
+                plt.figure(figsize=(10, 5))
+                ls = "-o"
+                ms = 3
+                plt.plot([i+1 for i in range(len(train_losses))], train_losses, ls, markersize=ms, label="Train", color="red")
+                plt.plot([i+1 for i in range(len(val_losses))], val_losses, ls, markersize=ms, label="Validation", color="blue")
+                plt.legend()
+                plt.xlabel("Epoch")
+                plt.ylabel("MSE loss")
+                plt.yscale('log')
+                plt.title("Learning curves")
+                plt.show()
+
+            self.svd_model[filt]["model"] = state
 
     def check_model(self):
 
