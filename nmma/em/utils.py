@@ -548,7 +548,7 @@ def fluxDensity(t, nu, **params):
 def grb_lc(t_day, Ebv, param_dict, filters=None):
     day = 86400.0  # in seconds
     tStart = (np.amin(t_day)) * day
-    tStart = max(10**(-5)*day, tStart)
+    tStart = max(10**(-5) * day, tStart)
     tEnd = (np.amax(t_day) + 1) * day
     tnode = min(len(t_day), 201)
     default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
@@ -1013,6 +1013,73 @@ def metzger_lc(t_day, param_dict, filters=None):
         mAB *= np.inf
         mAB[F > 0] = -2.5 * np.log10(F[F > 0]) - 48.6
         mag[filt] = mAB
+
+    return t_day, lbol, mag
+
+
+def blackbody_constant_temperature(t_day, param_dict, filters=None):
+    # prevent the output message flooded by these warning messages
+    old = np.seterr()
+    np.seterr(invalid="ignore")
+    np.seterr(divide="ignore")
+
+    # convert time from day to second
+    day = 86400.0  # in seconds
+    t = t_day * day
+
+    # define constants
+    c = astropy.constants.c.cgs.value
+    h = astropy.constants.h.cgs.value
+    kb = astropy.constants.k_B.cgs.value
+    sigSB = astropy.constants.sigma_sb.cgs.value
+    Mpc = astropy.constants.pc.cgs.value * 1e6
+
+    # fetch parameters
+    bb_luminosity = param_dict["bb_luminosity"]  # blackboady's total luminosity in erg/s
+    temperature = param_dict["temperature"]  # blackbody's temperature in K
+    z = param_dict["z"]
+    Ebv = param_dict["Ebv"]
+    D = 1e-5 * Mpc  # 10pc
+
+    # parameter conversion
+    one_over_T = 1.0 / temperature
+    bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
+    # get the default filters and wavelength
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
+
+    nu_obs = scipy.constants.c / lambdas
+    nu_host = nu_obs * (1 + z)
+    t /= 1 + z
+
+    if Ebv != 0.0:
+        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
+    else:
+        ext = np.ones(len(nu_obs))
+
+    mag = {}
+    for idx, filt in enumerate(filts):
+        nu_of_filt = nu_host[idx]
+        ext_per_filt = ext[idx]
+        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
+        F_bb = (
+            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
+            * exp
+            / (1 - exp)
+            * bb_radius
+            * bb_radius
+            / D
+            / D
+        )
+
+        F_bb *= ext_per_filt
+        F_bb *= 1 + z
+        mAB = np.ones(len(t_day))
+        mAB *= -2.5 * np.log10(F_bb) - 48.6
+        mag[filt] = mAB
+
+    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
+
+    np.seterr(**old)
 
     return t_day, lbol, mag
 

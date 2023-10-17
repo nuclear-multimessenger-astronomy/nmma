@@ -42,6 +42,7 @@ model_parameters_dict = {
     "Me2017": ["log10_mej", "log10_vej", "beta", "log10_kappa_r"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
+    "blackbody_fixedT": ["bb_luminosity", "temperature"],
     "CV": ["example_num"],
     "AnBa2022_sparse": ["mrp", "xmix"],
     "AnBa2022_log": ["log10_mtot", "log10_mni", "vej", "log10_mrp", "xmix"],
@@ -984,6 +985,10 @@ class SimpleKilonovaLightCurveModel(object):
             )
         elif self.model == "PL_BB_fixedT":
             _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(
+                sample_times, param_dict, filters=self.filters
+            )
+        elif self.model == "blackbody_fixedT":
+            _, lbol, mag = utils.blackbody_constant_temperature(
                 sample_times, param_dict, filters=self.filters
             )
         return lbol, mag
