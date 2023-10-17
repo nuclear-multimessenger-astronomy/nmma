@@ -1084,6 +1084,44 @@ def blackbody_constant_temperature(t_day, param_dict, filters=None):
     return t_day, lbol, mag
 
 
+def synchrotron_powerlaw(t_day, param_dict, filters=None):
+    # prevent the output message flooded by these warning messages
+    old = np.seterr()
+    np.seterr(invalid="ignore")
+    np.seterr(divide="ignore")
+
+    beta = param_dict["beta_freq"]  # frequency index
+    alpha = param_dict["alpha_time"]  # time index
+    F_ref = param_dict["F_ref"]  # in mJy for t=1day and nu=1Hz
+    Ebv = param_dict["Ebv"]
+
+    # get the default filters and wavelength
+    filts, lambdas = get_default_filts_lambdas(filters=filters)
+
+    nu_obs = scipy.constants.c / lambdas
+
+    if Ebv != 0.0:
+        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
+    else:
+        ext = np.ones(len(nu_obs))
+
+    mag = {}
+    for idx, filt in enumerate(filts):
+        nu_of_filt = nu_obs[idx]
+        ext_per_filt = ext[idx]
+        F_pl = F_ref * np.power(nu_of_filt, -beta) * np.power(t_day, -alpha)
+        F_pl *= ext_per_filt
+        mAB = np.ones(len(t_day))
+        mAB *= -2.5 * np.log10(F_pl) + 16.4  # convert flux in mJy to AB magnitude
+        mag[filt] = mAB
+
+    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
+
+    np.seterr(**old)
+
+    return t_day, lbol, mag
+
+
 def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict, filters=None):
 
     # prevent the output message flooded by these warning messages

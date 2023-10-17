@@ -43,6 +43,7 @@ model_parameters_dict = {
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
     "blackbody_fixedT": ["bb_luminosity", "temperature"],
+    "synchrotron_powerlaw": ["alpha_time", "beta_freq", "F_ref"],
     "CV": ["example_num"],
     "AnBa2022_sparse": ["mrp", "xmix"],
     "AnBa2022_log": ["log10_mtot", "log10_mni", "vej", "log10_mrp", "xmix"],
@@ -991,6 +992,16 @@ class SimpleKilonovaLightCurveModel(object):
             _, lbol, mag = utils.blackbody_constant_temperature(
                 sample_times, param_dict, filters=self.filters
             )
+        elif self.model == "synchrotron_powerlaw":
+            _, lbol, mag = utils.synchrotron_powerlaw(
+                sample_times, param_dict, filters=self.filters
+            )
+            # remove the distance modulus for the synchrotron powerlaw
+            # as the reference flux is defined at the observer
+            dist_mod = 5. * np.log10(new_parameters['luminosity_distance'] * 1e6 / 10)
+            for filt in mag.keys():
+                mag[filt] -= dist_mod
+
         return lbol, mag
 
 
