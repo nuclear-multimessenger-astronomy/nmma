@@ -122,6 +122,12 @@ def get_parser(**kwargs):
         help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
     )
     parser.add_argument(
+        "--use-Ebv",
+        action="store_true",
+        default=False,
+        help="If using the Ebv extinction during the inference",
+    )
+    parser.add_argument(
         "--Ebv-max",
         type=float,
         default=0.5724,
@@ -540,20 +546,20 @@ def analysis(args):
         # load the kilonova afterglow data
         try:
             data = loadEvent(args.data)
-            
+
         except ValueError:
             with open(args.data) as f:
                 data = json.load(f)
                 for key in data.keys():
                     data[key] = np.array(data[key])
-    
+
         if args.trigger_time is None:
-            #load the minimum time as trigger time
+            # load the minimum time as trigger time
             min_time = np.inf
             for key, array in data.items():
                 min_time = np.minimum(min_time, np.min(array[:, 0]))
-            trigger_time=min_time
-            print(f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}") 
+            trigger_time = min_time
+            print(f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}")
         else:
             trigger_time = args.trigger_time
 
