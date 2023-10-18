@@ -4,7 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
 import os
-import seaborn as sns
 import matplotlib.patches as mpatches
 import re
 import matplotlib
@@ -177,7 +176,23 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, **kwargs):
     else:
         truth_values = truths
 
-    color_array = sns.color_palette("deep", n_colors=len(data), desat=0.8)
+    red = '#F42969'
+    orange = 'orange'
+    blue = '#22ADFC'
+    purple = '#4635CE'
+    green = '#4CAF50'
+    yellow = '#FFD700'
+    pink = '#FF69B4'
+    teal = '#008080'
+    gold = '#FFD700'
+    gray = '#808080'
+    brown = '#8B4513'
+    lavender = '#E6E6FA'
+    cyan = '#00FFFF'
+    deep_blue = '#00008B'
+    tomato = '#FF6347'
+
+    color_array = [blue, purple, orange, red, green, gold, teal, deep_blue, cyan, brown, tomato]
 
     _limit = np.concatenate(data, axis=0)
     limit = np.array([np.min(_limit, axis=0), np.max(_limit, axis=0)]).T
