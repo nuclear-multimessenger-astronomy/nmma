@@ -12,7 +12,7 @@ def args():
     workingDir = os.path.dirname(__file__)
     dataDir = os.path.join(workingDir, "data")
     svdmodels = os.path.join(workingDir, "../../svdmodels/")
-    
+
     args = Namespace(
         model="Bu2019lm",
         interpolation_type="sklearn_gp",
@@ -72,13 +72,14 @@ def args():
         sampler_kwargs="{}",
         verbose=False,
         local_only=True,
+        skip_sampling=False,
     )
 
     return args
 
 
 def test_analysis(args):
-    
+
     analysis.main(args)
 
 
