@@ -374,10 +374,23 @@ def get_parser(**kwargs):
         action="store_true",
         default=False,
     )
+
+    parser.add_argument(
+        "--skip-sampling",
+        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.",
+        action="store_true",
+        default=False,
+    )
     return parser
 
 
 def analysis(args):
+
+    # --skip-sampling currently not compatible with --bestfit or --injection arguments
+    if args.skip_sampling & ((args.injection is not None) | (args.bestfit)):
+        raise ValueError(
+            "Cannot skip sampling (--skip-sampling) if --injection or --bestfit are set."
+        )
 
     if args.sampler == "pymultinest":
         if len(args.outdir) > 64:
@@ -559,7 +572,9 @@ def analysis(args):
             for key, array in data.items():
                 min_time = np.minimum(min_time, np.min(array[:, 0]))
             trigger_time = min_time
-            print(f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}")
+            print(
+                f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}"
+            )
         else:
             trigger_time = args.trigger_time
 
@@ -653,36 +668,40 @@ def analysis(args):
     if args.bilby_zero_likelihood_mode:
         likelihood = ZeroLikelihood(likelihood)
 
-    # fetch the additional sampler kwargs
-    sampler_kwargs = literal_eval(args.sampler_kwargs)
-    print("Running with the following additional sampler_kwargs:")
-    print(sampler_kwargs)
-    # check if it is running with reactive sampler
-    if args.reactive_sampling:
-        if args.sampler != "ultranest":
-            print("Reactive sampling is only available in ultranest")
+    if not args.skip_sampling:
+        # fetch the additional sampler kwargs
+        sampler_kwargs = literal_eval(args.sampler_kwargs)
+        print("Running with the following additional sampler_kwargs:")
+        print(sampler_kwargs)
+        # check if it is running with reactive sampler
+        if args.reactive_sampling:
+            if args.sampler != "ultranest":
+                print("Reactive sampling is only available in ultranest")
+            else:
+                print("Running with reactive-sampling in ultranest")
+                nlive = None
         else:
-            print("Running with reactive-sampling in ultranest")
-            nlive = None
+            nlive = args.nlive
+
+        result = bilby.run_sampler(
+            likelihood,
+            priors,
+            sampler=args.sampler,
+            outdir=args.outdir,
+            label=args.label,
+            nlive=nlive,
+            seed=args.seed,
+            soft_init=args.soft_init,
+            queue_size=args.cpus,
+            check_point_delta_t=3600,
+            **sampler_kwargs,
+        )
+
+        result.save_posterior_samples()
     else:
-        nlive = args.nlive
+        print("Skipping sampling; plotting checkpointed results.")
 
-    result = bilby.run_sampler(
-        likelihood,
-        priors,
-        sampler=args.sampler,
-        outdir=args.outdir,
-        label=args.label,
-        nlive=nlive,
-        seed=args.seed,
-        soft_init=args.soft_init,
-        queue_size=args.cpus,
-        check_point_delta_t=3600,
-        **sampler_kwargs,
-    )
-
-    result.save_posterior_samples()
-
+    alt_corner = False
     if args.injection:
         injlist_all = []
         for model_name in model_names:
@@ -718,8 +737,10 @@ def analysis(args):
             if key in injection_parameters
         }
         result.plot_corner(parameters=injection)
-    else:
+    elif not args.skip_sampling:
         result.plot_corner()
+    else:
+        alt_corner = True
 
     if args.bestfit or args.plot:
         posterior_file = os.path.join(
@@ -770,6 +791,25 @@ def analysis(args):
     if args.plot:
         import matplotlib.pyplot as plt
         from matplotlib.pyplot import cm
+
+        #################################
+        # Generate corner plot if missing
+        #################################
+        if alt_corner:
+            import corner
+
+            # remove columns from posterior_samples where dynamic range is zero
+            col_exclude_list = [
+                x
+                for x in posterior_samples.columns
+                if np.max(np.diff(posterior_samples[x])) == 0
+            ]
+            # make/save corner plot using posterior samples
+            cornerfig = corner.corner(posterior_samples.drop(col_exclude_list, axis=1))
+            cornerpath = os.path.join(args.outdir, f"{args.label}_corner.png")
+            plt.tight_layout()
+            cornerfig.savefig(cornerpath)
+            plt.close()
 
         if len(models) > 1:
             _, mag_all = light_curve_model.generate_lightcurve(
