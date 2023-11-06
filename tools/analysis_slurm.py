@@ -124,11 +124,10 @@ def main(args=None):
         "tmin": "$TMIN",
         "tmax": "$TMAX",
         "dt": "$DT",
+        "skip_sampling": "$SKIP_SAMPLING",
     }
 
-    args.outdir = f"{args.outdir}/$LABEL"
-
-    for key in [
+    wildcard_keys = [
         "model",
         "label",
         "trigger_time",
@@ -137,7 +136,12 @@ def main(args=None):
         "tmin",
         "tmax",
         "dt",
-    ]:
+    ]
+    wildcard_boolean_keys = ["skip_sampling"]
+
+    args.outdir = f"{args.outdir}/$LABEL"
+
+    for key in wildcard_keys:
         if type(args_vars[key]) in [float, int]:
             if np.isnan(args_vars[key]):
                 args_vars[key] = wildcard_mapper[key]
@@ -151,8 +155,11 @@ def main(args=None):
             arg_value = args_vars[arg]
             if type(arg_value) == bool:
                 if arg_value:
-                    hyphen_arg = arg.replace("_", "-")
-                    args_to_add.append(f"--{hyphen_arg}")
+                    if arg in wildcard_boolean_keys:
+                        args_to_add.append(wildcard_mapper[arg])
+                    else:
+                        hyphen_arg = arg.replace("_", "-")
+                        args_to_add.append(f"--{hyphen_arg}")
             elif (arg_value is not None) & (arg_value != "None"):
                 hyphen_arg = arg.replace("_", "-")
                 args_to_add.append(f"--{hyphen_arg} {args_vars[arg]}")
@@ -208,7 +215,7 @@ def main(args=None):
     )
     print()
     print(
-        "It is also recommended to set the following keywords to 'None' when running this script to allow them to be customized: --label ($LABEL), --tmin ($TMIN), --tmax ($TMAX), and --dt ($DT)"
+        "It is also recommended to set the following keywords to 'None' when running this script to allow them to be customized: --label ($LABEL), --tmin ($TMIN), --tmax ($TMAX), --dt ($DT), and --skip-sampling ($SKIP_SAMPLING)"
     )
     print()
     print(
