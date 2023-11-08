@@ -19,6 +19,7 @@ import astropy.constants
 
 import matplotlib
 import matplotlib.pyplot as plt
+from nmma.em.training import SVDTrainingModel
 
 try:
     import afterglowpy
@@ -205,20 +206,33 @@ def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
     return processedData
 
 
-def interpolate_nans(data):
+def interpolate_nans(data: dict) -> dict:
+    """
+    Interpolates the NaN values in a photometric data.
+    
+    Args:
+        data (dict): Dictionary containing photometric data. The keys correspond to the filenames
+        of the data. The values are dictionaries of which the keys correspond to time (t) or the filters considered.
+        The corresponding values are the time grid (in days) and the magnitudes of the different filters.
+    """
 
+    # Iterate over all the data files
     for name in data.keys():
+        # For each file, iterate over the time or the filters present
         for d in data[name].keys():
+            # Skip over the time grid and filters which have no NaN values
             if d == "t":
                 continue
             if not any(np.isnan(data[name][d])):
                 continue
 
+            # Find indices where the data is not NaN for interpolation values
             ii = np.where(~np.isnan(data[name][d]))[0]
             if len(ii) > 1:
                 f = interp.interp1d(
                     data[name]["t"][ii], data[name][d][ii], fill_value="extrapolate"
                 )
+                # Do the interpolation
                 data[name][d] = f(data[name]["t"])
 
     return data
@@ -316,15 +330,27 @@ def get_default_filts_lambdas(filters=None):
 
 
 def calc_lc(
-    tt,
-    param_list,
-    svd_mag_model=None,
-    svd_lbol_model=None,
-    mag_ncoeff=None,
-    lbol_ncoeff=None,
-    interpolation_type="sklearn_gp",
-    filters=None,
-):
+    tt: np.array,
+    param_list: np.array,
+    svd_mag_model: SVDTrainingModel=None,
+    svd_lbol_model: SVDTrainingModel=None,
+    mag_ncoeff: int=None,
+    lbol_ncoeff: int=None,
+    interpolation_type: str="sklearn_gp",
+    filters: list=None,
+) -> "tuple[np.array, np.array, np.array]":
+    """
+    Computes the lightcurve from a surrogate model, given the model parameters.
+    Args:
+        tt (Array): Time grid on which to evaluate lightcurve
+        param_list (Array): Input parameters for the surrogate model
+        svd_mag_model (SVDTrainingModel): Trained surrogate model for mag
+        svd_lbol_model (SVDTrainingModel): Trained surrogate model for lbol
+        mag_ncoeff (int): Number of coefficients after SVD projection for mag
+        lbol_ncoeff (int): Number of coefficients after SVD projection for lbol
+        interpolation_type (str): String denoting which interpolation type is used for the surrogate model
+        filters (Array): List/array of filters at which we want to evaluate the model
+    """
 
     mAB = {}
 
