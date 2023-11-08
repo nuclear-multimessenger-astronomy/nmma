@@ -91,11 +91,31 @@ def read_spectroscopy_files(
     return data
 
 
-def read_photometry_files(
-    files, filters=None, tt=np.linspace(0, 14, 100), datatype="bulla"
-):
+def read_photometry_files(files: list, filters: list = None, tt: np.array = np.linspace(0, 14, 100), datatype:str ="bulla") -> dict:
+    """
+    Read in a list of photometry files with given filenames and process them in a dictionary
+    
+    Args:
+        files (list): List of filenames with the photometry files.
+        filters (list): List of photometry filters to be extracted.
+        tt (np.array): Array containing the time grid at which photometry values are given.
+        datatype (str): Which model we are considering. Currently supports
+        
+    Returns:
+        data: Dictionary with keys being the given filenames and values being dictionaries themselves, with keys 
+        being t (time) and specified filters and values being the time grid, and values the time grid and lightcurves.
+    """
+    
+    # First, check whether given datatype is supported in this function
+    supported_datatypes = ["ztf", "bulla", "standard", "hdf5"]
+    if datatype not in supported_datatypes:
+        space = " "
+        raise ValueError(f"datatype {datatype} unknown. Currently supported datatypes are: {space.join(supported_datatypes)}")
 
+    # Return value 
     data = {}
+    
+    # Iterate over all the given files and extract the lightcurve data from it
     for filename in files:
         name = (
             filename.replace(".csv", "")
@@ -148,6 +168,8 @@ def read_photometry_files(
                     assume_sorted=True,
                 )
                 data[name][filt] = lc(tt)
+        
+        # Bulla datatype
         elif datatype == "bulla":
             with open(filename, "r") as f:
                 header = list(filter(None, f.readline().rstrip().strip("#").split(" ")))
@@ -165,6 +187,7 @@ def read_photometry_files(
                 k.replace(":", "_"): v.to_numpy() for k, v in data[name].items()
             }
 
+        # Standard datatype
         elif datatype == "standard":
             mag_d = np.loadtxt(filename)
             mag_d_shape = mag_d.shape
@@ -188,6 +211,7 @@ def read_photometry_files(
                 data[name]["R"] = mag_d[:, 13]
                 data[name]["I"] = mag_d[:, 14]
 
+        # HDF5 datatype
         elif datatype == "hdf5":
             f = h5py.File(filename, "r")
             keys = list(f.keys())
@@ -230,9 +254,7 @@ def read_photometry_files(
                     k.replace(":", "_"): v.to_numpy() for k, v in data[key].items()
                 }
 
-        else:
-            raise ValueError(f"datatype {datatype} unknown")
-
+        # Finally, extract the desired filters from all filters present in the data
         if filters is not None:
             filters_to_remove = set(list(data[name].keys())) - set(filters + ["t"])
             for filt in filters_to_remove:
@@ -241,7 +263,11 @@ def read_photometry_files(
     return data
 
 
-def read_lightcurve_file(filename):
+def read_lightcurve_file(filename: str) -> dict:
+    """
+    Function to read in lightcurve file and create a dictionary containing the time (in days) at which the lightcurves 
+    are evaluated and the corresponding values for different filters.
+    """
 
     with open(filename, "r") as f:
         header = list(filter(None, f.readline().rstrip().strip("#").split(" ")))

@@ -40,6 +40,8 @@ class SVDTrainingModel(object):
         Whether to show plots or not
     plotdir: str
         Directory for plotting
+    start_training: bool
+        Indicate whether we want to start training a model directly after initialization. Defaults to True.
     """
 
     def __init__(
@@ -61,6 +63,7 @@ class SVDTrainingModel(object):
         univariate_spline=False,
         univariate_spline_s=2,
         random_seed=42,
+        start_training=True
     ):
 
         if interpolation_type not in ["sklearn_gp", "tensorflow", "api_gp"]:
@@ -102,7 +105,7 @@ class SVDTrainingModel(object):
 
         # Only want to train if we must, so check if the model exists
         model_exists = self.check_model()
-        if not model_exists:
+        if not model_exists and start_training:
             print("Training new model")
             self.svd_model = self.generate_svd_model()
             self.train_model()
@@ -174,8 +177,16 @@ class SVDTrainingModel(object):
                 del self.data[key]["fnu"]
             del self.data[key]["t"]
 
-    def generate_svd_model(self):
-
+    def generate_svd_model(self) -> dict:
+        """
+        Function that preprocesses the data and performs the SVD decomposition for each filter of the data.
+        The SVD is done with np.linalg
+        
+        Returns:
+            svd_model: A dictionary with keys being the filters. The values are dictionaries containing
+            the processed values of the parameters, processed values of the data (normalized into a [0, 1] range)
+            and the matrices which are used in the projection of the SVD.
+        """
         model_keys = list(self.data.keys())
 
         # Place the relevant parameters into an array
@@ -195,7 +206,7 @@ class SVDTrainingModel(object):
                 param_array_postprocess[:, i] - param_mins[i]
             ) / (param_maxs[i] - param_mins[i])
 
-        # Place the relevant parameters into an array
+        # Output is data with keys being filters, and values being dictionaries for the SVD decomposition
         svd_model = {}
         # Loop through filters
         for jj, filt in enumerate(self.filters):
@@ -222,6 +233,7 @@ class SVDTrainingModel(object):
             svd_model[filt]["maxs"] = maxs
             svd_model[filt]["tt"] = self.sample_times
 
+            # Perform the SVD decomposition
             UA, sA, VA = np.linalg.svd(data_array_postprocess, full_matrices=True)
             VA = VA.T
 
@@ -231,10 +243,12 @@ class SVDTrainingModel(object):
             cAmat = np.zeros((self.n_coeff, n))
             cAvar = np.zeros((self.n_coeff, n))
             for i in range(n):
-                ErrorLevel = 1.0
+                # Get the data matrix
                 cAmat[:, i] = np.dot(
                     data_array_postprocess[i, :], VA[:, : self.n_coeff]
                 )
+                # Get variance matrix
+                ErrorLevel = 1.0
                 errors = ErrorLevel * np.ones_like(data_array_postprocess[i, :])
                 cAvar[:, i] = np.diag(
                     np.dot(
@@ -375,7 +389,9 @@ class SVDTrainingModel(object):
             self.svd_model[filt]["gps"] = gps
 
     def train_tensorflow_model(self, dropout_rate=0.6):
-
+        """
+        Train a tensorflow model to emulate the KN model.
+        """
         try:
             import tensorflow as tf
 
