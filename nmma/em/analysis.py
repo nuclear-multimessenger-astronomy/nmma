@@ -790,17 +790,17 @@ def analysis(args):
             sample_times = mag["bestfit_sample_times"]
             mag_used = mag[filt]
             interp = interp1d(sample_times, mag_used)
-            # fetch the erorr_budget
-            if "em_syserr" in bestfit_params:
-                err = bestfit_params["em_syserr"]
-            else:
-                err = error_budget
             # fetch data
             samples = copy.deepcopy(processed_data[filt])
             t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
             # only the detection data are needed
             finite_idx = np.where(np.isfinite(sigma_y))[0]
             if len(finite_idx) > 0:
+                # fetch the erorr_budget
+                if "em_syserr" in bestfit_params:
+                    err = bestfit_params["em_syserr"]
+                else:
+                    err = error_budget[filt]
                 t_det, y_det, sigma_y_det = (t[finite_idx], y[finite_idx],
                                              sigma_y[finite_idx])
                 num = (y_det - interp(t_det))**2
