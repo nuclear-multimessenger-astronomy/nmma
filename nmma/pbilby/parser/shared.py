@@ -186,13 +186,16 @@ def _add_eos_settings_to_parser(parser):
     eos_input_parser.add(
         "--with-eos",
         action="store_true",
-        default=True,
-        help="Flag for sampling over EOS (default:True)",
+        default=False,
+        help="Flag for sampling over EOS (default:False)",
     )
-    eos_input_parser.add("--eos-data", type=str, help="Path to the EOS directory")
-    eos_input_parser.add("--Neos", type=int, help="Number of EOSs to be used")
+    eos_input_parser.add("--eos-data", type=str, required=False,
+                         help="Path to the EOS directory")
+    eos_input_parser.add("--Neos", type=int, required=False,
+                         help="Number of EOSs to be used")
     eos_input_parser.add(
-        "--eos-weight", type=str, help="Path to the precalculated EOS weighting"
+        "--eos-weight", type=str, required=False,
+        help="Path to the precalculated EOS weighting"
     )
 
     return parser
