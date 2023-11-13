@@ -18,13 +18,13 @@ def test_training():
 
     # The filters we'll be focusing on
     filts = [
-        "g",
-        "r",
-    ]  # We will focus on these two bands; all available: ["u","g","r","i","z","y","J","H","K"]
+        "ztfg",
+        "ztfr",
+    ]  # We will focus on these two bands; all available: ["sdssu","ztfg","ztfr","ztfi","ps1__z","ps1__y","2massj","2massh","2massks"]
 
     workingDir = os.path.dirname(__file__)
 
-    dataDir = os.path.join(workingDir, 'data/bulla')
+    dataDir = os.path.join(workingDir, "data/bulla")
     ModelPath = "svdtrainingmodel"
     filenames = glob.glob(f"{dataDir}/*.dat")
 
