@@ -388,12 +388,6 @@ def get_parser(**kwargs):
 
 def analysis(args):
 
-    # --skip-sampling currently not compatible with --bestfit or --injection arguments
-    if args.skip_sampling & ((args.injection is not None) | (args.bestfit)):
-        raise ValueError(
-            "Cannot skip sampling (--skip-sampling) if --injection or --bestfit are set."
-        )
-
     if args.sampler == "pymultinest":
         if len(args.outdir) > 64:
             print(
@@ -670,40 +664,46 @@ def analysis(args):
     if args.bilby_zero_likelihood_mode:
         likelihood = ZeroLikelihood(likelihood)
 
-    if not args.skip_sampling:
-        # fetch the additional sampler kwargs
-        sampler_kwargs = literal_eval(args.sampler_kwargs)
-        print("Running with the following additional sampler_kwargs:")
-        print(sampler_kwargs)
-        # check if it is running with reactive sampler
-        if args.reactive_sampling:
-            if args.sampler != "ultranest":
-                print("Reactive sampling is only available in ultranest")
-            else:
-                print("Running with reactive-sampling in ultranest")
-                nlive = None
+    # fetch the additional sampler kwargs
+    sampler_kwargs = literal_eval(args.sampler_kwargs)
+    print("Running with the following additional sampler_kwargs:")
+    print(sampler_kwargs)
+
+    # check if it is running with reactive sampler
+    if args.reactive_sampling:
+        if args.sampler != "ultranest":
+            print("Reactive sampling is only available in ultranest")
         else:
-            nlive = args.nlive
-
-        result = bilby.run_sampler(
-            likelihood,
-            priors,
-            sampler=args.sampler,
-            outdir=args.outdir,
-            label=args.label,
-            nlive=nlive,
-            seed=args.seed,
-            soft_init=args.soft_init,
-            queue_size=args.cpus,
-            check_point_delta_t=3600,
-            **sampler_kwargs,
-        )
-
-        result.save_posterior_samples()
+            print("Running with reactive-sampling in ultranest")
+            nlive = None
     else:
-        print("Skipping sampling; plotting checkpointed results.")
+        nlive = args.nlive
 
-    alt_corner = False
+    if args.skip_sampling:
+        print("Sampling for 1 iteration and plotting checkpointed results.")
+        if args.sampler == "pymultinest":
+            sampler_kwargs["max_iter"] = 1
+        elif args.sampler == "ultranest":
+            sampler_kwargs["niter"] = 1
+        elif args.sampler == "dynesty":
+            sampler_kwargs["maxiter"] = 1
+
+    result = bilby.run_sampler(
+        likelihood,
+        priors,
+        sampler=args.sampler,
+        outdir=args.outdir,
+        label=args.label,
+        nlive=nlive,
+        seed=args.seed,
+        soft_init=args.soft_init,
+        queue_size=args.cpus,
+        check_point_delta_t=3600,
+        **sampler_kwargs,
+    )
+
+    result.save_posterior_samples()
+
     if args.injection:
         injlist_all = []
         for model_name in model_names:
@@ -739,10 +739,8 @@ def analysis(args):
             if key in injection_parameters
         }
         result.plot_corner(parameters=injection)
-    elif not args.skip_sampling:
-        result.plot_corner()
     else:
-        alt_corner = True
+        result.plot_corner()
 
     if args.bestfit or args.plot:
         posterior_file = os.path.join(
@@ -780,10 +778,11 @@ def analysis(args):
         ######################
         # calculate the chi2 #
         ######################
-        processed_data = dataProcess(data, filters_to_analyze, trigger_time,
-                                     args.tmin, args.tmax)
-        chi2 = 0.
-        dof = 0.
+        processed_data = dataProcess(
+            data, filters_to_analyze, trigger_time, args.tmin, args.tmax
+        )
+        chi2 = 0.0
+        dof = 0.0
         chi2_per_dof_dict = {}
         for filt in filters_to_analyze:
             # make best-fit lc interpolation
@@ -801,9 +800,12 @@ def analysis(args):
                     err = bestfit_params["em_syserr"]
                 else:
                     err = error_budget[filt]
-                t_det, y_det, sigma_y_det = (t[finite_idx], y[finite_idx],
-                                             sigma_y[finite_idx])
-                num = (y_det - interp(t_det))**2
+                t_det, y_det, sigma_y_det = (
+                    t[finite_idx],
+                    y[finite_idx],
+                    sigma_y[finite_idx],
+                )
+                num = (y_det - interp(t_det)) ** 2
                 den = sigma_y_det**2 + err**2
                 chi2_per_filt = np.sum(num / den)
                 # store the data
@@ -820,7 +822,9 @@ def analysis(args):
         bestfit_to_write["Best fit index"] = int(bestfit_idx)
         bestfit_to_write["Magnitudes"] = {i: mag[i].tolist() for i in mag.keys()}
         bestfit_to_write["chi2_per_dof"] = chi2_per_dof
-        bestfit_to_write["chi2_per_dof_per_filt"] = {i: chi2_per_dof_dict[i].tolist() for i in chi2_per_dof_dict.keys()}
+        bestfit_to_write["chi2_per_dof_per_filt"] = {
+            i: chi2_per_dof_dict[i].tolist() for i in chi2_per_dof_dict.keys()
+        }
         bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
 
         with open(bestfit_file, "w") as file:
@@ -831,25 +835,6 @@ def analysis(args):
     if args.plot:
         import matplotlib.pyplot as plt
         from matplotlib.pyplot import cm
-
-        #################################
-        # Generate corner plot if missing
-        #################################
-        if alt_corner:
-            import corner
-
-            # remove columns from posterior_samples where dynamic range is zero
-            col_exclude_list = [
-                x
-                for x in posterior_samples.columns
-                if np.max(np.diff(posterior_samples[x])) == 0
-            ]
-            # make/save corner plot using posterior samples
-            cornerfig = corner.corner(posterior_samples.drop(col_exclude_list, axis=1))
-            cornerpath = os.path.join(args.outdir, f"{args.label}_corner.png")
-            plt.tight_layout()
-            cornerfig.savefig(cornerpath)
-            plt.close()
 
         if len(models) > 1:
             _, mag_all = light_curve_model.generate_lightcurve(
