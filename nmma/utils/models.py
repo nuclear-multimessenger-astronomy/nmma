@@ -278,9 +278,6 @@ def get_model(
         model_name_components.remove("tf")
     core_model_name = "_".join(model_name_components)
 
-    # TODO: remove the line below once <model>_tf.pkl files on Zenodo are updated to <model>.pkl
-    core_model_name = model_name
-
     filepaths = (
         [Path(models_home, f"{core_model_name}.{core_format}")]
         if not filters_only
