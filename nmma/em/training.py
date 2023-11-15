@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -63,12 +64,18 @@ class SVDTrainingModel(object):
         univariate_spline=False,
         univariate_spline_s=2,
         random_seed=42,
-        start_training=True
+        start_training=True,
+        continue_training=False,
     ):
 
         if interpolation_type not in ["sklearn_gp", "tensorflow", "api_gp"]:
             raise ValueError(
                 "interpolation_type must be sklearn_gp, api_gp or tensorflow"
+            )
+
+        if (interpolation_type != "tensorflow") and continue_training:
+            raise ValueError(
+                "--continue-training only supported with --interpolation-type tensorflow"
             )
 
         self.model = model
@@ -103,15 +110,27 @@ class SVDTrainingModel(object):
 
         self.interpolate_data(data_time_unit=data_time_unit)
 
-        # Only want to train if we must, so check if the model exists
-        model_exists = self.check_model()
-        if not model_exists and start_training:
-            print("Training new model")
+        self.model_exists = self.check_model()
+        self.start_training = start_training
+        self.continue_training = continue_training
+
+        if self.model_exists:
+            print("Model exists... will load that model.")
+            self.load_model()
+        else:
             self.svd_model = self.generate_svd_model()
+            if self.continue_training:
+                warnings.warn(
+                    "Warning: --continue-training set, but no existing model found."
+                )
+
+        if (not self.model_exists and self.start_training) or (
+            self.model_exists and self.continue_training
+        ):
+            print("Training model...")
+            # self.svd_model = self.generate_svd_model()
             self.train_model()
             self.save_model()
-        else:
-            print("Model exists... will load that model.")
 
         self.load_model()
 
@@ -181,7 +200,7 @@ class SVDTrainingModel(object):
         """
         Function that preprocesses the data and performs the SVD decomposition for each filter of the data.
         The SVD is done with np.linalg
-        
+
         Returns:
             svd_model: A dictionary with keys being the filters. The values are dictionaries containing
             the processed values of the parameters, processed values of the data (normalized into a [0, 1] range)
@@ -419,21 +438,25 @@ class SVDTrainingModel(object):
             )
 
             tf.keras.utils.set_random_seed(self.random_seed)
-            model = Sequential()
-            # One/few layers of wide NN approximate GP
-            model.add(
-                Dense(
-                    2048,
-                    activation="relu",
-                    kernel_initializer="he_normal",
-                    input_shape=(train_X.shape[1],),
-                )
-            )
-            model.add(Dropout(dropout_rate))
-            model.add(Dense(self.n_coeff))
 
-            # compile the model
-            model.compile(optimizer="adam", loss="mse")
+            if self.model_exists and self.continue_training:
+                model = self.svd_model[filt]["model"]
+            else:
+                model = Sequential()
+                # One/few layers of wide NN approximate GP
+                model.add(
+                    Dense(
+                        2048,
+                        activation="relu",
+                        kernel_initializer="he_normal",
+                        input_shape=(train_X.shape[1],),
+                    )
+                )
+                model.add(Dropout(dropout_rate))
+                model.add(Dense(self.n_coeff))
+
+                # compile the model
+                model.compile(optimizer="adam", loss="mse")
 
             # fit the model
             training_history = model.fit(

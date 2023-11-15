@@ -171,6 +171,12 @@ def main():
         default=42,
         help="random seed to set during training",
     )
+    parser.add_argument(
+        "--continue-training",
+        action="store_true",
+        default=False,
+        help="Continue training an existing model",
+    )
     args = parser.parse_args()
 
     refresh = False
@@ -253,6 +259,7 @@ def main():
         univariate_spline=args.use_UnivariateSpline,
         univariate_spline_s=args.UnivariateSpline_s,
         random_seed=args.random_seed,
+        continue_training=args.continue_training,
     )
 
     light_curve_model = SVDLightCurveModel(
