@@ -77,6 +77,7 @@ This model is then ready to use in an analysis.
 
 	lightcurve-analysis --model Bu2022mv --interpolation-type tensorflow --svd-path svdmodels --outdir outdir --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2022mv.prior
 
+To continue training an existing model (e.g. on additional data), set the --continue-training flag.
 
 ### Spectral grids
 
