@@ -73,6 +73,11 @@ class SVDTrainingModel(object):
                 "interpolation_type must be sklearn_gp, api_gp or tensorflow"
             )
 
+        if (interpolation_type != "tensorflow") and continue_training:
+            raise ValueError(
+                "--continue-training only supported with --interpolation-type tensorflow"
+            )
+
         self.model = model
         self.data = data
         self.model_parameters = parameters
