@@ -15,3 +15,4 @@ arviz
 p_tqdm
 ultranest
 tornado
+tensorflow
