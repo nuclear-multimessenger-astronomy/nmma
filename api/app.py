@@ -39,7 +39,7 @@ default_analysis_parameters = {
     "nlive": 512,
     "error_budget": 1.0,
     "Ebv_max": 0.5724,
-    "interpolation_type": "tensorflow",
+    "interpolation-type": "tensorflow",
     "sampler": "pymultinest",
 }
 
@@ -95,7 +95,7 @@ def run_nmma_model(data_dict):
     nlive = analysis_parameters.get("nlive")
     error_budget = analysis_parameters.get("error_budget")
     Ebv_max = analysis_parameters.get("Ebv_max")
-    interpolation_type = analysis_parameters.get("interpolation_type")
+    interpolation_type = analysis_parameters.get("interpolation-type")
     sampler = analysis_parameters.get("sampler")
 
     # this example analysis service expects the photometry to be in
@@ -206,7 +206,7 @@ def run_nmma_model(data_dict):
             str(nlive),
             "--Ebv-max",
             str(Ebv_max),
-            "--interpolation_type",
+            "--interpolation-type",
             interpolation_type,
             "--sampler",
             sampler,
@@ -369,7 +369,7 @@ class HealthHandler(tornado.web.RequestHandler):
 def make_app():
     return tornado.web.Application(
         [
-            (r"/analysis/nmma_analysis", MainHandler),
+            (r"/analysis", MainHandler),
             (r"/health", HealthHandler),
         ]
     )
@@ -380,7 +380,7 @@ if __name__ == "__main__":
     if "PORT" in os.environ:
         port = int(os.environ["PORT"])
     else:
-        port = 6901
+        port = 4000
     nmma_analysis.listen(port)
     log(f"NMMA Service Listening on port {port}")
     tornado.ioloop.IOLoop.current().start()
