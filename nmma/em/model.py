@@ -7,7 +7,6 @@ import numpy as np
 from scipy.special import logsumexp
 import scipy.constants
 from sncosmo.models import _SOURCES
-import warnings
 
 from . import utils
 
@@ -283,15 +282,9 @@ class SVDLightCurveModel(object):
                 self.svd_lbol_model = None
         elif self.interpolation_type == "tensorflow":
             import tensorflow as tf
+
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
-
-            # TODO: remove below 3 lines once <model>_tf.pkl files on Zenodo are updated to <model>.pkl
-            if not os.path.exists(modelfile):
-                warnings.warn(
-                    f"Attempting to load {core_model_name}_tf.pkl. In the future, all model files will have the format <model>.pkl, regardless of --interpolation-type."
-                )
-                modelfile = os.path.join(self.svd_path, f"{core_model_name}_tf.pkl")
 
             if not local_only:
                 _, model_filters = get_model(
@@ -520,7 +513,7 @@ class GRBLightCurveModel(object):
             ):
                 return np.zeros(len(sample_times)), {}
 
-        if grb_param_dict["epsilon_e"] + grb_param_dict["epsilon_B"] > 1.:
+        if grb_param_dict["epsilon_e"] + grb_param_dict["epsilon_B"] > 1.0:
             return np.zeros(len(sample_times)), {}
 
         if self.jetType == 1 or self.jetType == 4:
@@ -998,7 +991,7 @@ class SimpleKilonovaLightCurveModel(object):
             )
             # remove the distance modulus for the synchrotron powerlaw
             # as the reference flux is defined at the observer
-            dist_mod = 5. * np.log10(new_parameters['luminosity_distance'] * 1e6 / 10)
+            dist_mod = 5.0 * np.log10(new_parameters["luminosity_distance"] * 1e6 / 10)
             for filt in mag.keys():
                 mag[filt] -= dist_mod
 
