@@ -60,6 +60,15 @@ model_parameters_dict = {
         "vej_wind",
         "KNtheta",
     ],
+    "Bu2023Ye": [
+        "log10_mej_dyn",
+        "vej_dyn",
+        "Yedyn",
+        "log10_mej_wind",
+        "vej_wind",
+        "Yewind",
+        "KNtheta",
+    ],
     "LANL2022": [
         "log10_mej_dyn",
         "vej_dyn",

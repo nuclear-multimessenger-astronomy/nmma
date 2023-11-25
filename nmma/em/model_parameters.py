@@ -1,3 +1,5 @@
+
+
 """Script with various functions to extract the parameters of models from their naming convention for filenames."""
 import re
 import numpy as np
@@ -200,6 +202,40 @@ def Bu2022Ye(data):
         # Best to interpolate mass in log10 space
         rr[1] = np.log10(rr[1])
         rr[4] = np.log10(rr[4])
+
+        data_out[key] = {
+            param: rr[idx] for param, idx in zip(parameters, parameters_idx)
+        }
+        data_out[key] = {**data_out[key], **data[key]}
+
+    return data_out, parameters
+
+def Bu2023Ye(data):
+
+    data_out = {}
+
+    parameters = [
+        "log10_mej_dyn",
+        "vej_dyn",
+        "Yedyn",
+        "log10_mej_wind",
+        "vej_wind",
+        "Yewind",
+        "KNtheta",
+    ]
+    parameters_idx = [0, 1, 2, 3, 4, 5, 6]
+    magkeys = data.keys()
+    for jj, key in enumerate(magkeys):
+        rr = [
+            np.abs(float(x))
+            for x in re.findall(
+                r"[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", key
+            )
+        ]
+
+        # Best to interpolate mass in log10 space
+        rr[0] = np.log10(rr[0])
+        rr[3] = np.log10(rr[3])
 
         data_out[key] = {
             param: rr[idx] for param, idx in zip(parameters, parameters_idx)
