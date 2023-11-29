@@ -15,7 +15,7 @@ def refresh_models_list(models_home=None, source=None):
                 from .gitlab import refresh_models_list
             elif source == "zenodo":
                 from .zenodo import refresh_models_list
-            refresh_models_list(models_home=models_home)
+            models = refresh_models_list(models_home=models_home)
             break
         except Exception as e:
             print(f"Error while refreshing models list from {source}: {str(e)}")
@@ -26,6 +26,8 @@ def refresh_models_list(models_home=None, source=None):
                 raise e
             source = remaining_sources[0]
             print(f"Trying to refresh models list from {source} instead")
+
+    return models
 
 
 def get_model(
