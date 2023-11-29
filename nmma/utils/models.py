@@ -49,7 +49,8 @@ def get_model(
                 from .gitlab import get_model
             elif source == "zenodo":
                 from .zenodo import get_model
-            get_model(
+
+            files, filters = get_model(
                 models_home=models_home,
                 model_name=model_name,
                 filters=filters,
@@ -66,6 +67,8 @@ def get_model(
                 raise e
             source = remaining_sources[0]
             print(f"Trying to get model from {source} instead")
+
+    return files, filters
 
 
 def main(args=None):
