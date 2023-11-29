@@ -8,24 +8,24 @@ import requests
 from requests.exceptions import ConnectionError
 from yaml import load
 
-from models_tools import *
+from models_tools import SKIP_FILTERS, download, decompress, get_models_home
 
 REPO = "https://gitlab.com/Theodlz/nmma-models"
 
 MODELS = {}
 
+
 def download_and_decompress(file_info):
     download(file_info)
     decompress(file_info[1])
+
 
 def download_models_list(models_home=None):
     # first we load the models list from gitlab
     models_home = get_models_home(models_home)
     if not exists(models_home):
         makedirs(models_home)
-    r = requests.get(
-        f"{REPO}/raw/main/models.yaml", allow_redirects=True
-    )
+    r = requests.get(f"{REPO}/raw/main/models.yaml", allow_redirects=True)
     with open(Path(models_home, "models.yaml"), "wb") as f:
         f.write(r.content)
 
@@ -181,21 +181,22 @@ def get_model(
         else []
     ) + [Path(models_home, model_name, f"{f}.{filter_format}") for f in filters]
     urls = (
-        [f"{base_url}/{core_model_name}.{core_format}"]
-        if not filters_only
-        else []
+        [f"{base_url}/{core_model_name}.{core_format}"] if not filters_only else []
     ) + [f"{base_url}/{model_name}/{f}.{filter_format}" for f in filters]
 
-    missing = [(f"{u}.lzma", f"{f}.lzma") for u, f in zip(urls, filepaths) if not f.exists()]
+    missing = [
+        (f"{u}.lzma", f"{f}.lzma") for u, f in zip(urls, filepaths) if not f.exists()
+    ]
     if len(missing) > 0:
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
 
-        print(f"downloading {len(missing)} and decompressing files for model {model_name}:")
+        print(
+            f"downloading {len(missing)} and decompressing files for model {model_name}:"
+        )
         with ThreadPoolExecutor(
             max_workers=min(len(missing), max(cpu_count(), 8))
         ) as executor:
             executor.map(download_and_decompress, missing)
 
     return [str(f) for f in filepaths], filters + skipped_filters
-

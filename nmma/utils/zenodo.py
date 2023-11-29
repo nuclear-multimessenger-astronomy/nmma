@@ -9,12 +9,11 @@ import requests
 from requests.exceptions import ConnectionError
 from yaml import load
 
-from models_tools import *
+from models_tools import SKIP_FILTERS, download, get_models_home
 
 PERMANENT_DOI = "8039909"
 DOI = ""
 MODELS = {}
-
 
 
 def get_latest_zenodo_doi(permanent_doi):
@@ -38,6 +37,7 @@ def get_latest_zenodo_doi(permanent_doi):
     except Exception as e:
         raise ValueError(f"Could not find latest DOI: {str(e)}")
     return doi
+
 
 def download_models_list(doi=None, models_home=None):
     # first we load the models list from zenodo

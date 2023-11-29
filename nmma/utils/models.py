@@ -1,4 +1,5 @@
-from models_tools import SOURCES, get_models_home, get_parser
+from models_tools import SOURCES, get_models_home, get_parser  # noqa
+
 
 def refresh_models_list(models_home=None, source=None):
 
@@ -6,7 +7,7 @@ def refresh_models_list(models_home=None, source=None):
         source = SOURCES[0]
     if source not in ["zenodo", "gitlab"]:
         raise ValueError(f"source must be one of ['gitlab', 'zenodo'], got {source}")
-    
+
     sources_tried = []
     while True:
         try:
@@ -25,6 +26,7 @@ def refresh_models_list(models_home=None, source=None):
                 raise e
             source = remaining_sources[0]
             print(f"Trying to refresh models list from {source} instead")
+
 
 def get_model(
     models_home=None,
@@ -65,6 +67,7 @@ def get_model(
             source = remaining_sources[0]
             print(f"Trying to get model from {source} instead")
 
+
 def main(args=None):
 
     if args is None:
@@ -74,7 +77,9 @@ def main(args=None):
     if args.source is None:
         args.source = SOURCES[0]
     if args.source not in ["zenodo", "gitlab"]:
-        raise ValueError(f"source must be one of ['gitlab', 'zenodo'], got {args.source}")
+        raise ValueError(
+            f"source must be one of ['gitlab', 'zenodo'], got {args.source}"
+        )
 
     refresh = False
     try:
@@ -83,7 +88,8 @@ def main(args=None):
         pass
     if refresh:
         refresh_models_list(
-            models_home=args.svd_path if args.svd_path not in [None, ""] else None, source=args.source
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None,
+            source=args.source,
         )
 
     filters = []
@@ -102,7 +108,7 @@ def main(args=None):
         filters=filters,
         source=args.source,
     )
-        
+
 
 if __name__ == "__main__":
     main()

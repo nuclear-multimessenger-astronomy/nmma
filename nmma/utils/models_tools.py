@@ -69,19 +69,21 @@ def download(file_info):
 
     return filepath
 
+
 def decompress(file_path):
     if not file_path.endswith(".lzma"):
         raise ValueError(f"File {file_path} is not a .lzma file")
     if not exists(file_path):
         raise ValueError(f"File {file_path} does not exist")
-    
+
     stdout, stderr = subprocess.Popen(
         ["lzma", "-d", file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ).communicate()
-    if stderr.decode('utf-8') != '' and 'File exists' not in stderr.decode('utf-8'):
-            raise RuntimeError(f'Error decompressing {file_path}: {stderr}')
+    if stderr.decode("utf-8") != "" and "File exists" not in stderr.decode("utf-8"):
+        raise RuntimeError(f"Error decompressing {file_path}: {stderr}")
     return file_path
-    
+
+
 def get_parser():
 
     parser = argparse.ArgumentParser(
@@ -114,4 +116,3 @@ def get_parser():
     )
 
     return parser
-
