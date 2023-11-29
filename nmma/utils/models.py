@@ -12,9 +12,9 @@ def refresh_models_list(models_home=None, source=None):
     while True:
         try:
             if source == "gitlab":
-                from gitlab import refresh_models_list
+                from .gitlab import refresh_models_list
             elif source == "zenodo":
-                from zenodo import refresh_models_list
+                from .zenodo import refresh_models_list
             refresh_models_list(models_home=models_home)
             break
         except Exception as e:
@@ -46,9 +46,9 @@ def get_model(
     while True:
         try:
             if source == "gitlab":
-                from gitlab import get_model
+                from .gitlab import get_model
             elif source == "zenodo":
-                from zenodo import get_model
+                from .zenodo import get_model
             get_model(
                 models_home=models_home,
                 model_name=model_name,
