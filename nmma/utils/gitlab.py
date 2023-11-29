@@ -8,7 +8,7 @@ import requests
 from requests.exceptions import ConnectionError
 from yaml import load
 
-from models_tools import SKIP_FILTERS, download, decompress, get_models_home
+from .models_tools import SKIP_FILTERS, download, decompress, get_models_home
 
 REPO = "https://gitlab.com/Theodlz/nmma-models"
 

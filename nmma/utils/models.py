@@ -1,4 +1,4 @@
-from models_tools import SOURCES, get_models_home, get_parser  # noqa
+from .models_tools import SOURCES, get_models_home, get_parser  # noqa
 
 
 def refresh_models_list(models_home=None, source=None):

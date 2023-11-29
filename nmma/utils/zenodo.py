@@ -9,7 +9,7 @@ import requests
 from requests.exceptions import ConnectionError
 from yaml import load
 
-from models_tools import SKIP_FILTERS, download, get_models_home
+from .models_tools import SKIP_FILTERS, download, get_models_home
 
 PERMANENT_DOI = "8039909"
 DOI = ""
