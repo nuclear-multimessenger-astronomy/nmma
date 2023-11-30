@@ -792,6 +792,9 @@ def analysis(args):
             # fetch data
             samples = copy.deepcopy(processed_data[filt])
             t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
+            # shift t values by timeshift
+            if "timeshift" in bestfit_params:
+                t += bestfit_params["timeshift"]
             # only the detection data are needed
             finite_idx = np.where(np.isfinite(sigma_y))[0]
             if len(finite_idx) > 0:
