@@ -16,3 +16,4 @@ p_tqdm
 ultranest
 tornado
 tensorflow
+notebook
