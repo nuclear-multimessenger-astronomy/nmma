@@ -15,7 +15,7 @@ def parse():
     parser.add_argument(
         "--filters",
         type=str,
-        default="bessellux,bessellb,bessellv,bessellr,besselli,sdssu,ps1::g,ps1::r,ps1::i,ps1::z,ps1::y,uvot::b,uvot::u,uvot::uvm2,uvot::uvw1,uvot::uvw2,uvot::v,uvot::white,atlasc,atlaso,2massj,2massh,2massks,ztfg,ztfr,ztfi",
+        default="bessellux,bessellb,bessellv,bessellr,besselli,sdssu,ps1::g,ps1::r,ps1::i,ps1::z,ps1::y,uvot::b,uvot::u,uvot::uvm2,uvot::uvw1,uvot::uvw2,uvot::v,uvot::white,atlasc,atlaso,2massj,2massh,2massks,ztfg,ztfr,ztfi,ultrasat",
         help="comma-separated list of filters for photometric lcs; must be from the bandpasses listed here: \
     https://sncosmo.readthedocs.io/en/stable/bandpass-list.html",
     )
@@ -80,9 +80,9 @@ if args.z is None:
     D_cm = dMpc * 3.0857e16 * 100  # 10 pc in cm
     H0 = cosmo.H0.value
     CLIGHT = 2.99792458e5
-    ztest = np.arange(0.0001,1,0.00001)
+    ztest = np.arange(0.0001, 1, 0.00001)
     Dtest = np.array(cosmo.luminosity_distance(ztest).to("Mpc").value)
-    z = ztest[np.argmin(abs(dMpc-Dtest))] 
+    z = ztest[np.argmin(abs(dMpc - Dtest))]
 else:
     z = args.z
     dMpc = cosmo.luminosity_distance(z).to("Mpc").value
@@ -139,7 +139,13 @@ for kk, filename in enumerate(files):
 
             source = sncosmo.TimeSeriesSource(ph, wave, fls)
             for ifilt, filt in enumerate(filters):
-                m = source.bandmag(filters[ifilt], "ab", ph)
+
+                if filters[ifilt] == "ultrasat":
+                    bandpass = sncosmo.get_bandpass(filters[ifilt], 5.0)
+                else:
+                    bandpass = sncosmo.get_bandpass(filters[ifilt])
+
+                m = source.bandmag(bandpass, "ab", ph)
 
                 # apply smoothing filter
                 # if args.doSmoothing:
