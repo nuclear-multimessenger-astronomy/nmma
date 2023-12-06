@@ -92,11 +92,18 @@ def run_nmma_model(data_dict):
     tmin = analysis_parameters.get("tmin")
     tmax = analysis_parameters.get("tmax")
     dt = analysis_parameters.get("dt")
+    filters = analysis_parameters.get("filters (comma-separated)")
     nlive = analysis_parameters.get("nlive")
     error_budget = analysis_parameters.get("error_budget")
     Ebv_max = analysis_parameters.get("Ebv_max")
     interpolation_type = analysis_parameters.get("interpolation-type")
     sampler = analysis_parameters.get("sampler")
+
+    if "all" in filters:
+        filter_arg = None
+    else:
+        filter_list = [x.strip() for x in filters.split(",")]
+        filter_arg = ",".join(filter_list)
 
     # this example analysis service expects the photometry to be in
     # a csv file (at data_dict["inputs"]["photometry"]) with the following columns
@@ -210,6 +217,8 @@ def run_nmma_model(data_dict):
             interpolation_type,
             "--sampler",
             sampler,
+            "--filters",
+            filter_arg,
             "--plot",
         ]
 
