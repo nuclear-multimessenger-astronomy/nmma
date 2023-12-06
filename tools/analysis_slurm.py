@@ -124,6 +124,7 @@ def main(args=None):
         "tmin": "$TMIN",
         "tmax": "$TMAX",
         "dt": "$DT",
+        "filters": "$FILTERS",
         "skip_sampling": "$SKIP_SAMPLING",
     }
 
@@ -136,6 +137,7 @@ def main(args=None):
         "tmin",
         "tmax",
         "dt",
+        "filters",
     ]
     wildcard_boolean_keys = ["skip_sampling"]
 
