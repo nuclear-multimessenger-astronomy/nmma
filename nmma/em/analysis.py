@@ -421,6 +421,9 @@ def analysis(args):
         sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
     print("Creating light curve model for inference")
 
+    if args.filters == "None":
+        args.filters = None
+
     if args.filters:
         filters = args.filters.split(",")
     else:
