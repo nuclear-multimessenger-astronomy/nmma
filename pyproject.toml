@@ -28,7 +28,7 @@ classifiers = [
     'Operating System :: MacOS',
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 ]
-version = "0.1.2"
+version = "0.1.3"
 dynamic = ["dependencies", "optional-dependencies"]
 
 [tool.setuptools.dynamic]
@@ -116,7 +116,7 @@ parentdir_prefix = "nmma-"
 addopts = "--verbose -r s"
 
 [tool.bumpver]
-current_version = "0.1.2"
+current_version = "0.1.3"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
 commit_message = "bump version {old_version} -> {new_version}"
 commit = true
