@@ -28,10 +28,11 @@ classifiers = [
     'Operating System :: MacOS',
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 ]
-version = "0.1.3"
-dynamic = ["dependencies", "optional-dependencies"]
+dynamic = ["dependencies", "optional-dependencies", "version"]
+
 
 [tool.setuptools.dynamic]
+version = {attr = "nmma.__version__"}
 dependencies = {file = ["requirements.txt"]}
 optional-dependencies.doc = { file = ["doc_requirements.txt"] }
 optional-dependencies.grb = { file = ["grb_requirements.txt"] }
@@ -104,14 +105,6 @@ ignore_errors = true
 [tool.isort]
 profile = "black"
 
-[tool.versioneer]
-VCS = "git"
-style = "pep440"
-versionfile_source = "nmma/__init__.py"
-versionfile_build = "nmma/__init__.py"
-tag_prefix = "v"
-parentdir_prefix = "nmma-"
-
 [tool.pytest.ini_options]
 addopts = "--verbose -r s"
 
@@ -124,5 +117,5 @@ tag = true
 push = true
 
 [tool.bumpver.file_patterns]
-"pyproject.toml" = ['current_version = "{version}"','version = "{version}"']
+"pyproject.toml" = ['current_version = "{version}"']
 "nmma/__init__.py" = ['__version__ = "{version}"']
