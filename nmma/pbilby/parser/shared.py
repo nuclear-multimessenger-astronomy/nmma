@@ -6,7 +6,7 @@ from numpy import inf
 
 logger = bilby.core.utils.logger
 
-from ..._version import __version__
+from ... import __version__  # noqa: E402
 
 
 class StoreBoolean(argparse.Action):
@@ -91,7 +91,7 @@ def _add_em_settings_to_parser(parser):
     em_input_parser.add(
         "--kilonova-interpolation-type",
         type=str,
-        help="Interpolation method to be used for KN model (sklearn_gp or tensorflow)"
+        help="Interpolation method to be used for KN model (sklearn_gp or tensorflow)",
     )
     em_input_parser.add(
         "--svd-mag-ncoeff",
@@ -189,13 +189,17 @@ def _add_eos_settings_to_parser(parser):
         default=False,
         help="Flag for sampling over EOS (default:False)",
     )
-    eos_input_parser.add("--eos-data", type=str, required=False,
-                         help="Path to the EOS directory")
-    eos_input_parser.add("--Neos", type=int, required=False,
-                         help="Number of EOSs to be used")
     eos_input_parser.add(
-        "--eos-weight", type=str, required=False,
-        help="Path to the precalculated EOS weighting"
+        "--eos-data", type=str, required=False, help="Path to the EOS directory"
+    )
+    eos_input_parser.add(
+        "--Neos", type=int, required=False, help="Number of EOSs to be used"
+    )
+    eos_input_parser.add(
+        "--eos-weight",
+        type=str,
+        required=False,
+        help="Path to the precalculated EOS weighting",
     )
 
     return parser

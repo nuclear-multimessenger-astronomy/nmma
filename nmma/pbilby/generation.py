@@ -24,38 +24,39 @@ from parallel_bilby.utils import get_cli_args
 from .parser import (
     create_nmma_generation_parser,
     create_nmma_gw_generation_parser,
-    parse_generation_args
+    parse_generation_args,
 )
 from ..em.io import loadEvent
 from ..em.injection import create_light_curve_data
 
-from .._version import __version__
+from .. import __version__
+
 
 def find_sh_scripts(file_path):
     # Open the file
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         # Read the content
         content = f.read()
-        
+
     # Split the content into words using any whitespace as a separator
     words = content.split()
-    
+
     # Filter out the words that end with '.sh'
-    sh_scripts = [word for word in words if word.endswith('.sh)')]
-    
+    sh_scripts = [word for word in words if word.endswith(".sh)")]
+
     return sh_scripts
 
 
 def replace_pbilby_in_file(file_path, name):
     # Read the contents of the file
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         file_contents = file.read()
 
     # Replace the text
     new_contents = file_contents.replace("parallel_bilby", name)
 
     # Write the updated contents back to the file
-    with open(file_path, 'w+') as file:
+    with open(file_path, "w+") as file:
         file.write(new_contents)
 
     return
@@ -68,7 +69,7 @@ def get_version_info():
         parallel_bilby_version=parallel_bilby.__version__,
         dynesty_version=dynesty.__version__,
         lalsimulation_version=lalsimulation.__version__,
-        nmma_version=__version__
+        nmma_version=__version__,
     )
 
 
@@ -111,7 +112,7 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
         self.inference_favour = inference_favour
-        assert inference_favour in ['nmma', 'nmma_gw'], "invalid inference_favour"
+        assert inference_favour in ["nmma", "nmma_gw"], "invalid inference_favour"
         self.setup_inputs()
 
     @property
@@ -126,7 +127,7 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         np.random.seed(sampling_seed)
 
     def save_data_dump(self):
-        if self.inference_favour == 'nmma':
+        if self.inference_favour == "nmma":
             if self.injection_parameters:
                 light_curve_data = create_light_curve_data(
                     self.injection_parameters, self.args
@@ -147,7 +148,7 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
                 )
                 pickle.dump(data_dump, file)
 
-        elif self.inference_favour == 'nmma_gw':
+        elif self.inference_favour == "nmma_gw":
             with open(self.data_dump_file, "wb+") as file:
                 data_dump = dict(
                     waveform_generator=self.waveform_generator,
@@ -245,20 +246,19 @@ def main_nmma():
     # Parse command line arguments
     cli_args = get_cli_args()
     generation_parser = create_nmma_generation_parser()
-    args = parse_generation_args(generation_parser,
-                                 cli_args, as_namespace=True)
+    args = parse_generation_args(generation_parser, cli_args, as_namespace=True)
 
     # Initialise run
-    inputs, logger = generate_runner(inference_favour='nmma',
-                                     parser=generation_parser,
-                                     **vars(args))
+    inputs, logger = generate_runner(
+        inference_favour="nmma", parser=generation_parser, **vars(args)
+    )
 
     # Write slurm script
     bash_file = slurm.setup_submit(inputs.data_dump_file, inputs, args, cli_args)
     # change the parallel_bilby_analysis to nmma_analysis
     sh_scripts = find_sh_scripts(bash_file)
     for sh_script in sh_scripts:
-        replace_pbilby_in_file(sh_script.replace(')', ''), 'nmma')
+        replace_pbilby_in_file(sh_script.replace(")", ""), "nmma")
     if args.submit:
         subprocess.run([f"bash {bash_file}"], shell=True)
     else:
@@ -276,20 +276,19 @@ def main_nmma_gw():
     # Parse command line arguments
     cli_args = get_cli_args()
     generation_parser = create_nmma_gw_generation_parser()
-    args = parse_generation_args(generation_parser,
-                                 cli_args, as_namespace=True)
+    args = parse_generation_args(generation_parser, cli_args, as_namespace=True)
 
     # Initialise run
-    inputs, logger = generate_runner(inference_favour='nmma_gw',
-                                     parser=generation_parser,
-                                     **vars(args))
+    inputs, logger = generate_runner(
+        inference_favour="nmma_gw", parser=generation_parser, **vars(args)
+    )
 
     # Write slurm script
     bash_file = slurm.setup_submit(inputs.data_dump_file, inputs, args, cli_args)
     # change the parallel_bilby_analysis to nmma_gw_analysis
     sh_scripts = find_sh_scripts(bash_file)
     for sh_script in sh_scripts:
-        replace_pbilby_in_file(sh_script.replace(')', ''), 'nmma_gw')
+        replace_pbilby_in_file(sh_script.replace(")", ""), "nmma_gw")
 
     if args.submit:
         subprocess.run([f"bash {bash_file}"], shell=True)
