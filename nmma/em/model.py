@@ -3,6 +3,7 @@ from __future__ import division
 import copy
 import os
 import pickle
+import joblib
 import numpy as np
 from scipy.special import logsumexp
 import scipy.constants
@@ -218,7 +219,7 @@ class SVDLightCurveModel(object):
             model_name_components.remove("tf")
         core_model_name = "_".join(model_name_components)
 
-        modelfile = os.path.join(self.svd_path, f"{core_model_name}.pkl")
+        modelfile = os.path.join(self.svd_path, f"{core_model_name}.joblib")
 
         if self.interpolation_type == "sklearn_gp":
             if not local_only:
@@ -229,15 +230,14 @@ class SVDLightCurveModel(object):
                     self.filters = model_filters
 
             if os.path.isfile(modelfile):
-                with open(modelfile, "rb") as handle:
-                    self.svd_mag_model = pickle.load(handle)
+                self.svd_mag_model = joblib.load(modelfile)
 
                 if self.filters is None:
                     self.filters = list(self.svd_mag_model.keys())
 
                 outdir = os.path.join(self.svd_path, f"{model}")
                 for filt in self.filters:
-                    outfile = os.path.join(outdir, f"{filt}.pkl")
+                    outfile = os.path.join(outdir, f"{filt}.joblib")
                     if not os.path.isfile(outfile):
                         print(f"Could not find model file for filter {filt}")
                         if filt not in self.svd_mag_model:
@@ -245,11 +245,10 @@ class SVDLightCurveModel(object):
                         self.svd_mag_model[filt]["gps"] = None
                     else:
                         print(f"Loaded filter {filt}")
-                        with open(outfile, "rb") as handle:
-                            self.svd_mag_model[filt]["gps"] = pickle.load(handle)
+                        self.svd_mag_model[filt]["gps"] = joblib.load(outfile)
                 self.svd_lbol_model = None
             else:
-                # Try old style request
+                # Try old style request (deprecate/remove?)
                 mag_modelfile = os.path.join(self.svd_path, "{0}_mag.pkl".format(model))
                 with open(mag_modelfile, "rb") as handle:
                     self.svd_mag_model = pickle.load(handle)
@@ -272,8 +271,7 @@ class SVDLightCurveModel(object):
             from .training import load_api_gp_model
 
             if os.path.isfile(modelfile):
-                with open(modelfile, "rb") as handle:
-                    self.svd_mag_model = pickle.load(handle)
+                self.svd_mag_model = joblib.load(modelfile)
                 for filt in self.filters:
                     for ii in range(len(self.svd_mag_model[filt]["gps"])):
                         self.svd_mag_model[filt]["gps"][ii] = load_api_gp_model(
@@ -294,8 +292,7 @@ class SVDLightCurveModel(object):
                     self.filters = model_filters
 
             if os.path.isfile(modelfile):
-                with open(modelfile, "rb") as handle:
-                    self.svd_mag_model = pickle.load(handle)
+                self.svd_mag_model = joblib.load(modelfile)
 
                 if self.filters is None:
                     self.filters = list(self.svd_mag_model.keys())
@@ -313,6 +310,7 @@ class SVDLightCurveModel(object):
                         self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
             else:
+                # Old style request - deprecate/remove?
                 _, model_filters = get_model(
                     self.svd_path, f"{self.model}_mag_tf", filters=filters
                 )
