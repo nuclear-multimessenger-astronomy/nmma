@@ -25,7 +25,7 @@ def main():
     parser.add_argument(
         "--svd-path",
         type=str,
-        help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
+        help="Path to the SVD directory with {model}.joblib",
     )
     parser.add_argument(
         "--outdir", type=str, required=True, help="Path to the output directory"

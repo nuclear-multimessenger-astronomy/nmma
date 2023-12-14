@@ -50,7 +50,7 @@ def get_parser(**kwargs):
     parser.add_argument(
         "--svd-path",
         type=str,
-        help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
+        help="Path to the SVD directory with {model}.joblib",
         default="svdmodels",
     )
     parser.add_argument(

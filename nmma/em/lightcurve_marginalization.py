@@ -12,11 +12,14 @@ from astropy.cosmology import LambdaCDM
 from gwpy.table import Table
 from ligo.skymap import bayestar, distance
 from ligo.skymap.io import read_sky_map
-from scipy.interpolate import interpolate as interp
 
 from nmma.em.injection import create_light_curve_data
-from nmma.em.model import (GRBLightCurveModel, KilonovaGRBLightCurveModel,
-                           SupernovaGRBLightCurveModel, SVDLightCurveModel)
+from nmma.em.model import (
+    GRBLightCurveModel,
+    KilonovaGRBLightCurveModel,
+    SupernovaGRBLightCurveModel,
+    SVDLightCurveModel,
+)
 from nmma.joint.conversion import EOS2Parameters, MultimessengerConversion
 
 from ..utils.models import refresh_models_list
@@ -84,7 +87,7 @@ def main():
     parser.add_argument(
         "--svd-path",
         type=str,
-        help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
+        help="Path to the SVD directory with {model}.joblib",
     )
     parser.add_argument(
         "--tmin",
@@ -175,7 +178,9 @@ def main():
     except AttributeError:
         pass
     if refresh:
-        refresh_models_list(models_home=args.svd_path if args.svd_path not in [None, ''] else None)
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
 
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
@@ -251,7 +256,9 @@ def main():
     global EOS_data
     EOS_data, weights = {}, []
     for EOSIdx in range(0, Neos):
-        data = np.loadtxt("{0}/{1}.dat".format(args.eos_dir, EOSIdx + 1), usecols = [0,1,2])
+        data = np.loadtxt(
+            "{0}/{1}.dat".format(args.eos_dir, EOSIdx + 1), usecols=[0, 1, 2]
+        )
         EOS_data[EOSIdx] = {}
         EOS_data[EOSIdx]["R"] = np.array(data[:, 0])
         EOS_data[EOSIdx]["M"] = np.array(data[:, 1])
@@ -359,7 +366,7 @@ def main():
             m1,
             m2,
         )
-        
+
         params = {
             "luminosity_distance": dist,
             "chirp_mass": mchirp,

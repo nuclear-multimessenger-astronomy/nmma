@@ -164,8 +164,8 @@ def get_model(
                 f'models list from GitLab does not have filters {",".join(missing_filters)} for {model_name}'
             )
 
-    core_format = "pkl"
-    filter_format = "pkl"
+    core_format = "joblib"
+    filter_format = "joblib"
     if "_tf" in model_name:
         filter_format = "h5"
 
