@@ -218,6 +218,13 @@ def get_parser():
         help="Change seed for every injection",
         action="store_true",
     )
+    
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        default=False,
+        help="only look for local svdmodels (ignore Zenodo)",
+    )
 
     return parser
 
