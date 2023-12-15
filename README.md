@@ -1,9 +1,18 @@
-<div align="center">
-   <img alt="NMMA" src="https://github.com/nuclear-multimessenger-astronomy/nmma/raw/main/doc/images/light-logo.svg" width="600px" height="300px">
+<p align="center">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" width="600px" height="300px" srcset="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/doc/images/dark-logo.svg">
+      <source media="(prefers-color-scheme: light)" width="600px" height="300px" srcset="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/doc/images/light-logo.svg">
+      <img alt="NMMA">
+    </picture>
+</p>
+
+
+<div align="center"> 
    <h1>NMMA</h1>
    <h2>a pythonic library for probing nuclear physics and cosmology with multimessenger analysis</h2>
    <br/><br/>
 </div>
+
 
 [![Coverage Status](https://coveralls.io/repos/github/nuclear-multimessenger-astronomy/nmma/badge.svg?branch=main)](https://coveralls.io/github/nuclear-multimessenger-astronomy/nmma?branch=main)
 [![CI](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/continous_integration.yml/badge.svg)](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/continous_integration.yml)
