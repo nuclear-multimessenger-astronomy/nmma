@@ -2,17 +2,24 @@ from __future__ import division
 
 import numpy as np
 
-from ..em.model import SVDLightCurveModel, GRBLightCurveModel, GenericCombineLightCurveModel
+from ..em.model import (
+    SVDLightCurveModel,
+    GRBLightCurveModel,
+    GenericCombineLightCurveModel,
+)
 from ..em.likelihood import OpticalLightCurve
 from .conversion import MultimessengerConversion, MultimessengerConversionWithLambdas
 
-from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient
+from bilby.gw.likelihood import (
+    GravitationalWaveTransient,
+    ROQGravitationalWaveTransient,
+)
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Interped, DeltaFunction
 
 
 class MultiMessengerLikelihood(Likelihood):
-    """ A multi-messenger likelihood object
+    """A multi-messenger likelihood object
 
     This likelihood combines the usual gravitational-wave transient
     likelihood and the kilonva afterglow light curve likelihood.
@@ -114,37 +121,70 @@ class MultiMessengerLikelihood(Likelihood):
 
     """
 
-    def __init__(self, interferometers, waveform_generator,
-                 light_curve_data, light_curve_model_name,
-                 light_curve_SVD_path, em_trigger_time, mag_ncoeff, lbol_ncoeff,
-                 eos_path, Neos, eos_weight_path, binary_type, gw_likelihood_type,
-                 priors, with_grb, grb_resolution, light_curve_interpolation_type, with_eos=True,
-                 filters=None, error_budget=1., tmin=0., tmax=14.,
-                 roq_weights=None, roq_params=None, roq_scale_factor=None,
-                 time_marginalization=False, distance_marginalization=False,
-                 phase_marginalization=False, distance_marginalization_lookup_table=None,
-                 jitter_time=True, reference_frame="sky", time_reference="geocenter"):
+    def __init__(
+        self,
+        interferometers,
+        waveform_generator,
+        light_curve_data,
+        light_curve_model_name,
+        light_curve_SVD_path,
+        em_trigger_time,
+        mag_ncoeff,
+        lbol_ncoeff,
+        eos_path,
+        Neos,
+        eos_weight_path,
+        binary_type,
+        gw_likelihood_type,
+        priors,
+        with_grb,
+        grb_resolution,
+        light_curve_interpolation_type,
+        with_eos=True,
+        filters=None,
+        error_budget=1.0,
+        tmin=0.0,
+        tmax=14.0,
+        roq_weights=None,
+        roq_params=None,
+        roq_scale_factor=None,
+        time_marginalization=False,
+        distance_marginalization=False,
+        phase_marginalization=False,
+        distance_marginalization_lookup_table=None,
+        jitter_time=True,
+        reference_frame="sky",
+        time_reference="geocenter",
+        local_only=False,
+    ):
         # construct the eos prior
         if with_eos:
             xx = np.arange(0, Neos + 1)
             eos_weight = np.loadtxt(eos_weight_path)
             yy = np.concatenate((eos_weight, [eos_weight[-1]]))
-            eos_prior = Interped(xx, yy, minimum=0, maximum=Neos, name='EOS')
-            priors['EOS'] = eos_prior
+            eos_prior = Interped(xx, yy, minimum=0, maximum=Neos, name="EOS")
+            priors["EOS"] = eos_prior
 
             # construct the eos conversion
-            parameter_conversion_class = MultimessengerConversion(eos_data_path=eos_path, Neos=Neos,
-                                                                  binary_type=binary_type)
+            parameter_conversion_class = MultimessengerConversion(
+                eos_data_path=eos_path, Neos=Neos, binary_type=binary_type
+            )
         else:
-            parameter_conversion_class = MultimessengerConversionWithLambdas(binary_type=binary_type)
+            parameter_conversion_class = MultimessengerConversionWithLambdas(
+                binary_type=binary_type
+            )
 
-        priors.conversion_function = parameter_conversion_class.priors_conversion_function
-        parameter_conversion = parameter_conversion_class.convert_to_multimessenger_parameters
+        priors.conversion_function = (
+            parameter_conversion_class.priors_conversion_function
+        )
+        parameter_conversion = (
+            parameter_conversion_class.convert_to_multimessenger_parameters
+        )
         waveform_generator.parameter_conversion = parameter_conversion
 
         # add the ratio_epsilon in case it is not present for no-grb case
-        if not with_grb and 'ratio_epsilon' not in priors:
-            priors['ratio_epsilon'] = DeltaFunction(0.01, name='ratio_epsilon')
+        if not with_grb and "ratio_epsilon" not in priors:
+            priors["ratio_epsilon"] = DeltaFunction(0.01, name="ratio_epsilon")
 
         # initialize the GW likelihood
         gw_likelihood_kwargs = dict(
@@ -158,37 +198,63 @@ class MultiMessengerLikelihood(Likelihood):
             reference_frame=reference_frame,
             time_reference=time_reference,
         )
-        if gw_likelihood_type == 'GravitationalWaveTransient':
+        if gw_likelihood_type == "GravitationalWaveTransient":
             GWLikelihood = GravitationalWaveTransient(**gw_likelihood_kwargs)
 
-        elif gw_likelihood_type == 'ROQGravitationalWaveTransient':
+        elif gw_likelihood_type == "ROQGravitationalWaveTransient":
             gw_likelihood_kwargs.pop("time_marginalization", None)
             gw_likelihood_kwargs.pop("jitter_time", None)
-            gw_likelihood_kwargs.update(dict(weights=roq_weights, roq_params=roq_params,
-                                             roq_scale_factor=roq_scale_factor))
+            gw_likelihood_kwargs.update(
+                dict(
+                    weights=roq_weights,
+                    roq_params=roq_params,
+                    roq_scale_factor=roq_scale_factor,
+                )
+            )
             GWLikelihood = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         # initialize the EM likelihood
         if not filters:
             filters = list(light_curve_data.keys())
         sample_times = np.arange(tmin, tmax, 0.1)
-        light_curve_model_kwargs = dict(model=light_curve_model_name, sample_times=sample_times,
-                                        svd_path=light_curve_SVD_path,
-                                        parameter_conversion=parameter_conversion,
-                                        mag_ncoeff=mag_ncoeff, lbol_ncoeff=lbol_ncoeff,
-                                        interpolation_type=light_curve_interpolation_type, filters=filters)
+        light_curve_model_kwargs = dict(
+            model=light_curve_model_name,
+            sample_times=sample_times,
+            svd_path=light_curve_SVD_path,
+            parameter_conversion=parameter_conversion,
+            mag_ncoeff=mag_ncoeff,
+            lbol_ncoeff=lbol_ncoeff,
+            interpolation_type=light_curve_interpolation_type,
+            filters=filters,
+            local_only=local_only,
+        )
 
         if with_grb:
             models = []
             models.append(SVDLightCurveModel(**light_curve_model_kwargs))
-            models.append(GRBLightCurveModel(sample_times = sample_times, resolution = grb_resolution, filters = filters, parameter_conversion = parameter_conversion))
-            light_curve_model = GenericCombineLightCurveModel(models = models, sample_times=sample_times)
+            models.append(
+                GRBLightCurveModel(
+                    sample_times=sample_times,
+                    resolution=grb_resolution,
+                    filters=filters,
+                    parameter_conversion=parameter_conversion,
+                )
+            )
+            light_curve_model = GenericCombineLightCurveModel(
+                models=models, sample_times=sample_times
+            )
         else:
             light_curve_model = SVDLightCurveModel(**light_curve_model_kwargs)
 
-        em_likelihood_kwargs = dict(light_curve_model=light_curve_model, filters=filters,
-                                    light_curve_data=light_curve_data, trigger_time=em_trigger_time,
-                                    error_budget=error_budget, tmin=tmin, tmax=tmax)
+        em_likelihood_kwargs = dict(
+            light_curve_model=light_curve_model,
+            filters=filters,
+            light_curve_data=light_curve_data,
+            trigger_time=em_trigger_time,
+            error_budget=error_budget,
+            tmin=tmin,
+            tmax=tmax,
+        )
         EMLikelihood = OpticalLightCurve(**em_likelihood_kwargs)
 
         super(MultiMessengerLikelihood, self).__init__(parameters={})
@@ -202,8 +268,13 @@ class MultiMessengerLikelihood(Likelihood):
         self.__sync_parameters()
 
     def __repr__(self):
-        return self.__class__.__name__ + ' with ' + self.GWLikelihood.__repr__() +\
-            ' and ' + self.EMLikelihood.__repr__()
+        return (
+            self.__class__.__name__
+            + " with "
+            + self.GWLikelihood.__repr__()
+            + " and "
+            + self.EMLikelihood.__repr__()
+        )
 
     def __sync_parameters(self):
         self.GWLikelihood.parameters = self.parameters
@@ -225,4 +296,7 @@ class MultiMessengerLikelihood(Likelihood):
         return logL_EM + logL_GW
 
     def noise_log_likelihood(self):
-        return self.GWLikelihood.noise_log_likelihood() + self.EMLikelihood.noise_log_likelihood()
+        return (
+            self.GWLikelihood.noise_log_likelihood()
+            + self.EMLikelihood.noise_log_likelihood()
+        )

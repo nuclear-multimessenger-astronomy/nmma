@@ -1,16 +1,14 @@
 import inspect
-from importlib import import_module
 
 import numpy as np
 import pandas as pd
 
-import bilby
-import bilby_pipe
 from bilby.core.utils import logger
 from bilby.core.prior import Interped
 
 from ...joint.likelihood import MultiMessengerLikelihood
 from ...gw.likelihood import GravitationalWaveTransientLikelihoodwithEOS
+
 
 def reorder_loglikelihoods(unsorted_loglikelihoods, unsorted_samples, sorted_samples):
     """Reorders the stored log-likelihood after they have been reweighted
@@ -90,13 +88,9 @@ def roq_likelihood_kwargs(args):
 
 
 def setup_nmma_likelihood(
-        interferometers,
-        waveform_generator,
-        light_curve_data,
-        priors,
-        args
-        ):
-    """Takes the kwargs and sets up and returns 
+    interferometers, waveform_generator, light_curve_data, priors, args
+):
+    """Takes the kwargs and sets up and returns
     MultiMessengerLikelihood with either an ROQ GW or GW likelihood.
 
     Parameters
@@ -153,6 +147,7 @@ def setup_nmma_likelihood(
             eos_weight_path=args.eos_weight,
             binary_type=args.binary_type,
             gw_likelihood_type=args.likelihood_type,
+            local_only=args.local_model_only,
         )
 
     else:
@@ -188,6 +183,7 @@ def setup_nmma_likelihood(
             with_eos=False,
             binary_type=args.binary_type,
             gw_likelihood_type=args.likelihood_type,
+            local_only=args.local_model_only,
         )
 
     if args.with_Hubble and args.Hubble_weight:
@@ -195,15 +191,15 @@ def setup_nmma_likelihood(
         logger.info("Assuming the redshift prior is the Hubble flow")
         logger.info("Overwriting any Hubble prior in the prior file")
 
-        Hubble_prior_data = pd.read_csv(args.Hubble_weight,
-                                        delimiter=' ', header=0)
+        Hubble_prior_data = pd.read_csv(args.Hubble_weight, delimiter=" ", header=0)
         xx = Hubble_prior_data.Hubble.to_numpy()
         yy = Hubble_prior_data.prior_weight.to_numpy()
         Hmin = xx[0]
         Hmax = xx[-1]
 
-        priors['Hubble_constant'] = Interped(xx, yy, minimum=Hmin, maximum=Hmax,
-                                              name='Hubble_constant')
+        priors["Hubble_constant"] = Interped(
+            xx, yy, minimum=Hmin, maximum=Hmax, name="Hubble_constant"
+        )
 
     Likelihood = MultiMessengerLikelihood
     if args.likelihood_type == "GravitationalWaveTransient":
@@ -235,13 +231,8 @@ def setup_nmma_likelihood(
     return likelihood, priors
 
 
-def setup_nmma_gw_likelihood(
-        interferometers,
-        waveform_generator,
-        priors,
-        args
-        ):
-    """Takes the kwargs and sets up and returns 
+def setup_nmma_gw_likelihood(interferometers, waveform_generator, priors, args):
+    """Takes the kwargs and sets up and returns
     GravitationalWaveTransientLikelihoodwithEOS
     with either an ROQ GW or GW likelihood.
 
@@ -313,15 +304,15 @@ def setup_nmma_gw_likelihood(
         logger.info("Assuming the redshift prior is the Hubble flow")
         logger.info("Overwriting any Hubble prior in the prior file")
 
-        Hubble_prior_data = pd.read_csv(args.Hubble_weight,
-                                        delimiter=' ', header=0)
+        Hubble_prior_data = pd.read_csv(args.Hubble_weight, delimiter=" ", header=0)
         xx = Hubble_prior_data.Hubble.to_numpy()
         yy = Hubble_prior_data.prior_weight.to_numpy()
         Hmin = xx[0]
         Hmax = xx[-1]
 
-        priors['Hubble_constant'] = Interped(xx, yy, minimum=Hmin, maximum=Hmax,
-                                              name='Hubble_constant')
+        priors["Hubble_constant"] = Interped(
+            xx, yy, minimum=Hmin, maximum=Hmax, name="Hubble_constant"
+        )
 
     Likelihood = GravitationalWaveTransientLikelihoodwithEOS
     if args.likelihood_type == "GravitationalWaveTransient":
