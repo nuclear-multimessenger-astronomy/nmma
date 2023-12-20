@@ -30,14 +30,20 @@ A tutorial on how to produce simulations of lightcurves is given here [tutorial-
 
 ### Citing NMMA
 
-When utilizing this code for a publication, kindly make a reference to the package by its name and a citation to [NMMA: A nuclear-physics and multi-messenger astrophysics framework to analyze binary neutron star mergers](https://arxiv.org/abs/2205.08513). The BibTeX entry for the paper is:
+When utilizing this code for a publication, kindly make a reference to the package by its name, NMMA, and a citation to the companion paper [An updated nuclear-physics and multi-messenger astrophysics framework for binary neutron star mergers](https://www.nature.com/articles/s41467-023-43932-6). The BibTeX entry for the paper is:
 ```bibtex
 @misc{pang2022nmma,
-      title={NMMA: A nuclear-physics and multi-messenger astrophysics framework to analyze binary neutron star mergers},
+      title={An updated nuclear-physics and multi-messenger astrophysics framework for binary neutron star mergers},
       author={Peter T. H. Pang and Tim Dietrich and Michael W. Coughlin and Mattia Bulla and Ingo Tews and Mouza Almualla and Tyler Barna and Weizmann Kiendrebeogo and Nina Kunert and Gargi Mansingh and Brandon Reed and Niharika Sravan and Andrew Toivonen and Sarah Antier and Robert O. VandenBerg and Jack Heinzel and Vsevolod Nedora and Pouyan Salehi and Ritwik Sharma and Rahul Somasundaram and Chris Van Den Broeck},
-      year={2022},
-      eprint={2205.08513},
-      archivePrefix={arXiv},
-      primaryClass={astro-ph.HE}
+      journal={Nature Communications},
+      year={2023},
+      month={Dec},
+      day={20},
+      volume={14},
+      number={1},
+      pages={8352},
+      issn={2041-1723},
+      doi={10.1038/s41467-023-43932-6},
+      url={https://doi.org/10.1038/s41467-023-43932-6}
 }
 ```
