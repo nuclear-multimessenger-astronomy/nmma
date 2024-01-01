@@ -203,3 +203,138 @@ class OpticalLightCurve(Likelihood):
             print(self.parameters, log_prob)
 
         return log_prob
+
+
+class BolometricLightCurve(Likelihood):
+    """A bolometric likelihood object
+
+    Parameters
+    ----------
+    light_curve_model: `nmma.em.SimpleBolometricLightCurveModel`
+        And object which computes the light curve of a kilonova signal,
+        given a set of parameters
+    light_curve_data: dict
+        Dictionary of light curve data returned from nmma.em.utils.loadEvent
+    error_budget: float (default:1)
+        Additionally introduced statistical error on the light curve data,
+        so as to keep the systematic error in control
+    tmin: float (default:0)
+        Days from trigger_time to be started analysing
+    tmax: float (default:14)
+        Days from trigger_time to be ended analysing
+
+    Returns
+    -------
+    Likelihood: `bilby.core.likelihood.Likelihood`
+        A likelihood object, able to compute the likelihood of the data given
+        a set of  model parameters
+
+    """
+
+    def __init__(
+        self,
+        light_curve_model,
+        light_curve_data,
+        detection_limit=None,
+        error_budget=1.0,
+        tmin=0.0,
+        tmax=14.0,
+        verbose=False,
+    ):
+        self.light_curve_model = light_curve_model
+        super(BolometricLightCurve, self).__init__(dict())
+        self.tmin = tmin
+        self.tmax = tmax
+        self.error_budget = error_budget
+
+        self.light_curve_data = light_curve_data
+        self.sample_times = self.light_curve_model.sample_times
+        self.verbose = verbose
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(light_curve_model={},\n\tfilters={}".format(
+            self.light_curve_model, self.filters
+        )
+
+    def noise_log_likelihood(self):
+        return 0.0
+
+    def log_likelihood(self):
+        lbol = self.light_curve_model.generate_lightcurve(
+            self.sample_times, self.parameters
+        )
+
+        # sanity checking
+        if len(np.isfinite(lbol)) == 0:
+            return np.nan_to_num(-np.inf)
+        if np.sum(lbol) == 0.0:
+            return np.nan_to_num(-np.inf)
+
+        # build the interpolation
+        idx = np.where(np.isfinite(lbol))[0]
+        t0 = self.parameters["timeshift"]
+        lbol_interp = interp1d(
+            self.sample_times[idx] + t0,
+            lbol[idx],
+            fill_value='extrapolate',
+            bound_error=False
+        )
+
+        # compare the estimated light curve and the measured data
+        minus_chisquare_total = 0.0
+        gaussprob_total = 0.0
+
+        data_time = self.light_curve_data['phase'].to_numpy()
+        data_lbol = self.light_curve_data['Lbb'].to_numpy()
+        data_sigma = self.light_curve_data['Lbb_unc'].to_numpy()
+
+        # include the error budget into calculation
+        if 'em_syserr' in self.parameters:
+            data_sigma = np.sqrt(data_sigma**2 + self.parameters['em_syserr']**2)
+        else:
+            data_sigma = np.sqrt(data_sigma**2 + self.error_budget**2)
+
+        # evaluate the light curve bolometric luminosity at the data points
+        lbol_est = lbol_interp(data_time)
+
+        # seperate the data into bounds (inf err) and actual measurement
+        infIdx = np.where(~np.isfinite(data_sigma))[0]
+        finiteIdx = np.where(np.isfinite(data_sigma))[0]
+
+        # evaluate the chisuquare
+        if len(finiteIdx) >= 1:
+            minus_chisquare = np.sum(
+                truncated_gaussian(
+                    data_lbol[finiteIdx],
+                    data_sigma[finiteIdx],
+                    lbol_est[finiteIdx],
+                    np.inf,
+                )
+            )
+        else:
+            minus_chisquare = 0.0
+
+        if np.isnan(minus_chisquare):
+            return np.nan_to_num(-np.inf)
+
+        minus_chisquare_total += minus_chisquare
+
+        # evaluate the data with infinite error
+        if len(infIdx) > 0:
+            if 'em_syserr' in self.parameters:
+                upperlim_sigma = self.parameters['em_syserr']
+                gausslogsf = scipy.stats.norm.logsf(
+                    data_lbol[infIdx], lbol_est[infIdx], upperlim_sigma
+                )
+            else:
+                gausslogsf = scipy.stats.norm.logsf(
+                    data_lbol[infIdx], lbol_est[infIdx], self.error_budget
+                )
+            gaussprob_total += np.sum(gausslogsf)
+
+        log_prob = minus_chisquare_total + gaussprob_total
+
+        if self.verbose:
+            print(self.parameters, log_prob)
+
+        return log_prob
