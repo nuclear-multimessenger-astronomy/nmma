@@ -58,20 +58,23 @@ def file_to_dataframe(
         injection_values["mass_2"].append(min(float(row["mass1"]), float(row["mass2"])))
         injection_values["luminosity_distance"].append(float(row["distance"]))
 
-        if "polarization" in row:
+        if "polarization" in row.colnames:
             injection_values["psi"].append(float(row["polarization"]))
         else:
             injection_values["psi"].append(0.0)
 
-        if "coa_phase" in row:
+        if "coa_phase" in row.colnames:
             coa_phase = float(row["coa_phase"])
             injection_values["phase"].append(float(row["coa_phase"]))
         else:
             coa_phase = 0.0
             injection_values["phase"].append(0.0)
 
-        if "geocent_end_time" in row:
-            injection_values["geocent_time"].append(float(row["geocent_end_time"]))
+        if "geocent_end_time" in row.colnames:
+            if "geocent_end_time_ns" in row.colnames:
+                injection_values["geocent_time"].append(float(row["geocent_end_time"]) + float(row["geocent_end_time_ns"]) * (10 ** -9))
+            else:
+                injection_values["geocent_time"].append(float(row["geocent_end_time"]))
         else:
             injection_values["geocent_time"].append(trigger_time)
 
