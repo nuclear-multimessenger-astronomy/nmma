@@ -1,0 +1,4 @@
+tau_m = Uniform(1, 5, latex_label='$\\tau_m$')
+log10_mni = Uniform(-4, 0, latex_label='$\\log_{10}M_{Ni}$')
+t_0 = Uniform(1, 10, latex_label='$t_0$')
+timeshift = Uniform(-8, -2)
