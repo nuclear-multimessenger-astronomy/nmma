@@ -277,7 +277,7 @@ class BolometricLightCurve(Likelihood):
             self.sample_times[idx] + t0,
             lbol[idx],
             fill_value='extrapolate',
-            bound_error=False
+            bounds_error=False
         )
 
         # compare the estimated light curve and the measured data

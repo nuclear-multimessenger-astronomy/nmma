@@ -35,7 +35,9 @@ def get_parser(**kwargs):
         help="Name of the configuration file containing parameter values.",
     )
     parser.add_argument(
-        "--model", type=str, help="Name of the kilonova model to be used"
+        "--model",
+        type=str,
+        help="Name of the kilonova model to be used"
     )
     parser.add_argument(
         "--interpolation-type",
@@ -47,7 +49,6 @@ def get_parser(**kwargs):
         "--svd-path",
         type=str,
         help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
-        default="svdmodels",
     )
     parser.add_argument(
         "--outdir",
@@ -56,7 +57,9 @@ def get_parser(**kwargs):
         default="outdir",
     )
     parser.add_argument(
-        "--label", type=str, help="Label for the run", default="injection"
+        "--label",
+        type=str,
+        help="Label for the run",
     )
     parser.add_argument(
         "--trigger-time",
@@ -68,7 +71,11 @@ def get_parser(**kwargs):
         type=str,
         help="Path to the data file in [time(isot) filter magnitude error] format",
     )
-    parser.add_argument("--prior", type=str, help="Path to the prior file")
+    parser.add_argument(
+        "--prior",
+        type=str,
+        help="Path to the prior file"
+    )
     parser.add_argument(
         "--tmin",
         type=float,
@@ -82,7 +89,10 @@ def get_parser(**kwargs):
         help="Days to stop analysing from the trigger time (default: 14)",
     )
     parser.add_argument(
-        "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
+        "--dt",
+        type=float,
+        default=0.1,
+        help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
         "--log-space-time",
@@ -100,13 +110,38 @@ def get_parser(**kwargs):
         "--error-budget",
         type=float,
         default=0.1,
-        help="Bolometric error (default: 10% of relative error)",
+        help="Bolometric error (default: 10 percent of relative error)",
     )
     parser.add_argument(
         "--svd-lbol-ncoeff",
         type=int,
         default=10,
         help="Number of eigenvalues to be taken for lbol evaluation (default: 10)",
+    )
+    parser.add_argument(
+        "--use-Ebv",
+        action="store_true",
+        default=False,
+        help="If using the Ebv extinction during the inference",
+    )
+    parser.add_argument(
+        "--Ebv-max",
+        type=float,
+        default=0.5724,
+        help="Maximum allowed value for Ebv (default:0.5724)",
+    )
+    parser.add_argument(
+        "--conditional-gaussian-prior-thetaObs",
+        action="store_true",
+        default=False,
+        help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma",
+    )
+
+    parser.add_argument(
+        "--conditional-gaussian-prior-N-sigma",
+        default=1,
+        type=float,
+        help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True",
     )
     parser.add_argument(
         "--sampler",
@@ -133,7 +168,10 @@ def get_parser(**kwargs):
         help="Number of cores to be used, only needed for dynesty (default: 1)",
     )
     parser.add_argument(
-        "--nlive", type=int, default=2048, help="Number of live points (default: 2048)"
+        "--nlive",
+        type=int,
+        default=2048,
+        help="Number of live points (default: 2048)"
     )
     parser.add_argument(
         "--reactive-sampling",
@@ -149,10 +187,22 @@ def get_parser(**kwargs):
         help="Sampling seed (default: 42)",
     )
     parser.add_argument(
-        "--injection", metavar="PATH", type=str, help="Path to the injection json file"
+        "--injection",
+        metavar="PATH",
+        type=str,
+        help="Path to the injection json file"
     )
     parser.add_argument(
-        "--plot", action="store_true", default=False, help="add best fit plot"
+        "--plot",
+        action="store_true",
+        default=False,
+        help="add best fit plot"
+    )
+    parser.add_argument(
+        "--bestfit",
+        help="Save the best fit parameters and magnitudes to JSON",
+        action="store_true",
+        default=False,
     )
     parser.add_argument(
         "--bilby-zero-likelihood-mode",
@@ -165,6 +215,12 @@ def get_parser(**kwargs):
         action="store_true",
         default=False,
         help="print out log likelihoods",
+    )
+    parser.add_argument(
+        "--skip-sampling",
+        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.",
+        action="store_true",
+        default=False,
     )
     return parser
 
@@ -204,8 +260,8 @@ def analysis(args):
     error_budget = args.error_budget
 
     light_curve_model = SimpleBolometricLightCurveModel(
-        args.model,
-        sample_times
+        model=args.model,
+        sample_times=sample_times
     )
 
     # setup the prior
@@ -272,6 +328,7 @@ def analysis(args):
         result.plot_corner()
 
     if args.bestfit or args.plot:
+        import matplotlib.pyplot as plt
         posterior_file = os.path.join(
             args.outdir, f"{args.label}_posterior_samples.dat"
         )
@@ -301,9 +358,46 @@ def analysis(args):
                 lbol_dict["bestfit_sample_times"] + bestfit_params["timeshift"]
             )
 
-        ######################
-        # calculate the chi2 #
-        ######################
+        matplotlib.rcParams.update(
+            {'font.size': 12,
+             'text.usetex': True,
+             'font.family': 'Times New Roman'}
+        )
+
+        plt.figure(1)
+        plotName = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
+        color = "coral"
+
+        t = data["phase"].to_numpy()
+        y = data["Lbb"].to_numpy()
+        sigma_y = data["Lbb_unc"].to_numpy()
+
+        idx = np.where(~np.isnan(y))[0]
+        t, y, sigma_y = t[idx], y[idx], sigma_y[idx]
+
+        idx = np.where(np.isfinite(sigma_y))[0]
+        plt.errorbar(
+            t[idx], y[idx], sigma_y[idx], fmt="o", color="k", markersize=12,
+        )
+
+        idx = np.where(~np.isfinite(sigma_y))[0]
+        plt.errorbar(
+            t[idx], y[idx], sigma_y[idx], fmt="v", color="k", markersize=12
+        )
+
+        plt.plot(lbol_dict['bestfit_sample_times'], lbol_dict['lbol'],
+                 color=color,
+                 linewidth=3,
+                 linestyle="--",
+                 )
+
+        plt.ylabel("L [erg / s]")
+        plt.xlabel("Time [days]")
+        plt.tight_layout()
+        plt.savefig(plotName)
+        plt.close()
+
+    return
 
 
 def main(args=None):

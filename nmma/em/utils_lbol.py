@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.intergrate import quad
+from scipy.integrate import quad
 import astropy.constants
 
 
@@ -37,7 +37,7 @@ def arnett_lc(t_day, param_dict):
     y = tau_m / (2 * tau_ni)
     s = tau_m * (tau_co - tau_ni) / (2 * tau_co * tau_ni)
 
-    int_A = arnett_lc_get_int_A(x, y, s)
+    int_A = arnett_lc_get_int_A(x, y)
     int_B = arnett_lc_get_int_B(x, y, s)
 
     Ls = Mni * np.exp(-x**2) * (
@@ -63,7 +63,7 @@ def arnett_modified_lc(t_day, param_dict):
     y = tau_m / (2 * tau_ni)
     s = tau_m * (tau_co - tau_ni) / (2 * tau_co * tau_ni)
 
-    int_A = arnett_lc_get_int_A(x, y, s)
+    int_A = arnett_lc_get_int_A(x, y)
     int_B = arnett_lc_get_int_B(x, y, s)
 
     Ls = Mni * np.exp(-x**2) * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)

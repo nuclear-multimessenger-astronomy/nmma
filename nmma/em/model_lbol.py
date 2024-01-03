@@ -59,20 +59,13 @@ class SimpleBolometricLightCurveModel(object):
         else:
             new_parameters = parameters.copy()
 
-        z = utils.getRedShift(new_parameters)
-
-        param_dict = {}
-        for key in self.model_parameters:
-            param_dict[key] = new_parameters[key]
-        param_dict["z"] = z
-
         if self.model == "Arnett":
             lbol = utils_lbol.arnett_lc(
-                sample_times / (1. + z), param_dict
+                sample_times, new_parameters
             )
         elif self.model == "Arnett_modified":
             lbol = utils_lbol.arnett_modified_lc(
-                sample_times / (1. + z), param_dict
+                sample_times, new_parameters
             )
 
         return lbol
