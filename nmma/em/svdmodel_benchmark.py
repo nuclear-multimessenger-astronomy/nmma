@@ -81,14 +81,15 @@ def main():
     )
     parser.add_argument(
         "--filters",
+        nargs="+",
         type=str,
-        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
+        help="A space-seperated list of filters to use (e.g. g r i). If none is provided, will use all the filters available",
     )
     parser.add_argument(
         "--ncpus",
         type=int,
-        default=4,
-        help="Number of CPU to be used (default: 4)",
+        default=1,
+        help="Number of CPU to be used (default: 1)",
     )
     parser.add_argument(
         "--outdir", type=str, default="output", help="Path to the output directory"
@@ -146,6 +147,7 @@ def main():
         svd_path=args.svd_path,
         mag_ncoeff=args.svd_ncoeff,
         interpolation_type=args.interpolation_type,
+        filters=args.filters,
         local_only=args.local_only,
     )
 
