@@ -3,7 +3,7 @@ import copy
 import glob
 import numpy as np
 
-from ..em import training, model_parameters, io
+from ..em import training, model_parameters, io, svdmodel_benchmark
 
 
 def test_training():
@@ -44,6 +44,8 @@ def test_training():
         interpolation_type=interpolation_type,
     )
 
+    # TODO: add svdmodel_benchmark.create_benchmark for sklearn_gp
+
     interpolation_type = "tensorflow"
     training.SVDTrainingModel(
         model_name,
@@ -54,4 +56,12 @@ def test_training():
         n_coeff=n_coeff,
         svd_path=ModelPath,
         interpolation_type=interpolation_type,
+    )
+
+    svdmodel_benchmark.create_benchmark(
+        model=model_name,
+        svd_path=ModelPath,
+        data_path=dataDir,
+        interpolation_type=interpolation_type,
+        filters=filts,
     )
