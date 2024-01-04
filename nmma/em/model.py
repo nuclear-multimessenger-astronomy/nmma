@@ -20,6 +20,7 @@ ln10 = np.log(10)
 model_parameters_dict = {
     "Bu2019nsbh": ["log10_mej_dyn", "log10_mej_wind", "KNtheta"],
     "Bu2019lm": ["log10_mej_dyn", "log10_mej_wind", "KNphi", "KNtheta"],
+    "Bu2019lm_sparse": ["log10_mej_dyn", "log10_mej_wind"],
     "Ka2017": ["log10_mej", "log10_vej", "log10_Xlan"],
     "TrPi2018": [
         "inclination_EM",
