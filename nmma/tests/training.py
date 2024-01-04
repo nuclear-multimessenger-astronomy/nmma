@@ -44,7 +44,13 @@ def test_training():
         interpolation_type=interpolation_type,
     )
 
-    # TODO: add svdmodel_benchmark.create_benchmark for sklearn_gp
+    svdmodel_benchmark.create_benchmark(
+        model_name,
+        ModelPath,
+        dataDir,
+        interpolation_type=interpolation_type,
+        filters=filts,
+    )
 
     interpolation_type = "tensorflow"
     training.SVDTrainingModel(
