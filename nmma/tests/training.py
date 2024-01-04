@@ -59,9 +59,9 @@ def test_training():
     )
 
     svdmodel_benchmark.create_benchmark(
-        model=model_name,
-        svd_path=ModelPath,
-        data_path=dataDir,
+        model_name,
+        ModelPath,
+        dataDir,
         interpolation_type=interpolation_type,
         filters=filts,
     )
