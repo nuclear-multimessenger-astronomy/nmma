@@ -8,7 +8,7 @@ import scipy.interpolate as interp
 import scipy.signal
 import scipy.constants
 import scipy.stats
-from sncosmo.bandpasses import _BANDPASSES
+from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
 
 import sncosmo
 import dust_extinction.shapes as dustShp
@@ -124,6 +124,20 @@ def getRedShift(parameters):
             z = 0.0
     return z
 
+def get_all_bandpass_metadata():
+    """
+    Retrieves and combines the metadata for all registered bandpasses and interpolators.
+    
+    Returns:
+        list: Combined list of metadata dictionaries from bandpasses and interpolators for sncosmo.
+    """
+    
+    bandpass_metadata = _BANDPASSES.get_loaders_metadata()
+    interpolator_metadata = _BANDPASS_INTERPOLATORS.get_loaders_metadata()
+    
+    combined_metadata = bandpass_metadata + interpolator_metadata
+    
+    return combined_metadata
 
 def getFilteredMag(mag, filt):
     unprocessed_filt = [
@@ -151,7 +165,7 @@ def getFilteredMag(mag, filt):
         "swope2__J",
         "swope2__H",
     ]
-    sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
+    sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
     sncosmo_maps = {
         name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts
     }
@@ -275,10 +289,17 @@ def get_default_filts_lambdas(filters=None):
         [lambdas_sloan, lambdas_bessel, lambdas_radio, lambdas_Xray]
     )
 
-    bandpasses = [
-        sncosmo.get_bandpass(val["name"]) for val in _BANDPASSES.get_loaders_metadata()
-    ]
+    bandpasses = []
+    for val in get_all_bandpass_metadata():
+        try:
+            bandpass = sncosmo.get_bandpass(val["name"])
+        except Exception :
+            if val["name"] == "ultrasat":
+                bandpass = sncosmo.get_bandpass(val["name"], 3)
+                bandpass.name = bandpass.name.split()[0]
 
+        bandpasses.append(bandpass)
+        
     filts = filts + [band.name for band in bandpasses]
     lambdas = np.concatenate([lambdas, [1e-10 * band.wave_eff for band in bandpasses]])
 
