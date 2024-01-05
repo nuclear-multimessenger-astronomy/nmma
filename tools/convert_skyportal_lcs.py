@@ -13,10 +13,13 @@ def main(
 ):
     data_path = BASE_DIR / filepath
     try:
-        data = Table.read(data_path, format="ascii.csv", header_start=1)
+        data = Table.read(data_path, format="ascii.csv")
     except Exception as e:
         raise ValueError(f"input data is not in the expected format {e}")
 
+    import code
+
+    code.interact(local=locals())
     try:
         local_data_path = str(data_path.with_suffix(".dat"))
         with open(local_data_path, "w") as f:
