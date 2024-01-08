@@ -32,7 +32,7 @@ A tutorial on how to produce simulations of lightcurves is given here [tutorial-
 
 When utilizing this code for a publication, kindly make a reference to the package by its name, NMMA, and a citation to the companion paper [An updated nuclear-physics and multi-messenger astrophysics framework for binary neutron star mergers](https://www.nature.com/articles/s41467-023-43932-6). The BibTeX entry for the paper is:
 ```bibtex
-@misc{pang2022nmma,
+@article{Pang:2022rzc,
       title={An updated nuclear-physics and multi-messenger astrophysics framework for binary neutron star mergers},
       author={Peter T. H. Pang and Tim Dietrich and Michael W. Coughlin and Mattia Bulla and Ingo Tews and Mouza Almualla and Tyler Barna and Weizmann Kiendrebeogo and Nina Kunert and Gargi Mansingh and Brandon Reed and Niharika Sravan and Andrew Toivonen and Sarah Antier and Robert O. VandenBerg and Jack Heinzel and Vsevolod Nedora and Pouyan Salehi and Ritwik Sharma and Rahul Somasundaram and Chris Van Den Broeck},
       journal={Nature Communications},
