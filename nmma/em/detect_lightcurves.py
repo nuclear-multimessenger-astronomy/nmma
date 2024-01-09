@@ -62,12 +62,6 @@ def main():
         help="Either BNS or NSBH"
     )
     parser.add_argument(
-        "-c", 
-        "--configDirectory",
-        help="gwemopt config file directory.", 
-        required=False
-    )
-    parser.add_argument(
         "--outdir", 
         type=str, 
         default="outdir",
@@ -192,10 +186,10 @@ def main():
         )
 
         if args.telescope.lower() == 'ultrasat': 
-            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy --doMovie --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --powerlaw_cl 0.9 --doObservability --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --doPlots --doUsePrimary --ignore_observability"
+            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy_slew --doTrueLocation --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --powerlaw_cl 0.9 --doObservability --doObservabilityExit --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --doPlots --doUsePrimary  --ignore_observability"
             
         else:
-            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy --doMovie --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --powerlaw_cl 0.9 --doObservability --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --doPlots --doUsePrimary"
+            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy_slew --doTrueLocation --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --powerlaw_cl 0.9 --doObservability --doObservabilityExit --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --doPlots --doUsePrimary"
         
         commands.append(command)
         
