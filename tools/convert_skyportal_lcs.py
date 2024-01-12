@@ -17,9 +17,6 @@ def main(
     except Exception as e:
         raise ValueError(f"input data is not in the expected format {e}")
 
-    import code
-
-    code.interact(local=locals())
     try:
         local_data_path = str(data_path.with_suffix(".dat"))
         with open(local_data_path, "w") as f:
