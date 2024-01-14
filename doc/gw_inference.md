@@ -8,7 +8,7 @@ Setting up a `config.ini` file and running the command
 
 Perform the analysis or parameter estimation using:
 
-    nmma-gw-analysis <name_of_analysis>_data_dump.pickle
+    nmma-gw-analysis --data-dump <name_of_analysis>_data_dump.pickle
 
 Below, we provide an example of a gravitational-wave inference setup using observational data of GW170817 and another example for an injection based analysis.
 
@@ -104,7 +104,7 @@ Once the `config.ini` file is set, the genertation can be run with `nmma_gw_gene
 	export OMP_NUM_THREADS=1
 	export MPI_PER_NODE=48
 
-	mpiexec -n $SLURM_NTASKS nmma-gw-analysis outdir/data/GW170817_data_dump.pickle --nlive 2048 --maxmcmc 10000 --nact 10 --no-plot --label GW170817 --outdir outdir/result --sampling-seed 1234
+	mpiexec -n $SLURM_NTASKS nmma-gw-analysis --data-dump outdir/data/GW170817_data_dump.pickle --nlive 2048 --maxmcmc 10000 --nact 10 --no-plot --label GW170817 --outdir outdir/result --sampling-seed 1234
 
 The final posterior samples for the observed event GW170817 can be found under `outdir/result/`. Note that settings might differ from cluster to cluster and also the installation of NMMA might be changed (conda vs. python installation).
 
