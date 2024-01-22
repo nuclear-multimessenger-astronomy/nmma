@@ -1,5 +1,5 @@
 
-## Training
+## Training overview
 
 It is common to have light curves on "grids", for which you have a discrete set of parameters for which the lightcurves were simulated. For example, we may know the lightcurves to expect for specific masses m_1 and m_2, but not for any masses between the two.
 
@@ -7,8 +7,9 @@ We rely on sampling from a grid of modeled lightcurves through the use of Princi
 
 At this point, you can model this grid as either a Gaussian process or Neural Network. This will allow you to form a **continuous map** from merger parameters to lightcurve eigenvalues, which are then converted directly to the set of light curve parameters that most likely resulted in this lightcurve.
 
+For a list of example training calls on various model grids using tensorflow, see `tools/tf_training_calls.sh`.
 
-### NMMA training
+### Training details
 
 There are helper functions within NMMA to support this. In particular, `nmma.em.training.SVDTrainingModel` is designed to take in a grid of models and return an interpolation class.
 
