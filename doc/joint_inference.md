@@ -8,7 +8,7 @@ In order to run a multi-messenger inference, we need to follow to main steps:
 
 Perform the analysis or parameter estimation using:
 
-    nmma_analysis <name_of_analysis>_data_dump.pickle
+    nmma_analysis --data-dump <name_of_analysis>_data_dump.pickle
 
 First of all, we set up the `config.ini` file and provide all required data and information.
 
@@ -126,7 +126,7 @@ This will generate a `GW170817-AT2017gfo-GRB170817A_data_dump.pickle` file under
 
 **Running the analysis**
 
-As detailed above, running the analysis with the command `nmma_analysis outidr/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle` requires computational resources on a larger cluster. Below we show an example script for job submission called `jointinf.pbs` on a German cluster:
+As detailed above, running the analysis with the command `nmma_analysis --data-dump outidr/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle` requires computational resources on a larger cluster. Below we show an example script for job submission called `jointinf.pbs` on a German cluster:
 
     #!/bin/bash
     #PBS -N <name of simulation>
@@ -146,6 +146,6 @@ As detailed above, running the analysis with the command `nmma_analysis outidr/d
     export MPI_LAUNCH_TIMEOUT=240
     
     cd $PBS_O_WORKDIR
-    mpirun -np 512 omplace -c 0-127:st=4 nmma_analysis <absolute path to folder>/outdir/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle --nlive 1024 --nact 10 --maxmcmc 10000 --sampling-seed 20210213 --no-plot --outdir <absolute path to outdir/result folder>
+    mpirun -np 512 omplace -c 0-127:st=4 nmma_analysis --data-dump <absolute path to folder>/outdir/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle --nlive 1024 --nact 10 --maxmcmc 10000 --sampling-seed 20210213 --no-plot --outdir <absolute path to outdir/result folder>
 
 Note that settings might differ from cluster to cluster and also the installation of NMMA might be changed (conda vs. python installation). 

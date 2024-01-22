@@ -62,12 +62,6 @@ def main():
         help="Either BNS or NSBH"
     )
     parser.add_argument(
-        "-c", 
-        "--configDirectory",
-        help="gwemopt config file directory.", 
-        required=True
-    )
-    parser.add_argument(
         "--outdir", 
         type=str, 
         default="outdir",
@@ -128,7 +122,12 @@ def main():
         default=1, 
         help="Number of cores"
     )
-
+    parser.add_argument(
+        "--label", 
+        type=str, 
+        required=True, 
+        help="Label for the run"
+    )
     args = parser.parse_args()
 
     # load the injection json file
@@ -159,7 +158,7 @@ def main():
             os.makedirs(outdir)
  
         skymap_file = os.path.join(args.skymap_dir, "%d.fits" % indices[index])
-        lc_file = os.path.join(args.lightcurve_dir, "%d.dat" %  indices[index])
+        lc_file = os.path.join(args.lightcurve_dir, "%s.dat" %  f"{args.label}_{indices[index]}")
         
         # fixed scheduling time as observation plan
         #number_shot = int(1 + (args.tmax - args.tmin)/args.dt)
@@ -168,7 +167,7 @@ def main():
         
         lcs[index] = np.loadtxt(lc_file)
 
-        efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
+        efffile = os.path.join(outdir, f"efficiency_true_{args.label}_{indices[index]}.txt")
         if os.path.isfile(efffile):
             continue
 
@@ -186,9 +185,14 @@ def main():
             [str(args.exposuretime) for i in args.filters.split(",")]
         )
 
-        command = f"gwemopt_run --telescopes {args.telescope} --do3D --doTiles --doSchedule --doSkymap --doTrueLocation --true_ra {ra} --true_dec {dec} --true_distance {dist} --doObservability --doObservabilityExit --timeallocationType powerlaw --scheduleType greedy -o {outdir} --gpstime {gpstime} --skymap {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file} --modelType file --configDirectory {args.configDirectory} --doPlots"
+        if args.telescope.lower() == 'ultrasat': 
+            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy_slew --doTrueLocation --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --powerlaw_cl 0.9 --doObservability --doObservabilityExit --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --doPlots --doUsePrimary  --ignore_observability"
+            
+        else:
+            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy_slew --doTrueLocation --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --powerlaw_cl 0.9 --doObservability --doObservabilityExit --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --doPlots --doUsePrimary"
+        
         commands.append(command)
-
+        
     print("Number of jobs remaining... %d." % len(commands))
 
     if args.parallel:
@@ -207,16 +211,22 @@ def main():
     for index, row in dataframe_from_inj.iterrows():
         outdir = os.path.join(args.outdir, str(index))
         
-        efffile = os.path.join(outdir, f"efficiency_true_{indices[index]}.txt")
+        efffile = os.path.join(outdir, f"efficiency_true_{args.label}_{indices[index]}.txt")
         
         ## Choose band for the best proxy
         # for ZTF r-band give the best proxy 
         if args.telescope == 'ZTF':
-            absmag.append(np.min(lcs[index][:, 3]))
-        # For Rubin i-band or z-band are best 
-        else:
-            absmag.append(np.min(lcs[index][:, 4]))
+            absmag.append(np.min(lcs[index][:, 2]))
             
+        # For Rubin i-band or z-band are best 
+        elif args.telescope == 'LSST':
+            absmag.append(np.min(lcs[index][:, 3]))
+            
+        elif args.telescope.lower() == 'ultrasat':
+            absmag.append(np.min(lcs[index][:, 1]))
+        
+        else:
+            absmag.append(np.min(lcs[index][:, 3]))
         
         if not os.path.isfile(efffile):
             fid.write("0\n")
@@ -233,8 +243,8 @@ def main():
             with open(efffile, "r") as file:
                 data_out = file.read()
             effs.append(float(data_out.split("\n")[1].split("\t")[4]))
-
-        efffile = os.path.join(outdir, f"efficiency_{indices[index]}.txt")
+            
+        efffile = os.path.join(outdir, f"efficiency_{args.label}_{indices[index]}.txt")
         if not os.path.isfile(efffile):
             probs.append(0.0)
         else:
@@ -372,7 +382,7 @@ def main():
 
     plt.axes(ax4)
     plt.axis("off")
-    cbar = plt.colorbar(sm, shrink=0.5, orientation="horizontal")
+    cbar = fig.colorbar(sm, ax=ax4, orientation='horizontal')
     cbar.set_label(r"Detection Efficiency")
 
     plt.axes(ax3)

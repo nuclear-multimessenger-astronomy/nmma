@@ -174,6 +174,11 @@ def _add_em_settings_to_parser(parser):
         default=1.0,
         help="Additionaly statistical error (mag) to be introdouced (default: 1)",
     )
+    em_input_parser.add(
+        "--local-model-only",
+        action="store_true",
+        help="use local svd models only",
+    )
 
     return parser
 

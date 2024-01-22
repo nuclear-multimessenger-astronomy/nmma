@@ -155,6 +155,7 @@ class MultiMessengerLikelihood(Likelihood):
         jitter_time=True,
         reference_frame="sky",
         time_reference="geocenter",
+        local_only=False,
     ):
         # construct the eos prior
         if with_eos:
@@ -225,6 +226,7 @@ class MultiMessengerLikelihood(Likelihood):
             lbol_ncoeff=lbol_ncoeff,
             interpolation_type=light_curve_interpolation_type,
             filters=filters,
+            local_only=local_only,
         )
 
         if with_grb:

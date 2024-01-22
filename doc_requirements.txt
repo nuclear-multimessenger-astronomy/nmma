@@ -1,4 +1,4 @@
-sphinx==4.4.0
+sphinx>=5.0
 sphinx_math_dollar
 recommonmark
 numpydoc

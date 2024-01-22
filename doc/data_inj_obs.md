@@ -72,3 +72,12 @@ Example: AT2017gfo data excerpt
     2017-08-18T18:11:31.200 2massk 17.91000 0.05000
 
 The first column represents the ISOT time, followed by the filter or spectral band in the second column, the measured AB magnitude and its respective error are given in the third and fourth column. This data structure detailed above is also applicable for other astrophysical sources (SNe, GRBs) or models implemented in NMMA.
+
+Example: transient data downloaded from [SkyPortal](https://github.com/skyportal/skyportal)/fritz:
+
+    "id","mjd","mag","magerr","limiting_mag","filter","instrument_name","instrument_id","snr","magsys","origin","altdata","ra","dec","ra_unc","dec_unc","created_at","annotations","owner","Edit","Delete"
+    "518817455","60257.28104169993","","","19.30739974975586","ztfr","ZTF","1","","ab","None","","","","","","2023-12-07T05:49:42.369500","","[object Object]","",""
+    "518817456","60257.282500000205","","","19.347900390625","ztfr","ZTF","1","","ab","None","","","","","","2023-12-07T05:49:42.369555","","[object Object]","",""
+    "518817457","60257.36459490005","","","20.112499237060547","ztfg","ZTF","1","","ab","None","","","","","","2023-12-07T05:49:42.369574","","[object Object]","",""
+
+Data downloaded from a source's photometry table on SkyPortal take the comma-separated format above. These files must be converted to NMMA format (see first example above) before running analyses. Run `tools/convert_skyportal_lcs.py --filepath <path/to/lcs.csv>` to perform the conversion.

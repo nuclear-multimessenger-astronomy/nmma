@@ -203,9 +203,9 @@ def get_parser():
     parser.add_argument(
         "--ylim",
         type=str,
-        default="22,16",
+        default="-12,-18",
         nargs="*",
-        help="Upper and lower magnitude limit for light curve plot (default: 22-16)",
+        help="Upper and lower magnitude limit for light curve plot (default: -12,-18)",
     )
     parser.add_argument(
         "--photometric-error-budget",
@@ -217,6 +217,13 @@ def get_parser():
         "--increment-seeds",
         help="Change seed for every injection",
         action="store_true",
+    )
+
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        default=False,
+        help="only look for local svdmodels (ignore Zenodo)",
     )
 
     return parser
@@ -393,7 +400,7 @@ def main(args=None):
             "ytick.labelsize": 42,
             "text.usetex": True,
             "font.family": "Times New Roman",
-            "figure.figsize": [16, 20],
+            "figure.figsize": [18, 25],
         }
         matplotlib.rcParams.update(params)
 
@@ -403,7 +410,8 @@ def main(args=None):
 
         fig = plt.figure()
 
-        filts = list(set(mag_ds[index].keys()).difference({"t"}))
+        # filts = list(set(mag_ds[index].keys()).difference({"t"}))
+        filts = filters
 
         ncols = 1
         nrows = int(np.ceil(len(filts) / ncols))
@@ -459,7 +467,8 @@ def main(args=None):
             ylim = [float(x) for x in ylim]
             plt.ylim(ylim)
 
-            ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
+            # ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
+            ax.set_ylabel(filt, fontsize=30, rotation=90, labelpad=8)
 
             if ii == len(filts) - 1:
                 ax.set_xticks([np.ceil(x) for x in np.linspace(xlim[0], xlim[1], 8)])
@@ -467,8 +476,8 @@ def main(args=None):
                 plt.setp(ax.get_xticklabels(), visible=False)
 
             ax.set_yticks([np.ceil(x) for x in np.linspace(ylim[0], ylim[1], 8)])
-            ax.tick_params(axis="x", labelsize=42)
-            ax.tick_params(axis="y", labelsize=42)
+            ax.tick_params(axis="x", labelsize=35)
+            ax.tick_params(axis="y", labelsize=35)
             ax.grid(which="both", alpha=0.5)
 
             axs.append(ax)
@@ -476,12 +485,12 @@ def main(args=None):
         fig.colorbar(c, ax=axs, location="right", shrink=0.6)
         fig.text(0.4, 0.05, r"Time [days]", fontsize=42)
         fig.text(
-            0.01,
+            0.001,
             0.5,
             r"Absolute Magnitude",
             va="center",
             rotation="vertical",
-            fontsize=42,
+            fontsize=35,
         )
 
         # plt.tight_layout()

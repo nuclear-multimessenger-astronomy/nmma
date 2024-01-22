@@ -2,7 +2,6 @@ from __future__ import division
 
 import copy
 import os
-import pickle
 import joblib
 import numpy as np
 from scipy.special import logsumexp
@@ -21,6 +20,7 @@ ln10 = np.log(10)
 model_parameters_dict = {
     "Bu2019nsbh": ["log10_mej_dyn", "log10_mej_wind", "KNtheta"],
     "Bu2019lm": ["log10_mej_dyn", "log10_mej_wind", "KNphi", "KNtheta"],
+    "Bu2019lm_sparse": ["log10_mej_dyn", "log10_mej_wind"],
     "Ka2017": ["log10_mej", "log10_vej", "log10_Xlan"],
     "TrPi2018": [
         "inclination_EM",
@@ -58,6 +58,15 @@ model_parameters_dict = {
         "Yedyn",
         "log10_mej_wind",
         "vej_wind",
+        "KNtheta",
+    ],
+    "Bu2023Ye": [
+        "log10_mej_dyn",
+        "vej_dyn",
+        "Yedyn",
+        "log10_mej_wind",
+        "vej_wind",
+        "Yewind",
         "KNtheta",
     ],
     "LANL2022": [
@@ -248,25 +257,12 @@ class SVDLightCurveModel(object):
                         self.svd_mag_model[filt]["gps"] = joblib.load(outfile)
                 self.svd_lbol_model = None
             else:
-                # Try old style request (deprecate/remove?)
-                mag_modelfile = os.path.join(self.svd_path, "{0}_mag.pkl".format(model))
-                with open(mag_modelfile, "rb") as handle:
-                    self.svd_mag_model = pickle.load(handle)
-
-                outdir = mag_modelfile.replace(".pkl", "")
-                for filt in self.filters:
-                    outfile = os.path.join(outdir, f"{filt}.pkl")
-                    if not os.path.isfile(outfile):
-                        print(f"Could not find model file for filter {filt}")
-                    else:
-                        print(f"Loaded filter {filt}")
-                        with open(outfile, "rb") as handle:
-                            self.svd_mag_model[filt]["gps"] = pickle.load(handle)
-                lbol_modelfile = os.path.join(
-                    self.svd_path, "{0}_lbol.pkl".format(model)
-                )
-                with open(lbol_modelfile, "rb") as handle:
-                    self.svd_lbol_model = pickle.load(handle)
+                if local_only:
+                    raise ValueError(
+                        f"Model file not found: {modelfile}\n If possible, try removing the --local-only flag and rerunning."
+                    )
+                else:
+                    raise ValueError(f"Model file not found: {modelfile}")
         elif self.interpolation_type == "api_gp":
             from .training import load_api_gp_model
 
@@ -310,39 +306,12 @@ class SVDLightCurveModel(object):
                         self.svd_mag_model[filt]["model"] = load_model(outfile)
                 self.svd_lbol_model = None
             else:
-                # Old style request - deprecate/remove?
-                _, model_filters = get_model(
-                    self.svd_path, f"{self.model}_mag_tf", filters=filters
-                )
-                if filters is None and model_filters is not None:
-                    self.filters = model_filters
-
-                mag_modelfile = os.path.join(
-                    self.svd_path, "{0}_mag_tf.pkl".format(model)
-                )
-                with open(mag_modelfile, "rb") as handle:
-                    self.svd_mag_model = pickle.load(handle)
-
-                if self.filters is None:
-                    self.filters = list(self.svd_mag_model.keys())
-
-                outdir = mag_modelfile.replace(".pkl", "")
-                for filt in self.filters:
-                    outfile = os.path.join(outdir, f"{filt}.h5")
-                    self.svd_mag_model[filt]["model"] = load_model(outfile)
-
-                get_model(
-                    self.svd_path, f"{self.model}_lbol_tf", self.svd_mag_model.keys()
-                )
-                lbol_modelfile = os.path.join(
-                    self.svd_path, "{0}_lbol_tf.pkl".format(model)
-                )
-                with open(lbol_modelfile, "rb") as handle:
-                    self.svd_lbol_model = pickle.load(handle)
-
-                outdir = lbol_modelfile.replace(".pkl", "")
-                outfile = os.path.join(outdir, "model.h5")
-                self.svd_lbol_model["model"] = load_model(outfile)
+                if local_only:
+                    raise ValueError(
+                        f"Model file not found: {modelfile}\n If possible, try removing the --local-only flag and rerunning."
+                    )
+                else:
+                    raise ValueError(f"Model file not found: {modelfile}")
         else:
             return ValueError("--interpolation-type must be sklearn_gp or tensorflow")
 
