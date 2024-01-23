@@ -1,6 +1,8 @@
 import os
+from argparse import Namespace
 
 from tools.resample_grid import Grid
+from tools import convert_skyportal_lcs
 
 
 def test_resampling():
@@ -22,3 +24,14 @@ def test_resampling():
 
     grid.fragment(factor=5, shuffle=False)
     grid.fragment(factor=5, shuffle=True)
+
+
+def test_lc_conversion():
+    workingDir = os.path.dirname(__file__)
+    filepath = os.path.join(workingDir, "data", "ZTF23aaxeacr_partial.csv")
+
+    args = Namespace(
+        filepath=filepath,
+    )
+
+    convert_skyportal_lcs.main(args)

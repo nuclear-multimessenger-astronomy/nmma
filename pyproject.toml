@@ -63,6 +63,7 @@ nmma-create-injection = "nmma.eos.create_injection:main"
 gwem-resampling = "nmma.em.gwem_resampling:main"
 gwem-resampling-condor = "nmma.em.gwem_resampling_condor:main"
 gwem-Hubble-estimate = "nmma.em.gwem_Hubble_estimate:main"
+convert-skyportal-lcs = "tools.convert_skyportal_lcs:main"
 
 
 [tool.setuptools]
