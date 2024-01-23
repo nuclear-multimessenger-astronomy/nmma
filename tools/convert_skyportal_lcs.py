@@ -8,9 +8,7 @@ import argparse
 BASE_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
 
-def main(
-    filepath,
-):
+def convert_skyportal_lcs(filepath):
     data_path = BASE_DIR / filepath
     try:
         data = Table.read(data_path, format="ascii.csv")
@@ -51,7 +49,9 @@ def get_parser():
     return parser
 
 
-if __name__ == "__main__":
-    parser = get_parser()
-    args = parser.parse_args()
-    main(**vars(args))
+def main(args=None):
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
+
+    convert_skyportal_lcs(**vars(args))
