@@ -1,8 +1,8 @@
 # Example tensorflow training calls for different model grids
 
-# model: LANL2022
+# model: LANLTS2
 # lightcurves: lcs_lanl_TS_wind2
-create-svdmodel --model LANL2022 --svd-path svdmodels_LANL2022 --interpolation-type tensorflow --tmin 0. --tmax 21.0 --dt 0.1 --data-path lcs_lanl_TS_wind2 --tensorflow-nepochs 100 --outdir output_LANL2022_tf --plot
+create-svdmodel --model LANLTS2 --svd-path svdmodels_LANLTS2 --interpolation-type tensorflow --tmin 0. --tmax 21.0 --dt 0.1 --data-path lcs_lanl_TS_wind2 --tensorflow-nepochs 100 --outdir output_LANLTS2_tf --plot
 
 # model: Bu2019lm
 # lightcurves: lcs_bulla_2019_bns
