@@ -80,4 +80,4 @@ Example: transient data downloaded from [SkyPortal](https://github.com/skyportal
     "518817456","60257.282500000205","","","19.347900390625","ztfr","ZTF","1","","ab","None","","","","","","2023-12-07T05:49:42.369555","","[object Object]","",""
     "518817457","60257.36459490005","","","20.112499237060547","ztfg","ZTF","1","","ab","None","","","","","","2023-12-07T05:49:42.369574","","[object Object]","",""
 
-Data downloaded from a source's photometry table on SkyPortal take the comma-separated format above. These files must be converted to NMMA format (see first example above) before running analyses. Run `tools/convert_skyportal_lcs.py --filepath <path/to/lcs.csv>` to perform the conversion.
+Data downloaded from a source's photometry table on SkyPortal take the comma-separated format above. These files must be converted to NMMA format (see first example above) before running analyses. Run `convert-skyportal-lcs --filepath <path/to/lcs.csv>` to perform the conversion.
