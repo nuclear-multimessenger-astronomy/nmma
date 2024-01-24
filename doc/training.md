@@ -1,5 +1,5 @@
 
-## Training overview
+## Training
 
 It is common to have light curves on "grids", for which you have a discrete set of parameters for which the lightcurves were simulated. For example, we may know the lightcurves to expect for specific masses m_1 and m_2, but not for any masses between the two.
 
@@ -79,6 +79,10 @@ This model is then ready to use in an analysis.
 	lightcurve-analysis --model Bu2022mv --interpolation-type tensorflow --svd-path svdmodels --outdir outdir --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2022mv.prior
 
 To continue training an existing tensorflow model (e.g. on additional data), set the --continue-training flag.
+
+For the HDF5 file format, the `resample-grid` script enables downsampling and fragmentation into smaller components to make training less computationally demanding. For example:
+
+	resample-grid --gridpath nmma/tests/data/lowmass_collapsar_updated.h5 --factor 5 --do-downsample
 
 ### Spectral grids
 
