@@ -69,8 +69,8 @@ def get_parser():
     parser.add_argument(
         "--filters",
         type=str,
-        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
-        default="u,g,r,i,z,y,J,H,K",
+        help="A comma seperated list of filters to use (e.g. sdssu,2massh,2massj). If none is provided, will use all the default filters",
+        default = "ztfr,ztfg,ztfi"
     )
     parser.add_argument(
         "--generation-seed",
@@ -203,9 +203,9 @@ def get_parser():
     parser.add_argument(
         "--ylim",
         type=str,
-        default="-12,-18",
+        default="22,16",
         nargs="*",
-        help="Upper and lower magnitude limit for light curve plot (default: -12,-18)",
+        help="Upper and lower magnitude limit for light curve plot (default: 22,16)",
     )
     parser.add_argument(
         "--photometric-error-budget",
@@ -485,7 +485,7 @@ def main(args=None):
         fig.colorbar(c, ax=axs, location="right", shrink=0.6)
         fig.text(0.4, 0.05, r"Time [days]", fontsize=42)
         fig.text(
-            0.001,
+            0.01,
             0.5,
             r"Absolute Magnitude",
             va="center",
