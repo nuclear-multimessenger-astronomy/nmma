@@ -16,7 +16,7 @@ def parse():
     parser.add_argument(
         "--filters",
         type=str,
-        default="bessellux,bessellb,bessellv,bessellr,besselli,sdssu,ps1::g,ps1::r,ps1::i,ps1::z,ps1::y,uvot::b,uvot::u,uvot::uvm2,uvot::uvw1,uvot::uvw2,uvot::v,uvot::white,atlasc,atlaso,2massj,2massh,2massks,ztfg,ztfr,ztfi",
+        default="bessellux,bessellb,bessellv,bessellr,besselli,sdssu,ps1::g,ps1::r,ps1::i,ps1::z,ps1::y,uvot::b,uvot::u,uvot::uvm2,uvot::uvw1,uvot::uvw2,uvot::v,uvot::white,atlasc,atlaso,2massj,2massh,2massks,ztfg,ztfr,ztfi,ultrasat",
         help="comma-separated list of filters for photometric lcs; must be from the bandpasses listed here: \
                         https://sncosmo.readthedocs.io/en/stable/bandpass-list.html",
     )
@@ -45,10 +45,10 @@ def parse():
         default=False,
     )
     parser.add_argument(
-        '--doSmoothing',
-        help='Employ Savitzky-Golay filter for smoothing',
+        "--doSmoothing",
+        help="Employ Savitzky-Golay filter for smoothing",
         action="store_true",
-        default=False
+        default=False,
     )
     parser.add_argument(
         "--dMpc",
@@ -139,15 +139,21 @@ for kk, filename in enumerate(files):
         m_tot = []
         for filt in filters:
             source = sncosmo.TimeSeriesSource(ph, wave, Llam)
-            m = source.bandmag(filt, "ab", ph)
 
-            #apply smoothing filter
+            if filt == "ultrasat":
+                bandpass = sncosmo.get_bandpass(filt, 5.0)
+            else:
+                bandpass = sncosmo.get_bandpass(filt)
+
+            m = source.bandmag(bandpass, "ab", ph)
+
+            # apply smoothing filter
             if args.doSmoothing:
                 ii = np.where(~np.isnan(m))[0]
                 if len(ii) > 1:
-                    f = interp.interp1d(ph[ii], m[ii], fill_value='extrapolate')
+                    f = interp.interp1d(ph[ii], m[ii], fill_value="extrapolate")
                     m = f(ph)
-                m = savgol_filter(m,window_length=17,polyorder=3)
+                m = savgol_filter(m, window_length=17, polyorder=3)
 
             m_tot.append(m)
 
@@ -184,9 +190,9 @@ for kk, filename in enumerate(files):
 
         if args.doSmoothing:
             ii = np.where(np.isfinite(np.log10(Lbol)))[0]
-            f = interp.interp1d(ph[ii], np.log10(Lbol[ii]), fill_value='extrapolate')
-            Lbol = 10**f(ph)
-            Lbol = savgol_filter(Lbol,window_length=17,polyorder=3)
+            f = interp.interp1d(ph[ii], np.log10(Lbol[ii]), fill_value="extrapolate")
+            Lbol = 10 ** f(ph)
+            Lbol = savgol_filter(Lbol, window_length=17, polyorder=3)
 
         for i, t in enumerate(ph):
             if t < 0:
