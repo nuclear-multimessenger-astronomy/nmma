@@ -69,8 +69,7 @@ def get_parser():
     parser.add_argument(
         "--filters",
         type=str,
-        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
-        default="u,g,r,i,z,y,J,H,K",
+        help="A comma seperated list of filters to use (e.g. sdssu,2massh,2massj). If none is provided, will use all the filters available",
     )
     parser.add_argument(
         "--generation-seed",
@@ -218,6 +217,12 @@ def get_parser():
         help="Change seed for every injection",
         action="store_true",
     )
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        default=False,
+        help="only look for local svdmodels (ignore Zenodo)",
+    )
 
     return parser
 
@@ -350,7 +355,7 @@ def main(args=None):
                 # fid.write('# t[days] u g r i z y J H K\n')
                 # fid.write(str(" ".join(('# t[days]'," ".join(args.filters.split(',')),"\n"))))
                 fid.write("# t[days] ")
-                fid.write(str(" ".join(args.filters.split(","))))
+                fid.write(str(' '.join((list(data.keys())))))
                 fid.write("\n")
 
                 for ii, tt in enumerate(sample_times):
