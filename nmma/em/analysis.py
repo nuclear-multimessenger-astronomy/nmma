@@ -688,6 +688,19 @@ def analysis(args):
         **sampler_kwargs,
     )
 
+    # check if it is running under mpi
+    try:
+        from mpi4py import MPI
+        rank = MPI.COMM_WORLD.Get_rank()
+        if rank == 0:
+            pass
+        else:
+            return
+
+    except ImportError:
+        pass
+
+
     result.save_posterior_samples()
 
     if args.injection:

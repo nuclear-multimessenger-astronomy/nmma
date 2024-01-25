@@ -4,6 +4,7 @@ from .analysis import get_parser
 from pathlib import Path
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import sys
 
 
 def get_parser_here():
@@ -52,6 +53,23 @@ def main(args=None):
 
     futures = []
 
+    total_processes = 0
+
+    for analysis_set in yaml_dict.keys():
+        params = yaml_dict[analysis_set]
+
+        if "process-per-config" in params or args.process is None:
+            processes = params.get("process-per-config", 0)
+            total_processes += processes
+        elif args.parallel and args.process is not None:
+            processes = args.process // total_configs
+        else:
+            processes = args.process
+            total_processes += processes
+
+    print(f"Total number of processes: {total_processes}")
+    sys.stdout.flush()
+    
     with ThreadPoolExecutor() as executor:
         for analysis_set in yaml_dict.keys():
             params = yaml_dict[analysis_set]
@@ -63,7 +81,7 @@ def main(args=None):
             else:
                 processes = args.process
 
-            cmd = ["mpiexec", "-np", str(processes), "light_curve_analysis"]
+            cmd = ["mpiexec", "-np", str(processes), "lightcurve-analysis"]
 
             for key, value in params.items():
                 key = key.replace("-", "_")
