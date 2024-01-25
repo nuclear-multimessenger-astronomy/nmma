@@ -1,0 +1,75 @@
+Me2017_1:
+  model: Me2017
+  outdir: outdir_1
+  label: injection
+  prior: ../../priors/Me2017.prior
+  tmin: 0.1
+  tmax: 20
+  dt: 0.5
+  error-budget: 1
+  nlive: 40
+  Ebv-max: 0
+  injection: ./injection.json
+  injection-num: 0
+  injection-outfile: outdir_1/lc.csv
+  generation-seed: 42
+  filters: ztfg,ztfr,ztfi
+  remove-nondetections: True
+  #process-per-config: 4
+
+Me2017_2:
+  model: Me2017
+  outdir: outdir_2
+  label: injection
+  prior: ../../priors/Me2017.prior
+  tmin: 0.1
+  tmax: 20
+  dt: 0.5
+  error-budget: 1
+  nlive: 40
+  Ebv-max: 0
+  injection: ./injection.json
+  injection-num: 0
+  injection-outfile: outdir_2/lc.csv
+  generation-seed: 42
+  filters: ztfg,ztfr,ztfi
+  remove-nondetections: True
+  #process-per-config: 5
+
+Me2017_3:
+  model: Me2017
+  outdir: outdir_3
+  label: injection
+  prior: ../../priors/Me2017.prior
+  tmin: 0.1
+  tmax: 20
+  dt: 0.5
+  error-budget: 1
+  nlive: 40
+  Ebv-max: 0
+  injection: ./injection.json
+  injection-num: 0
+  injection-outfile: outdir_3/lc.csv
+  generation-seed: 42
+  filters: ztfg,ztfr,ztfi
+  remove-nondetections: True
+  #process-per-config: 6
+
+Me2017_4:
+  model: Me2017
+  outdir: outdir_4
+  label: injection
+  prior: ../../priors/Me2017.prior
+  tmin: 0.1
+  tmax: 20
+  dt: 0.5
+  error-budget: 1
+  nlive: 40
+  Ebv-max: 0
+  injection: ./injection.json
+  injection-num: 0
+  injection-outfile: outdir_4/lc.csv
+  generation-seed: 42
+  filters: ztfg,ztfr,ztfi
+  remove-nondetections: True
+  #process-per-config: 7

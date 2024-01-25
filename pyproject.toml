@@ -65,6 +65,7 @@ gwem-resampling-condor = "nmma.em.gwem_resampling_condor:main"
 gwem-Hubble-estimate = "nmma.em.gwem_Hubble_estimate:main"
 convert-skyportal-lcs = "tools.convert_skyportal_lcs:main"
 resample-grid = "tools.resample_grid:main"
+multi-config-analysis = "nmma.em.multi_config_analysis:main"
 
 
 [tool.setuptools]
