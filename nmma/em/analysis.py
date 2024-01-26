@@ -422,7 +422,10 @@ def analysis(args):
     print("Creating light curve model for inference")
 
     if args.filters:
-        filters = args.filters.split(",")
+        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+        if len(filters) == 0:
+            raise ValueError("Need at least one valid filter.")
     else:
         filters = None
 
