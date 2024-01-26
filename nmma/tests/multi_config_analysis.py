@@ -3,19 +3,19 @@ import os
 import pytest
 
 
-from ..em import multi_config_analysis
+from nmma.em import multi_config_analysis
 
 
 @pytest.fixture(scope="module")
 def args():
     workingDir = os.path.dirname(__file__)
-    dataDir = os.path.join(workingDir, "data")
-    configDir = os.path.join(workingDir, "data/multi_config_analysis")
+    config = os.path.join(workingDir, "data/multi_config_analysis/config.yaml")
 
-    args = Namespace(config=configDir, process=2, parallel=True)
+    arguments = Namespace(config=config, process=1, parallel=False)
 
-    return args
+    return arguments
 
 
 def test_analysis(args):
     multi_config_analysis.main(args)
+
