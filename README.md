@@ -53,7 +53,7 @@ If you benefited from participating in our community, we ask that you please ack
 Please use the following text for this acknowledgment:
   > We acknowledge the Nuclear Multi-Messenger Astronomy collective as an open community of multi-domain experts and collaborators. This community and \<names of individuals\>, in particular, were important for the development of this project.
 
-# Funding
+### Funding
 We gratefully acknowledge previous and current support from the U.S. National Science Foundation (NSF) Harnessing the Data Revolution (HDR) Institute for <a href="https://a3d3.ai">Accelerating AI Algorithms for Data Driven Discovery (A3D3)</a> under Cooperative Agreement No. <a href="https://www.nsf.gov/awardsearch/showAward?AWD_ID=2117997">PHY-2117997</a> and the European Research Council (ERC) under the European Union's Starting Grant (Grant No. <a href="https://doi.org/10.3030/101076369">101076369</a>).
 
 <p align="center">
