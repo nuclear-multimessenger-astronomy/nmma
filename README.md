@@ -57,6 +57,6 @@ Please use the following text for this acknowledgment:
 We gratefully acknowledge previous and current support from the U.S. National Science Foundation (NSF) Harnessing the Data Revolution (HDR) Institute for <a href="https://a3d3.ai">Accelerating AI Algorithms for Data Driven Discovery (A3D3)</a> under Cooperative Agreement No. <a href="https://www.nsf.gov/awardsearch/showAward?AWD_ID=2117997">PHY-2117997</a> and the European Research Council (ERC) under the European Union's Starting Grant (Grant No. <a href="https://doi.org/10.3030/101076369">101076369</a>).
 
 <p align="center">
-<img src="https://github.com/nuclear-multimessenger-astronomy/nmma/assets/a3d3.png" alt="A3D3" width="130"/>
-<img src="https://github.com/fastmachinelearning/nmma/assets/nsf.png" alt="NSF" width="130"/>
-<img src="https://github.com/fastmachinelearning/nmma/assets/erc.png" alt="ERC" width="130"/>
+<img src="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/assets/a3d3.png" alt="A3D3" width="130"/>
+<img src="https://github.com/fastmachinelearning/nmma/blob/main/assets/nsf.png" alt="NSF" width="130"/>
+<img src="https://github.com/fastmachinelearning/nmma/blob/main/assets/erc.png" alt="ERC" width="130"/>
