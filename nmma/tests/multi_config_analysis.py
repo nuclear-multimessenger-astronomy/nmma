@@ -16,6 +16,6 @@ def args():
     return args
 
 
-def test_analysis(args):
+def test_analysis_multi(args):
     multi_config_analysis.main(args)
 
