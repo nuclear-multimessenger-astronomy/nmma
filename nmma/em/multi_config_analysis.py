@@ -46,14 +46,17 @@ def run_cmd_in_subprocess(cmd):
 
 
 def main(args=None):
-    parser2 = get_parser_here()
-    args2 = parser2.parse_known_args()
+    if args is None:
+        parser2 = get_parser_here()
+        args2 = parser2.parse_known_args()
 
-    parser = get_parser()
-    args, _ = parser.parse_known_args(args2[1])
+        parser = get_parser()
+        args, _ = parser.parse_known_args(args2[1])
 
-    for key, value in vars(args2[0]).items():
-        setattr(args, key, value)
+        for key, value in vars(args2[0]).items():
+            setattr(args, key, value)
+    else:
+        pass
 
     yaml_dict = yaml.safe_load(Path(args.config).read_text())
     total_configs = len(list(yaml_dict.keys()))
