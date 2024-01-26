@@ -11,9 +11,9 @@ def args():
     workingDir = os.path.dirname(__file__)
     config = os.path.join(workingDir, "data/multi_config_analysis/config.yaml")
 
-    arguments = Namespace(config=config, process=1, parallel=False)
+    args = Namespace(config=config, process=1, parallel=False)
 
-    return arguments
+    return args
 
 
 def test_analysis(args):
