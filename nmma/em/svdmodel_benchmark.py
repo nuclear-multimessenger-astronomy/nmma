@@ -171,6 +171,9 @@ def create_benchmark(
     elif isinstance(filters, str):
         filts = filters.replace(" ", "")  # remove all whitespace
         filts = filts.split(",")
+    else:
+        # list input from analysis test code
+        filts = filters
 
     if len(filts) == 0:
         raise ValueError("Need at least one valid filter.")
