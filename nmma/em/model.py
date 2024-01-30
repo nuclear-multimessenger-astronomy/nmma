@@ -375,16 +375,19 @@ class SVDLightCurveModel(object):
         _, lambdas = utils.get_default_filts_lambdas(filters=filts)
         nu_0s = scipy.constants.c / lambdas
 
-        Ebv = new_parameters['Ebv']
-        if Ebv != 0.0:
-            ext = utils.extinctionFactorP92SMC(nu_0s, Ebv, z)
-            ext_mag = -2.5 * np.log10(ext)
-        else:
-            ext_mag = np.zeros(len(nu_0s))
+        try:
+            Ebv = new_parameters['Ebv']
+            if Ebv != 0.0:
+                ext = utils.extinctionFactorP92SMC(nu_0s, Ebv, z)
+                ext_mag = -2.5 * np.log10(ext)
+            else:
+                ext_mag = np.zeros(len(nu_0s))
 
-        # apply extinction
-        for ext_mag_per_filt, filt in zip(ext_mag, filts):
-            mag[filt] += ext_mag_per_filt
+            # apply extinction
+            for ext_mag_per_filt, filt in zip(ext_mag, filts):
+                mag[filt] += ext_mag_per_filt
+        except KeyError:
+            pass
 
         return lbol, mag
 
