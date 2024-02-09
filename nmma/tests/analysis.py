@@ -13,7 +13,7 @@ def args():
     dataDir = os.path.join(workingDir, "data")
 
     args = Namespace(
-        model="Bu2019lm",
+        model="Bu2019nsbh",
         interpolation_type="tensorflow",
         svd_path=dataDir,
         outdir="outdir",
@@ -30,7 +30,7 @@ def args():
         bestfit=True,
         svd_mag_ncoeff=10,
         svd_lbol_ncoeff=10,
-        filters="uvot__v",
+        filters="ztfr",
         Ebv_max=0.0,
         grb_resolution=5,
         jet_type=0,
