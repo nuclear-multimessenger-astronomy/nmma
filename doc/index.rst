@@ -120,9 +120,12 @@ Check python and pip version like this:
    python --version
    pip --version
 
-Python 3.9 and above and Pip 21.2 and above is ideal for this
+Python 3.8 and above and Pip 21.2 and above is ideal for this
 installation. It is recommended to update these for your installation.
 
+.. important::
+
+   Python 3.11 is now supported by NMMA!
 
 Install mpi4py:
 
