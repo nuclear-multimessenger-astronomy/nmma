@@ -120,12 +120,9 @@ Check python and pip version like this:
    python --version
    pip --version
 
-Python 3.8 and above and Pip 21.2 and above is ideal for this
+Python 3.9 and above and Pip 21.2 and above is ideal for this
 installation. It is recommended to update these for your installation.
 
-.. important::
-
-   Python 3.11 is now supported by NMMA!
 
 Install mpi4py:
 
@@ -193,31 +190,26 @@ requirements.txt file which are necessary for NMMA:
 
    There is an issue pip installing ``pyfftw`` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
-``$ pip install importlib_resources``
-
-``$ pip install  extinction``
-
-``$ pip install dill``
-
-``$ pip install multiprocess``
-
-``$ pip install lalsuite``
-
-``$ pip install python-ligo-lw``
-
-``$ pip install sncosmo``
-
-``$ pip install scikit-learn``
-
-``$ pip install joblib``
-
-``$ conda install -c conda-forge p-tqdm``
+.. code::
+   
+   pip install importlib_resources
+   pip install  extinction
+   pip install dill
+   pip install multiprocess
+   pip install lalsuite
+   pip install python-ligo-lw
+   pip install sncosmo
+   pip install scikit-learn
+   pip install joblib
+   conda install -c conda-forge p-tqdm
 
 .. note::
 
    If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies if not covered by ``pip install .``. Also, if running ``pip install .`` shows something on the lines of "cannot cythonize without cython", do:
 
-``conda install -c anaconda cython==0.29.24`` and redo ``pip install .``.
+.. code::
+   conda install -c anaconda cython==0.29.24
+   pip install
 
 .. _arm64mac:
 
@@ -355,7 +347,7 @@ If you want to install a custom lalsuite version (e.g. with a certain GW templat
 
 .. code::
 
-   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.8
+   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.9
    conda activate YOUR_PREFIX
 
 and then installing mpi4py first before installing the required packages for the build process (here the second line):
