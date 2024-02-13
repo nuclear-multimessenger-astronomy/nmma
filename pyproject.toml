@@ -31,10 +31,10 @@ classifiers = [
 
 
 [project.urls]
-homepage = "https://github.com/nuclear-multimessenger-astronomy/nmma"
-documentation = "https://nuclear-multimessenger-astronomy.github.io/nmma/"
-download = "https://pypi.org/project/nmma/#files"
-tracker = "https://github.com/nuclear-multimessenger-astronomy/nmma/issues"
+Homepage = "https://github.com/nuclear-multimessenger-astronomy/nmma"
+Documentation = "https://nuclear-multimessenger-astronomy.github.io/nmma/"
+Download = "https://pypi.org/project/nmma/#files"
+Tracker = "https://github.com/nuclear-multimessenger-astronomy/nmma/issues"
 
 
 dynamic = ["dependencies", "optional-dependencies", "version"]
