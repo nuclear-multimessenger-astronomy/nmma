@@ -28,15 +28,6 @@ classifiers = [
     'Operating System :: MacOS',
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 ]
-
-
-[project.urls]
-homepage = "https://github.com/nuclear-multimessenger-astronomy/nmma"
-documentation = "https://nuclear-multimessenger-astronomy.github.io/nmma/"
-download = "https://pypi.org/project/nmma/#files"
-tracker = "https://github.com/nuclear-multimessenger-astronomy/nmma/issues"
-
-
 dynamic = ["dependencies", "optional-dependencies", "version"]
 
 
@@ -75,6 +66,11 @@ gwem-Hubble-estimate = "nmma.em.gwem_Hubble_estimate:main"
 convert-skyportal-lcs = "tools.convert_skyportal_lcs:main"
 resample-grid = "tools.resample_grid:main"
 
+[project.urls]
+Homepage = "https://github.com/nuclear-multimessenger-astronomy/nmma"
+Documentation = "https://nuclear-multimessenger-astronomy.github.io/nmma/"
+Download = "https://pypi.org/project/nmma/#files"
+Tracker = "https://github.com/nuclear-multimessenger-astronomy/nmma/issues"
 
 [tool.setuptools]
 packages = ["nmma"]
