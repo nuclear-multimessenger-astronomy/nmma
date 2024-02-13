@@ -28,6 +28,15 @@ classifiers = [
     'Operating System :: MacOS',
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 ]
+
+
+[project.urls]
+homepage = "https://github.com/nuclear-multimessenger-astronomy/nmma"
+documentation = "https://nuclear-multimessenger-astronomy.github.io/nmma/"
+download = "https://pypi.org/project/nmma/#files"
+tracker = "https://github.com/nuclear-multimessenger-astronomy/nmma/issues"
+
+
 dynamic = ["dependencies", "optional-dependencies", "version"]
 
 
