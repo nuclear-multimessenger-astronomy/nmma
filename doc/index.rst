@@ -190,31 +190,26 @@ requirements.txt file which are necessary for NMMA:
 
    There is an issue pip installing ``pyfftw`` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
-``$ pip install importlib_resources``
-
-``$ pip install  extinction``
-
-``$ pip install dill``
-
-``$ pip install multiprocess``
-
-``$ pip install lalsuite``
-
-``$ pip install python-ligo-lw``
-
-``$ pip install sncosmo``
-
-``$ pip install scikit-learn``
-
-``$ pip install joblib``
-
-``$ conda install -c conda-forge p-tqdm``
+.. code::
+   
+   pip install importlib_resources
+   pip install  extinction
+   pip install dill
+   pip install multiprocess
+   pip install lalsuite
+   pip install python-ligo-lw
+   pip install sncosmo
+   pip install scikit-learn
+   pip install joblib
+   conda install -c conda-forge p-tqdm
 
 .. note::
 
    If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies if not covered by ``pip install .``. Also, if running ``pip install .`` shows something on the lines of "cannot cythonize without cython", do:
 
-``conda install -c anaconda cython==0.29.24`` and redo ``pip install .``.
+.. code::
+   conda install -c anaconda cython==0.29.24
+   pip install
 
 .. _arm64mac:
 
