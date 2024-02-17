@@ -16,7 +16,7 @@ RUN apt-get install -y \
 WORKDIR /work
 
 # Clone a Git repository using the provided credentials
-RUN git clone https://github.com/FabioRagosta/nmma/
+RUN git clone https://github.com/nuclear-multimessenger-astronomy/nmma/
 
 # Set the working directory to the cloned repository
 WORKDIR /work/nmma
