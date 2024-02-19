@@ -25,6 +25,7 @@ RUN apt-get update
 RUN apt-get install -y libopenmpi-dev openmpi-bin openmpi-doc
 RUN apt install -y python3-mpi4py
 #install dependencies
+RUN pip3 install numpy
 RUN pip3 install -r /work/nmma/doc_requirements.txt -r /work/nmma/grb_requirements.txt -r /work/nmma/production_requirements.txt -r /work/nmma/requirements.txt
 
 # Clone and build Multinest
