@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
 env:
-  REGISTRY_IMAGE: nmma/nmma_api
+  REGISTRY_IMAGE: nmma/nmma
 
 jobs:
   build:
