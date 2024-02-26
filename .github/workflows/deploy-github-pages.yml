@@ -6,7 +6,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -45,7 +44,7 @@ jobs:
         touch doc/_build/html/.nojekyll
 
     - name: Deploy to GitHub Pages
-      if: success()
+      if: success() && github.repository_owner == 'nuclear-multimessenger-astronomy'
       uses: crazy-max/ghaction-github-pages@v2
       with:
         target_branch: gh-pages
