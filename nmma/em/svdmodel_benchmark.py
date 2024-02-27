@@ -87,7 +87,7 @@ def get_parser():
     parser.add_argument(
         "--filters",
         type=str,
-        help="A space-seperated list of filters to use (e.g. ztfg,ztfr,ztfi). If none is provided, will use all the filters available",
+        help="A comma-seperated list of filters to use (e.g. ztfg,ztfr,ztfi). If none is provided, will use all the filters available",
     )
     parser.add_argument(
         "--ncpus",
