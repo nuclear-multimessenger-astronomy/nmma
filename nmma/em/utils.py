@@ -45,6 +45,37 @@ import warnings
 
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
+# Define default filters variable for import in other parts of the code
+DEFAULT_FILTERS = [
+    "bessellux",
+    "bessellb",
+    "bessellv",
+    "bessellr",
+    "besselli",
+    "sdssu",
+    "ps1::g",
+    "ps1::r",
+    "ps1::i",
+    "ps1::z",
+    "ps1::y",
+    "uvot::b",
+    "uvot::u",
+    "uvot::uvm2",
+    "uvot::uvw1",
+    "uvot::uvw2",
+    "uvot::v",
+    "uvot::white",
+    "atlasc",
+    "atlaso",
+    "2massj",
+    "2massh",
+    "2massks",
+    "ztfg",
+    "ztfr",
+    "ztfi",
+    "ultrasat",
+]
+
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
@@ -124,20 +155,22 @@ def getRedShift(parameters):
             z = 0.0
     return z
 
+
 def get_all_bandpass_metadata():
     """
     Retrieves and combines the metadata for all registered bandpasses and interpolators.
-    
+
     Returns:
         list: Combined list of metadata dictionaries from bandpasses and interpolators for sncosmo.
     """
-    
+
     bandpass_metadata = _BANDPASSES.get_loaders_metadata()
     interpolator_metadata = _BANDPASS_INTERPOLATORS.get_loaders_metadata()
-    
+
     combined_metadata = bandpass_metadata + interpolator_metadata
-    
+
     return combined_metadata
+
 
 def getFilteredMag(mag, filt):
     unprocessed_filt = [
@@ -223,7 +256,7 @@ def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
 def interpolate_nans(data: dict) -> dict:
     """
     Interpolates the NaN values in a photometric data.
-    
+
     Args:
         data (dict): Dictionary containing photometric data. The keys correspond to the filenames
         of the data. The values are dictionaries of which the keys correspond to time (t) or the filters considered.
@@ -293,13 +326,13 @@ def get_default_filts_lambdas(filters=None):
     for val in get_all_bandpass_metadata():
         try:
             bandpass = sncosmo.get_bandpass(val["name"])
-        except Exception :
+        except Exception:
             if val["name"] == "ultrasat":
                 bandpass = sncosmo.get_bandpass(val["name"], 3)
                 bandpass.name = bandpass.name.split()[0]
 
         bandpasses.append(bandpass)
-        
+
     filts = filts + [band.name for band in bandpasses]
     lambdas = np.concatenate([lambdas, [1e-10 * band.wave_eff for band in bandpasses]])
 
@@ -353,12 +386,12 @@ def get_default_filts_lambdas(filters=None):
 def calc_lc(
     tt: np.array,
     param_list: np.array,
-    svd_mag_model: SVDTrainingModel=None,
-    svd_lbol_model: SVDTrainingModel=None,
-    mag_ncoeff: int=None,
-    lbol_ncoeff: int=None,
-    interpolation_type: str="sklearn_gp",
-    filters: list=None,
+    svd_mag_model: SVDTrainingModel = None,
+    svd_lbol_model: SVDTrainingModel = None,
+    mag_ncoeff: int = None,
+    lbol_ncoeff: int = None,
+    interpolation_type: str = "sklearn_gp",
+    filters: list = None,
 ) -> "tuple[np.array, np.array, np.array]":
     """
     Computes the lightcurve from a surrogate model, given the model parameters.
@@ -595,7 +628,7 @@ def fluxDensity(t, nu, **params):
 def grb_lc(t_day, Ebv, param_dict, filters=None):
     day = 86400.0  # in seconds
     tStart = (np.amin(t_day)) * day
-    tStart = max(10**(-5) * day, tStart)
+    tStart = max(10 ** (-5) * day, tStart)
     tEnd = (np.amax(t_day) + 1) * day
     tnode = min(len(t_day), 201)
     default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
@@ -682,8 +715,9 @@ def sn_lc(
 
     # regularize the absolute magnitude
     abs_mag -= Planck18.distmod(z).value
-    model.set_source_peakabsmag(abs_mag, regularize_band,
-                                regularize_system, cosmo=Planck18)
+    model.set_source_peakabsmag(
+        abs_mag, regularize_band, regularize_system, cosmo=Planck18
+    )
 
     if Ebv != 0.0:
         ext = extinctionFactorP92SMC(nus, Ebv, z)
@@ -1082,7 +1116,9 @@ def blackbody_constant_temperature(t_day, param_dict, filters=None):
     Mpc = astropy.constants.pc.cgs.value * 1e6
 
     # fetch parameters
-    bb_luminosity = param_dict["bb_luminosity"]  # blackboady's total luminosity in erg/s
+    bb_luminosity = param_dict[
+        "bb_luminosity"
+    ]  # blackboady's total luminosity in erg/s
     temperature = param_dict["temperature"]  # blackbody's temperature in K
     z = param_dict["z"]
     Ebv = param_dict["Ebv"]
