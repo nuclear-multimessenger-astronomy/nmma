@@ -184,9 +184,7 @@ def get_model(
         [f"{base_url}/{core_model_name}.{core_format}"] if not filters_only else []
     ) + [f"{base_url}/{model_name}/{f}.{filter_format}" for f in filters]
 
-    missing = [
-        (f"{u}.lzma", f"{f}.lzma") for u, f in zip(urls, filepaths) if not f.exists()
-    ]
+    missing = [(f"{u}", f"{f}") for u, f in zip(urls, filepaths) if not f.exists()]
     if len(missing) > 0:
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
