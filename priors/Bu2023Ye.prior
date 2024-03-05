@@ -3,7 +3,6 @@ vej_dyn = Uniform(name='vej_dyn', minimum=0.12, maximum=0.25, latex_label='$V^{\
 Yedyn = Uniform(name='Yedyn', minimum=0.15, maximum=0.30, latex_label='$Y_{\\rm{e dyn}}$')
 log10_mej_wind = Uniform(name='log10_mej_wind', minimum=-2., maximum=-0.89, latex_label='$\\log_{10}M^{\\rm{wind}}_{\\rm{ej}}$')
 vej_wind = Uniform(name='vej_wind', minimum=0.03, maximum=0.15, latex_label='$V^{\\rm{wind}}_{\\rm{ej}}$')
-Yedyn = Uniform(name='Yewind', minimum=0.15, maximum=0.30, latex_label='$Y_{\\rm{e wind}}$')
 Yewind = Uniform(name='Yewind', minimum=0.20, maximum=0.40, latex_label='$Y_{\\rm{e wind}}$')
 inclination_EM = Sine(name='inclination_EM', minimum=0., maximum=np.pi/2., latex_label='$\\iota$')
 luminosity_distance = Uniform(minimum=0.0, maximum=200., name='luminosity_distance',latex_label='$D_L$')

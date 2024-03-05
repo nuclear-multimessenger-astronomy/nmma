@@ -84,9 +84,8 @@ def get_parser():
     )
     parser.add_argument(
         "--filters",
-        nargs="+",
         type=str,
-        help="A space-seperated list of filters to use (e.g. g r i). If none is provided, will use all the filters available",
+        help="A comma-seperated list of filters to use (e.g. ztfg,ztfr,ztfi). If none is provided, will use all the filters available",
     )
     parser.add_argument(
         "--ncpus",
@@ -161,6 +160,22 @@ def create_benchmark(
     model_function = MODEL_FUNCTIONS[model]
     grid_training_data, parameters = model_function(grid_data)
 
+    # get the filts
+    if not filters:
+        first_entry_name = list(grid_training_data.keys())[0]
+        first_entry = grid_training_data[first_entry_name]
+        filts = first_entry.keys() - set(["t"] + parameters)
+        filts = list(filts)
+    elif isinstance(filters, str):
+        filts = filters.replace(" ", "")  # remove all whitespace
+        filts = filts.split(",")
+    else:
+        # list input from analysis test code
+        filts = filters
+
+    if len(filts) == 0:
+        raise ValueError("Need at least one valid filter.")
+
     # create the SVDlight curve model
     sample_times = np.arange(tmin, tmax + dt, dt)
     light_curve_model = SVDLightCurveModel(
@@ -169,18 +184,9 @@ def create_benchmark(
         svd_path=svd_path,
         mag_ncoeff=svd_ncoeff,
         interpolation_type=interpolation_type,
-        filters=filters,
+        filters=filts,
         local_only=local_only,
     )
-
-    # get the filts
-    if not filters:
-        first_entry_name = list(grid_training_data.keys())[0]
-        first_entry = grid_training_data[first_entry_name]
-        filts = first_entry.keys() - set(["t"] + parameters)
-        filts = list(filts)
-    else:
-        filts = filters
 
     print(f"Benchmarking model {model} on filter {filts} with {ncpus} cpus")
 

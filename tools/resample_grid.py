@@ -96,7 +96,7 @@ class Grid:
                 new_file.copy(original_obj, key)
 
 
-if __name__ == "__main__":
+def get_parser():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -143,7 +143,13 @@ if __name__ == "__main__":
         help="Random seed for numpy",
     )
 
-    args = parser.parse_args()
+    return parser
+
+
+def main(args=None):
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
 
     if not args.gridpath.endswith(".h5"):
         raise ValueError(

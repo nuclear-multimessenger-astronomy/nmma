@@ -7,7 +7,7 @@
 </p>
 
 
-<div align="center"> 
+<div align="center">
    <h1>NMMA</h1>
    <h2>a pythonic library for probing nuclear physics and cosmology with multimessenger analysis</h2>
    <br/><br/>
@@ -47,3 +47,16 @@ When utilizing this code for a publication, kindly make a reference to the packa
       url={https://doi.org/10.1038/s41467-023-43932-6}
 }
 ```
+
+### Acknowledgments
+If you benefited from participating in our community, we ask that you please acknowledge the Nuclear Multi-Messenger Astronomy collaboration, and particular individuals who helped you, in any publications.
+Please use the following text for this acknowledgment:
+  > We acknowledge the Nuclear Multi-Messenger Astronomy collective as an open community of multi-domain experts and collaborators. This community and \<names of individuals\>, in particular, were important for the development of this project.
+
+### Funding
+We gratefully acknowledge previous and current support from the U.S. National Science Foundation (NSF) Harnessing the Data Revolution (HDR) Institute for <a href="https://a3d3.ai">Accelerating AI Algorithms for Data Driven Discovery (A3D3)</a> under Cooperative Agreement No. <a href="https://www.nsf.gov/awardsearch/showAward?AWD_ID=2117997">PHY-2117997</a> and the European Research Council (ERC) under the European Union's Starting Grant (Grant No. <a href="https://doi.org/10.3030/101076369">101076369</a>).
+
+<p align="center">
+<img src="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/assets/a3d3.png" alt="A3D3" width="200"/>
+<img src="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/assets/nsf.png" alt="NSF" width="200"/>
+<img src="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/assets/erc.png" alt="ERC" width="200"/>

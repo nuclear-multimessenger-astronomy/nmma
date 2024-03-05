@@ -422,7 +422,10 @@ def analysis(args):
     print("Creating light curve model for inference")
 
     if args.filters:
-        filters = args.filters.split(",")
+        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+        if len(filters) == 0:
+            raise ValueError("Need at least one valid filter.")
     else:
         filters = None
 
@@ -701,6 +704,18 @@ def analysis(args):
         check_point_delta_t=3600,
         **sampler_kwargs,
     )
+
+    # check if it is running under mpi
+    try:
+        from mpi4py import MPI
+        rank = MPI.COMM_WORLD.Get_rank()
+        if rank == 0:
+            pass
+        else:
+            return
+
+    except ImportError:
+        pass
 
     result.save_posterior_samples()
 

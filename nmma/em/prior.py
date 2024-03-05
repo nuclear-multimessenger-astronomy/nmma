@@ -85,20 +85,21 @@ def create_prior_from_args(model_names, args):
         priors = bilby.gw.prior.PriorDict(args.prior)
 
     # setup for Ebv
-    if args.Ebv_max > 0.0 and args.use_Ebv:
-        Ebv_c = 1.0 / (0.5 * args.Ebv_max)
-        priors["Ebv"] = bilby.core.prior.Interped(
-            name="Ebv",
-            minimum=0.0,
-            maximum=args.Ebv_max,
-            latex_label="$E(B-V)$",
-            xx=[0, args.Ebv_max],
-            yy=[Ebv_c, 0],
-        )
-    else:
-        priors["Ebv"] = bilby.core.prior.DeltaFunction(
-            name="Ebv", peak=0.0, latex_label="$E(B-V)$"
-        )
+    if 'Ebv' not in priors:
+        if args.Ebv_max > 0.0 and args.use_Ebv:
+            Ebv_c = 1.0 / (0.5 * args.Ebv_max)
+            priors["Ebv"] = bilby.core.prior.Interped(
+                name="Ebv",
+                minimum=0.0,
+                maximum=args.Ebv_max,
+                latex_label="$E(B-V)$",
+                xx=[0, args.Ebv_max],
+                yy=[Ebv_c, 0],
+            )
+        else:
+            priors["Ebv"] = bilby.core.prior.DeltaFunction(
+                name="Ebv", peak=0.0, latex_label="$E(B-V)$"
+            )
 
     # re-setup the prior if the conditional prior for inclination is used
 

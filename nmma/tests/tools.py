@@ -1,6 +1,8 @@
 import os
+from argparse import Namespace
 
-from tools.resample_grid import Grid
+from tools import resample_grid
+from tools import convert_skyportal_lcs
 
 
 def test_resampling():
@@ -10,15 +12,39 @@ def test_resampling():
     base_filename = "lcs"
     gridpath = os.path.join(workingDir, "data", "lowmass_collapsar_updated.h5")
 
-    grid = Grid(
+    # Start with downsampling by 5x, no shuffle
+    args = Namespace(
         gridpath=gridpath,
         random_seed=21,
         base_dirname=base_dirname,
         base_filename=base_filename,
+        do_downsample=True,
+        do_fragment=False,
+        factor=5,
+        shuffle=False,
+    )
+    resample_grid.main(args)
+
+    # Downsample by 5x, shuffle
+    args.shuffle = True
+    resample_grid.main(args)
+
+    # Fragment by 5x, shuffle
+    args.do_downsample = False
+    args.do_fragment = True
+    resample_grid.main(args)
+
+    # Fragment by 5x, no shuffle
+    args.shuffle = False
+    resample_grid.main(args)
+
+
+def test_lc_conversion():
+    workingDir = os.path.dirname(__file__)
+    filepath = os.path.join(workingDir, "data", "ZTF23aaxeacr_partial.csv")
+
+    args = Namespace(
+        filepath=filepath,
     )
 
-    grid.downsample(factor=5, shuffle=False)
-    grid.downsample(factor=5, shuffle=True)
-
-    grid.fragment(factor=5, shuffle=False)
-    grid.fragment(factor=5, shuffle=True)
+    convert_skyportal_lcs.main(args)
