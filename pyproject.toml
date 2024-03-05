@@ -72,8 +72,8 @@ Documentation = "https://nuclear-multimessenger-astronomy.github.io/nmma/"
 Download = "https://pypi.org/project/nmma/#files"
 Tracker = "https://github.com/nuclear-multimessenger-astronomy/nmma/issues"
 
-[tool.setuptools]
-packages = ["nmma"]
+[tool.setuptools.packages.find]
+include = ["nmma*"]
 
 [tool.setuptools.package-data]
 gwemopt = ['data/*/*']
