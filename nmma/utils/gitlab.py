@@ -189,9 +189,7 @@ def get_model(
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
 
-        print(
-            f"downloading {len(missing)} and decompressing files for model {model_name}:"
-        )
+        print(f"downloading {len(missing)} files for model {model_name}:")
         with ThreadPoolExecutor(
             max_workers=min(len(missing), max(cpu_count(), 8))
         ) as executor:
