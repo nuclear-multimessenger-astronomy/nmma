@@ -109,7 +109,7 @@ def get_parser():
         "--local-only",
         action="store_true",
         default=False,
-        help="only look for local svdmodels (ignore Zenodo)",
+        help="only look for local svdmodels (ignore Gitlab)",
     )
 
     return parser

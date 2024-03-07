@@ -3,7 +3,7 @@
 
 NMMA will be under continuous development meaning that new astrophysical models such as for kilonovae, supernovae, gamma-ray bursts and so on will be implemented over time. Therefore, it is worthwhile to check out the `model_parameters_dict` in models.py from time to time.
 
-We make the interpolated models available here: https://zenodo.org/record/8039909, https://gitlab.com/Theodlz/nmma-models which are automatically downloaded upon their first request.
+We make the interpolated models available here: https://gitlab.com/Theodlz/nmma-models which are automatically downloaded upon their first request.
 
 ### Kilonovae
 

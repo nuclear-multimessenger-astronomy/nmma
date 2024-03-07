@@ -70,7 +70,7 @@ def get_parser():
         "--filters",
         type=str,
         help="A comma seperated list of filters to use (e.g. sdssu,2massh,2massj). If none is provided, will use all the default filters",
-        default = "ztfr,ztfg,ztfi"
+        default="ztfr,ztfg,ztfi",
     )
     parser.add_argument(
         "--generation-seed",
@@ -191,7 +191,7 @@ def get_parser():
         "--refresh-models-list",
         type=bool,
         default=False,
-        help="Refresh the list of models available on Zenodo",
+        help="Refresh the list of models available on Gitlab",
     )
     parser.add_argument(
         "--xlim",
@@ -223,7 +223,7 @@ def get_parser():
         "--local-only",
         action="store_true",
         default=False,
-        help="only look for local svdmodels (ignore Zenodo)",
+        help="only look for local svdmodels (ignore Gitlab)",
     )
 
     return parser

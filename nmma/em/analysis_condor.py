@@ -283,7 +283,7 @@ def main():
         "--refresh-models-list",
         type=bool,
         default=False,
-        help="Refresh the list of models available on Zenodo",
+        help="Refresh the list of models available on Gitlab",
     )
     args = parser.parse_args()
 

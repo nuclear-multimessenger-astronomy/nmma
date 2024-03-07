@@ -361,13 +361,13 @@ def get_parser(**kwargs):
         "--refresh-models-list",
         type=bool,
         default=False,
-        help="Refresh the list of models available on Zenodo",
+        help="Refresh the list of models available on Gitlab",
     )
     parser.add_argument(
         "--local-only",
         action="store_true",
         default=False,
-        help="only look for local svdmodels (ignore Zenodo)",
+        help="only look for local svdmodels (ignore Gitlab)",
     )
 
     parser.add_argument(
@@ -708,6 +708,7 @@ def analysis(args):
     # check if it is running under mpi
     try:
         from mpi4py import MPI
+
         rank = MPI.COMM_WORLD.Get_rank()
         if rank == 0:
             pass
