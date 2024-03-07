@@ -72,10 +72,10 @@ def inclination_prior_from_fit(priors, args):
 
     # check if the sky location is input
     # if not, the maximum posterior point is taken
-    if args.ra and args.dec:
-        print(f"Using the input sky location ra={args.ra}, dec={args.dec}")
-        ra = args.ra
-        dec = args.dec
+    if 'ra' in priors and 'dec' in priors:
+        ra = priors['ra'].peak
+        dec = priors['dec'].peak
+        print(f"Using the input sky location ra={ra}, dec={dec}")
         # convert them back to theta and phi
         phi = np.deg2rad(ra)
         theta = 0.5 * np.pi - np.deg2rad(dec)

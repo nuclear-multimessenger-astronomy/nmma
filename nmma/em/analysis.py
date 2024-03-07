@@ -378,6 +378,16 @@ def get_parser(**kwargs):
     )
 
     parser.add_argument(
+        "--fit-file",
+        help="Fit files output from Bayestar, to be used for constructing dL-iota prior"
+    )
+    parser.add_argument(
+        "--cosiota-node-num",
+        help="Number of cos-iota nodes used in the Bayestar fit (default: 10)",
+        default=10,
+    )
+
+    parser.add_argument(
         "--skip-sampling",
         help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.",
         action="store_true",
