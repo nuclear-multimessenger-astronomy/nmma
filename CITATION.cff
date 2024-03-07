@@ -3,7 +3,7 @@ title: "NMMA"
 abstract: "An updated nuclear-physics and multi-messenger astrophysics framework for binary neutron star mergers"
 message: "If you use this code, please cite this repository along with the paper"
 repository-code: "https://github.com/nuclear-multimessenger-astronomy/nmma"
-doi: "10.5281/zenodo.8039909"
+url: "https://gitlab.com/Theodlz/nmma-models"
 license: "GPL-3.0"
 authors:
 - given-names: "Peter"
