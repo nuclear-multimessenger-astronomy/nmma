@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 
 pbar = {}
 
-SOURCES = ["gitlab", "zenodo"]
+SOURCES = ["gitlab"]
 
 # X-ray and Radio data
 SKIP_FILTERS = [
@@ -86,9 +86,7 @@ def decompress(file_path):
 
 def get_parser():
 
-    parser = argparse.ArgumentParser(
-        description="Download SVD models from GitLab or Zenodo"
-    )
+    parser = argparse.ArgumentParser(description="Download SVD models from GitLab")
     parser.add_argument(
         "--model", type=str, required=True, help="Name the model to be used"
     )
@@ -106,13 +104,13 @@ def get_parser():
         "--refresh-models-list",
         type=bool,
         default=False,
-        help="Refresh the list of models available on Zenodo",
+        help="Refresh the list of models available on Gitlab",
     )
     parser.add_argument(
         "--source",
         type=str,
         default="gitlab",
-        help="Source of the models list. Must be one of ['zenodo', 'gitlab']. Default is 'gitlab'",
+        help="Source of the models list. Must be one of ['gitlab']. Default is 'gitlab'",
     )
 
     return parser

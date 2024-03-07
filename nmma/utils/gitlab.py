@@ -164,8 +164,8 @@ def get_model(
                 f'models list from GitLab does not have filters {",".join(missing_filters)} for {model_name}'
             )
 
-    core_format = "pkl"
-    filter_format = "pkl"
+    core_format = "joblib"
+    filter_format = "joblib"
     if "_tf" in model_name:
         filter_format = "h5"
 
@@ -184,16 +184,12 @@ def get_model(
         [f"{base_url}/{core_model_name}.{core_format}"] if not filters_only else []
     ) + [f"{base_url}/{model_name}/{f}.{filter_format}" for f in filters]
 
-    missing = [
-        (f"{u}.lzma", f"{f}.lzma") for u, f in zip(urls, filepaths) if not f.exists()
-    ]
+    missing = [(f"{u}", f"{f}") for u, f in zip(urls, filepaths) if not f.exists()]
     if len(missing) > 0:
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
 
-        print(
-            f"downloading {len(missing)} and decompressing files for model {model_name}:"
-        )
+        print(f"downloading {len(missing)} files for model {model_name}:")
         with ThreadPoolExecutor(
             max_workers=min(len(missing), max(cpu_count(), 8))
         ) as executor:

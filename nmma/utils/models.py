@@ -5,16 +5,14 @@ def refresh_models_list(models_home=None, source=None):
 
     if source is None:
         source = SOURCES[0]
-    if source not in ["zenodo", "gitlab"]:
-        raise ValueError(f"source must be one of ['gitlab', 'zenodo'], got {source}")
+    if source not in ["gitlab"]:
+        raise ValueError(f"source must be one of ['gitlab'], got {source}")
 
     sources_tried = []
     while True:
         try:
             if source == "gitlab":
                 from .gitlab import refresh_models_list
-            elif source == "zenodo":
-                from .zenodo import refresh_models_list
             models = refresh_models_list(models_home=models_home)
             break
         except Exception as e:
@@ -41,16 +39,14 @@ def get_model(
 
     if source is None:
         source = SOURCES[0]
-    if source not in ["zenodo", "gitlab"]:
-        raise ValueError(f"source must be one of ['gitlab', 'zenodo'], got {source}")
+    if source not in ["gitlab"]:
+        raise ValueError(f"source must be one of ['gitlab'], got {source}")
 
     sources_tried = []
     while True:
         try:
             if source == "gitlab":
                 from .gitlab import get_model
-            elif source == "zenodo":
-                from .zenodo import get_model
 
             files, filters = get_model(
                 models_home=models_home,
@@ -81,10 +77,8 @@ def main(args=None):
 
     if args.source is None:
         args.source = SOURCES[0]
-    if args.source not in ["zenodo", "gitlab"]:
-        raise ValueError(
-            f"source must be one of ['gitlab', 'zenodo'], got {args.source}"
-        )
+    if args.source not in ["gitlab"]:
+        raise ValueError(f"source must be one of ['gitlab'], got {args.source}")
 
     refresh = False
     try:

@@ -32,9 +32,7 @@ def get_parser():
     parser.add_argument(
         "--svd-path",
         type=str,
-        help="Path to the SVD directory, \
-              with {model}_mag.pkl, {model}_lbol.pkl or {model_tf.pkl}",
-        required=True,
+        help="Path to the SVD directory with {model}.joblib",
     )
     parser.add_argument(
         "--data-path",
@@ -111,7 +109,7 @@ def get_parser():
         "--local-only",
         action="store_true",
         default=False,
-        help="only look for local svdmodels (ignore Zenodo)",
+        help="only look for local svdmodels (ignore Gitlab)",
     )
 
     return parser

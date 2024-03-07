@@ -37,7 +37,7 @@ class MultiMessengerLikelihood(Likelihood):
     light_curve_model_name: str
         Name of the kilonova model to be used
     light_curve_SVD_path: str
-        Path to the SVD pickles for the light curve model
+        Path to the SVD files for the light curve model
     em_trigger_time: float
         GPS time of the kilonova trigger in days
     mag_ncoeff: int

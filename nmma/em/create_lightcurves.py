@@ -27,7 +27,7 @@ def get_parser():
         "--svd-path",
         type=str,
         default="svdmodels",
-        help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
+        help="Path to the SVD directory with {model}.joblib",
     )
     parser.add_argument(
         "--outdir", type=str, required=True, help="Path to the output directory"
@@ -70,7 +70,7 @@ def get_parser():
         "--filters",
         type=str,
         help="A comma seperated list of filters to use (e.g. sdssu,2massh,2massj). If none is provided, will use all the default filters",
-        default = "ztfr,ztfg,ztfi"
+        default="ztfr,ztfg,ztfi",
     )
     parser.add_argument(
         "--generation-seed",
@@ -191,7 +191,7 @@ def get_parser():
         "--refresh-models-list",
         type=bool,
         default=False,
-        help="Refresh the list of models available on Zenodo",
+        help="Refresh the list of models available on Gitlab",
     )
     parser.add_argument(
         "--xlim",
@@ -218,12 +218,12 @@ def get_parser():
         help="Change seed for every injection",
         action="store_true",
     )
-    
+
     parser.add_argument(
         "--local-only",
         action="store_true",
         default=False,
-        help="only look for local svdmodels (ignore Zenodo)",
+        help="only look for local svdmodels (ignore Gitlab)",
     )
 
     return parser
@@ -410,9 +410,9 @@ def main(args=None):
 
         fig = plt.figure()
 
-        #filts = list(set(mag_ds[index].keys()).difference({"t"}))
+        # filts = list(set(mag_ds[index].keys()).difference({"t"}))
         filts = filters
-        
+
         ncols = 1
         nrows = int(np.ceil(len(filts) / ncols))
         gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
@@ -467,7 +467,7 @@ def main(args=None):
             ylim = [float(x) for x in ylim]
             plt.ylim(ylim)
 
-            #ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
+            # ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
             ax.set_ylabel(filt, fontsize=30, rotation=90, labelpad=8)
 
             if ii == len(filts) - 1:

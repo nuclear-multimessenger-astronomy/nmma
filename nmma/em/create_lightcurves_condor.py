@@ -53,7 +53,7 @@ def main():
         "--refresh-models-list",
         type=bool,
         default=False,
-        help="Refresh the list of models available on Zenodo",
+        help="Refresh the list of models available on Gitlab",
     )
     args = parser.parse_args()
 
@@ -63,7 +63,9 @@ def main():
     except AttributeError:
         pass
     if refresh:
-        refresh_models_list(models_home="/home/%s/gwemlightcurves/output/svdmodels" % os.environ["USER"])
+        refresh_models_list(
+            models_home="/home/%s/gwemlightcurves/output/svdmodels" % os.environ["USER"]
+        )
 
     with open(args.injection, "r") as f:
         injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
