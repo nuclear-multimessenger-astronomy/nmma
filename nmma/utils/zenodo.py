@@ -204,8 +204,8 @@ def get_model(
                 f'models list from zenodo does not have filters {",".join(missing_filters)} for {model_name}'
             )
 
-    core_format = "joblib"
-    filter_format = "joblib"
+    core_format = "pkl"
+    filter_format = "pkl"
     if "_tf" in model_name:
         filter_format = "h5"
 
