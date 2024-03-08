@@ -40,6 +40,8 @@ def args():
         sampler_kwargs="{}",
         verbose=False,
         skip_sampling=False,
+        fits_file=None,
+        cosiota_node_num=10
     )
 
     return args

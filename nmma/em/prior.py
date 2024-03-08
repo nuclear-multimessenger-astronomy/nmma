@@ -1,6 +1,7 @@
 import bilby
 import bilby.core
 from bilby.core.prior import Prior
+from bilby.core.prior.interpolated import Interped
 from bilby.core.prior.conditional import ConditionalTruncatedGaussian
 
 
@@ -56,6 +57,92 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
             if key in instantiation_dict:
                 instantiation_dict[key] = value
         return instantiation_dict
+
+
+def inclination_prior_from_fits(priors, args):
+    from ligo.skymap import io, moc
+    from scipy.interpolate import PchipInterpolator
+    from scipy.stats import norm
+    import healpy as hp
+    import numpy as np
+    import matplotlib
+    matplotlib.use("agg")
+    import matplotlib.pyplot as plt
+
+    print("Constructing prior on inclination with fits input")
+
+    # load the skymap
+    skymap = io.read_sky_map(args.fits_file, moc=True)
+
+    # check if the sky location is input
+    # if not, the maximum posterior point is taken
+    if 'ra' in priors and 'dec' in priors:
+        ra = priors['ra'].peak
+        dec = priors['dec'].peak
+        print(f"Using the input sky location ra={ra}, dec={dec}")
+        # convert them back to theta and phi
+        phi = np.deg2rad(ra)
+        theta = 0.5 * np.pi - np.deg2rad(dec)
+        # get the nested_idx
+    else:
+        print("Using the maP point from the fits file input")
+        maP_idx = np.argmax(skymap['PROBDENSITY'])
+        uniq_idx = skymap[maP_idx]['UNIQ']
+        # convert to nested indexing and find the location of that index
+        order, nest_idx = moc.uniq2nest(uniq_idx)
+        nside = hp.order2nside(order)
+        theta, phi = hp.pix2ang(nside, int(nest_idx), nest=True)
+        # convert theta and phi to ra and dec
+        ra = np.rad2deg(phi)
+        dec = np.rad2deg(0.5 * np.pi - theta)
+        print(f"The maP location is ra={ra}, dec={dec}")
+        # fetching the skymap row
+        row = skymap[maP_idx]
+
+    # construct the iota prior
+    cosiota_nodes_num = args.cosiota_node_num
+    cosiota_nodes = np.cos(np.linspace(0, np.pi, cosiota_nodes_num))
+    colnames = ['PROBDENSITY', 'DISTMU', 'DISTSIGMA', 'DISTNORM']
+    # do an all-in-one interpolation
+    prob_density, dist_mu, dist_sigma, dist_norm = (
+        PchipInterpolator(
+            cosiota_nodes[::-1], row['{}_SAMPLES'.format(colname)][::-1],
+        )
+        for colname in colnames)
+    # now have the joint distribution evaluated
+    u = np.linspace(-1, 1, 1000)  # this is cosiota
+    # fetch the fixed distance
+    dL = priors['luminosity_distance'].peak
+    prob_u = prob_density(u) * dist_norm(u) * np.square(dL) * norm(dist_mu(u), dist_sigma(u)).pdf(dL)
+
+    iota = np.arccos(u)
+    prob_iota = prob_u * np.absolute(np.sin(iota))
+    # in GW, iota in [0, pi], but in EM, iota in [0, pi/2]
+    # therefore, we need to do a folding
+    # split the domain in half
+    iota_lt_pi2 = iota[iota < np.pi / 2]
+    prob_lt_pi2, prob_gt_pi2 = prob_iota[iota < np.pi / 2], prob_iota[iota >= np.pi / 2]
+    iota_EM = iota_lt_pi2
+    prob_iota_EM = prob_lt_pi2 + prob_gt_pi2[::-1]
+
+    # normalize
+    prob_iota /= np.trapz(iota_EM, prob_iota_EM)
+
+    priors['inclination_EM'] = Interped(
+        xx=iota_EM,
+        yy=prob_iota_EM,
+        minimum=0,
+        maximum=np.pi / 2)
+
+    if args.plot:
+        figIdx = np.random.randint(1000)
+        plt.figure(figIdx)
+        plt.xlabel('Inclination')
+        plt.ylabel('PDF')
+        plt.plot(iota_EM, prob_iota_EM)
+        plt.savefig(f"{args.outdir}/Fits_motivated_inclination_prior.png")
+
+    return priors
 
 
 def create_prior_from_args(model_names, args):
@@ -118,5 +205,8 @@ def create_prior_from_args(model_names, args):
 
         priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
+
+    if args.fits_file:
+        priors = inclination_prior_from_fits(priors, args)
 
     return priors
