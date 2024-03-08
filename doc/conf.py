@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 import nmma
 
-extensions = ["myst_parser", "sphinx_copybutton"]
+extensions = ["myst_parser", "sphinx_copybutton","sphinx_github_changelog"]
 myst_enable_extensions = [
     "amsmath",
     "colon_fence",
@@ -28,6 +28,8 @@ mathjax_config = {
         "displayMath": [["\\[", "\\]"]],
     },
 }
+
+sphinx_github_changelog_token = os.getenv("SPHINX_GITHUB_CHANGELOG_TOKEN")
 
 
 templates_path = ["_templates"]

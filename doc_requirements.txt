@@ -10,3 +10,4 @@ linkify
 myst-parser
 sphinx-book-theme
 sphinx_copybutton
+sphinx-github-changelog
