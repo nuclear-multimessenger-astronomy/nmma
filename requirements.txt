@@ -17,3 +17,5 @@ ultranest
 tornado
 tensorflow
 notebook
+ligo.skymap
+healpy
