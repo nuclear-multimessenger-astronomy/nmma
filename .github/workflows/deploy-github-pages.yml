@@ -39,6 +39,8 @@ jobs:
         python -m pip install .[doc]
 
     - name: Make dependencies
+      env:
+        SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.SPHINX_GITHUB_CHANGELOG_TOKEN }}
       run: |
         cd doc && make html; cd ../
         touch doc/_build/html/.nojekyll
