@@ -61,14 +61,18 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
 
 def inclination_prior_from_fit(priors, args):
     from ligo.skymap import io, moc
-    from scipy.interpolate import interp1d
+    from scipy.interpolate import PchipInterpolator
     from scipy.stats import norm
     import healpy as hp
+    import numpy as np
+    import matplotlib
+    matplotlib.use("agg")
+    import matplotlib.pyplot as plt
 
     print("Constructing prior on inclination with fits input")
 
     # load the skymap
-    skymap = io.read_sky_map(args.fits_file, moc=True)
+    skymap = io.read_sky_map(args.fit_file, moc=True)
 
     # check if the sky location is input
     # if not, the maximum posterior point is taken
@@ -101,17 +105,18 @@ def inclination_prior_from_fit(priors, args):
     colnames = ['PROBDENSITY', 'DISTMU', 'DISTSIGMA', 'DISTNORM']
     # do an all-in-one interpolation
     prob_density, dist_mu, dist_sigma, dist_norm = (
-        interp1d(
-            cosiota_nodes, row['{}_SAMPLES'.format(colname)], kind='cubic'
+        PchipInterpolator(
+            cosiota_nodes[::-1], row['{}_SAMPLES'.format(colname)][::-1],
         )
         for colname in colnames)
     # now have the joint distribution evaluated
     u = np.linspace(-1, 1, 1000)  # this is cosiota
     # fetch the fixed distance
     dL = priors['luminosity_distance'].peak
-    prob_u = prob_density(u) * dist_norm * np.square(dL) * norm(dist_mu(u), dist_sigma(u)).pdf(u)
+    prob_u = prob_density(u) * dist_norm(u) * np.square(dL) * norm(dist_mu(u), dist_sigma(u)).pdf(dL)
+
     iota = np.arccos(u)
-    prob_iota = prob_u * np.sin(iota)
+    prob_iota = prob_u * np.absolute(np.sin(iota))
     # in GW, iota in [0, pi], but in EM, iota in [0, pi/2]
     # therefore, we need to do a folding
     # split the domain in half
@@ -123,7 +128,19 @@ def inclination_prior_from_fit(priors, args):
     # normalize
     prob_iota /= np.trapz(iota_EM, prob_iota_EM)
 
-    priors['inclination_EM'] = Interped(xx=iota_EM, yy=prob_iota_EM)
+    priors['inclination_EM'] = Interped(
+        xx=iota_EM,
+        yy=prob_iota_EM,
+        minimum = 0,
+        maximum = np.pi / 2)
+
+    if args.plot:
+        figIdx = np.random.randint(1000)
+        plt.figure(figIdx)
+        plt.xlabel('Inclination')
+        plt.ylabel('PDF')
+        plt.plot(iota_EM, prob_iota_EM)
+        plt.savefig(f"{args.outdir}/Fit_motivated_inclination_prior.png")
 
     return priors
 
@@ -188,7 +205,7 @@ def create_prior_from_args(model_names, args):
         priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
 
-    if args.fits_file:
-        priors = inclination_prior_from_fit(priors, args):
+    if args.fit_file:
+        priors = inclination_prior_from_fit(priors, args)
 
     return priors
