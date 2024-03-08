@@ -59,7 +59,7 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
         return instantiation_dict
 
 
-def inclination_prior_from_fit(priors, args):
+def inclination_prior_from_fits(priors, args):
     from ligo.skymap import io, moc
     from scipy.interpolate import PchipInterpolator
     from scipy.stats import norm
@@ -72,7 +72,7 @@ def inclination_prior_from_fit(priors, args):
     print("Constructing prior on inclination with fits input")
 
     # load the skymap
-    skymap = io.read_sky_map(args.fit_file, moc=True)
+    skymap = io.read_sky_map(args.fits_file, moc=True)
 
     # check if the sky location is input
     # if not, the maximum posterior point is taken
@@ -140,7 +140,7 @@ def inclination_prior_from_fit(priors, args):
         plt.xlabel('Inclination')
         plt.ylabel('PDF')
         plt.plot(iota_EM, prob_iota_EM)
-        plt.savefig(f"{args.outdir}/Fit_motivated_inclination_prior.png")
+        plt.savefig(f"{args.outdir}/Fits_motivated_inclination_prior.png")
 
     return priors
 
@@ -206,7 +206,7 @@ def create_prior_from_args(model_names, args):
         priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
 
-    if args.fit_file:
-        priors = inclination_prior_from_fit(priors, args)
+    if args.fits_file:
+        priors = inclination_prior_from_fits(priors, args)
 
     return priors

@@ -378,12 +378,12 @@ def get_parser(**kwargs):
     )
 
     parser.add_argument(
-        "--fit-file",
-        help="Fit files output from Bayestar, to be used for constructing dL-iota prior"
+        "--fits-file",
+        help="Fits file output from Bayestar, to be used for constructing dL-iota prior"
     )
     parser.add_argument(
         "--cosiota-node-num",
-        help="Number of cos-iota nodes used in the Bayestar fit (default: 10)",
+        help="Number of cos-iota nodes used in the Bayestar fits (default: 10)",
         default=10,
     )
 
