@@ -458,6 +458,7 @@ User Guide
    combined_analysis
    Cluster_Resources
    contributing
+   changelog
 
 .. Indices and tables
 .. ==================
