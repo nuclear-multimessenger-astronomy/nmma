@@ -120,7 +120,7 @@ def inclination_prior_from_fit(priors, args):
     # in GW, iota in [0, pi], but in EM, iota in [0, pi/2]
     # therefore, we need to do a folding
     # split the domain in half
-    iota_lt_pi2, iota_gt_pi2 = iota[iota < np.pi / 2], iota[iota >= np.pi / 2]
+    iota_lt_pi2 = iota[iota < np.pi / 2]
     prob_lt_pi2, prob_gt_pi2 = prob_iota[iota < np.pi / 2], prob_iota[iota >= np.pi / 2]
     iota_EM = iota_lt_pi2
     prob_iota_EM = prob_lt_pi2 + prob_gt_pi2[::-1]
@@ -131,8 +131,8 @@ def inclination_prior_from_fit(priors, args):
     priors['inclination_EM'] = Interped(
         xx=iota_EM,
         yy=prob_iota_EM,
-        minimum = 0,
-        maximum = np.pi / 2)
+        minimum=0,
+        maximum=np.pi / 2)
 
     if args.plot:
         figIdx = np.random.randint(1000)
@@ -143,6 +143,7 @@ def inclination_prior_from_fit(priors, args):
         plt.savefig(f"{args.outdir}/Fit_motivated_inclination_prior.png")
 
     return priors
+
 
 def create_prior_from_args(model_names, args):
 
