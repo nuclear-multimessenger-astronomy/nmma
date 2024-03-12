@@ -77,13 +77,28 @@ def inclination_prior_from_fits(priors, args):
     # check if the sky location is input
     # if not, the maximum posterior point is taken
     if 'ra' in priors and 'dec' in priors:
-        ra = priors['ra'].peak
-        dec = priors['dec'].peak
+        ra = np.rad2deg(priors['ra'].peak)
+        dec = np.rad2deg(priors['dec'].peak)
         print(f"Using the input sky location ra={ra}, dec={dec}")
         # convert them back to theta and phi
         phi = np.deg2rad(ra)
         theta = 0.5 * np.pi - np.deg2rad(dec)
-        # get the nested_idx
+        # make use of the maP nside
+        maP_idx = np.argmax(skymap['PROBDENSITY'])
+        order, _ = moc.uniq2nest(skymap[maP_idx]['UNIQ'])
+        nside = hp.order2nside(order)
+        # get the nested idx for the given sky location
+        nest_idx = hp.ang2pix(nside, theta, phi, nest=True)
+        # find the row with the closest nested index
+        nest_idxs = []
+        for row in skymap:
+            order_per_row, nest_idx_per_row = moc.uniq2nest(row['UNIQ'])
+            if order_per_row == order:
+                nest_idxs.append(nest_idx_per_row)
+            else:
+                nest_idxs.append(0)
+        nest_idxs = np.array(nest_idxs)
+        row = skymap[np.argmin(np.absolute(nest_idxs - nest_idx))]
     else:
         print("Using the maP point from the fits file input")
         maP_idx = np.argmax(skymap['PROBDENSITY'])
