@@ -1,3 +1,4 @@
+import json
 import astropy
 from astropy.time import Time
 import h5py
@@ -9,28 +10,35 @@ from sncosmo.bandpasses import _BANDPASSES
 
 
 def loadEvent(filename):
-    lines = [line.rstrip("\n") for line in open(filename)]
-    lines = filter(None, lines)
+    try:
+        lines = [line.rstrip("\n") for line in open(filename)]
+        lines = filter(None, lines)
 
-    sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
-    sncosmo_maps = {name: name.replace(":", "_") for name in sncosmo_filts}
+        sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
+        sncosmo_maps = {name: name.replace(":", "_") for name in sncosmo_filts}
 
-    data = {}
-    for line in lines:
-        lineSplit = line.split(" ")
-        lineSplit = list(filter(None, lineSplit))
-        mjd = Time(lineSplit[0], format="isot").mjd
-        filt = lineSplit[1]
+        data = {}
+        for line in lines:
+            lineSplit = line.split(" ")
+            lineSplit = list(filter(None, lineSplit))
+            mjd = Time(lineSplit[0], format="isot").mjd
+            filt = lineSplit[1]
 
-        if filt in sncosmo_maps:
-            filt = sncosmo_maps[filt]
+            if filt in sncosmo_maps:
+                filt = sncosmo_maps[filt]
 
-        mag = float(lineSplit[2])
-        dmag = float(lineSplit[3])
+            mag = float(lineSplit[2])
+            dmag = float(lineSplit[3])
 
-        if filt not in data:
-            data[filt] = np.empty((0, 3), float)
-        data[filt] = np.append(data[filt], np.array([[mjd, mag, dmag]]), axis=0)
+            if filt not in data:
+                data[filt] = np.empty((0, 3), float)
+            data[filt] = np.append(data[filt], np.array([[mjd, mag, dmag]]), axis=0)
+    ## attempts to load the file with json in the event that the standard method fails
+    except ValueError:
+        with open(filename) as f:
+            data = json.load(f)
+            for key in data.keys():
+                data[key] = np.array(data[key])
 
     return data
 
