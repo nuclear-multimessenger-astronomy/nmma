@@ -79,11 +79,18 @@ def validate_lightcurve(args):
         filter_data = [data[filter][i] for i in filter_data_indices]
         num_observations = sum(1 for value in filter_data[:,1] if value != np.inf and not np.isnan(value))
         num_detections = sum(1 for value in filter_data[:,2] if value != np.inf and not np.isnan(value) and value != 99)
+        num_nondetections = num_observations - num_detections
         if num_detections < args.min_obs:
             print(f"{filter} in lightcurve has {num_detections} detections, less than the required {args.min_obs}")
             return False
         else:
             continue
     print(f"Lightcurve has at least {args.min_obs} detections in the {" ".join(filters_to_check)} filters within the first {args.cutoff_time} days")
-    
+
     return True
+
+def main(args=None):
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args(args)
+    validate_lightcurve(args)
