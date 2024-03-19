@@ -19,6 +19,7 @@ def get_parser(**kwargs):
     parser.add_argument(
         "--data",
         type=str,
+        required=True,
         help="Path to the data file in [time(isot) filter magnitude error] format",
     )
     parser.add_argument(
@@ -41,3 +42,29 @@ def get_parser(**kwargs):
     )
     return parser
 
+def validate_lightcurve(args):
+    """
+    Evaluates whether the lightcurve has the requisite user-defined number of observations in the filters provided within the defined time window from the first observation
+    
+    Args:
+        args (argparse.Namespace): Arguments provided when function is called from command line. See get_parser() for individual arguments.
+    
+    Returns:
+        bool: True if the lightcurve meets the minimum number of observations in the defined time window, False otherwise.
+    """
+    data = loadEvent(args.data)
+    if args.filters:
+        filters_to_check = args.filters.replace(" ", "").split(",")
+    else:
+        filters_to_check = list(data.keys())
+        
+    min_time, max_time = np.inf, -np.inf
+    for key, array in data.items():
+        min_time = np.minimum(min_time, np.min(array[:,0]))
+        max_time = np.maximum(max_time, np.max(array[:,0]))
+    for filter in filters_to_check:
+        if filter not in DEFAULT_FILTERS:
+            raise ValueError(f"Filter {filter} not in supported filter list")
+        elif filter not in data.keys():
+            print(f"{filter} not present in data file, cannot validate")
+            return False
