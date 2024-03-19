@@ -466,6 +466,7 @@ class MultimessengerConversion(object):
         self.ejecta_parameter_conversion = ejectaFitting.ejecta_parameter_conversion
 
     def convert_to_multimessenger_parameters(self, parameters):
+
         converted_parameters = parameters.copy()
         original_keys = list(converted_parameters.keys())
         converted_parameters, added_keys = convert_to_lal_binary_black_hole_parameters(

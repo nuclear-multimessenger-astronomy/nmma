@@ -262,6 +262,7 @@ class AnalysisRun(object):
         if self.zero_likelihood_mode:
             return 0
         parameters = {key: v for key, v in zip(self.sampling_keys, v_array)}
+        parameters['fiducial']=0
         if self.priors.evaluate_constraints(parameters) > 0:
             self.likelihood.parameters.update(parameters)
             return (
