@@ -10,7 +10,12 @@ from sncosmo.bandpasses import _BANDPASSES
 
 
 def loadEvent(filename):
-    try:
+    if filename.endswith(".json"):
+        with open(filename) as f:
+            data = json.load(f)
+            for key in data.keys():
+                data[key] = np.array(data[key])
+    else:
         lines = [line.rstrip("\n") for line in open(filename)]
         lines = filter(None, lines)
 
@@ -33,12 +38,6 @@ def loadEvent(filename):
             if filt not in data:
                 data[filt] = np.empty((0, 3), float)
             data[filt] = np.append(data[filt], np.array([[mjd, mag, dmag]]), axis=0)
-    ## attempts to load the file with json in the event that the standard method fails
-    except ValueError:
-        with open(filename) as f:
-            data = json.load(f)
-            for key in data.keys():
-                data[key] = np.array(data[key])
 
     return data
 
