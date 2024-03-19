@@ -565,15 +565,8 @@ def analysis(args):
             lc.to_csv(args.injection_outfile)
 
     else:
-        # load the kilonova afterglow data
-        try:
-            data = loadEvent(args.data)
-
-        except ValueError:
-            with open(args.data) as f:
-                data = json.load(f)
-                for key in data.keys():
-                    data[key] = np.array(data[key])
+        # load the lightcurve data
+        data = loadEvent(args.data)
 
         if args.trigger_time is None:
             # load the minimum time as trigger time
