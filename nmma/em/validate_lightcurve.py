@@ -38,7 +38,12 @@ def get_parser(**kwargs):
         "--cutoff-time",
         default=0,
         type=float,
-        help="cutoff time (relative to the first data point) that the minimum observations must be in. If not provided, the entire lightcurve will be evaluated",
+        help="Cutoff time (relative to the first data point) that the minimum observations must be in. If not provided, the entire lightcurve will be evaluated",
+    )
+    parser.add_argument(
+        "--silent",
+        action="store_true",
+        help="Suppress output",
     )
     return parser
 
@@ -69,7 +74,7 @@ def validate_lightcurve(args):
         if filter not in DEFAULT_FILTERS:
             raise ValueError(f"Filter {filter} not in supported filter list")
         elif filter not in data.keys():
-            print(f"{filter} not present in data file, cannot validate")
+            print(f"{filter} not present in data file, cannot validate") if not args.silent else None
             return False
         filter_data_indices = np.where(data[filter][:,0] <= max_time)[0]
         filter_data = [data[filter][i] for i in filter_data_indices]
@@ -78,11 +83,11 @@ def validate_lightcurve(args):
         num_observations = sum(1 for value in filter_data if value[1] != np.inf and not np.isnan(value[1]))
         num_detections = sum(1 for value in filter_data if value[2] != np.inf and not np.isnan(value[2]) and value[2] != 99)
         if num_detections < args.min_obs:
-            print(f"{filter} filter has {num_detections} detections, less than the required {args.min_obs}")
+            print(f"{filter} filter has {num_detections} detections, less than the required {args.min_obs}") if not args.silent else None
             return False
         else:
             continue
-    print(f"Lightcurve has at least {args.min_obs} detections in the filters within the first {max_time-min_time} days")
+    print(f"Lightcurve has at least {args.min_obs} detections in the filters within the first {max_time-min_time} days") if not args.silent else None
 
     return True
 
