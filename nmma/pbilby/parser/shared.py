@@ -209,7 +209,7 @@ def _add_eos_settings_to_parser(parser):
 
     return parser
 
-
+    
 def _add_Hubble_settings_to_parser(parser):
     H0_input_parser = parser.add_argument_group(
         title="Hubble input arguments", description="Specify Hubble inputs"
