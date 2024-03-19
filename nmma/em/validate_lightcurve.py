@@ -36,7 +36,7 @@ def get_parser(**kwargs):
     )
     parser.add_argument(
         "--cutoff-time",
-        default='',
+        default=0,
         type=float,
         help="cutoff time (relative to the first data point) that the minimum observations must be in. If not provided, the entire lightcurve will be evaluated",
     )
@@ -61,12 +61,8 @@ def validate_lightcurve(args):
         filters_to_check = list(data.keys())
 
     ## determine time window to consider
-    min_time, max_time = np.inf, -np.inf
-    for key, array in data.items():
-        min_time = np.minimum(min_time, np.min(array[:,0]))
-        max_time = np.maximum(max_time, np.max(array[:,0]))
-    if args.cutoff_time:
-        max_time = min_time + args.cutoff_time
+    min_time = np.min([np.min(array[:,0]) for array in data.values()])
+    max_time = min_time + args.cutoff_time if args.cutoff_time > 0 else np.max([np.max(array[:,0]) for array in data.values()])
 
     ## evaluate lightcurve for each filter
     for filter in filters_to_check:
@@ -75,17 +71,18 @@ def validate_lightcurve(args):
         elif filter not in data.keys():
             print(f"{filter} not present in data file, cannot validate")
             return False
-        filter_data_indices = np.where(data[filter][:,0] <= max_time)
+        filter_data_indices = np.where(data[filter][:,0] <= max_time)[0]
         filter_data = [data[filter][i] for i in filter_data_indices]
-        num_observations = sum(1 for value in filter_data[:,1] if value != np.inf and not np.isnan(value))
-        num_detections = sum(1 for value in filter_data[:,2] if value != np.inf and not np.isnan(value) and value != 99)
-        num_nondetections = num_observations - num_detections
+        
+        ## evaluate the number of detections
+        num_observations = sum(1 for value in filter_data if value[1] != np.inf and not np.isnan(value[1]))
+        num_detections = sum(1 for value in filter_data if value[2] != np.inf and not np.isnan(value[2]) and value[2] != 99)
         if num_detections < args.min_obs:
-            print(f"{filter} in lightcurve has {num_detections} detections, less than the required {args.min_obs}")
+            print(f"{filter} filter has {num_detections} detections, less than the required {args.min_obs}")
             return False
         else:
             continue
-    print(f"Lightcurve has at least {args.min_obs} detections in the {" ".join(filters_to_check)} filters within the first {args.cutoff_time} days")
+    print(f"Lightcurve has at least {args.min_obs} detections in the filters within the first {max_time-min_time} days")
 
     return True
 
