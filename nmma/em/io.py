@@ -10,6 +10,15 @@ from sncosmo.bandpasses import _BANDPASSES
 
 
 def loadEvent(filename):
+    """
+    Reads in lightcurve data from a file and returns data in a dictionary format.
+    
+    Args:
+    - filename (str): Path to lightcurve file
+    
+    Returns:
+    - data (dict): Dictionary containing the lightcurve data from the file. The keys are generally 't' and each of the filters in the file as well as their accompanying error values.
+    """
     if filename.endswith(".json"):
         with open(filename) as f:
             data = json.load(f)
