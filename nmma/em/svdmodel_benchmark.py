@@ -4,6 +4,7 @@ import argparse
 import glob
 import inspect
 from p_tqdm import p_map
+import json
 
 from .model import SVDLightCurveModel
 from .io import read_photometry_files
@@ -133,10 +134,6 @@ def create_benchmark(
     local_only=False,
 ):
 
-    # make the outdir
-    if not os.path.isdir(outdir):
-        os.makedirs(outdir)
-
     # get the grid data file path
     file_extensions = ["dat", "csv", "dat.gz", "h5"]
     filenames = []
@@ -239,13 +236,29 @@ def create_benchmark(
         chi2_dict_array = p_map(
             chi2_func,
             grid_entry_names,
-            data_time_unit=data_time_unit,
+            data_time_unit,
             num_cpus=ncpus,
         )
 
     chi2_array_by_filt = {}
     for filt in chi2_dict_array[0].keys():
         chi2_array_by_filt[filt] = [dict_entry[filt] for dict_entry in chi2_dict_array]
+
+    results_dct = {}
+    results_dct[model] = {}
+
+    print(
+        "Stats below are reduced chi2 distribution percentiles (0, 25, 50, 75, 100) for each filter:"
+    )
+
+    model_subscript = ""
+    if interpolation_type == "tensorflow":
+        model_subscript = "_tf"
+
+    # make the outdir
+    outpath = f"{outdir}/{model}{model_subscript}"
+    if not os.path.isdir(outpath):
+        os.makedirs(outpath)
 
     # make the plots
     for figidx, filt in enumerate(filts):
@@ -254,8 +267,26 @@ def create_benchmark(
         plt.ylabel("Count")
         plt.hist(chi2_array_by_filt[filt], label=filt, bins=51, histtype="step")
         plt.legend()
-        plt.savefig(f"{outdir}/{filt}.pdf", bbox_inches="tight")
+        plt.savefig(f"{outpath}/{filt}.pdf", bbox_inches="tight")
         plt.close()
+
+        percentiles_list = [
+            np.round(np.percentile(chi2_array_by_filt[filt], 0), 2),
+            np.round(np.percentile(chi2_array_by_filt[filt], 25), 2),
+            np.round(np.percentile(chi2_array_by_filt[filt], 50), 2),
+            np.round(np.percentile(chi2_array_by_filt[filt], 75), 2),
+            np.round(np.percentile(chi2_array_by_filt[filt], 100), 2),
+        ]
+
+        print(filt, percentiles_list)
+
+        results_dct[model][filt] = percentiles_list
+
+    with open(f"{outpath}/benchmark_chi2_percentiles_0_25_50_75_100.json", "w") as f:
+        # save json file with filter-by-filter details
+        json.dump(results_dct, f)
+
+    print("Saved json file containing reduced chi2 percentiles.")
 
 
 def main():
