@@ -324,12 +324,19 @@ def get_default_filts_lambdas(filters=None):
 
     bandpasses = []
     for val in get_all_bandpass_metadata():
-        try:
+        if val["name"] in [
+            "ultrasat",
+            "megacampsf::u",
+            "megacampsf::g",
+            "megacampsf::r",
+            "megacampsf::i",
+            "megacampsf::z",
+            "megacampsf::y",
+        ]:
+            bandpass = sncosmo.get_bandpass(val["name"], 3)
+            bandpass.name = bandpass.name.split()[0]
+        else:
             bandpass = sncosmo.get_bandpass(val["name"])
-        except Exception:
-            if val["name"] == "ultrasat":
-                bandpass = sncosmo.get_bandpass(val["name"], 3)
-                bandpass.name = bandpass.name.split()[0]
 
         bandpasses.append(bandpass)
 
