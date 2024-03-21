@@ -1,6 +1,6 @@
 import argparse
 
-from .shared import (
+from .base_parser import (
     _create_base_nmma_gw_parser,
     _create_base_nmma_parser,
 )

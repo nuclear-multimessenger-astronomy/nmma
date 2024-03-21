@@ -1,7 +1,7 @@
 import bilby
 import bilby_pipe.data_generation
 
-from .shared import (
+from .base_parser import (
     _create_base_nmma_gw_parser,
     _create_base_nmma_parser,
     _add_slurm_settings_to_parser
@@ -86,22 +86,6 @@ def create_nmma_generation_parser():
     bilby_pipe_parser = _create_reduced_bilby_pipe_parser()
     generation_parser = bilby_pipe.parser.BilbyArgParser(
         prog="nmma_generation",
-        usage=__doc__,
-        ignore_unknown_config_file_keys=False,
-        allow_abbrev=False,
-        parents=[parser, bilby_pipe_parser],
-        add_help=False,
-    )
-    generation_parser = _add_slurm_settings_to_parser(generation_parser)
-    return generation_parser
-
-
-def create_nmma_gw_generation_parser():
-    """Parser for nmma_gw_generation"""
-    parser = _create_base_nmma_gw_parser(sampler="all")
-    bilby_pipe_parser = _create_reduced_bilby_pipe_parser()
-    generation_parser = bilby_pipe.parser.BilbyArgParser(
-        prog="nmma_gw_generation",
         usage=__doc__,
         ignore_unknown_config_file_keys=False,
         allow_abbrev=False,

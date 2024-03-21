@@ -105,29 +105,46 @@ def create_generation_logger(outdir, label):
 
 
 class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
-    def __init__(self, args, unknown_args, inference_favour):
-        super().__init__(args, unknown_args, inference_favour)
+    def __init__(self, args, unknown_args):
+        super().__init__(args, unknown_args)
         self.args = args
         self.sampler = "dynesty"
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
-        self.inference_favour = inference_favour
-        assert inference_favour in ["nmma", "nmma_gw"], "invalid inference_favour"
+
+        messengers=[]
+        if args.with_eos:
+            messengers.append("eos")
+        if args.with_grb:
+            messengers.append("grb")
+        if args.with_gw:
+            messengers.append("gw")
+        if args.with_Hubble:
+            messengers.append("Hubble")
+        
+        self.messengers = messengers
         self.setup_inputs()
 
     @property
     def sampling_seed(self):
-        return self._samplng_seed
+        return self._sampling_seed
 
     @sampling_seed.setter
     def sampling_seed(self, sampling_seed):
         if sampling_seed is None:
             sampling_seed = np.random.randint(1, 1e6)
-        self._samplng_seed = sampling_seed
+        self._sampling_seed = sampling_seed
         np.random.seed(sampling_seed)
 
     def save_data_dump(self):
-        if self.inference_favour == "nmma":
+        data_dump= dict(
+                prior_file=self.prior_file,
+                args=self.args,
+                data_dump_file=self.data_dump_file,
+                meta_data=self.meta_data,
+                injection_parameters=self.injection_parameters,
+        )
+        if "em" in self.messengers:
             if self.injection_parameters:
                 light_curve_data = create_light_curve_data(
                     self.injection_parameters, self.args
@@ -135,36 +152,24 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
             else:
                 light_curve_data = loadEvent(self.args.light_curve_data)
 
-            with open(self.data_dump_file, "wb+") as file:
-                data_dump = dict(
-                    waveform_generator=self.waveform_generator,
-                    ifo_list=self.interferometers,
-                    prior_file=self.prior_file,
-                    light_curve_data=light_curve_data,
-                    args=self.args,
-                    data_dump_file=self.data_dump_file,
-                    meta_data=self.meta_data,
-                    injection_parameters=self.injection_parameters,
-                )
-                pickle.dump(data_dump, file)
+            data_dump |=  dict(
+                light_curve_data=light_curve_data
+            )
 
-        elif self.inference_favour == "nmma_gw":
-            with open(self.data_dump_file, "wb+") as file:
-                data_dump = dict(
-                    waveform_generator=self.waveform_generator,
-                    ifo_list=self.interferometers,
-                    prior_file=self.prior_file,
-                    args=self.args,
-                    data_dump_file=self.data_dump_file,
-                    meta_data=self.meta_data,
-                    injection_parameters=self.injection_parameters,
-                )
-                pickle.dump(data_dump, file)
+        if "gw" in self.messengers:
+            data_dump |= dict(
+                waveform_generator=self.waveform_generator,
+                ifo_list=self.interferometers,
+            )
+
+        with open(self.data_dump_file, "wb+") as file:
+            pickle.dump(data_dump, file)
 
     def setup_inputs(self):
-        if self.likelihood_type == "ROQGravitationalWaveTransient":
-            self.save_roq_weights()
-        self.interferometers.plot_data(outdir=self.data_directory, label=self.label)
+        if "gw" in self.messengers:
+            if self.gw_likelihood_type == "ROQGravitationalWaveTransient":
+                self.save_roq_weights()
+            self.interferometers.plot_data(outdir=self.data_directory, label=self.label)
 
         # This is done before instantiating the likelihood so that it is the full prior
         self.priors.to_json(outdir=self.data_directory, label=self.label)
@@ -185,7 +190,7 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         self.save_data_dump()
 
 
-def generate_runner(inference_favour=None, parser=None, **kwargs):
+def generate_runner(parser=None, **kwargs):
     """
     API for running the generation from Python instead of the command line.
     It takes all the same options as the CLI, specified as keyword arguments,
@@ -215,7 +220,7 @@ def generate_runner(inference_favour=None, parser=None, **kwargs):
     for package, version in get_version_info().items():
         logger.info(f"{package} version: {version}")
 
-    inputs = NMMADataGenerationInput(args, [], inference_favour)
+    inputs = NMMADataGenerationInput(args, [])
     logger.info(
         "Setting up likelihood with marginalizations: "
         f"distance={inputs.distance_marginalization}, "
@@ -235,7 +240,7 @@ def generate_runner(inference_favour=None, parser=None, **kwargs):
     return inputs, logger
 
 
-def main_nmma():
+def nmma_generation():
     """
     nmma_generation entrypoint.
 
@@ -249,8 +254,7 @@ def main_nmma():
     args = parse_generation_args(generation_parser, cli_args, as_namespace=True)
 
     # Initialise run
-    inputs, logger = generate_runner(
-        inference_favour="nmma", parser=generation_parser, **vars(args)
+    inputs, logger = generate_runner(parser=generation_parser, **vars(args)
     )
 
     # Write slurm script
@@ -264,33 +268,3 @@ def main_nmma():
     else:
         logger.info(f"Setup complete, now run:\n $ bash {bash_file}")
 
-
-def main_nmma_gw():
-    """
-    nmma_gw_generation entrypoint.
-
-    This function is a wrapper around generate_runner(),
-    giving it a command line interface.
-    """
-
-    # Parse command line arguments
-    cli_args = get_cli_args()
-    generation_parser = create_nmma_gw_generation_parser()
-    args = parse_generation_args(generation_parser, cli_args, as_namespace=True)
-
-    # Initialise run
-    inputs, logger = generate_runner(
-        inference_favour="nmma_gw", parser=generation_parser, **vars(args)
-    )
-
-    # Write slurm script
-    bash_file = slurm.setup_submit(inputs.data_dump_file, inputs, args, cli_args)
-    # change the parallel_bilby_analysis to nmma_gw_analysis
-    sh_scripts = find_sh_scripts(bash_file)
-    for sh_script in sh_scripts:
-        replace_pbilby_in_file(sh_script.replace(")", ""), "nmma_gw")
-
-    if args.submit:
-        subprocess.run([f"bash {bash_file}"], shell=True)
-    else:
-        logger.info(f"Setup complete, now run:\n $ bash {bash_file}")

@@ -39,8 +39,7 @@ optional-dependencies.grb = { file = ["grb_requirements.txt"] }
 optional-dependencies.production = { file = ["production_requirements.txt"] }
 
 [project.scripts]
-nmma-generation = "nmma.pbilby.generation:main_nmma"
-nmma-gw-generation = "nmma.pbilby.generation:main_nmma_gw"
+nmma-generation = "nmma.pbilby.generation:nmma_generation"
 nmma-analysis = "nmma.pbilby.analysis:main_nmma"
 nmma-gw-analysis = "nmma.pbilby.analysis:main_nmma_gw"
 lightcurve-analysis = "nmma.em.analysis:main"

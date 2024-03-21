@@ -34,29 +34,15 @@ def _create_base_nmma_parser(sampler="dynesty"):
         action="version",
         version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
     )
+
     if sampler in ["all", "dynesty"]:
         base_parser = _add_dynesty_settings_to_parser(base_parser)
     base_parser = _add_em_settings_to_parser(base_parser)
     base_parser = _add_eos_settings_to_parser(base_parser)
+    base_parser = _add_gw_settings_to_parser(base_parser)
     base_parser = _add_Hubble_settings_to_parser(base_parser)
     base_parser = _add_misc_settings_to_parser(base_parser)
     return base_parser
-
-
-def _create_base_nmma_gw_parser(sampler="dynesty"):
-    base_parser = argparse.ArgumentParser("base", add_help=False)
-    base_parser.add(
-        "--version",
-        action="version",
-        version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
-    )
-    if sampler in ["all", "dynesty"]:
-        base_parser = _add_dynesty_settings_to_parser(base_parser)
-    base_parser = _add_eos_settings_to_parser(base_parser)
-    base_parser = _add_Hubble_settings_to_parser(base_parser)
-    base_parser = _add_misc_settings_to_parser(base_parser)
-    return base_parser
-
 
 def _add_em_settings_to_parser(parser):
     em_input_parser = parser.add_argument_group(
@@ -166,13 +152,13 @@ def _add_em_settings_to_parser(parser):
         "--kilonova-tstep",
         type=float,
         default=0.1,
-        help="Time step (in days) for light curve initial evalution (default: 0.1)",
+        help="Time step (in days) for light curve initial evaluation (default: 0.1)",
     )
     em_input_parser.add(
         "--kilonova-error",
         type=float,
         default=1.0,
-        help="Additionaly statistical error (mag) to be introdouced (default: 1)",
+        help="Additional statistical error (mag) to be introduced (default: 1)",
     )
     em_input_parser.add(
         "--local-model-only",
@@ -182,17 +168,21 @@ def _add_em_settings_to_parser(parser):
 
     return parser
 
-
 def _add_eos_settings_to_parser(parser):
     eos_input_parser = parser.add_argument_group(
         title="EOS input arguments", description="Specify EOS inputs"
-    )
-    eos_input_parser.add("--binary-type", type=str, help="The binary is BNS or NSBH")
+    )    
     eos_input_parser.add(
         "--with-eos",
         action="store_true",
         default=False,
         help="Flag for sampling over EOS (default:False)",
+    )
+    eos_input_parser.add(
+        "--tabulated-eos",
+        action="store_true",
+        default=False,
+        help="If EOS sampling is used (--with-eos = True), either tabulated EOSs or NEP sampling must be used."
     )
     eos_input_parser.add(
         "--eos-data", type=str, required=False, help="Path to the EOS directory"
@@ -206,8 +196,32 @@ def _add_eos_settings_to_parser(parser):
         required=False,
         help="Path to the precalculated EOS weighting",
     )
+    eos_input_parser.add(
+        "--eos-from-neps",
+        default=False,
+        help="If EOS sampling is used (--with-eos = True), either tabulated EOSs or NEP sampling must be used"
+    )
+    eos_input_parser.add(
+        "--eos-crust-file",
+        type=str,
+        help="Path to data file for eos crust, to be used if --eos-from-neps is set to True"
+    )
 
     return parser
+
+
+
+def _add_gw_settings_to_parser(parser):
+    gw_input_parser = parser.add_argument_group(
+        title="GW input arguments", description="Specify GW inputs"
+    )
+    gw_input_parser.add(
+        "--with-gw",
+        action="store_true",
+        default=True,
+        help="Flag for sampling over GW parameters (default:True)",
+    )
+    gw_input_parser.add("--binary-type", type=str, help="The binary is BNS or NSBH")
 
 
 def _add_Hubble_settings_to_parser(parser):
