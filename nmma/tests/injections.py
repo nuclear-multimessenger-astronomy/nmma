@@ -312,17 +312,17 @@ def test_validate_lightcurves():
         cutoff_time=0,
         silent=False,
     )
-    assert validate_lightcurve(args) == True, "Test for 3 observations in the ztf g filter failed"
+    assert validate_lightcurve(**vars(args)) == True, "Test for 3 observations in the ztf g filter failed"
 
     args.filters = "ztfr"
     args.min_obs = 1
-    assert validate_lightcurve(args) == True, "Test for 1 observation in the ztf r filter failed"
+    assert validate_lightcurve(**vars(args)) == True, "Test for 1 observation in the ztf r filter failed"
 
     args.filters = "ztfg,ztfr"
-    assert validate_lightcurve(args) == True, "Test for  passing multiple filters failed"
+    assert validate_lightcurve(**vars(args)) == True, "Test for  passing multiple filters failed"
 
     args.filters = ""
-    assert validate_lightcurve(args) == True, "Test for automatic filter selection failed"
+    assert validate_lightcurve(**vars(args)) == True, "Test for automatic filter selection failed"
 
     args.cutoff_time = 1
-    assert validate_lightcurve(args) == False, "Test for setting cutoff time failed"
+    assert validate_lightcurve(**vars(args)) == False, "Test for setting cutoff time failed"
