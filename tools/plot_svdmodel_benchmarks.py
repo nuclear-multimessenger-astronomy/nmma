@@ -50,7 +50,7 @@ def plot_benchmarks(
         plt.tight_layout()
         ax.bar(filter_names, pctls_75, label="<= 75th", color="red", hatch="\\")
         ax.bar(filter_names, pctls_50, label="<= 50th", color="slategray")
-        ax.bar(filter_names, pctls_25, label="<= 20th", color="blue", hatch="/")
+        ax.bar(filter_names, pctls_25, label="<= 25th", color="blue", hatch="/")
         ax.set_ylim(0, 1.1 * np.max(pctls_75))
         ax.tick_params(axis="x", labelrotation=75)
         ax.set_xlabel("Filter")
