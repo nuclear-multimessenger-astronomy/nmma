@@ -20,10 +20,11 @@
 [![Python version](https://img.shields.io/pypi/pyversions/nmma.svg)](https://badge.fury.io/py/nmma)
 
 
+Citations to the NMMA code: [Citation record](https://inspirehep.net/literature?sort=mostrecent&size=250&page=1&q=refersto%3Arecid%3A2083145&ui-citation-summary=true)
+
 Read our official documentation: [NMMA Documentation](https://nuclear-multimessenger-astronomy.github.io/nmma/)
 
 Check out our contribution guide: [For contributors](https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html)
-
 
 A tutorial on how to produce simulations of lightcurves is given here [tutorial-lightcurve_simulation.ipynb](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/tutorials/tutorial-lightcurve_simulation.ipynb)
 
