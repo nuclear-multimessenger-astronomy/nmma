@@ -13,7 +13,7 @@ from nmma.em.model import (
     SVDLightCurveModel,
 )
 
-from ..em import create_lightcurves
+from ..em import create_lightcurves, validate_lightcurve
 from ..em.io import read_lightcurve_file
 from ..eos import create_injection
 
@@ -299,3 +299,29 @@ def test_injections():
     }
     for model_name, model_lightcurve_function in lightcurve_models.items():
         lightcurveInjectionTest(model_name, model_lightcurve_function)
+
+def test_validate_lightcurves():
+    print("validate_lightcurve test")
+
+    ## initialize args, check a file that is known to have 3 observations in the ztf g filter and 1 in the ztf r filter. All detections occur within 9 days of the original observation.
+    args = Namespace(
+        data='../../example_files/candidate_data/ZTF20abwysqy.dat',
+        filters="ztfg",
+        min_obs=3,
+        cutoff_time=0,
+        silent=False,
+    )
+    assert validate_lightcurve(args) == True, "Test for 3 observations in the ztf g filter failed"
+
+    args.filters = "ztfr"
+    args.min_obs = 1
+    assert validate_lightcurve(args) == True, "Test for 1 observation in the ztf r filter failed"
+
+    args.filters = "ztfg,ztfr"
+    assert validate_lightcurve(args) == True, "Test for  passing multiple filters failed"
+
+    args.filters = ""
+    assert validate_lightcurve(args) == True, "Test for automatic filter selection failed"
+
+    args.cutoff_time = 1
+    assert validate_lightcurve(args) == False, "Test for setting cutoff time failed"
