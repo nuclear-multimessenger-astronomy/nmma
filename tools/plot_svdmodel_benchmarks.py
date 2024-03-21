@@ -14,6 +14,13 @@ def plot_benchmarks(
     outdir: str = "benchmark_output",
     interpolation_type: str = "tensorflow",
 ):
+    """
+    make barplots of 25th, 50th and 75th percentiles of reduced chi2 distributions for trained models
+
+    :param outdir: Path to the output directory (str)
+    :param interpolation_type: Type of interpolation (str)
+
+    """
     benchmark_path = BASE_DIR / outdir
     interpolation_suffix = "_tf" if interpolation_type == "tensorflow" else ""
     json_files = benchmark_path.glob(f"*{interpolation_suffix}/*.json")
@@ -66,13 +73,13 @@ def get_parser():
         "--outdir",
         type=str,
         default="benchmark_output",
-        help="Path to the output directory",
+        help="path to the output directory",
     )
     parser.add_argument(
         "--interpolation-type",
         type=str,
         default="tensorflow",
-        help="Type of interpolation",
+        help="type of interpolation",
     )
     return parser
 
