@@ -47,34 +47,38 @@ def get_parser(**kwargs):
     )
     return parser
 
-def validate_lightcurve(args):
+def validate_lightcurve(data,filters=None,min_obs=3,cutoff_time=0,silent=False):
     """
-    Evaluates whether the lightcurve has the requisite user-defined number of observations in the filters provided within the defined time window from the first observation
+    Evaluates whether the lightcurve has the requisite user-defined number of observations in the filters provided within the defined time window from the first observation. In the case where one wants to check that at least one filter has the requisite number of observations, the function should be called multiple times with different filter arguments.
 
     Args:
-        args (argparse.Namespace): Arguments provided when function is called from command line. See get_parser() for individual arguments.
+        data (str): Path to the data file in [nmma-compliant format (.dat, .json, etc.)
+        filters (str): Comma separated list of filters to validate against. If not provided, all filters in the data will be used.
+        min_obs (int): Minimum number of observations required in each filter before cutoff time.
+        cutoff_time (float): Cutoff time (relative to the first data point) that the minimum observations must be in. If not provided, the entire lightcurve will be evaluated
+        silent (bool): Suppress output
 
     Returns:
         bool: True if the lightcurve meets the minimum number of observations in the defined time window, False otherwise.
     """
-    data = loadEvent(args.data)
+    data = loadEvent(data)
 
     ## determine filters to consider
-    if args.filters:
-        filters_to_check = args.filters.replace(" ", "").split(",")
+    if filters:
+        filters_to_check = filters.replace(" ", "").split(",")
     else:
         filters_to_check = list(data.keys())
 
     ## determine time window to consider
     min_time = np.min([np.min(array[:,0]) for array in data.values()])
-    max_time = min_time + args.cutoff_time if args.cutoff_time > 0 else np.max([np.max(array[:,0]) for array in data.values()])
+    max_time = min_time + cutoff_time if cutoff_time > 0 else np.max([np.max(array[:,0]) for array in data.values()])
 
     ## evaluate lightcurve for each filter
     for filter in filters_to_check:
         if filter not in DEFAULT_FILTERS:
             raise ValueError(f"Filter {filter} not in supported filter list")
         elif filter not in data.keys():
-            print(f"{filter} not present in data file, cannot validate") if not args.silent else None
+            print(f"{filter} not present in data file, cannot validate") if not silent else None
             return False
         filter_data_indices = np.where(data[filter][:,0] <= max_time)[0]
         filter_data = [data[filter][i] for i in filter_data_indices]
@@ -82,12 +86,12 @@ def validate_lightcurve(args):
         ## evaluate the number of detections
         num_observations = sum(1 for value in filter_data if value[1] != np.inf and not np.isnan(value[1]))
         num_detections = sum(1 for value in filter_data if value[2] != np.inf and not np.isnan(value[2]) and value[2] != 99)
-        if num_detections < args.min_obs:
-            print(f"{filter} filter has {num_detections} detections, less than the required {args.min_obs}") if not args.silent else None
+        if num_detections < min_obs:
+            print(f"{filter} filter has {num_detections} detections, less than the required {min_obs}") if not silent else None
             return False
         else:
             continue
-    print(f"Lightcurve has at least {args.min_obs} detections in the filters within the first {max_time-min_time} days") if not args.silent else None
+    print(f"Lightcurve has at least {min_obs} detections in the filters within the first {max_time-min_time} days") if not silent else None
 
     return True
 
@@ -95,4 +99,4 @@ def main(args=None):
     if args is None:
         parser = get_parser()
         args = parser.parse_args(args)
-    validate_lightcurve(args)
+    validate_lightcurve(data=args.data,filters=args.filters,min_obs=args.min_obs,cutoff_time=args.cutoff_time,silent=args.silent)
