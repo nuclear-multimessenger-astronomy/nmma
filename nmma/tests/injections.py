@@ -322,7 +322,9 @@ def test_validate_lightcurves():
     assert validate_lightcurve(**vars(args)) == True, "Test for  passing multiple filters failed"
 
     args.filters = ""
+    args.min_obs = 0
     assert validate_lightcurve(**vars(args)) == True, "Test for automatic filter selection failed"
 
     args.cutoff_time = 1
+    args.min_obs = 1
     assert validate_lightcurve(**vars(args)) == False, "Test for setting cutoff time failed"
