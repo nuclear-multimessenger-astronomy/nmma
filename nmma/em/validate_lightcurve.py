@@ -99,4 +99,5 @@ def main(args=None):
     if args is None:
         parser = get_parser()
         args = parser.parse_args(args)
-    validate_lightcurve(data=args.data,filters=args.filters,min_obs=args.min_obs,cutoff_time=args.cutoff_time,silent=args.silent)
+    validation_bool = validate_lightcurve(data=args.data,filters=args.filters,min_obs=args.min_obs,cutoff_time=args.cutoff_time,silent=args.silent)
+    return validation_bool

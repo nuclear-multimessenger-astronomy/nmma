@@ -13,8 +13,9 @@ from nmma.em.model import (
     SVDLightCurveModel,
 )
 
-from ..em import create_lightcurves, validate_lightcurve
+from ..em import create_lightcurves
 from ..em.io import read_lightcurve_file
+from ..em.validate_lightcurve import validate_lightcurve
 from ..eos import create_injection
 
 
