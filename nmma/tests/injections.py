@@ -306,7 +306,7 @@ def test_validate_lightcurves():
 
     ## initialize args, check a file that is known to have 3 observations in the ztf g filter and 1 in the ztf r filter. All detections occur within 9 days of the original observation.
     args = Namespace(
-        data='../../example_files/candidate_data/ZTF20abwysqy.dat',
+        data='example_files/candidate_data/ZTF20abwysqy.dat',
         filters="ztfg",
         min_obs=3,
         cutoff_time=0,
