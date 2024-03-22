@@ -95,11 +95,13 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
     fiducial_parameters: dictionary, fiducial parameters for relative binning
         reference waveform
     epsilon: float, sets the precision of the binning for relative binning
+    update_fiducial_parameters: boolean, it True trys to optimize fiducial parameters
+                               with the maximum likelihood. Default = False
     """
 
     def __init__(self, interferometers, waveform_generator,
                  eos_path, Neos, eos_weight_path, binary_type, gw_likelihood_type,
-                 priors, fiducial_parameters, epsilon, with_eos=True,
+                 priors, fiducial_parameters, epsilon, update_fiducial_parameters, with_eos=True,
                  roq_weights=None, roq_params=None, roq_scale_factor=None,
                  time_marginalization=False, distance_marginalization=False,
                  phase_marginalization=False, distance_marginalization_lookup_table=None,
@@ -151,7 +153,7 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
 
         elif gw_likelihood_type == 'RelativeBinningGravitationalWaveTransient':
 
-            gw_likelihood_kwargs.update(dict(fiducial_parameters=fiducial_parameters, epsilon=epsilon))
+            gw_likelihood_kwargs.update(dict(fiducial_parameters=fiducial_parameters, epsilon=epsilon, update_fiducial_parameters = update_fiducial_parameters))
             GWLikelihood = RelativeBinningGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         super(GravitationalWaveTransientLikelihoodwithEOS, self).__init__(parameters={})
