@@ -2,11 +2,9 @@ name: Unit Test nmma
 
 on:
   push:
-    branches: [main]
     paths-ignore:
       - 'doc/**'
   pull_request:
-    branches: [main]
     paths-ignore:
       - 'doc/**'
   workflow_dispatch:
