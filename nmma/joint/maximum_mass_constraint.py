@@ -46,7 +46,7 @@ def main():
             help="EOS folder with EOS files in [n, energy density, pressure, speed of sound squared] format."
     )
     parser.add_argument(
-            "--use_M_Kepler", 
+            "--use-M-Kepler", 
             action="store_true",
             help="If set, it is assumed that the BNS remnant collapsed to a black hole above the Kepler limit.",
 
@@ -59,18 +59,18 @@ def main():
             default=1024
     )
 
-    args = vars(parser.parse_args())
+    args = parser.parse_args()
     try:
-       os.makedirs(args["outdir"] + "/pm/")
+       os.makedirs(args.outdir + "/pm/")
     except:
        pass
     
-    posterior_samples = pd.read_csv(args["joint_posterior"], header = 0, delimiter = " ")
-    prior = bilby.gw.prior.PriorDict(args["prior"])
-    Neos = len(next(os.walk(args["eos_path_macro"]))[2])
+    posterior_samples = pd.read_csv(args.joint_posterior, header = 0, delimiter = " ")
+    prior = bilby.gw.prior.PriorDict(args.prior)
+    Neos = len(next(os.walk(args.eos_path_macro))[2])
     
    
-    if args["use_M_Kepler"]:
+    if args.use_M_Kepler:
        n_dims = 7
        if len(prior.keys())!= n_dims-1:
           raise Exception("If use_M_kepler is True, you need to provide a prior fo ratio_R and delta to be used in the quasi-universal relation.")
@@ -82,9 +82,9 @@ def main():
     
     
     pymulti_kwargs = dict(
-                outputfiles_basename=args["outdir"] + "/pm/",
+                outputfiles_basename=args.outdir + "/pm/",
                 n_dims=n_dims,
-                n_live_points=args["nlive"],
+                n_live_points=args.nlive,
                 verbose=True,
                 resume=True,
                 seed=42,
@@ -92,7 +92,7 @@ def main():
                 use_MPI = True,
             )
     
-    solution = utils.PostmergerInference(prior, posterior_samples, Neos, args["eos_path_macro"], args["eos_path_micro"], args["use_M_Kepler"], **pymulti_kwargs)
+    solution = utils.PostmergerInference(prior, posterior_samples, Neos, args.eos_path_macro, args.eos_path_micro, args.use_M_Kepler, **pymulti_kwargs)
     
     
     samples = solution.samples.T

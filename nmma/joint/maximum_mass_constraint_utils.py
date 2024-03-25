@@ -7,6 +7,9 @@ from bilby.gw.prior import PriorDict
 from bilby.core.prior import Uniform
 import bilby.gw.conversion as conversion
 
+import astropy.units as u
+import astropy.constants as constants
+
 import os
 import sys
 import contextlib
@@ -47,8 +50,11 @@ def stdout_redirected(to=os.devnull, stdout=None):
 
 def baryonic_mass(gravitational_mass, EOS, eos_path_macro, eos_path_micro):
 
-    Msun_to_MeV = 1.11549833*10**60
-    G = 1.4766696910334391 #G/c^2 in km/Msun
+    Msun_to_MeV = (1*u.Msun*constants.c**2).to(u.MeV).value #1.1154E+60 MeV are one solar mass
+    MeV_per_fm3_to_Msun_per_km3 = 1/Msun_to_MeV * (1.*u.fm**(-3)).to(u.km**(-3)).value # 1 MeV/fm**3 is 8.9653E-7 Msun/km**3
+    G = (constants.G/constants.c**2).to(u.km/u.Msun).value #G/c^2 is 1.4766 km/Msun
+    
+
     R, M, L, P0 = np.loadtxt(eos_path_macro+f"/{EOS}.dat", unpack= True, skiprows = 0)
     N, EPS, P, CS2 = np.loadtxt(eos_path_micro+f"/{EOS}.dat", unpack = True, skiprows = 0)
     eps_of_p = scipy.interpolate.interp1d(P, EPS, kind = 'linear', bounds_error = False, fill_value =0)
@@ -58,8 +64,8 @@ def baryonic_mass(gravitational_mass, EOS, eos_path_macro, eos_path_micro):
       p, m = y
       eps = eps_of_p(p)
 
-      Dp = -G*m*eps/x**2 * (1+p/eps) * (1+4*np.pi*(x**3* p)*8.964603290800086e-07/m) * (1-2*G*m/x)**(-1)
-      Dm = (4*np.pi*x**2*eps)*8.964603290800086e-07 #1 MeV/fm^3 km^2 are 8.965123536*10**(-7) Msun/km
+      Dp = -G*m*eps/x**2 * (1+p/eps) * (1+4*np.pi*(x**3* p)*MeV_per_fm3_to_Msun_per_km3/m) * (1-2*G*m/x)**(-1)
+      Dm = (4*np.pi*x**2*eps)*MeV_per_fm3_to_Msun_per_km3
 
       return [Dp, Dm]
 
@@ -67,7 +73,7 @@ def baryonic_mass(gravitational_mass, EOS, eos_path_macro, eos_path_micro):
     r = np.interp(gravitational_mass, M, R)
     p0= np.interp(gravitational_mass, M, P0)
     eps0 = eps_of_p(p0)
-    m0 = (eps0*4*np.pi/3*dr**3)*8.964603290800086e-07 #convert Mev/fm^3 * km^3 in Msun
+    m0 = (eps0*4*np.pi/3*dr**3)*MeV_per_fm3_to_Msun_per_km3
     x = np.arange(dr, r+dr, dr)
     y0 = [p0, m0]
 
@@ -82,9 +88,9 @@ def baryonic_mass(gravitational_mass, EOS, eos_path_macro, eos_path_micro):
           cut = min(cut, np.where(np.isnan(m_solv))[0][0])
        n_solv = n_solv[:cut]; m_solv = m_solv[:cut]; x= x[:cut]
 
-
-    particle_mass = 8.40893833 * 10**(-4) #proton mass in Msun*(fm/km)**3
-    m_baryonic = particle_mass*4*np.pi*scipy.integrate.simpson((n_solv)*x**2/np.sqrt(1-2*G*m_solv/x), x)
+    n_solv = n_solv *(1.*u.fm**(-3)).to(u.km**(-3)) #convert from fm**(-3) to km**(-3)
+    particle_mass = constants.m_p.to(u.Msun).value  #get proton mass in Msun
+    m_baryonic = particle_mass*4*np.pi*scipy.integrate.simpson((n_solv)*x**2/np.sqrt(1-2*G*m_solv/x), x) #get baryonic mass in Msun
     
     if np.isnan(m_baryonic):
        import warnings
