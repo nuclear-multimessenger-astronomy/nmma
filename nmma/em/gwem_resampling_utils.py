@@ -177,17 +177,18 @@ class TotalEjectaMassInference(Solver):
         z = luminosity_distance_to_redshift(self.GWsamples.luminosity_distance.to_numpy())
         mc = self.GWsamples.chirp_mass.to_numpy() / (1 + z)
         q = self.GWsamples.mass_ratio.to_numpy()
+        eta = q/(1+q)**2
         EOS = self.GWsamples.EOS.to_numpy()
 
         if (withNSBH):
             chi_1 = self.GWsamples.chi_1.to_numpy()
             chi_2 = self.GWsamples.chi_2.to_numpy()
             chi_eff = (chi_1 + q*chi_2)/(1+q)
-            self.chi_1KDE = scipy.stats.gaussian_kde(chi_1)
-            self.chi_2KDE = scipy.stats.gaussian_kde(chi_2)
+            self.priorKDE((chi_1, chi_2, mc, eta))
 
-        self.mcKDE = scipy.stats.gaussian_kde(mc)
-        self.invqKDE = scipy.stats.gaussian_kde(1. / q)
+        else:
+            self.priorKDE = scipy.stats.gaussian_kde((mc, eta))
+
         self.EOSsamples = EOS.astype(int) + 1
         self.EMKDE = construct_EM_KDE(self.EMsamples)
         
@@ -218,7 +219,7 @@ class TotalEjectaMassInference(Solver):
             return np.nan_to_num(-np.inf)
         
         if self.withNSBH:
-            logprior = self.chi_1KDE.logpdf(chi_1) + self.chi_2KDE.logpdf(chi_2) + self.mcKDE.logpdf(mc) + self.invqKDE.logpdf(m1 / m2) + np.log(len(np.where(self.EOSsamples == EOS)[0]))
+            logprior = self.priorKDE.logpdf(chi_1, chi_2, mc, eta) + np.log(len(np.where(self.EOSsamples == EOS)[0]))
             try:
                 r2 = self.EOS_radius_interp_dict[EOS](m2)
             except ValueError:
@@ -232,7 +233,7 @@ class TotalEjectaMassInference(Solver):
             loglikelihood = self.EMKDE.logpdf(total_ejecta_mass)
 
         else:
-            logprior = self.mcKDE.logpdf(mc) + self.invqKDE.logpdf(m1 / m2) + np.log(len(np.where(self.EOSsamples == EOS)[0]))
+            logprior = self.priorKDE.logpdf(mc, eta) + np.log(len(np.where(self.EOSsamples == EOS)[0]))
 
             try:
                 r1 = self.EOS_radius_interp_dict[EOS](m1)
