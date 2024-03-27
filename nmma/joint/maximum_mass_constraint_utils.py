@@ -90,7 +90,7 @@ def baryonic_mass(gravitational_mass, EOS, eos_path_macro, eos_path_micro):
 
     n_solv = n_solv *(1.*u.fm**(-3)).to(u.km**(-3)) #convert from fm**(-3) to km**(-3)
     particle_mass = constants.m_p.to(u.Msun).value  #get proton mass in Msun
-    m_baryonic = particle_mass*4*np.pi*scipy.integrate.simpson((n_solv)*x**2/np.sqrt(1-2*G*m_solv/x), x) #get baryonic mass in Msun
+    m_baryonic = particle_mass*4*np.pi*scipy.integrate.simpson(y=(n_solv)*x**2/np.sqrt(1-2*G*m_solv/x), x=x) #get baryonic mass in Msun
     
     if np.isnan(m_baryonic):
        import warnings

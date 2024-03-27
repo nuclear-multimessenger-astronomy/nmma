@@ -2,12 +2,13 @@ from . import maximum_mass_constraint_utils as utils
 import pandas as pd
 import numpy as np
 import bilby
+
 import argparse
 import os
 
 
-def main():
 
+def get_parser():
     parser = argparse.ArgumentParser(
         description="Inference on the maximum mass constraint of the EOS when a joint posterior for binary components, ejecta and EOS is provided."
     )
@@ -58,8 +59,10 @@ def main():
             required=False, 
             default=1024
     )
+    
+    return parser
 
-    args = parser.parse_args()
+def maximum_mass_resampling(args):
     try:
        os.makedirs(args.outdir + "/pm/")
     except:
@@ -104,15 +107,24 @@ def main():
     posterior["log10_mdisk"] = samples[3]
     posterior["log10_mej_dyn"] = samples[4]
     
-    if args["use_M_Kepler"]:
+    if args.use_M_Kepler:
        posterior["ratio_R"] = samples[5]
        posterior["delta"] = samples[6]
     
     
     posterior = pd.DataFrame.from_dict(posterior)
-    posterior.to_csv(args["outdir"]+"/posterior_samples.dat", sep = " ", index = False)
+    posterior.to_csv(args.outdir+"/posterior_samples.dat", sep = " ", index = False)
         
-        
+def main(args = None):
+   
+   if args is None:
+      parser = get_parser()
+      args = parser.parse_args()
+
+      maximum_mass_resampling(args)
+      
+   else:
+      maximum_mass_resampling(args)
 
 if __name__ == "__main__":
     main()
