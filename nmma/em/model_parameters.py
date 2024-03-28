@@ -1,10 +1,9 @@
-
-
 """Script with various functions to extract the parameters of models from their naming convention for filenames."""
 import re
 import numpy as np
 
 from .utils import get_knprops_from_LANLfilename
+
 
 def AnBa2022_linear(data):
 
@@ -210,6 +209,7 @@ def Bu2022Ye(data):
 
     return data_out, parameters
 
+
 def Bu2023Ye(data):
 
     data_out = {}
@@ -278,36 +278,6 @@ def Ka2017(data):
     return data_out, parameters
 
 
-def LANL2022(data):
-
-    parameters = [
-        # "Ye_wind",
-        "log10_mej_dyn",
-        "vej_dyn",
-        "log10_mej_wind",
-        "vej_wind",
-        "KNtheta",
-    ]
-
-    data_out = {}
-
-    magkeys = data.keys()
-    for jj, key in enumerate(magkeys):
-        knprops = get_knprops_from_LANLfilename(key)
-
-        # best to interpolate masses in log10
-        knprops["log10_mej_dyn"] = np.log10(knprops["mej_dyn"])
-        knprops["log10_mej_wind"] = np.log10(knprops["mej_wind"])
-        del knprops["mej_dyn"]
-        del knprops["mej_wind"]
-        # del knprops["morphology"]
-
-        data_out[key] = knprops
-        data_out[key] = {**data_out[key], **data[key]}
-
-    return data_out, parameters
-
-
 def LANLTP1(data):
 
     parameters = [
@@ -366,6 +336,7 @@ def LANLTS1(data):
         data_out[key] = {**data_out[key], **data[key]}
 
     return data_out, parameters
+
 
 def LANLTP2(data):
 
