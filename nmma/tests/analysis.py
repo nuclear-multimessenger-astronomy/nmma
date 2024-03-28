@@ -73,7 +73,9 @@ def args():
         local_only=True,
         skip_sampling=False,
         fits_file=None,
-        cosiota_node_num=10
+        cosiota_node_num=10,
+        ra=None,
+        dec=None,
     )
 
     return args

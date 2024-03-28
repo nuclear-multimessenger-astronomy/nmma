@@ -386,6 +386,14 @@ def get_parser(**kwargs):
         help="Number of cos-iota nodes used in the Bayestar fits (default: 10)",
         default=10,
     )
+    parser.add_argument(
+        "--ra",
+        help="Right ascension of the sky location; to be used together with fits file"
+    )
+    parser.add_argument(
+        "--dec",
+        help="Declination of the sky location; to be used together with fits file"
+    )
 
     parser.add_argument(
         "--skip-sampling",
