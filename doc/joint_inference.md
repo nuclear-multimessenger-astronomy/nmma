@@ -4,11 +4,11 @@ A joint inference on gravitational-wave and electromagnetic signals requires NMM
 
 In order to run a multi-messenger inference, we need to follow to main steps:
 
-	nmma_generation config.ini
+	nmma-generation config.ini
 
 Perform the analysis or parameter estimation using:
 
-    nmma_analysis --data-dump <name_of_analysis>_data_dump.pickle
+    nmma-analysis --data-dump <name_of_analysis>_data_dump.pickle
 
 First of all, we set up the `config.ini` file and provide all required data and information.
 
@@ -120,13 +120,13 @@ In order to prepare the joint inference, a `config.ini` file is required which s
 
 The joint inference generation can be performed by running:
     
-    nmma_gw_generation config.ini
+    nmma-generation config.ini
 
-This will generate a `GW170817-AT2017gfo-GRB170817A_data_dump.pickle` file under `outdir/data/` which need to be provided for the joint inference function `nmma_analysis`. 
+This will generate a `GW170817-AT2017gfo-GRB170817A_data_dump.pickle` file under `outdir/data/` which need to be provided for the joint inference function `nmma-analysis`. 
 
 **Running the analysis**
 
-As detailed above, running the analysis with the command `nmma_analysis --data-dump outidr/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle` requires computational resources on a larger cluster. Below we show an example script for job submission called `jointinf.pbs` on a German cluster:
+As detailed above, running the analysis with the command `nmma-analysis --data-dump outidr/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle` requires computational resources on a larger cluster. Below we show an example script for job submission called `jointinf.pbs` on a German cluster:
 
     #!/bin/bash
     #PBS -N <name of simulation>
@@ -146,6 +146,23 @@ As detailed above, running the analysis with the command `nmma_analysis --data-d
     export MPI_LAUNCH_TIMEOUT=240
     
     cd $PBS_O_WORKDIR
-    mpirun -np 512 omplace -c 0-127:st=4 nmma_analysis --data-dump <absolute path to folder>/outdir/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle --nlive 1024 --nact 10 --maxmcmc 10000 --sampling-seed 20210213 --no-plot --outdir <absolute path to outdir/result folder>
+    mpirun -np 512 omplace -c 0-127:st=4 nmma-analysis --data-dump <absolute path to folder>/outdir/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle --nlive 1024 --nact 10 --maxmcmc 10000 --sampling-seed 20210213 --no-plot --outdir <absolute path to outdir/result folder>
 
 Note that settings might differ from cluster to cluster and also the installation of NMMA might be changed (conda vs. python installation). 
+
+
+**Maximum mass constraint from a joint analysis**
+
+From a joint posterior of GW and lightcurve data from a BNS, one can derive an upper limit on the TOV mass, if one assumes that the remnant collapsed to a black hole. The idea is to determine the posterior distribution on the remnant's mass from the posterior distribution of the individual neutron star masses $m_1$, $m_2$ and the ejecta and compare this to the TOV mass of EOSs. 
+
+This can be done via the command 
+    
+    maximum-mass-constraint --outdir <path to folder> --joint-posterior <path to the file with samples from GW+EM analysis>  --prior <path to a bilby prior file> --eos-path-macro <path to macroscopic EOS> --eos-path-micro <path to microscopic EOS> [--use-M-Kepler]
+
+The last flag determines whether the remnant mass is compared against the TOV mass or the maximum mass limit for a rotating NS (Kepler limit). The latter is less conservative. The joint posterior should contain the parameters chirp mass, eta_star, log10_mdisk, log10_mej_dyn as named columns. Here, eta_star is $η* = \ln(0.25-η)$ from the symmetric mass ratio $η$. The macroscopic EOS curves must have the central pressure p0 in MeV/fm³ of each NS mass as last column. 
+
+If --use-M-Kepler is set, the prior file needs to contain two additional fiducial paramters for the quasi-universal relations: 
+
+    ratio_R = Gaussian(name = "R", mu = 1.255, sigma = 0.024)
+    delta = Uniform(name="delta", minimum = -0.0125, maximum = 0.0125)
+

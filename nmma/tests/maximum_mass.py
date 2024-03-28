@@ -16,7 +16,7 @@ def args():
     args = Namespace(
         outdir="outdir",
         prior = f"{priorDir}/maximum_mass_resampling.prior",
-        joint_posterior = f"{dataDir}/joint_posterior",
+        joint_posterior = f"{dataDir}/GW+KN+GRB_posterior",
         eos_path_macro = f"{dataDir}/eos_macro",
         eos_path_micro = f"{dataDir}/eos_micro",
         nlive = 32,
