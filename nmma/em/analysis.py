@@ -388,10 +388,12 @@ def get_parser(**kwargs):
     )
     parser.add_argument(
         "--ra",
+        type=float,
         help="Right ascension of the sky location; to be used together with fits file"
     )
     parser.add_argument(
         "--dec",
+        type=float,
         help="Declination of the sky location; to be used together with fits file"
     )
 
