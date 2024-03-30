@@ -133,7 +133,12 @@ def inclination_prior_from_fits(priors, args):
     # now have the joint distribution evaluated
     u = np.linspace(-1, 1, 1000)  # this is cosiota
     # fetch the fixed distance
-    dL = priors['luminosity_distance'].peak
+    if args.dL:
+        print("Using command line input for distance, ignoring the prior file input")
+        dL = args.dL
+    else:
+        print("Using prior file input for distance")
+        dL = priors['luminosity_distance'].peak
     prob_u = prob_density(u) * dist_norm(u) * np.square(dL) * norm(dist_mu(u), dist_sigma(u)).pdf(dL)
 
     iota = np.arccos(u)

@@ -396,6 +396,11 @@ def get_parser(**kwargs):
         type=float,
         help="Declination of the sky location; to be used together with fits file"
     )
+    parser.add_argument(
+        "--dL",
+        type=float,
+        help="Distance of the location; to be used together with fits file"
+    )
 
     parser.add_argument(
         "--skip-sampling",
