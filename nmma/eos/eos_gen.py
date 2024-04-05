@@ -1,7 +1,10 @@
 import numpy as np
 import scipy
 
-def eos_from_nep (S0_val, L_val, crust_path="BPS.dat"):
+def eos_from_nep (S0_val, L_val, nsat_val = 0.16, 
+	Esat_val = -16.0, Ksat_val = 220.0, Qsat_val = 0.0, Zsat_val = 0.0,
+	Ksym_val = -100.0, Qsym_val = 0.0, Zsym_val = 0.0,
+	crust_path="BPS.dat"):
 	
 	# Load crust EOS
 	# will load an array with n, p, eps
@@ -13,18 +16,18 @@ def eos_from_nep (S0_val, L_val, crust_path="BPS.dat"):
 
 	# Define remaining empirical parameters
 	# Symmetric matter:
-	nsat = 0.16
-	Esat = -16.0
-	Ksat = 220.0
-	Qsat = 0.0
-	Zsat = 0.0
+	nsat = nsat_val
+	Esat = Esat_val
+	Ksat = Ksat_val
+	Qsat = Qsat_val
+	Zsat = Zsat_val
 
 	#Symmetry energy:
 	Ssym = S0_val
 	Lsym = L_val 
-	Ksym = -100.0
-	Qsym = 0.0
-	Zsym = 0.0
+	Ksym = Ksym_val
+	Qsym = Qsym_val
+	Zsym = Zsym_val
 
 	# Energy/Particle for symmetric nuclear matter
 	def EA_SNM (n):
