@@ -18,6 +18,8 @@ from bilby.gw.conversion import (
     _generate_all_cbc_parameters,
 )
 
+from ..eos.eos_gen import generate_macro_eos
+
 
 def Hubble_constant_to_distance(converted_parameters, added_keys):
     # FIXME for future detection with high redshift
@@ -53,14 +55,95 @@ def source_frame_masses(converted_parameters, added_keys):
 
     if "mass_1_source" not in converted_parameters.keys():
         z = converted_parameters["redshift"]
-        converted_parameters["mass_1_source"] = converted_parameters["mass_1"] / (1 + z)
+        converted_parameters["mass_1_source"] = np.array(converted_parameters["mass_1"] / (1 + z))
         added_keys = added_keys + ["mass_1_source"]
 
     if "mass_2_source" not in converted_parameters.keys():
         z = converted_parameters["redshift"]
-        converted_parameters["mass_2_source"] = converted_parameters["mass_2"] / (1 + z)
+        converted_parameters["mass_2_source"] = np.array(converted_parameters["mass_2"] / (1 + z))
         added_keys = added_keys + ["mass_2_source"]
 
+    return converted_parameters, added_keys
+
+def lambda_to_compactness(lambda_i):
+    "Function to link tidal deformability to compactness based on quasi-universal relation"
+    loglam= np.log(lambda_i)
+    return 0.371 - 0.0391 * loglam + 0.001056 * loglam * loglam
+
+def mass_and_compactness_to_radius(mass, comp):
+    return mass / comp * lal.MRSUN_SI / 1e3
+
+def radii_from_qur(converted_parameters, added_keys):
+    
+    mass_1_source = converted_parameters["mass_1_source"]
+    mass_2_source = converted_parameters["mass_2_source"]    
+    lambda_1 = converted_parameters["lambda_1"]
+    lambda_2 = converted_parameters["lambda_2"]
+
+    compactness_1 = lambda_to_compactness(lambda_1)
+    compactness_2 = lambda_to_compactness(lambda_2)
+
+    converted_parameters["radius_1"] = mass_and_compactness_to_radius(
+        mass_1_source, compactness_1)
+    converted_parameters["radius_2"] = mass_and_compactness_to_radius(
+        mass_2_source, compactness_2)
+
+    chirp_mass_source = component_masses_to_chirp_mass(mass_1_source, mass_2_source)
+    lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(
+        lambda_1, lambda_2, mass_1_source, mass_2_source
+    )
+
+    converted_parameters["R_16"] = (
+        chirp_mass_source
+        * np.power(lambda_tilde / 0.0042, 1.0 / 6.0)
+        * lal.MRSUN_SI / 1e3
+    )
+
+    added_keys += ["radius_1", "radius_2", "R_16"]
+    return converted_parameters, added_keys
+
+def radii_from_eos(eos_data, converted_parameters, added_keys):
+    ### assuming TOV mass and radius are the last entries of the respective arrays
+    TOV_radius_list = []
+    TOV_mass_list = []
+    lambda_1_list = []
+    lambda_2_list = []
+    radius_1_list = []
+    radius_2_list = []
+    R_14_list = []
+    R_16_list = []
+    for i, eos_vals in enumerate(eos_data):
+        radii, masses, Lambdas = eos_vals
+
+        (TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1,
+            radius_2, R_14, R_16
+        ) = EOS2Parameters(radii, masses, Lambdas,
+                            converted_parameters[" mass_1_source"][i], 
+                            converted_parameters[" mass_2_source"][i],
+                            )
+            
+        TOV_radius_list.append(TOV_radius)
+        TOV_mass_list.append(TOV_mass)
+        lambda_1_list.append(lambda_1[0])
+        lambda_2_list.append(lambda_2[0])
+        radius_1_list.append(radius_1[0])
+        radius_2_list.append(radius_2[0])
+        R_14_list.append(R_14)
+        R_16_list.append(R_16)
+
+        converted_parameters["TOV_radius"]  = np.array(TOV_radius_list)
+        converted_parameters["TOV_mass"]    = np.array(TOV_mass_list)
+        converted_parameters["radius_1"]    = np.array(radius_1_list)
+        converted_parameters["radius_2"]    = np.array(radius_2_list)
+
+        converted_parameters["lambda_1"]    = np.array(lambda_1_list)
+        converted_parameters["lambda_2"]    = np.array(lambda_2_list)
+
+        converted_parameters["R_14"]        = np.array(R_14_list)
+        converted_parameters["R_16"]        = np.array(R_16_list)
+
+    added_keys +=["lambda_1", "lambda_2", "TOV_mass", "TOV_radius",
+                "radius_1", "radius_2", "R_14", "R_16"]
     return converted_parameters, added_keys
 
 
@@ -72,7 +155,7 @@ def EOS2Parameters(
     TOV_radius = radius_val[np.argmax(mass_val)]
     minimum_mass = mass_val.min()
 
-    
+    ### assume BH if outside EoS range
     if mass_1_source < minimum_mass or mass_1_source > TOV_mass:
         lambda_1 = np.array([0.0])
         radius_1 = np.array([2.0 * mass_1_source * lal.MRSUN_SI / 1e3])
@@ -87,6 +170,7 @@ def EOS2Parameters(
         lambda_2 = np.array(np.interp(mass_2_source, mass_val, Lambda_val)).reshape(1)
         radius_2 = np.array(np.interp(mass_2_source, mass_val, radius_val)).reshape(1)
 
+    ### FIXME : What to do if EOS generates TOV_mas lower than these?
     R_14 = np.interp(1.4, mass_val, radius_val)
     R_16 = np.interp(1.6, mass_val, radius_val)
 
@@ -447,11 +531,11 @@ class BNSEjectaFitting(object):
 
 
 class MultimessengerConversion(object):
-    def __init__(self, eos_data_path, Neos, binary_type, with_ejecta=True):
-        self.eos_data_path = eos_data_path
-        self.Neos = Neos
-        self.binary_type = binary_type
-        self.with_ejecta = with_ejecta
+    def __init__(self, args):
+        self.messenegers    = args.messengers
+        self.binary_type    = args.binary_type
+        self.eos_to_ram     = args.eos_to_ram
+        self.args           = args
 
         if self.binary_type == "BNS":
             ejectaFitting = BNSEjectaFitting()
@@ -463,246 +547,59 @@ class MultimessengerConversion(object):
             print("Unknown binary type, exiting")
             sys.exit()
 
+        if self.eos_to_ram:
+            EOSdata = [None]*args.Neos
+            for j in range(args.Neos):
+                EOSdata[j] = np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T
+            self.EOSdata=np.array(EOSdata)
+
+
         self.ejecta_parameter_conversion = ejectaFitting.ejecta_parameter_conversion
 
     def convert_to_multimessenger_parameters(self, parameters):
         converted_parameters = parameters.copy()
         original_keys = list(converted_parameters.keys())
-        converted_parameters, added_keys = convert_to_lal_binary_black_hole_parameters(
-            converted_parameters
-        )
-
-        converted_parameters, added_keys = Hubble_constant_to_distance(
+        if "gw" in self.messengers:
+            
+            converted_parameters, added_keys = convert_to_lal_binary_black_hole_parameters(
+                converted_parameters
+            )
+        if "Hubble" in self.messenegers:
+            converted_parameters, added_keys = Hubble_constant_to_distance(
             converted_parameters, added_keys
         )
 
         converted_parameters, added_keys = source_frame_masses(
             converted_parameters, added_keys
         )
-        mass_1_source = converted_parameters["mass_1_source"]
-        mass_2_source = converted_parameters["mass_2_source"]
 
-        if "EOS" in converted_parameters:
-            if isinstance(
-                converted_parameters["EOS"],
-                (list, tuple, pd.core.series.Series, np.ndarray),
-            ):
-                TOV_radius_list = []
-                TOV_mass_list = []
-                lambda_1_list = []
-                lambda_2_list = []
-                radius_1_list = []
-                radius_2_list = []
-                R_14_list = []
-                R_16_list = []
-                EOSID = np.array(converted_parameters["EOS"]).astype(int) + 1
-                EOSdata = [None]*self.Neos
-                for j in np.unique(EOSID):
-                    EOSdata[j-1] = np.loadtxt(f"{self.eos_data_path}/{j}.dat", usecols = [0,1,2]).T
-
-
-                for i in range(0, len(EOSID)):
-                    radius_val, mass_val, Lambda_val = EOSdata[EOSID[i]-1]
-
-                    (
-                        TOV_mass,
-                        TOV_radius,
-                        lambda_1,
-                        lambda_2,
-                        radius_1,
-                        radius_2,
-                        R_14,
-                        R_16
-                    ) = EOS2Parameters(
-                        mass_val,
-                        radius_val,
-                        Lambda_val,
-                        mass_1_source[i],
-                        mass_2_source[i],
-                    )
-                    
-                    TOV_radius_list.append(TOV_radius)
-                    TOV_mass_list.append(TOV_mass)
-                    lambda_1_list.append(lambda_1[0])
-                    lambda_2_list.append(lambda_2[0])
-                    radius_1_list.append(radius_1[0])
-                    radius_2_list.append(radius_2[0])
-                    R_14_list.append(R_14)
-                    R_16_list.append(R_16)
-
-                converted_parameters["TOV_mass"] = np.array(TOV_mass_list)
-                converted_parameters["TOV_radius"] = np.array(TOV_radius_list)
-
-                converted_parameters["radius_1"] = np.array(radius_1_list)
-                converted_parameters["radius_2"] = np.array(radius_2_list)
-
-                converted_parameters["lambda_1"] = np.array(lambda_1_list)
-                converted_parameters["lambda_2"] = np.array(lambda_2_list)
-
-                converted_parameters["R_14"] = np.array(R_14_list)
-                converted_parameters["R_16"] = np.array(R_16_list)
-
+        ####EOS/ tidal treatment
+            ### case 1: no eos sampling at all
+        if "lambda_1" in converted_parameters.keys():
+            converted_parameters, added_keys = radii_from_qur(
+                converted_parameters, added_keys
+            )
+        
+        else:
+            ### case 2: EoS data (R, M, Lambda) is stored to ram
+            if self.eos_to_ram:
+                eos_data = self.EOSdata[np.array(converted_parameters["EOS"]).astype(int)]
+            
+            ### case 3: tabulated eos data is better loaded on the fly, 
+            ### depending on architecture
+            elif "EOS" in converted_parameters.keys():
+                EOSID = np.array(converted_parameters["EOS"]).astype(int)
+                eos_data =np.array([np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID])
+            ### case 4: EoS magic happens on the fly, provides R, m, lambda
             else:
-                EOSID = int(converted_parameters["EOS"]) + 1
-                radius_val, mass_val, Lambda_val = np.loadtxt(f"{self.eos_data_path}/{EOSID}.dat", unpack = True, usecols=[0,1,2])
+                eos_data  = generate_macro_eos(converted_parameters)      
+            
+            converted_parameters, added_keys = radii_from_eos(eos_data,
+                converted_parameters, added_keys
+            )
 
-                (
-                    TOV_mass,
-                    TOV_radius,
-                    lambda_1,
-                    lambda_2,
-                    radius_1,
-                    radius_2,
-                    R_14,
-                    R_16
-                ) = EOS2Parameters(
-                    mass_val,
-                    radius_val,
-                    Lambda_val,
-                    mass_1_source,
-                    mass_2_source
-                )
-                
-                converted_parameters["TOV_radius"] = TOV_radius
-                converted_parameters["TOV_mass"] = TOV_mass
-
-                converted_parameters["radius_1"] = radius_1[0]
-                converted_parameters["radius_2"] = radius_2[0]
-
-                converted_parameters["lambda_1"] = lambda_1[0]
-                converted_parameters["lambda_2"] = lambda_2[0]
-
-                converted_parameters["R_14"] = R_14
-                converted_parameters["R_16"] = R_16
-
-            added_keys = added_keys + [
-                "lambda_1",
-                "lambda_2",
-                "TOV_mass",
-                "TOV_radius",
-                "radius_1",
-                "radius_2",
-                "R_14",
-                "R_16",
-            ]
-
-            if self.with_ejecta:
-
-                converted_parameters, added_keys = self.ejecta_parameter_conversion(
-                    converted_parameters, added_keys
-                )
-
-                theta_jn = converted_parameters["theta_jn"]
-                converted_parameters["KNtheta"] = (
-                    180 / np.pi * np.minimum(theta_jn, np.pi - theta_jn)
-                )
-                converted_parameters["inclination_EM"] = (
-                    converted_parameters["KNtheta"] * np.pi / 180.0
-                )
-
-                added_keys = added_keys + ["KNtheta", "inclination_EM"]
-                
-        added_keys = [
-            key for key in converted_parameters.keys() if key not in original_keys
-        ]
-
-        return converted_parameters, added_keys
-    
-
-    def generate_all_parameters(self, sample, likelihood=None, priors=None, npool=1):
-        waveform_defaults = {
-            "reference_frequency": 50.0,
-            "waveform_approximant": "TaylorF2",
-            "minimum_frequency": 20.0,
-        }
-        output_sample = _generate_all_cbc_parameters(
-            sample,
-            defaults=waveform_defaults,
-            base_conversion=self.convert_to_multimessenger_parameters,
-            likelihood=likelihood,
-            priors=priors,
-            npool=npool,
-        )
-        output_sample = generate_tidal_parameters(output_sample)
-        return output_sample
-
-    def priors_conversion_function(self, sample):
-        out_sample = sample.copy()
-        out_sample, _ = self.convert_to_multimessenger_parameters(out_sample)
-        out_sample = generate_mass_parameters(out_sample)
-        out_sample = generate_tidal_parameters(out_sample)
-        return out_sample
-
-
-class MultimessengerConversionWithLambdas(object):
-    def __init__(self, binary_type, with_ejecta=True):
-        self.binary_type = binary_type
-        self.with_ejecta = with_ejecta
-
-        if self.binary_type == "BNS":
-            ejectaFitting = BNSEjectaFitting()
-
-        elif self.binary_type == "NSBH":
-            ejectaFitting = NSBHEjectaFitting()
-
-        else:
-            print("Unknown binary type, exiting")
-            sys.exit()
-
-        self.ejecta_parameter_conversion = ejectaFitting.ejecta_parameter_conversion
-
-    def convert_to_multimessenger_parameters(self, parameters):
-        converted_parameters = parameters.copy()
-        original_keys = list(converted_parameters.keys())
-        converted_parameters, added_keys = convert_to_lal_binary_black_hole_parameters(
-            converted_parameters
-        )
-
-        converted_parameters, added_keys = Hubble_constant_to_distance(
-            converted_parameters, added_keys
-        )
-
-        converted_parameters, added_keys = source_frame_masses(
-            converted_parameters, added_keys
-        )
-        mass_1_source = converted_parameters["mass_1_source"]
-        mass_2_source = converted_parameters["mass_2_source"]
-
-        lambda_1 = converted_parameters["lambda_1"]
-        lambda_2 = converted_parameters["lambda_2"]
-
-        log_lambda_1 = np.log(lambda_1)
-        log_lambda_2 = np.log(lambda_2)
-
-        compactness_1 = (
-            0.371 - 0.0391 * log_lambda_1 + 0.001056 * log_lambda_1 * log_lambda_1
-        )
-        compactness_2 = (
-            0.371 - 0.0391 * log_lambda_2 + 0.001056 * log_lambda_2 * log_lambda_2
-        )
-
-        converted_parameters["radius_1"] = (
-            mass_1_source / compactness_1 * lal.MRSUN_SI / 1e3
-        )
-        converted_parameters["radius_2"] = (
-            mass_2_source / compactness_2 * lal.MRSUN_SI / 1e3
-        )
-
-        chirp_mass_source = component_masses_to_chirp_mass(mass_1_source, mass_2_source)
-        lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(
-            lambda_1, lambda_2, mass_1_source, mass_2_source
-        )
-
-        converted_parameters["R_16"] = (
-            chirp_mass_source
-            * np.power(lambda_tilde / 0.0042, 1.0 / 6.0)
-            * lal.MRSUN_SI
-            / 1e3
-        )
-
-        added_keys = added_keys + ["radius_1", "radius_2", "R_16"]
-
-        if self.with_ejecta:
+            
+        if "em" in self.messengers:
 
             converted_parameters, added_keys = self.ejecta_parameter_conversion(
                 converted_parameters, added_keys
@@ -717,12 +614,13 @@ class MultimessengerConversionWithLambdas(object):
             )
 
             added_keys = added_keys + ["KNtheta", "inclination_EM"]
-
+    
         added_keys = [
             key for key in converted_parameters.keys() if key not in original_keys
         ]
 
         return converted_parameters, added_keys
+    
 
     def generate_all_parameters(self, sample, likelihood=None, priors=None, npool=1):
         waveform_defaults = {

@@ -185,6 +185,12 @@ def _add_eos_settings_to_parser(parser):
         help="If EOS sampling is used (--with-eos = True), either tabulated EOSs or NEP sampling must be used."
     )
     eos_input_parser.add(
+        "--eos-to-ram",
+        action="store_true",
+        default=False,
+        help="Depending on cluster architecture, it can be faster to load all EOS files directly to RAM"
+    )
+    eos_input_parser.add(
         "--eos-data", type=str, required=False, help="Path to the EOS directory"
     )
     eos_input_parser.add(

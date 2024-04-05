@@ -28,7 +28,6 @@ from parallel_bilby.analysis.sample_space import fill_sample
 
 from ..parser import (
     create_nmma_analysis_parser,
-    create_nmma_gw_analysis_parser,
     parse_analysis_args
     )
 from .analysis_run import AnalysisRun
@@ -36,7 +35,6 @@ from .analysis_run import AnalysisRun
 
 def analysis_runner(
     data_dump,
-    inference_favour,
     outdir=None,
     label=None,
     dynesty_sample="acceptance-walk",
@@ -88,7 +86,6 @@ def analysis_runner(
     # Initialise a run
     run = AnalysisRun(
         data_dump=data_dump,
-        inference_favour=inference_favour,
         outdir=outdir,
         label=label,
         dynesty_sample=dynesty_sample,
@@ -329,7 +326,7 @@ def analysis_runner(
         return exit_reason
 
 
-def main_nmma():
+def nmma_analysis():
     """
     nmma_analysis entrypoint.
 
@@ -343,21 +340,4 @@ def main_nmma():
     input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
 
     # Run the analysis
-    analysis_runner(**vars(input_args), inference_favour='nmma')
-
-
-def main_nmma_gw():
-    """
-    nmma_analysis entrypoint.
-
-    This function is a wrapper around analysis_runner(),
-    giving it a command line interface.
-    """
-    cli_args = get_cli_args()
-
-    # Parse command line arguments
-    analysis_parser = create_nmma_gw_analysis_parser(sampler="dynesty")
-    input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
-
-    # Run the analysis
-    analysis_runner(**vars(input_args), inference_favour='nmma_gw')
+    analysis_runner(**vars(input_args))

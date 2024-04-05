@@ -54,5 +54,13 @@ def eos_from_nep (S0_val, L_val, crust_path="BPS.dat"):
 
 	return (np.concatenate((crust_EOS,EOS_array)))
 
-#Just for testing
-print(eos_from_nep (32, 60))
+def generate_macro_eos(converted_parameters):
+	### TODO: Generate arbitrary set of EOSs 
+	### do EOS magic
+
+	### do TOV magic
+
+	#return np.array([r_array,m_array, lam_array])
+	pass
+# #Just for testing
+# print(eos_from_nep (32, 60))

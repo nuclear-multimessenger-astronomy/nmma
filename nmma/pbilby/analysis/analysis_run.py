@@ -5,6 +5,7 @@ import pickle
 import bilby
 import dynesty
 import numpy as np
+import pandas as pd
 from bilby.core.sampler.base_sampler import _SamplingContainer
 from bilby.core.sampler.dynesty import DynestySetupError, _set_sampling_kwargs
 from bilby.core.sampler.dynesty_utils import (
@@ -16,9 +17,61 @@ from bilby.core.sampler.dynesty_utils import (
 )
 from bilby.core.utils import logger
 from bilby_pipe.utils import convert_string_to_list
+from bilby.core.prior import Interped, DeltaFunction
+from bilby.gw.prior import PriorDict
 
-from .likelihood import setup_nmma_likelihood, setup_nmma_gw_likelihood
+from ...joint.joint_likelihood import setup_nmma_likelihood
+from ...joint.conversion import MultimessengerConversion
 
+
+def compose_priors(prior_file, args, logger):
+    """
+    Routine to create a bilby-Prior object from a prior-file and to modify it for NMMA
+
+    Parameters
+    ----------
+    prior_file: str
+        The path to the prior-file
+
+    Returns
+    -------
+    priors: bilby.gw.prior.PriorDict
+        a bilby-Prior object
+
+    """
+    priors = PriorDict.from_json(prior_file)
+    priors.convert_floats_to_delta_functions()
+
+    ###adjust hubble prior if applicable
+    if args.Hubble_weight:
+        logger.info("Sampling over Hubble constant with pre-calculated prior")
+        logger.info("Assuming the redshift prior is the Hubble flow")
+        logger.info("Overwriting any Hubble prior in the prior file")
+
+        Hubble_prior_data = pd.read_csv(args.Hubble_weight, delimiter=" ", header=0)
+        xx = Hubble_prior_data.Hubble.to_numpy()
+        yy = Hubble_prior_data.prior_weight.to_numpy()
+        Hmin = xx[0]
+        Hmax = xx[-1]
+
+        priors["Hubble_constant"] = Interped(
+            xx, yy, minimum=Hmin, maximum=Hmax, name="Hubble_constant"
+        )
+
+    # construct the eos prior
+    if args.tabulated_eos:
+        xx = np.arange(0, args.Neos + 1)
+        eos_weight = np.loadtxt(args.eos_weight)
+        yy = np.concatenate((eos_weight, [eos_weight[-1]]))
+        eos_prior = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
+        priors["EOS"] = eos_prior
+
+
+    # add the ratio_epsilon in case it is not present for no-grb case
+    if not args.with_grb and "ratio_epsilon" not in priors:
+        priors["ratio_epsilon"] = DeltaFunction(0.01, name="ratio_epsilon")
+    
+    return priors
 
 class AnalysisRun(object):
     """
@@ -30,7 +83,6 @@ class AnalysisRun(object):
     def __init__(
         self,
         data_dump,
-        inference_favour,
         outdir=None,
         label=None,
         dynesty_sample="acceptance-walk",
@@ -51,61 +103,70 @@ class AnalysisRun(object):
         self.nact = nact
         self.naccept = naccept
         self.proposals = convert_string_to_list(proposals)
+        self.zero_likelihood_mode = bilby_zero_likelihood_mode
+        self.nlive = nlive
 
         # Read data dump from the pickle file
         with open(data_dump, "rb") as file:
             data_dump = pickle.load(file)
 
-        ifo_list = data_dump["ifo_list"]
-        waveform_generator = data_dump["waveform_generator"]
-        waveform_generator.start_time = ifo_list[0].time_array[0]
-        args = data_dump["args"]
-        injection_parameters = data_dump.get("injection_parameters", None)
-
-        args.weight_file = data_dump["meta_data"].get("weight_file", None)
+        
+        self.data_dump = data_dump
+        self.args = data_dump["args"]
+        self.messengers= data_dump["messengers"]
+        self.injection_parameters = data_dump.get("injection_parameters", None)
 
         # If the run dir has not been specified, get it from the args
         if outdir is None:
-            outdir = args.outdir
+            outdir = self.args.outdir
         else:
             # Create the run dir
             os.makedirs(outdir, exist_ok=True)
+        self.outdir = outdir
 
         # If the label has not been specified, get it from the args
         if label is None:
-            label = args.label
+            label = self.args.label
+        self.label = label
 
-        priors = bilby.gw.prior.PriorDict.from_json(data_dump["prior_file"])
+        priors= compose_priors(data_dump["prior_file"], self.args, logger)
+       
+        param_conv=MultimessengerConversion(priors, self.args)
+        priors.conversion_function = param_conv.priors_conversion_function
+        
+        parameter_conversion = param_conv.convert_to_multimessenger_parameters
+    
+
+
+
+# ->->->############ MATCH ME TO setup_nmma_likelihood ##################### 
+
+        if "gw" in self.messengers:
+            ifo_list = data_dump["ifo_list"]
+            waveform_generator = data_dump["waveform_generator"]
+            waveform_generator.start_time = ifo_list[0].time_array[0]
+            waveform_generator.parameter_conversion = parameter_conversion
+
+            # ROQ-weight
+            self.args.weight_file = data_dump["meta_data"].get("weight_file", None)
+
+        if "em" in self.messengers:
+            light_curve_data = data_dump["light_curve_data"]
 
         logger.setLevel(logging.WARNING)
-        # split the likelihood for difference inference_favour
-        assert inference_favour in ['nmma', 'nmma_gw'], "Invalid inference_favour"
-        if inference_favour == 'nmma':
-            light_curve_data = data_dump["light_curve_data"]
-            likelihood, priors = setup_nmma_likelihood(
-                interferometers=ifo_list,
-                waveform_generator=waveform_generator,
-                light_curve_data=light_curve_data,
-                priors=priors,
-                args=args,
-            )
-
-        elif inference_favour == 'nmma_gw':
-            likelihood, priors = setup_nmma_gw_likelihood(
-                interferometers=ifo_list,
-                waveform_generator=waveform_generator,
-                priors=priors,
-                args=args,
-            )
-        priors.convert_floats_to_delta_functions()
+        
+        self.likelihood= setup_nmma_likelihood(
+            self.args, logger, priors, messenger_dict)
         logger.setLevel(logging.INFO)
+#<-<-<-############ MATCH ME TO setup_nmma_likelihood #####################
+        
 
         sampling_keys = []
         for p in priors:
             if isinstance(priors[p], bilby.core.prior.Constraint):
                 continue
             elif priors[p].is_fixed:
-                likelihood.parameters[p] = priors[p].peak
+                self.likelihood.parameters[p] = priors[p].peak
             else:
                 sampling_keys.append(p)
 
@@ -123,6 +184,11 @@ class AnalysisRun(object):
             periodic = None
         if len(reflective) == 0:
             reflective = None
+        
+        self.priors=priors
+        self.sampling_keys = sampling_keys
+        self.periodic = periodic
+        self.reflective = reflective
 
         self.init_sampler_kwargs = dict(
             nlive=nlive,
@@ -144,20 +210,6 @@ class AnalysisRun(object):
         logger.debug(
             f"Setting random state = {self.rstate} (seed={self.sampling_seed})"
         )
-
-        self.outdir = outdir
-        self.label = label
-        self.data_dump = data_dump
-        self.priors = priors
-        self.sampling_keys = sampling_keys
-        self.likelihood = likelihood
-        self.zero_likelihood_mode = bilby_zero_likelihood_mode
-        self.periodic = periodic
-        self.reflective = reflective
-        self.args = args
-        self.injection_parameters = injection_parameters
-        self.nlive = nlive
-        self.inference_favour = inference_favour
 
     def _set_sampling_method(self):
 

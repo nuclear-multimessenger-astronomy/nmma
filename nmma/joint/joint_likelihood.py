@@ -1,5 +1,6 @@
 from __future__ import division
 
+import inspect
 import numpy as np
 
 from ..em.model import (
@@ -7,26 +8,181 @@ from ..em.model import (
     GRBLightCurveModel,
     GenericCombineLightCurveModel,
 )
-from ..em.likelihood import OpticalLightCurve
-from .conversion import MultimessengerConversion, MultimessengerConversionWithLambdas
+from ..em.em_likelihood import OpticalLightCurve
+from .conversion import MultimessengerConversion
 
-from bilby.gw.likelihood import (
-    GravitationalWaveTransient,
-    ROQGravitationalWaveTransient,
-)
 from bilby.core.likelihood import Likelihood
-from bilby.core.prior import Interped, DeltaFunction
 
+
+from ..gw.gw_likelihood import GravitationalWaveTransientLikelihood, roq_likelihood_kwargs
+
+
+def reorder_loglikelihoods(unsorted_loglikelihoods, unsorted_samples, sorted_samples):
+    """Reorders the stored log-likelihood after they have been reweighted
+
+    This creates a sorting index by matching the reweights `result.samples`
+    against the raw samples, then uses this index to sort the
+    loglikelihoods
+
+    Parameters
+    ----------
+    sorted_samples, unsorted_samples: array-like
+        Sorted and unsorted values of the samples. These should be of the
+        same shape and contain the same sample values, but in different
+        orders
+    unsorted_loglikelihoods: array-like
+        The loglikelihoods corresponding to the unsorted_samples
+
+    Returns
+    -------
+    sorted_loglikelihoods: array-like
+        The loglikelihoods reordered to match that of the sorted_samples
+
+
+    """
+
+    idxs = []
+    for ii in range(len(unsorted_loglikelihoods)):
+        idx = np.where(np.all(sorted_samples[ii] == unsorted_samples, axis=1))[0]
+        if len(idx) > 1:
+            print(
+                "Multiple likelihood matches found between sorted and "
+                "unsorted samples. Taking the first match."
+            )
+        idxs.append(idx[0])
+    return unsorted_loglikelihoods[idxs]
+
+
+def setup_nmma_likelihood(args, logger, priors, messengers, **kwargs
+    #messengers, interferometers, waveform_generator, light_curve_data, priors, args
+):
+    """Takes the kwargs and sets up and returns
+    MultiMessengerLikelihood with either an ROQ GW or GW likelihood.
+
+    Parameters
+    ----------
+    messengers: list
+        list of messengers to be used in analysis
+    interferometers: bilby.gw.detectors.InterferometerList
+        The pre-loaded bilby IFO
+    waveform_generator: bilby.gw.waveform_generator.LALCBCWaveformGenerator
+        The waveform generation
+    light_curve_data: dict
+        The light curve data with filter as key
+    priors: dict
+        The priors, used for setting up marginalization
+    args: Namespace
+        The parser arguments
+
+
+    Returns
+    -------
+    likelihood: nmma.joint.likelihood.MultiMessengerLikelihood
+    priors: dict
+        The priors including eos setup in case --eos is used
+
+    """
+    likelihood_kwargs=dict(
+        messengers=messengers
+    )
+    gw_kwargs=None
+    em_kwargs=None
+    eos_kwargs=None
+    if "gw" in messengers:
+        gw_kwargs= dict(
+            binary_type=args.binary_type,
+            gw_likelihood_type=args.likelihood_type,
+            interferometers=interferometers,
+            waveform_generator=waveform_generator,
+            priors=priors,
+            phase_marginalization=args.phase_marginalization,
+            distance_marginalization=args.distance_marginalization,
+            distance_marginalization_lookup_table=args.distance_marginalization_lookup_table,
+            time_marginalization=args.time_marginalization,
+            reference_frame=args.reference_frame,
+            time_reference=args.time_reference
+        )
+    if "em" in messengers:
+        em_kwargs = dict(
+            light_curve_data=light_curve_data,
+            light_curve_model_name=args.kilonova_model,
+            light_curve_interpolation_type=args.kilonova_interpolation_type,
+            light_curve_SVD_path=args.kilonova_model_svd,
+            em_trigger_time=args.kilonova_trigger_time,
+            filters=args.filters,
+            mag_ncoeff=args.svd_mag_ncoeff,
+            lbol_ncoeff=args.svd_lbol_ncoeff,
+            tmin=args.kilonova_tmin,
+            tmax=args.kilonova_tmax,
+            error_budget=args.kilonova_error,
+            local_only=args.local_model_only,
+            grb_resolution=args.grb_resolution,
+            with_grb=args.with_grb
+        )
+
+    if "eos" in messengers:
+        if args.tabulated_eos:
+
+            logger.info("Sampling over precomputed EOSs")
+            
+            eos_kwargs = dict(
+                eos_path=args.eos_data,
+                Neos=args.Neos,
+                eos_weight_path=args.eos_weight,
+            )
+            if args.eos_from_neps:
+                raise ValueError("Can only sample over either precomputed eos or NEPs. Set tabulated-eos or eos-from-neps to False!")
+        
+        elif args.eos_from_neps:
+            logger.info("Sampling over EOS generated on the fly")
+            
+            eos_kwargs= dict(
+                crust_path=args.eos_crust_file
+            )
+            if args.tabulated_eos:
+                raise ValueError("Can only sample over either precomputed eos or NEPs. Set tabulated-eos or eos-from-neps to False!")
+        
+
+    Likelihood = MultiMessengerLikelihood
+    if args.gw_likelihood_type == "GravitationalWaveTransient":
+        likelihood_kwargs.update(jitter_time=args.jitter_time)
+
+    elif args.gw_likelihood_type == "ROQGravitationalWaveTransient":
+        if args.time_marginalization:
+            logger.warning(
+                "Time marginalization not implemented for "
+                "ROQGravitationalWaveTransient: option ignored"
+            )
+        likelihood_kwargs.pop("time_marginalization", None)
+        likelihood_kwargs.pop("jitter_time", None)
+        likelihood_kwargs.update(roq_likelihood_kwargs(args, logger))
+    else:
+        raise ValueError("Unknown GW Likelihood class {}")
+
+    likelihood_kwargs = {
+        key: likelihood_kwargs[key]
+        for key in likelihood_kwargs
+        if key in inspect.getfullargspec(Likelihood.__init__).args
+    }
+
+    logger.info(
+        f"Initialise likelihood {Likelihood} with kwargs: \n{likelihood_kwargs}"
+    )
+
+    likelihood = Likelihood(**likelihood_kwargs)
+    return likelihood
 
 class MultiMessengerLikelihood(Likelihood):
     """A multi-messenger likelihood object
 
     This likelihood combines the usual gravitational-wave transient
-    likelihood and the kilonva afterglow light curve likelihood.
+    likelihood and the kilonova afterglow light curve likelihood.
 
     Parameters
     ----------
-    interferometers: list, bilby.gw.detector.InterferometerList
+    
+    messengers: list
+        list of messengers to be used in analysisinterferometers: list, bilby.gw.detector.InterferometerList
         A list of `bilby.detector.Interferometer` instances - contains the
         detector data and power spectral densities
     waveform_generator: `bilby.waveform_generator.WaveformGenerator`
@@ -123,6 +279,7 @@ class MultiMessengerLikelihood(Likelihood):
 
     def __init__(
         self,
+        messengers,
         interferometers,
         waveform_generator,
         light_curve_data,
@@ -131,9 +288,6 @@ class MultiMessengerLikelihood(Likelihood):
         em_trigger_time,
         mag_ncoeff,
         lbol_ncoeff,
-        eos_path,
-        Neos,
-        eos_weight_path,
         binary_type,
         gw_likelihood_type,
         priors,
@@ -157,34 +311,6 @@ class MultiMessengerLikelihood(Likelihood):
         time_reference="geocenter",
         local_only=False,
     ):
-        # construct the eos prior
-        if with_eos:
-            xx = np.arange(0, Neos + 1)
-            eos_weight = np.loadtxt(eos_weight_path)
-            yy = np.concatenate((eos_weight, [eos_weight[-1]]))
-            eos_prior = Interped(xx, yy, minimum=0, maximum=Neos, name="EOS")
-            priors["EOS"] = eos_prior
-
-            # construct the eos conversion
-            parameter_conversion_class = MultimessengerConversion(
-                eos_data_path=eos_path, Neos=Neos, binary_type=binary_type
-            )
-        else:
-            parameter_conversion_class = MultimessengerConversionWithLambdas(
-                binary_type=binary_type
-            )
-
-        priors.conversion_function = (
-            parameter_conversion_class.priors_conversion_function
-        )
-        parameter_conversion = (
-            parameter_conversion_class.convert_to_multimessenger_parameters
-        )
-        waveform_generator.parameter_conversion = parameter_conversion
-
-        # add the ratio_epsilon in case it is not present for no-grb case
-        if not with_grb and "ratio_epsilon" not in priors:
-            priors["ratio_epsilon"] = DeltaFunction(0.01, name="ratio_epsilon")
 
         # initialize the GW likelihood
         gw_likelihood_kwargs = dict(
@@ -256,12 +382,12 @@ class MultiMessengerLikelihood(Likelihood):
             tmax=tmax,
         )
         EMLikelihood = OpticalLightCurve(**em_likelihood_kwargs)
+        # EOSLikelihood= 
 
         super(MultiMessengerLikelihood, self).__init__(parameters={})
         self.parameter_conversion = parameter_conversion
         self.GWLikelihood = GWLikelihood
         self.EMLikelihood = EMLikelihood
-        self.priors = priors
         self.time_marginalization = time_marginalization
         self.phase_marginalization = phase_marginalization
         self.distance_marginalization = distance_marginalization
@@ -282,12 +408,11 @@ class MultiMessengerLikelihood(Likelihood):
 
     def log_likelihood(self):
 
-        if not self.priors.evaluate_constraints(self.parameters):
-            return np.nan_to_num(-np.inf)
-
         logL_EM = self.EMLikelihood.log_likelihood()
         if not np.isfinite(logL_EM):
             return np.nan_to_num(-np.inf)
+        
+        #logL_EOS
 
         logL_GW = self.GWLikelihood.log_likelihood()
         if not np.isfinite(logL_GW):

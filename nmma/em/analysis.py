@@ -17,7 +17,7 @@ from bilby.core.likelihood import ZeroLikelihood
 
 from ..utils.models import refresh_models_list
 from .injection import create_light_curve_data
-from .likelihood import OpticalLightCurve
+from .em_likelihood import OpticalLightCurve
 from .model import create_light_curve_model_from_args, model_parameters_dict
 from .prior import create_prior_from_args
 from .utils import getFilteredMag, dataProcess

@@ -40,7 +40,7 @@ optional-dependencies.production = { file = ["production_requirements.txt"] }
 
 [project.scripts]
 nmma-generation = "nmma.pbilby.generation:nmma_generation"
-nmma-analysis = "nmma.pbilby.analysis:main_nmma"
+nmma-analysis = "nmma.pbilby.analysis:nmma_analysis"
 nmma-gw-analysis = "nmma.pbilby.analysis:main_nmma_gw"
 lightcurve-analysis = "nmma.em.analysis:main"
 lightcurve-analysis-lbol = "nmma.em.analysis_lbol:main"

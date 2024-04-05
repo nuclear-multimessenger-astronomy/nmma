@@ -11,8 +11,47 @@ from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWave
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Interped
 
+def roq_likelihood_kwargs(args, logger):
+    """Return the kwargs required for the ROQ setup
 
-class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
+    Parameters
+    ----------
+    args: Namespace
+        The parser arguments
+
+    Returns
+    -------
+    kwargs: dict
+        A dictionary of the required kwargs
+
+    """
+
+    kwargs = dict(
+        weights=None,
+        roq_params=None,
+        linear_matrix=None,
+        quadratic_matrix=None,
+        roq_scale_factor=args.roq_scale_factor,
+    )
+    if hasattr(args, "likelihood_roq_params") and hasattr(
+        args, "likelihood_roq_weights"
+    ):
+        kwargs["roq_params"] = args.likelihood_roq_params
+        kwargs["weights"] = args.likelihood_roq_weights
+    elif hasattr(args, "roq_folder") and args.roq_folder is not None:
+        logger.info(f"Loading ROQ weights from {args.roq_folder}, {args.weight_file}")
+        kwargs["roq_params"] = np.genfromtxt(
+            args.roq_folder + "/params.dat", names=True
+        )
+        kwargs["weights"] = args.weight_file
+    elif hasattr(args, "roq_linear_matrix") and args.roq_linear_matrix is not None:
+        logger.info(f"Loading linear_matrix from {args.roq_linear_matrix}")
+        logger.info(f"Loading quadratic_matrix from {args.roq_quadratic_matrix}")
+        kwargs["linear_matrix"] = args.roq_linear_matrix
+        kwargs["quadratic_matrix"] = args.roq_quadratic_matrix
+    return kwargs
+
+class GravitationalWaveTransientLikelihood(Likelihood):
     """ A GravitationalWaveTransient likelihood object
 
     This likelihood uses the usual gravitational-wave transient
@@ -101,24 +140,7 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
                  phase_marginalization=False, distance_marginalization_lookup_table=None,
                  jitter_time=True, reference_frame="sky", time_reference="geocenter"):
 
-        # construct the eos prior
-        if with_eos:
-            xx = np.arange(0, Neos + 1)
-            eos_weight = np.loadtxt(eos_weight_path)
-            yy = np.concatenate((eos_weight, [eos_weight[-1]]))
-            eos_prior = Interped(xx, yy, minimum=0, maximum=Neos, name='EOS')
-            priors['EOS'] = eos_prior
 
-            # construct the eos conversion
-            parameter_conversion_class = MultimessengerConversion(eos_data_path=eos_path,
-                                                                  Neos=Neos,
-                                                                  binary_type=binary_type,
-                                                                  with_ejecta=False)
-        else:
-            parameter_conversion_class = MultimessengerConversionWithLambdas(binary_type=binary_type,
-                                                                             with_ejecta=False)
-
-        priors.conversion_function = parameter_conversion_class.priors_conversion_function
         parameter_conversion = parameter_conversion_class.convert_to_multimessenger_parameters
         waveform_generator.parameter_conversion = parameter_conversion
 
@@ -144,7 +166,7 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
                                              roq_scale_factor=roq_scale_factor))
             GWLikelihood = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
-        super(GravitationalWaveTransientLikelihoodwithEOS, self).__init__(parameters={})
+        super(GravitationalWaveTransientLikelihood, self).__init__(parameters={})
         self.parameter_conversion = parameter_conversion
         self.GWLikelihood = GWLikelihood
         self.priors = priors

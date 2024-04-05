@@ -23,7 +23,6 @@ from parallel_bilby.utils import get_cli_args
 
 from .parser import (
     create_nmma_generation_parser,
-    create_nmma_gw_generation_parser,
     parse_generation_args,
 )
 from ..em.io import loadEvent
@@ -105,6 +104,7 @@ def create_generation_logger(outdir, label):
 
 
 class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
+    ###FIXME get rid of compulsory GW structure
     def __init__(self, args, unknown_args):
         super().__init__(args, unknown_args)
         self.args = args
@@ -140,6 +140,7 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         data_dump= dict(
                 prior_file=self.prior_file,
                 args=self.args,
+                messengers = self.messengers
                 data_dump_file=self.data_dump_file,
                 meta_data=self.meta_data,
                 injection_parameters=self.injection_parameters,
