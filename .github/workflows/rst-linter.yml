@@ -1,7 +1,8 @@
-name: Lint
+name: Lint rst
 
 on:
     push:
+        paths: ['**/**.rst']
 
 jobs:
     doctor-rst:
