@@ -1,4 +1,5 @@
 rules:
-    blank_line_after_directive: 
+    blank_line_after_directive: ~
 exclude_rule_for_file:
-    - path: doc/changelog.rst
+    - path: changelog.rst
+      rule_name: blank_line_after_directive
