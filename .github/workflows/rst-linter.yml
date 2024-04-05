@@ -3,6 +3,8 @@ name: Lint rst
 on:
     push:
         paths: ['**/**.rst']
+    pull_request:
+        paths: ['**/**.rst']
 
 jobs:
     doctor-rst:
