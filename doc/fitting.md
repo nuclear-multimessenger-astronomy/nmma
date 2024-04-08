@@ -4,6 +4,27 @@ Given a light curve from an optical survey telescope (and potential follow-up), 
 
 In many cases, the lightcurve predicted by each set of parameters is **extremely high-dimensional**, given the number of measurements made. Our goal for this example is to to determine the best-fit model parameters for an object based on its observed lightcurve.
 
+### Filters
+Often you will see that lightcurve may contain data from SDSS, for example `sdssr`, `sdssg`, `sdssr`, etc. Since the current SVD models are only trained for `sdssu` filter, it is advised that the following filter names should be changed to that of Pan-STARRS1 in the lightcurve data file.
+
+:::{table}
+:width: 50%
+:align: center
+
+|  SDSS | Pan-STARRS1 |
+|:-----:|:-----------:|
+| sdssg |    ps1::g   |
+| sdssr |    ps1::r   |
+| sdssi |    ps1::i   |
+| sdssz |    ps1::z   |
+:::
+
+And corresponding to this, the filter flag should be `--filter ps1__g,ps1__r,ps__i,ps1__z`
+
+:::{note}
+The same is applicable for LSST filters.
+:::
+
 ### Example fit to simulated data
 
 Following the quick start, we assume that an injection file has been made generated and made available. For example, there are a number of extra parameters available to modify the light curve sampling, including:
