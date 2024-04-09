@@ -13,10 +13,10 @@ Often you will see that lightcurve may contain data from SDSS, for example `sdss
 
 |  SDSS | Pan-STARRS1 |
 |:-----:|:-----------:|
-| sdssg |    ps1::g   |
-| sdssr |    ps1::r   |
-| sdssi |    ps1::i   |
-| sdssz |    ps1::z   |
+| sdssg |    ps1__g   |
+| sdssr |    ps1__r   |
+| sdssi |    ps1__i   |
+| sdssz |    ps1__z   |
 :::
 
 And corresponding to this, the filter flag should be `--filter ps1__g,ps1__r,ps__i,ps1__z`
