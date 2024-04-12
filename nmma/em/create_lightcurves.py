@@ -356,7 +356,7 @@ def main(args=None):
                 fid = open(injection_outfile, "w")
                 # fid.write('# t[days] u g r i z y J H K\n')
                 # fid.write(str(" ".join(('# t[days]'," ".join(args.filters.split(',')),"\n"))))
-                fid.write("# t[days] ")
+                fid.write("t[days] ")
                 fid.write(str(" ".join(args.filters.split(","))))
                 fid.write("\n")
 
