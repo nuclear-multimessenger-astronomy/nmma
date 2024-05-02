@@ -3,8 +3,6 @@ from multiprocessing import cpu_count
 from os.path import exists
 from pathlib import Path
 from os import makedirs
-from mpi4py import MPI
-
 import requests
 from requests.exceptions import ConnectionError
 from yaml import load
@@ -15,11 +13,19 @@ REPO = "https://gitlab.com/Theodlz/nmma-models"
 
 MODELS = {}
 
+try:
+    from mpi4py import MPI
+    mpi_enabled = True
+except ImportError:
+    mpi_enabled = False
 
 def download_and_decompress(file_info):
     download(file_info)
     decompress(file_info[1])
 
+def mpi_barrier(comm):
+    if mpi_enabled:
+        comm.Barrier()
 
 def download_models_list(models_home=None):
     # first we load the models list from gitlab
@@ -29,7 +35,6 @@ def download_models_list(models_home=None):
     r = requests.get(f"{REPO}/raw/main/models.yaml", allow_redirects=True)
     with open(Path(models_home, "models.yaml"), "wb") as f:
         f.write(r.content)
-
 
 def load_models_list(models_home=None):
 
@@ -97,7 +102,6 @@ def load_models_list(models_home=None):
 
     return models, downloaded_if_missing is False
 
-
 def refresh_models_list(models_home=None):
     global MODELS
     models_home = get_models_home(models_home)
@@ -110,7 +114,6 @@ def refresh_models_list(models_home=None):
     except Exception as e:
         raise ValueError(f"Could not load models list: {str(e)}")
     return models
-
 
 def get_model(
     models_home=None,
@@ -185,20 +188,32 @@ def get_model(
         [f"{base_url}/{core_model_name}.{core_format}"] if not filters_only else []
     ) + [f"{base_url}/{model_name}/{f}.{filter_format}" for f in filters]
 
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
+    comm = None
+    if mpi_enabled:
+        try:
+            comm = MPI.COMM_WORLD
+        except Exception as e:
+            print("MPI could not be initialized:", e)
+            comm = None
+
+    rank = 0
+    if comm:
+        try:
+            rank = comm.Get_rank()
+        except Exception as e:
+            print("Error getting MPI rank:", e)
 
     missing = [(f"{u}", f"{f}") for u, f in zip(urls, filepaths) if not f.exists()]
     if len(missing) > 0:
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
 
-        if rank == 0 or not MPI.Is_initialized():
+        if rank == 0 or not comm:
             print(f"downloading {len(missing)} files for model {model_name}:")
             with ThreadPoolExecutor(
                 max_workers=min(len(missing), max(cpu_count(), 8))
             ) as executor:
                 executor.map(download_and_decompress, missing)
-        comm.Barrier()
+        mpi_barrier(comm)
 
     return [str(f) for f in filepaths], filters + skipped_filters
