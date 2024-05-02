@@ -3,6 +3,7 @@ from multiprocessing import cpu_count
 from os.path import exists
 from pathlib import Path
 from os import makedirs
+from mpi4py import MPI
 
 import requests
 from requests.exceptions import ConnectionError
@@ -184,15 +185,20 @@ def get_model(
         [f"{base_url}/{core_model_name}.{core_format}"] if not filters_only else []
     ) + [f"{base_url}/{model_name}/{f}.{filter_format}" for f in filters]
 
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
     missing = [(f"{u}", f"{f}") for u, f in zip(urls, filepaths) if not f.exists()]
     if len(missing) > 0:
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
 
-        print(f"downloading {len(missing)} files for model {model_name}:")
-        with ThreadPoolExecutor(
-            max_workers=min(len(missing), max(cpu_count(), 8))
-        ) as executor:
-            executor.map(download_and_decompress, missing)
+        if rank == 0 or not MPI.Is_initialized():
+            print(f"downloading {len(missing)} files for model {model_name}:")
+            with ThreadPoolExecutor(
+                max_workers=min(len(missing), max(cpu_count(), 8))
+            ) as executor:
+                executor.map(download_and_decompress, missing)
+        comm.Barrier()
 
     return [str(f) for f in filepaths], filters + skipped_filters

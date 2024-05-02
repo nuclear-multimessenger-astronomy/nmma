@@ -1,5 +1,5 @@
 from .models_tools import SOURCES, get_models_home, get_parser  # noqa
-
+from mpi4py import MPI
 
 def refresh_models_list(models_home=None, source=None):
 
@@ -37,6 +37,9 @@ def get_model(
     source=None,
 ):
 
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
     if source is None:
         source = SOURCES[0]
     if source not in ["gitlab"]:
@@ -48,13 +51,15 @@ def get_model(
             if source == "gitlab":
                 from .gitlab import get_model
 
-            files, filters = get_model(
-                models_home=models_home,
-                model_name=model_name,
-                filters=filters,
-                download_if_missing=download_if_missing,
-                filters_only=filters_only,
-            )
+            if rank == 0 or not MPI.Is_initialized():
+                files, filters = get_model(
+                    models_home=models_home,
+                    model_name=model_name,
+                    filters=filters,
+                    download_if_missing=download_if_missing,
+                    filters_only=filters_only,
+                )
+            comm.Barrier()
             break
         except Exception as e:
             print(f"Error while getting model from {source}: {str(e)}")
