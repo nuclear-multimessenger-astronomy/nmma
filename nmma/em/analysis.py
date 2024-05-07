@@ -1009,6 +1009,12 @@ def analysis(args):
         plt.close()
 
 
+
+
+
+
+
+
 def main(args=None):
     if args is None:
         parser = get_parser()
@@ -1027,4 +1033,10 @@ def main(args=None):
         else:
             analysis(args)
     else:
-        analysis(args)
+        if args.sampler == "neuralnet":
+            nnanalysis(args)
+        else:
+            analysis(args)
+
+
+
