@@ -1008,12 +1008,72 @@ def analysis(args):
         plt.savefig(plotName)
         plt.close()
 
+def nnanalysis(args):
+    
+    if args.model != "Ka2017":
+        print(
+            "WARNING: model selected is not currently compatible with this inference method"
+        )
+        exit()
+            
+    if args.filters: 
+        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+        if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
+                pass
+            else:
+                raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
+    if args.dt != 0.25
+        print(
+            "WARNING: model selected is not currently compatible with this time step"
+        )
+        exit()
 
+    refresh = False
+    try:
+        refresh = args.refresh_models_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
 
+    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
+    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
+    # create the kilonova data if an injection set is given
+    if args.injection:
+        with open(args.injection, "r") as f:
+            injection_dict = json.load(
+                f, object_hook=bilby.core.utils.decode_bilby_json
+            )
+        injection_df = injection_dict["injections"]
+        injection_parameters = injection_df.iloc[args.injection_num].to_dict()
 
+        if "geocent_time" in injection_parameters:
+            tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
+        elif "geocent_time_x" in injection_parameters:
+            tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
+        else:
+            print("Need either geocent_time or geocent_time_x")
+            exit(1)
+        trigger_time = tc_gps.mjd
 
+        injection_parameters["kilonova_trigger_time"] = trigger_time
+        if args.prompt_collapse:
+            injection_parameters["log10_mej_wind"] = -3.0
+
+        # sanity check for eject masses
+        if "log10_mej_dyn" in injection_parameters and not np.isfinite(
+            injection_parameters["log10_mej_dyn"]
+        ):
+            injection_parameters["log10_mej_dyn"] = -3.0
+        if "log10_mej_wind" in injection_parameters and not np.isfinite(
+            injection_parameters["log10_mej_wind"]
+        ):
+            injection_parameters["log10_mej_wind"] = -3.0
 
 def main(args=None):
     if args is None:
