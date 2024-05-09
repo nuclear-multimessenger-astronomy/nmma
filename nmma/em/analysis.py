@@ -1030,18 +1030,25 @@ def nnanalysis(args):
         )
         exit()
 
-    refresh = False
-    try:
-        refresh = args.refresh_models_list
-    except AttributeError:
-        pass
-    if refresh:
-        refresh_models_list(
-            models_home=args.svd_path if args.svd_path not in [None, ""] else None
-        )
+    # refresh = False
+    # try:
+    #     refresh = args.refresh_models_list
+    # except AttributeError:
+    #     pass
+    # if refresh:
+    #     refresh_models_list(
+    #         models_home=args.svd_path if args.svd_path not in [None, ""] else None
+    #     )
 
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+
+    # initialize required parameters
+    t_min = args.tmin
+    t_max = args.tmax
+    time_step = args.dt
+    current_points = int(round(t_max - t_min))/time_step + 1
+    num_points = 121
 
     # create the kilonova data if an injection set is given
     if args.injection:
