@@ -8,7 +8,6 @@ from ..joint.conversion import (
     )
 
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient
-from bilby.gw.likelihood.relative import RelativeBinningGravitationalWaveTransient
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Interped
 
@@ -92,19 +91,15 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
           this is the default
         - e.g., "H1": sample in the time of arrival at H1
 
-    fiducial_parameters: dictionary, fiducial parameters for relative binning
-        reference waveform
-    epsilon: float, sets the precision of the binning for relative binning
     """
 
     def __init__(self, interferometers, waveform_generator,
                  eos_path, Neos, eos_weight_path, binary_type, gw_likelihood_type,
-                 priors, fiducial_parameters, epsilon, with_eos=True,
+                 priors, with_eos=True,
                  roq_weights=None, roq_params=None, roq_scale_factor=None,
                  time_marginalization=False, distance_marginalization=False,
                  phase_marginalization=False, distance_marginalization_lookup_table=None,
                  jitter_time=True, reference_frame="sky", time_reference="geocenter"):
-
 
         # construct the eos prior
         if with_eos:
@@ -148,11 +143,6 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
             gw_likelihood_kwargs.update(dict(weights=roq_weights, roq_params=roq_params,
                                              roq_scale_factor=roq_scale_factor))
             GWLikelihood = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
-
-        elif gw_likelihood_type == 'RelativeBinningGravitationalWaveTransient':
-
-            gw_likelihood_kwargs.update(dict(fiducial_parameters=fiducial_parameters, epsilon=epsilon))
-            GWLikelihood = RelativeBinningGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         super(GravitationalWaveTransientLikelihoodwithEOS, self).__init__(parameters={})
         self.parameter_conversion = parameter_conversion

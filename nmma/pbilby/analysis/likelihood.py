@@ -2,7 +2,6 @@ import inspect
 
 import numpy as np
 import pandas as pd
-import ast
 
 from bilby.core.utils import logger
 from bilby.core.prior import Interped
@@ -48,7 +47,6 @@ def reorder_loglikelihoods(unsorted_loglikelihoods, unsorted_samples, sorted_sam
 
 
 def roq_likelihood_kwargs(args):
-    
     """Return the kwargs required for the ROQ setup
 
     Parameters
@@ -88,31 +86,7 @@ def roq_likelihood_kwargs(args):
         kwargs["quadratic_matrix"] = args.roq_quadratic_matrix
     return kwargs
 
-def relbin_likelihood_kwargs(args):
 
-    """Return the kwargs required for the relative binning setup
-
-    Parameters
-    ----------
-    args: Namespace
-        The parser arguments
-
-    Returns
-    -------
-    kwargs: dict
-        A dictionary of the required kwargs
-
-    """
-
-    kwargs = dict(
-        fiducial_parameters = ast.literal_eval(args.fiducial_parameters),
-        epsilon = args.epsilon
-        )
-
-    return kwargs
-   
-    
-    
 def setup_nmma_likelihood(
     interferometers, waveform_generator, light_curve_data, priors, args
 ):
@@ -240,10 +214,6 @@ def setup_nmma_likelihood(
         likelihood_kwargs.pop("time_marginalization", None)
         likelihood_kwargs.pop("jitter_time", None)
         likelihood_kwargs.update(roq_likelihood_kwargs(args))
-
-    elif args.likelihood_type == "RelativeBinningGravitationalWaveTransient":
-        likelihood_kwargs.update(relbin_likelihood_kwargs(args))
-        
     else:
         raise ValueError("Unknown Likelihood class {}")
 
@@ -357,10 +327,6 @@ def setup_nmma_gw_likelihood(interferometers, waveform_generator, priors, args):
         likelihood_kwargs.pop("time_marginalization", None)
         likelihood_kwargs.pop("jitter_time", None)
         likelihood_kwargs.update(roq_likelihood_kwargs(args))
-
-    elif args.likelihood_type == "RelativeBinningGravitationalWaveTransient":
-        likelihood_kwargs.update(relbin_likelihood_kwargs(args))
-
     else:
         raise ValueError("Unknown Likelihood class {}")
 
