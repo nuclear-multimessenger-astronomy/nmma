@@ -55,7 +55,7 @@ The original light curves are available on GitHub [here](https://github.com/mbul
 
 #### Wollaeger et al. 2021
 
-We use a model from [Wollaeger et al. 2021](https://arxiv.org/abs/2105.11543) spanning the plausible binary neutron star parameter space. The model is named LANL2022 in the code, and there are a number of geometries to choose from (see [here](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/em/model.py#L59) for LANL list). The model parameters are:
+We use a model from [Wollaeger et al. 2021](https://arxiv.org/abs/2105.11543) spanning the plausible binary neutron star parameter space. The models are named LANLTS1, LANLTS2, LANLTP1, and LANLTP2 in the code, representing the different geometries to choose from (see [here](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/em/model.py#L72) for LANL list). The model parameters are:
 
 * dynamical ejecta mass $M^{\rm dyn}_{\rm ej}$
 * dynamical ejecta velocity $v^{\rm dyn}_{\rm ej}$

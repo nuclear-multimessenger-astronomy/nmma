@@ -76,9 +76,15 @@ def inclination_prior_from_fits(priors, args):
 
     # check if the sky location is input
     # if not, the maximum posterior point is taken
-    if 'ra' in priors and 'dec' in priors:
-        ra = np.rad2deg(priors['ra'].peak)
-        dec = np.rad2deg(priors['dec'].peak)
+    if ('ra' in priors and 'dec' in priors) or (args.ra and args.dec):
+        if args.ra and args.dec:
+            print("Using command line input for sky location, ignoring the prior file input")
+            ra = args.ra
+            dec = args.dec
+        else:
+            print("Using prior file input for sky location")
+            ra = np.rad2deg(priors['ra'].peak)
+            dec = np.rad2deg(priors['dec'].peak)
         print(f"Using the input sky location ra={ra}, dec={dec}")
         # convert them back to theta and phi
         phi = np.deg2rad(ra)
@@ -127,7 +133,12 @@ def inclination_prior_from_fits(priors, args):
     # now have the joint distribution evaluated
     u = np.linspace(-1, 1, 1000)  # this is cosiota
     # fetch the fixed distance
-    dL = priors['luminosity_distance'].peak
+    if args.dL:
+        print("Using command line input for distance, ignoring the prior file input")
+        dL = args.dL
+    else:
+        print("Using prior file input for distance")
+        dL = priors['luminosity_distance'].peak
     prob_u = prob_density(u) * dist_norm(u) * np.square(dL) * norm(dist_mu(u), dist_sigma(u)).pdf(dL)
 
     iota = np.arccos(u)

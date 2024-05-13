@@ -386,6 +386,21 @@ def get_parser(**kwargs):
         help="Number of cos-iota nodes used in the Bayestar fits (default: 10)",
         default=10,
     )
+    parser.add_argument(
+        "--ra",
+        type=float,
+        help="Right ascension of the sky location; to be used together with fits file"
+    )
+    parser.add_argument(
+        "--dec",
+        type=float,
+        help="Declination of the sky location; to be used together with fits file"
+    )
+    parser.add_argument(
+        "--dL",
+        type=float,
+        help="Distance of the location; to be used together with fits file"
+    )
 
     parser.add_argument(
         "--skip-sampling",
@@ -565,15 +580,8 @@ def analysis(args):
             lc.to_csv(args.injection_outfile)
 
     else:
-        # load the kilonova afterglow data
-        try:
-            data = loadEvent(args.data)
-
-        except ValueError:
-            with open(args.data) as f:
-                data = json.load(f)
-                for key in data.keys():
-                    data[key] = np.array(data[key])
+        # load the lightcurve data
+        data = loadEvent(args.data)
 
         if args.trigger_time is None:
             # load the minimum time as trigger time

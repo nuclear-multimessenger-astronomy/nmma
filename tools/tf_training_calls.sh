@@ -1,8 +1,20 @@
 # Example tensorflow training calls for different model grids
 
+# model: LANLTS1
+# lightcurves: lcs_lanl_TS_wind1
+create-svdmodel --model LANLTS1 --svd-path svdmodels_LANLTS1 --interpolation-type tensorflow --tmin 0. --tmax 21.0 --dt 0.1 --data-path lcs_lanl_TS_wind1 --tensorflow-nepochs 100 --outdir output_LANLTS1_tf --plot
+
 # model: LANLTS2
 # lightcurves: lcs_lanl_TS_wind2
 create-svdmodel --model LANLTS2 --svd-path svdmodels_LANLTS2 --interpolation-type tensorflow --tmin 0. --tmax 21.0 --dt 0.1 --data-path lcs_lanl_TS_wind2 --tensorflow-nepochs 100 --outdir output_LANLTS2_tf --plot
+
+# model: LANLTP1
+# lightcurves: lcs_lanl_TP_wind1
+create-svdmodel --model LANLTP1 --svd-path svdmodels_LANLTP1 --interpolation-type tensorflow --tmin 0. --tmax 21.0 --dt 0.1 --data-path lcs_lanl_TP_wind1 --tensorflow-nepochs 100 --outdir output_LANLTP1_tf --plot
+
+# model: LANLTP2
+# lightcurves: lcs_lanl_TP_wind2
+create-svdmodel --model LANLTP2 --svd-path svdmodels_LANLTP2 --interpolation-type tensorflow --tmin 0. --tmax 21.0 --dt 0.1 --data-path lcs_lanl_TP_wind2 --tensorflow-nepochs 100 --outdir output_LANLTP2_tf --plot
 
 # model: Bu2019lm
 # lightcurves: lcs_bulla_2019_bns
@@ -16,7 +28,7 @@ create-svdmodel --model Bu2019nsbh --svd-path svdmodels_Bu2019nsbh --interpolati
 # lightcurves: lcs_bulla_2022
 create-svdmodel --model Bu2022Ye --svd-path svdmodels_Bu2022Ye --interpolation-type tensorflow --tmin 0. --tmax 21.0 --dt 0.1 --data-path lcs_bulla_2022 --tensorflow-nepochs 100 --outdir output_Bu2022Ye_tf --plot
 
-# model: Bu2022Ye
+# model: Bu2023Ye
 # lightcurves: lcs_bulla_2023
 create-svdmodel --model Bu2023Ye --svd-path svdmodels_Bu2023Ye --interpolation-type tensorflow --tmin 0. --tmax 21.0 --dt 0.1 --data-path lcs_bulla_2023 --tensorflow-nepochs 100 --outdir output_Bu2023Ye_tf --plot
 

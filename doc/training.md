@@ -84,6 +84,12 @@ For the HDF5 file format, the `resample-grid` script enables downsampling and fr
 
 	resample-grid --gridpath nmma/tests/data/lowmass_collapsar_updated.h5 --factor 5 --do-downsample
 
+### Evaluating training results
+
+While the neural network training output includes diagnostic plots like loss functions, we recommend using `svdmodel-benchmark` to perform a more thorough evaluation. This code uses the trained NN to re-generate each light curve in the grid used for training and computes a reduced chi-squared value between the two. The distribution of these reduced chi-squared values are plotted filter-by-filter and saved in a json file.
+
+The `plot-svdmodel-benchmarks` script reads the json file associated with each model in a directory and creates a single bar plot per model showing the 25th, 50th and 75th percentiles of the reduced chi-squared distributions for each filter. The plots also list the maximum chi-squared value across all filters. This output provides a useful summary of training for each model, and these plots are included on the gitlab repo that contains the latest trained models.
+
 ### Spectral grids
 
 Often, the simulations come on spectral grids rather than as light curves, and it could be useful to create surrogate models for these spectral grids instead. In this case, the software expects files of the form:

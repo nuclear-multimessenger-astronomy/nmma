@@ -1,0 +1,4 @@
+chirp_mass = Uniform(name = "chirp_mass", minimum = 1.184, maximum = 1.19)
+eta_star = Uniform(name = "eta_star", minimum = -20, maximum = -5.5)
+log10_mdisk = Uniform(name = "log10_mdisk", minimum = -1.4, maximum = -0.6)
+log10_mej_dyn = Uniform(name = "log10_mej_dyn", minimum = -2.75, maximum = -2.05)
