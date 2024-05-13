@@ -106,8 +106,7 @@ def relbin_likelihood_kwargs(args):
 
     kwargs = dict(
         fiducial_parameters = ast.literal_eval(args.fiducial_parameters),
-        epsilon = args.epsilon,
-        update_fiducial_parameters = args.update_fiducial_parameters
+        epsilon = args.epsilon
         )
 
     return kwargs
