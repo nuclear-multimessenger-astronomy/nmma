@@ -1009,13 +1009,16 @@ def analysis(args):
         plt.close()
 
 def nnanalysis(args):
-    
+
+    # only continue if the Kasen model is selected
     if args.model != "Ka2017":
         print(
             "WARNING: model selected is not currently compatible with this inference method"
         )
         exit()
-            
+
+    # currently ensure just ztfr, ztfg, ztfi filters are offered
+    # can be made flexible later on
     if args.filters: 
         filters = args.filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
@@ -1024,22 +1027,22 @@ def nnanalysis(args):
             else:
                 raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
+    # need to interpolate between data points if time step is not 0.25
     if args.dt != 0.25
-        print(
-            "WARNING: model selected is not currently compatible with this time step"
-        )
+        do_lin_interpolation = True
         exit()
 
-    # refresh = False
-    # try:
-    #     refresh = args.refresh_models_list
-    # except AttributeError:
-    #     pass
-    # if refresh:
-    #     refresh_models_list(
-    #         models_home=args.svd_path if args.svd_path not in [None, ""] else None
-    #     )
+    refresh = False
+    try:
+        refresh = args.refresh_models_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
 
+    # set up outdir
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
@@ -1081,6 +1084,11 @@ def nnanalysis(args):
             injection_parameters["log10_mej_wind"]
         ):
             injection_parameters["log10_mej_wind"] = -3.0
+
+    # run the neural network analysis
+    result = flow_analysis(lightcurvetensor)
+    fig = plot_flow_inference(truth, samples)
+
 
 def main(args=None):
     if args is None:
