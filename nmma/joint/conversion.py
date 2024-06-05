@@ -96,31 +96,35 @@ class NSBHEjectaFitting(object):
     def __init__(self):
         pass
 
-    def chieff2risco(self, chi_eff):
+    def chibh2risco(self, chi_bh):
 
-        Z1 = 1.0 + (1.0 - chi_eff ** 2) ** (1.0 / 3) * (
-            (1 + chi_eff) ** (1.0 / 3) + (1 - chi_eff) ** (1.0 / 3)
+        Z1 = 1.0 + (1.0 - chi_bh ** 2) ** (1.0 / 3) * (
+            (1 + chi_bh) ** (1.0 / 3) + (1 - chi_bh) ** (1.0 / 3)
         )
-        Z2 = np.sqrt(3.0 * chi_eff ** 2 + Z1 ** 2.0)
+        Z2 = np.sqrt(3.0 * chi_bh ** 2 + Z1 ** 2.0)
 
-        return 3.0 + Z2 - np.sign(chi_eff) * np.sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2))
+        return 3.0 + Z2 - np.sign(chi_bh) * np.sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2))
 
     def remnant_disk_mass_fitting(
         self,
         mass_1_source,
         mass_2_source,
         compactness_2,
-        chi_eff,
+        chi_bh,
         a=0.40642158,
         b=0.13885773,
         c=0.25512517,
         d=0.761250847,
     ):
+        '''
+        equation (4) in https://arxiv.org/pdf/1807.00011
+        '''
 
         mass_ratio_invert = mass_1_source / mass_2_source
         symm_mass_ratio = mass_ratio_invert / np.power(1.0 + mass_ratio_invert, 2.0)
 
-        risco = self.chieff2risco(chi_eff)
+        #  use the BH spin to find the normalized risco
+        risco = self.chibh2risco(chi_bh)
         bayon_mass_2 = (
             mass_2_source * (1.0 + 0.6 * compactness_2) / (1.0 - 0.5 * compactness_2)
         )
@@ -143,7 +147,7 @@ class NSBHEjectaFitting(object):
         mass_1_source,
         mass_2_source,
         compactness_2,
-        chi_eff,
+        chi_bh,
         a1=7.11595154e-03,
         a2=1.43636803e-03,
         a4=-2.76202990e-02,
@@ -157,7 +161,8 @@ class NSBHEjectaFitting(object):
 
         mass_ratio_invert = mass_1_source / mass_2_source
 
-        risco = self.chieff2risco(chi_eff)
+        #  use the BH spin to find the normalized risco
+        risco = self.chibh2risco(chi_bh)
         bayon_mass_2 = (
             mass_2_source * (1.0 + 0.6 * compactness_2) / (1.0 - 0.5 * compactness_2)
         )
