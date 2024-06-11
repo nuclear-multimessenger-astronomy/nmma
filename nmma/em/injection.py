@@ -326,23 +326,68 @@ def create_light_curve_data(
             sim.to_csv(args.outdir + "/too.csv", index=False)
 
     if rubin_ToO:
+        print("Using rubin observing strategy.")
         start = tmin + tc
-        if args.rubin_ToO_type == "BNS":
+        if args.rubin_ToO_type == "platinum":
+            # platinum means 90% GW skymap <30 sq deg
+            # I made this name up, this is the gold strategy for an event similar to GW170817 (close and well localized)
+            # Three observations Night0 with grizy filters
+            # One scan Night 1,2,3 w/ same filters
             strategy = [
-                [1 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
-                [2 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
-                [4 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
-                [1.0, ["ps1__g", "ps1__z", "ps1__i"]],
+                [1 / 24.0, ["ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [2 / 24.0, ["ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [4 / 24.0, ["ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [1.0, ["ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [2.0, ["ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
+                [3.0, ["ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
             ]
-        elif args.rubin_ToO_type == "NSBH":
+        elif args.rubin_ToO_type == "gold":
+            # gold means 90% GW skymap <100 sq deg
+            # Three pointings Night 0 with gri (possibly grz if more sensitive to KNe)
+            # One scan Night 1,2,3 w/ r+i
             strategy = [
-                [1 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
-                [4 / 24.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
-                [1.0, ["sdssu", "ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]],
-                [2.0, ["ps1__g", "ps1__z", "ps1__i"]],
+                [1 / 24.0, ["ps1__g", "ps1__r", "ps1__i"]],
+                [2 / 24.0, ["ps1__g", "ps1__r", "ps1__i"]],
+                [4 / 24.0, ["ps1__g", "ps1__r", "ps1__i"]],
+                [1.0, ["ps1__r", "ps1__i"]],
+                [2.0, ["ps1__r", "ps1__i"]],
+                [3.0, ["ps1__r", "ps1__i"]],
+            ]
+        elif args.rubin_ToO_type == "gold_z":
+            # gold means 90% GW skymap <100 sq deg
+            # Three pointings Night 0 with gri (possibly grz if more sensitive to KNe)
+            # One scan Night 1,2,3 w/ r+i
+            strategy = [
+                [1 / 24.0, ["ps1__g", "ps1__r", "ps1__z"]],
+                [2 / 24.0, ["ps1__g", "ps1__r", "ps1__z"]],
+                [4 / 24.0, ["ps1__g", "ps1__r", "ps1__z"]],
+                [1.0, ["ps1__r", "ps1__i"]],
+                [2.0, ["ps1__r", "ps1__i"]],
+                [3.0, ["ps1__r", "ps1__i"]],
+            ]
+        elif args.rubin_ToO_type == "silver":
+            # silver means 90% GW skymap <500 sq deg
+            # One scan Night 0 w/ g+i or g+z
+            # One scan each Night 1,2,3 w/ same filters
+            strategy = [
+                [1 / 24.0, ["ps1__g", "ps1__i"]],
+                [1.0, ["ps1__g", "ps1__i"]],
+                [2.0, ["ps1__g", "ps1__i"]],
+                [3.0, ["ps1__g", "ps1__i"]],
+            ]
+        elif args.rubin_ToO_type == "silver_z":
+            # silver means 90% GW skymap <500 sq deg
+            # One scan Night 0 w/ g+i or g+z
+            # One scan each Night 1,2,3 w/ same filters
+            strategy = [
+                [1 / 24.0, ["ps1__g", "ps1__z"]],
+                [1.0, ["ps1__g", "ps1__z"]],
+                [2.0, ["ps1__g", "ps1__z"]],
+                [3.0, ["ps1__g", "ps1__z"]],
             ]
         else:
-            raise ValueError("args.rubin_ToO_type should be either BNS or NSBH")
+            raise ValueError("args.rubin_ToO_type should be either platinum, gold, or silver")
+        # took type names from Rubin 2024 Workshop write-up
 
         mjds, passbands = [], []
         sim = pd.DataFrame()
@@ -369,6 +414,7 @@ def create_light_curve_data(
                 assume_sorted=True,
             )
             times = group["mjd"].tolist()
+            #print("The times of observation are: ", times)
             data_per_filt = np.vstack([times, lc(times), lcerr(times)]).T
             data[filt] = data_per_filt
             passbands_to_keep.append(filt)

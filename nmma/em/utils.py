@@ -1740,3 +1740,20 @@ def parse_LANLfile(filename, key="band"):
     nrows = count - key_count - 3
 
     return nrows, keys_in_file
+
+
+def detection_limits(ztf-ToO, rubin-ToO, rubin-sampling):
+	detection_limit = {}
+	if ztf-ToO:
+		ztf_detection_limit = {'ztfg':21.1, 'ztfr':20.9, 'ztfi':20.1}
+	elif rubin-ToO:
+		rubin_detection_limit = {'sdssu':23.8,'ps1__g':24.5,'ps1__r':24,'ps1__i':23.4,'ps1__z':22.7,'ps1__y':23}
+	elif rubin-followup:
+		rubin_followup_detection_limit = {'sdssu':25.8,'ps1__g':26.9,'ps1__r':26.9,'ps1__i':26.4,'ps1__z':25.6,'ps1__y':24.8}
+	else:
+		detection_limit = None
+	
+	if detection_limit not None:
+		detection_limit = {**ztf_detection_limit, **rubin_detection_limit, **rubin_followup_detection_limit} 
+
+	return detection_limit
