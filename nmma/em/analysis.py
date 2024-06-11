@@ -471,7 +471,7 @@ def analysis(args):
     else:
         sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
 
-	  print("Creating light curve model for inference")
+	print("Creating light curve model for inference")
 
     if args.filters:
         filters = args.filters.replace(" ", "")  # remove all whitespace
