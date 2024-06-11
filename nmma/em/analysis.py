@@ -398,6 +398,22 @@ def get_parser(**kwargs):
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--ra",
+        type=float,
+        help="Right ascension of the sky location; to be used together with fits file"
+    )
+    parser.add_argument(
+        "--dec",
+        type=float,
+        help="Declination of the sky location; to be used together with fits file"
+    )
+    parser.add_argument(
+        "--dL",
+        type=float,
+        help="Distance of the location; to be used together with fits file"
+    )
+
     return parser
 
 
@@ -454,6 +470,16 @@ def analysis(args):
         )
     else:
         sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+
+	  print("Creating light curve model for inference")
+
+    if args.filters:
+        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+        if len(filters) == 0:
+            raise ValueError("Need at least one valid filter.")
+    else:
+        filters = None
 
     # create the kilonova data if an injection set is given
     if args.injection:
