@@ -470,8 +470,8 @@ def analysis(args):
         )
     else:
         sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
-
-	print("Creating light curve model for inference")
+        
+    print("Creating light curve model for inference")
 
     if args.filters:
         filters = args.filters.replace(" ", "")  # remove all whitespace
@@ -576,7 +576,7 @@ def analysis(args):
                     detection_limit = {x: np.inf for x in filters}
             else:
                 detection_limit = literal_eval(args.detection_limit)
- 
+
             #print("the detection limits for this run are: ", detection_limit)
 
             for filt in filters:
