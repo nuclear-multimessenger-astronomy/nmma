@@ -1740,3 +1740,4 @@ def parse_LANLfile(filename, key="band"):
     nrows = count - key_count - 3
 
     return nrows, keys_in_file
+
