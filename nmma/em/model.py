@@ -99,12 +99,52 @@ model_parameters_dict = {
     ],
 }
 
+class Mixin:
+    
 
-class GenericCombineLightCurveModel(object):
+    @property
+    def citation(self):
+
+        citation_dict = {
+            **dict.fromkeys(["LANLTP1", "LANLTP2", "LANLTS1", "LANLTS2"], ["https://arxiv.org/abs/2105.11543"]),
+            "Ka2017": ["https://arxiv.org/abs/1710.05463"],
+            **dict.fromkeys(["Bu2019lm", "Bu2019lm_sparse"], ["https://arxiv.org/abs/2002.11355", "https://arxiv.org/abs/1906.04205"]),
+            **dict.fromkeys(
+                [
+                    "AnBa2022_sparse",
+                    "AnBa2022_log",
+                    "AnBa2022_linear",
+                ],
+                ["https://arxiv.org/abs/2302.09226", "https://arxiv.org/abs/2205.10421"],
+            ),
+            "Bu2019nsbh": ["https://arxiv.org/abs/2009.07210", "https://arxiv.org/abs/1906.04205"],
+            **dict.fromkeys(
+                ["Bu2022Ye", "Bu2023Ye", "Bu2022mv"], ["https://arxiv.org/abs/2307.11080", "https://arxiv.org/abs/1906.04205"]
+            ),
+            "TrPi2018": ["https://arxiv.org/abs/1909.11691"],
+            "Piro2021": ["https://arxiv.org/abs/2007.08543"],
+            "Me2017": ["https://arxiv.org/abs/1910.01617"],
+            "Sr2023": None,  # TODO: add citation,
+            "nugent-hyper": ["https://sncosmo.readthedocs.io/en/stable/source-list.html"],
+            **dict.fromkeys(["PL_BB_fixedT", "blackbody_fixedT", "synchrotron_powerlaw"], "Analytical models"),
+        }
+        return {self.model: citation_dict[self.model]}
+
+
+class GenericCombineLightCurveModel(Mixin):
     def __init__(self, models, sample_times):
         self.models = models
         self.sample_times = sample_times
 
+    @property
+    def citation(self):
+        citations = []
+        for model in self.models:
+
+            citations.append(model.citation)
+
+        return citations
+    
     def generate_lightcurve(self, sample_times, parameters, return_all=False):
 
         total_lbol = np.zeros(len(sample_times))
@@ -149,7 +189,7 @@ class GenericCombineLightCurveModel(object):
             return total_lbol, total_mag
 
 
-class SVDLightCurveModel(object):
+class SVDLightCurveModel(Mixin):
     """A light curve model object
 
     An object to evaluate the light curve across filters
@@ -412,7 +452,7 @@ class SVDLightCurveModel(object):
         return spec
 
 
-class GRBLightCurveModel(object):
+class GRBLightCurveModel(Mixin):
     def __init__(
         self,
         sample_times,
@@ -508,7 +548,7 @@ class GRBLightCurveModel(object):
         return lbol, mag
 
 
-class KilonovaGRBLightCurveModel(object):
+class KilonovaGRBLightCurveModel(Mixin):
     def __init__(
         self,
         sample_times,
@@ -537,6 +577,12 @@ class KilonovaGRBLightCurveModel(object):
             self.kilonova_lightcurve_model
         )
         return self.__class__.__name__ + details
+    
+    @property
+    def citation(self):
+        citations = [self.grb_lightcurve_model.citation]
+        citations.append(self.kilonova_lightcurve_model.citation)
+        return citations
 
     def observation_angle_conversion(self, parameters):
 
@@ -600,7 +646,7 @@ class KilonovaGRBLightCurveModel(object):
         return total_lbol, total_mag
 
 
-class HostGalaxyLightCurveModel(object):
+class HostGalaxyLightCurveModel(Mixin):
     def __init__(
         self,
         sample_times,
@@ -657,7 +703,7 @@ class HostGalaxyLightCurveModel(object):
         return lbol, mag
 
 
-class SupernovaLightCurveModel(object):
+class SupernovaLightCurveModel(Mixin):
     def __init__(
         self,
         sample_times,
@@ -719,7 +765,7 @@ class SupernovaLightCurveModel(object):
         return lbol, mag
 
 
-class SupernovaGRBLightCurveModel(object):
+class SupernovaGRBLightCurveModel(Mixin):
     def __init__(
         self,
         sample_times,
@@ -744,6 +790,11 @@ class SupernovaGRBLightCurveModel(object):
     def __repr__(self):
         details = "(grb model using afterglowpy with supernova model nugent-hyper)"
         return self.__class__.__name__ + details
+    
+    @property
+    def citation(self):
+        citations = [self.grb_lightcurve_model.citation, self.supernova_lightcurve_model.citation]
+        return citations
 
     def generate_lightcurve(self, sample_times, parameters):
 
@@ -786,7 +837,7 @@ class SupernovaGRBLightCurveModel(object):
         return total_lbol, total_mag
 
 
-class ShockCoolingLightCurveModel(object):
+class ShockCoolingLightCurveModel(Mixin):
     def __init__(
         self, sample_times, parameter_conversion=None, model="Piro2021", filters=None
     ):
@@ -839,7 +890,7 @@ class ShockCoolingLightCurveModel(object):
         return lbol, mag
 
 
-class SupernovaShockCoolingLightCurveModel(object):
+class SupernovaShockCoolingLightCurveModel(Mixin):
     def __init__(self, sample_times, parameter_conversion=None, filters=None):
 
         self.sample_times = sample_times
@@ -857,6 +908,11 @@ class SupernovaShockCoolingLightCurveModel(object):
             "(shock cooling model using Piro2021 with supernova model nugent-hyper)"
         )
         return self.__class__.__name__ + details
+    
+    @property
+    def citation(self):
+        citations = [self.sc_lightcurve_model.citation, self.supernova_lightcurve_model.citation]
+        return citations
 
     def generate_lightcurve(self, sample_times, parameters):
 
@@ -903,7 +959,7 @@ class SupernovaShockCoolingLightCurveModel(object):
         return total_lbol, total_mag
 
 
-class SimpleKilonovaLightCurveModel(object):
+class SimpleKilonovaLightCurveModel(Mixin):
     def __init__(
         self, sample_times, parameter_conversion=None, model="Me2017", filters=None
     ):
