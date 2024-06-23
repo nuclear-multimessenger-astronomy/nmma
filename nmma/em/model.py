@@ -100,7 +100,7 @@ model_parameters_dict = {
 }
 
 
-class Mixin:
+class LightCurveMixin:
 
     @property
     def citation(self):
@@ -134,7 +134,7 @@ class Mixin:
         return {self.model: citation_dict[self.model]}
 
 
-class GenericCombineLightCurveModel(Mixin):
+class GenericCombineLightCurveModel(LightCurveMixin):
     def __init__(self, models, sample_times):
         self.models = models
         self.sample_times = sample_times
@@ -191,7 +191,7 @@ class GenericCombineLightCurveModel(Mixin):
             return total_lbol, total_mag
 
 
-class SVDLightCurveModel(Mixin):
+class SVDLightCurveModel(LightCurveMixin):
     """A light curve model object
 
     An object to evaluate the light curve across filters
@@ -438,7 +438,7 @@ class SVDLightCurveModel(Mixin):
         return spec
 
 
-class GRBLightCurveModel(Mixin):
+class GRBLightCurveModel(LightCurveMixin):
     def __init__(
         self,
         sample_times,
@@ -527,7 +527,7 @@ class GRBLightCurveModel(Mixin):
         return lbol, mag
 
 
-class KilonovaGRBLightCurveModel(Mixin):
+class KilonovaGRBLightCurveModel(LightCurveMixin):
     def __init__(
         self,
         sample_times,
@@ -620,7 +620,7 @@ class KilonovaGRBLightCurveModel(Mixin):
         return total_lbol, total_mag
 
 
-class HostGalaxyLightCurveModel(Mixin):
+class HostGalaxyLightCurveModel(LightCurveMixin):
     def __init__(
         self,
         sample_times,
@@ -677,7 +677,7 @@ class HostGalaxyLightCurveModel(Mixin):
         return lbol, mag
 
 
-class SupernovaLightCurveModel(Mixin):
+class SupernovaLightCurveModel(LightCurveMixin):
     def __init__(
         self,
         sample_times,
@@ -739,7 +739,7 @@ class SupernovaLightCurveModel(Mixin):
         return lbol, mag
 
 
-class SupernovaGRBLightCurveModel(Mixin):
+class SupernovaGRBLightCurveModel(LightCurveMixin):
     def __init__(
         self,
         sample_times,
@@ -806,7 +806,7 @@ class SupernovaGRBLightCurveModel(Mixin):
         return total_lbol, total_mag
 
 
-class ShockCoolingLightCurveModel(Mixin):
+class ShockCoolingLightCurveModel(LightCurveMixin):
     def __init__(self, sample_times, parameter_conversion=None, model="Piro2021", filters=None):
         """A light curve model object
 
@@ -855,7 +855,7 @@ class ShockCoolingLightCurveModel(Mixin):
         return lbol, mag
 
 
-class SupernovaShockCoolingLightCurveModel(Mixin):
+class SupernovaShockCoolingLightCurveModel(LightCurveMixin):
     def __init__(self, sample_times, parameter_conversion=None, filters=None):
 
         self.sample_times = sample_times
@@ -919,7 +919,7 @@ class SupernovaShockCoolingLightCurveModel(Mixin):
         return total_lbol, total_mag
 
 
-class SimpleKilonovaLightCurveModel(Mixin):
+class SimpleKilonovaLightCurveModel(LightCurveMixin):
     def __init__(self, sample_times, parameter_conversion=None, model="Me2017", filters=None):
         """A light curve model object
 
