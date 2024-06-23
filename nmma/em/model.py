@@ -126,9 +126,9 @@ class Mixin:
             "TrPi2018": ["https://arxiv.org/abs/1909.11691"],
             "Piro2021": ["https://arxiv.org/abs/2007.08543"],
             "Me2017": ["https://arxiv.org/abs/1910.01617"],
-            "Sr2023": None,  # TODO: add citation,
+            "Sr2023": [None],  # TODO: add citation,
             "nugent-hyper": ["https://sncosmo.readthedocs.io/en/stable/source-list.html"],
-            **dict.fromkeys(["PL_BB_fixedT", "blackbody_fixedT", "synchrotron_powerlaw"], "Analytical models"),
+            **dict.fromkeys(["PL_BB_fixedT", "blackbody_fixedT", "synchrotron_powerlaw"], ["Analytical models"]),
         }
         
         return {self.model: citation_dict[self.model]}
