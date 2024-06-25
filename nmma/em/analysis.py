@@ -1024,8 +1024,8 @@ def nnanalysis(args):
         filters = filters.split(",")
         if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
                 pass
-            else:
-                raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
+        else:
+            raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
     # need to interpolate between data points if time step is not 0.25
     if args.dt != 0.25
@@ -1053,6 +1053,18 @@ def nnanalysis(args):
     current_points = int(round(t_max - t_min))/time_step + 1
     num_points = 121
 
+    if args.log_space_time:
+        if args.n_tstep:
+            n_step = args.n_tstep
+        else:
+            n_step = int((args.tmax - args.tmin) / args.dt)
+        sample_times = np.logspace(
+            np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
+        )
+    else:
+        sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    print("Creating light curve model for inference")
+
     # create the kilonova data if an injection set is given
     if args.injection:
         with open(args.injection, "r") as f:
@@ -1061,6 +1073,9 @@ def nnanalysis(args):
             )
         injection_df = injection_dict["injections"]
         injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+
+        # save injection parameters as a pytorch tensor as well:
+        
 
         if "geocent_time" in injection_parameters:
             tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
