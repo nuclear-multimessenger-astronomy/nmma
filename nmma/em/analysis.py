@@ -1016,72 +1016,74 @@ def nnanalysis(args):
             "WARNING: model selected is not currently compatible with this inference method"
         )
         exit()
+    else: 
+        pass
 
     # currently ensure just ztfr, ztfg, ztfi filters are offered
     # can be made flexible later on
-    if args.filters: 
-        filters = args.filters.replace(" ", "")  # remove all whitespace
-        filters = filters.split(",")
-        if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
-            pass
-        else:
-            raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
+    # if args.filters: 
+    #     filters = args.filters.replace(" ", "")  # remove all whitespace
+    #     filters = filters.split(",")
+    #     if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
+    #         pass
+    #     else:
+    #         raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
-    print(filters)
+    # print(filters)
 
-    # need to interpolate between data points if time step is not 0.25
-    if args.dt != 0.25:
-        do_lin_interpolation = True
-        exit()
+    # # need to interpolate between data points if time step is not 0.25
+    # if args.dt != 0.25:
+    #     do_lin_interpolation = True
+    #     exit()
 
-    refresh = False
-    try:
-        refresh = args.refresh_models_list
-    except AttributeError:
-        pass
-    if refresh:
-        refresh_models_list(
-            models_home=args.svd_path if args.svd_path not in [None, ""] else None
-        )
+    # refresh = False
+    # try:
+    #     refresh = args.refresh_models_list
+    # except AttributeError:
+    #     pass
+    # if refresh:
+    #     refresh_models_list(
+    #         models_home=args.svd_path if args.svd_path not in [None, ""] else None
+    #     )
 
-    # set up outdir
-    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
-    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+    # # set up outdir
+    # bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
+    # bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
     # initialize required parameters
-    t_min = args.tmin
-    t_max = args.tmax
-    time_step = args.dt
-    current_points = int(round(t_max - t_min))/time_step + 1
-    num_points = 121
+    # t_min = args.tmin
+    # t_max = args.tmax
+    # time_step = args.dt
+    # current_points = int(round(t_max - t_min))/time_step + 1
+    # num_points = 121
 
-    print('min t:', t_min, 'max t', t_max, 'time step', time_step, 'number of points', current_points)
+    # print('min t:', t_min, 'max t', t_max, 'time step', time_step, 'number of points', current_points)
 
-    if args.log_space_time:
-        if args.n_tstep:
-            n_step = args.n_tstep
-        else:
-            n_step = int((args.tmax - args.tmin) / args.dt)
-        sample_times = np.logspace(
-            np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
-        )
-    else:
-        sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
-    print("Creating light curve model for inference")
+    # if args.log_space_time:
+    #     if args.n_tstep:
+    #         n_step = args.n_tstep
+    #     else:
+    #         n_step = int((args.tmax - args.tmin) / args.dt)
+    #     sample_times = np.logspace(
+    #         np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
+    #     )
+    # else:
+    #     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    # print("Creating light curve model for inference")
 
-    # create the kilonova data if an injection set is given
-    if args.injection:
-        with open(args.injection, "r") as f:
-            injection_dict = json.load(
-                f, object_hook=bilby.core.utils.decode_bilby_json
-            )
-        injection_df = injection_dict["injections"]
-        injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+    # # create the kilonova data if an injection set is given
+    # if args.injection:
+    #     with open(args.injection, "r") as f:
+    #         injection_dict = json.load(
+    #             f, object_hook=bilby.core.utils.decode_bilby_json
+    #         )
+    #     injection_df = injection_dict["injections"]
+    #     injection_parameters = injection_df.iloc[args.injection_num].to_dict()
 
-        print(injection_df)
-        print(injection_parameters)
+    #     print(injection_df)
+    #     print(injection_parameters)
 
-    #     # save injection parameters as a pytorch tensor as well:
+    # #     # save injection parameters as a pytorch tensor as well:
         
 
     #     if "geocent_time" in injection_parameters:
