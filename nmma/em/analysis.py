@@ -1027,6 +1027,8 @@ def nnanalysis(args):
         else:
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
+    print(filters)
+
     # need to interpolate between data points if time step is not 0.25
     if args.dt != 0.25:
         do_lin_interpolation = True
@@ -1053,6 +1055,8 @@ def nnanalysis(args):
     current_points = int(round(t_max - t_min))/time_step + 1
     num_points = 121
 
+    print('min t:', t_min, 'max t', t_max, 'time step', time_step, 'number of points', current_points)
+
     if args.log_space_time:
         if args.n_tstep:
             n_step = args.n_tstep
@@ -1074,35 +1078,38 @@ def nnanalysis(args):
         injection_df = injection_dict["injections"]
         injection_parameters = injection_df.iloc[args.injection_num].to_dict()
 
-        # save injection parameters as a pytorch tensor as well:
+        print(injection_df)
+        print(injection_parameters)
+
+    #     # save injection parameters as a pytorch tensor as well:
         
 
-        if "geocent_time" in injection_parameters:
-            tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
-        elif "geocent_time_x" in injection_parameters:
-            tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
-        else:
-            print("Need either geocent_time or geocent_time_x")
-            exit(1)
-        trigger_time = tc_gps.mjd
+    #     if "geocent_time" in injection_parameters:
+    #         tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
+    #     elif "geocent_time_x" in injection_parameters:
+    #         tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
+    #     else:
+    #         print("Need either geocent_time or geocent_time_x")
+    #         exit(1)
+    #     trigger_time = tc_gps.mjd
 
-        injection_parameters["kilonova_trigger_time"] = trigger_time
-        if args.prompt_collapse:
-            injection_parameters["log10_mej_wind"] = -3.0
+    #     injection_parameters["kilonova_trigger_time"] = trigger_time
+    #     if args.prompt_collapse:
+    #         injection_parameters["log10_mej_wind"] = -3.0
 
-        # sanity check for eject masses
-        if "log10_mej_dyn" in injection_parameters and not np.isfinite(
-            injection_parameters["log10_mej_dyn"]
-        ):
-            injection_parameters["log10_mej_dyn"] = -3.0
-        if "log10_mej_wind" in injection_parameters and not np.isfinite(
-            injection_parameters["log10_mej_wind"]
-        ):
-            injection_parameters["log10_mej_wind"] = -3.0
+    #     # sanity check for eject masses
+    #     if "log10_mej_dyn" in injection_parameters and not np.isfinite(
+    #         injection_parameters["log10_mej_dyn"]
+    #     ):
+    #         injection_parameters["log10_mej_dyn"] = -3.0
+    #     if "log10_mej_wind" in injection_parameters and not np.isfinite(
+    #         injection_parameters["log10_mej_wind"]
+    #     ):
+    #         injection_parameters["log10_mej_wind"] = -3.0
 
-    # run the neural network analysis
-    result = flow_analysis(lightcurvetensor)
-    fig = plot_flow_inference(truth, samples)
+    # # run the neural network analysis
+    # result = flow_analysis(lightcurvetensor)
+    # fig = plot_flow_inference(truth, samples)
 
 
 def main(args=None):
