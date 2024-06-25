@@ -1028,7 +1028,7 @@ def nnanalysis(args):
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
     # need to interpolate between data points if time step is not 0.25
-    if args.dt != 0.25
+    if args.dt != 0.25:
         do_lin_interpolation = True
         exit()
 
