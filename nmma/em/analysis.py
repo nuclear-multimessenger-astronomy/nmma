@@ -1008,18 +1008,20 @@ def analysis(args):
         plt.savefig(plotName)
         plt.close()
 
-# def nnanalysis(args):
+def nnanalysis(args):
 
-#     print('entering here')
+    print('entering here')
 
-#     # only continue if the Kasen model is selected
-#     if args.model != "Ka2017":
-#         print(
-#             "WARNING: model selected is not currently compatible with this inference method"
-#         )
-#         exit()
-#     else: 
-#         pass
+    # only continue if the Kasen model is selected
+    if args.model != "Ka2017":
+        print(
+            "WARNING: model selected is not currently compatible with this inference method"
+        )
+        exit()
+    else: 
+        pass
+
+    print('got the right model')
 
     # currently ensure just ztfr, ztfg, ztfi filters are offered
     # can be made flexible later on
@@ -1133,11 +1135,11 @@ def main(args=None):
                 analysis(args)
         else:
             analysis(args)
-    # else:
-    #     if args.sampler == "neuralnet":
-    #         nnanalysis(args)
-    #     else:
-    #         analysis(args)
+    else:
+        if args.sampler == "neuralnet":
+            nnanalysis(args)
+        else:
+            analysis(args)
 
 
 
