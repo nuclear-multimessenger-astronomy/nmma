@@ -1023,7 +1023,7 @@ def nnanalysis(args):
         filters = args.filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
         if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
-                pass
+            pass
         else:
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
