@@ -1010,8 +1010,6 @@ def analysis(args):
 
 def nnanalysis(args):
 
-    print('entering here')
-
     # only continue if the Kasen model is selected
     if args.model != "Ka2017":
         print(
@@ -1021,10 +1019,9 @@ def nnanalysis(args):
     else: 
         pass
 
-    print('got the right model')
+    print('Starting LFI')
 
-    # currently ensure just ztfr, ztfg, ztfi filters are offered
-    # can be made flexible later on
+    # only can use ztfr, ztfg, and ztfi filters in the light curve data
     if args.filters: 
         filters = args.filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
@@ -1034,12 +1031,12 @@ def nnanalysis(args):
         else:
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
-    
-
-    # # need to interpolate between data points if time step is not 0.25
-    # if args.dt != 0.25:
-    #     do_lin_interpolation = True
-    #     exit()
+    # need to interpolate between data points if time step is not 0.25
+    if args.dt:
+        if args.dt != 0.25:
+            do_lin_interpolation = True
+        else:
+            do_lin_interpolation = False
 
     # refresh = False
     # try:
