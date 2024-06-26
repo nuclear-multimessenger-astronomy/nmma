@@ -1058,14 +1058,18 @@ def nnanalysis(args):
     # initialize required parameters
     if args.tmin:
         t_min = args.tmin
+    else:
+        t_min = 0
 
     if args.tmax:
         t_max = args.tmax
+    else:
+        t_min = 20
     
-    # current_points = int(round(t_max - t_min))/time_step + 1
+    current_points = int(round(t_max - t_min))/time_step + 1
     num_points = 121
 
-    # print('min t:', t_min, 'max t', t_max, 'time step', time_step, 'number of points', current_points)
+    print('min t:', t_min, 'max t', t_max, 'time step', time_step, 'number of points', current_points)
 
     # if args.log_space_time:
     #     if args.n_tstep:
@@ -1078,6 +1082,138 @@ def nnanalysis(args):
     # else:
     #     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
     # print("Creating light curve model for inference")
+
+    # create the kilonova data if an injection set is given
+    if args.injection:
+        with open(args.injection, "r") as f:
+            injection_dict = json.load(
+                f, object_hook=bilby.core.utils.decode_bilby_json
+            )
+        injection_df = injection_dict["injections"]
+        injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+
+        if "geocent_time" in injection_parameters:
+            tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
+        elif "geocent_time_x" in injection_parameters:
+            tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
+        else:
+            print("Need either geocent_time or geocent_time_x")
+            exit(1)
+        trigger_time = tc_gps.mjd
+
+        injection_parameters["kilonova_trigger_time"] = trigger_time
+        if args.prompt_collapse:
+            injection_parameters["log10_mej_wind"] = -3.0
+
+        # sanity check for eject masses
+        if "log10_mej_dyn" in injection_parameters and not np.isfinite(
+            injection_parameters["log10_mej_dyn"]
+        ):
+            injection_parameters["log10_mej_dyn"] = -3.0
+        if "log10_mej_wind" in injection_parameters and not np.isfinite(
+            injection_parameters["log10_mej_wind"]
+        ):
+            injection_parameters["log10_mej_wind"] = -3.0
+
+        args.kilonova_tmin = args.tmin
+        args.kilonova_tmax = args.tmax
+        args.kilonova_tstep = args.dt
+        args.kilonova_error = args.photometric_error_budget
+
+        if not args.injection_model:
+            args.kilonova_injection_model = args.model
+        else:
+            args.kilonova_injection_model = args.injection_model
+        args.kilonova_injection_svd = args.svd_path
+        args.injection_svd_mag_ncoeff = args.svd_mag_ncoeff
+        args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
+
+        print("Creating injection light curve model")
+        _, _, injection_model = create_light_curve_model_from_args(
+            args.kilonova_injection_model,
+            args,
+            sample_times,
+            filters=filters,
+            sample_over_Hubble=args.sample_over_Hubble,
+        )
+        data = create_light_curve_data(
+            injection_parameters, args, light_curve_model=injection_model
+        )
+        print("Injection generated")
+
+        if args.injection_outfile is not None:
+            if filters is not None:
+                if args.injection_detection_limit is None:
+                    detection_limit = {x: np.inf for x in filters}
+                else:
+                    detection_limit = {
+                        x: float(y)
+                        for x, y in zip(
+                            filters,
+                            args.injection_detection_limit.split(","),
+                        )
+                    }
+            else:
+                detection_limit = {}
+            data_out = np.empty((0, 6))
+            for filt in data.keys():
+                if filters:
+                    if args.photometry_augmentation_filters:
+                        filts = list(
+                            set(
+                                filters
+                                + args.photometry_augmentation_filters.split(",")
+                            )
+                        )
+                    else:
+                        filts = filters
+                    if filt not in filts:
+                        continue
+                for row in data[filt]:
+                    mjd, mag, mag_unc = row
+                    if not np.isfinite(mag_unc):
+                        data_out = np.append(
+                            data_out,
+                            np.array([[mjd, 99.0, 99.0, filt, mag, 0.0]]),
+                            axis=0,
+                        )
+                    else:
+                        if filt in detection_limit:
+                            data_out = np.append(
+                                data_out,
+                                np.array(
+                                    [
+                                        [
+                                            mjd,
+                                            mag,
+                                            mag_unc,
+                                            filt,
+                                            detection_limit[filt],
+                                            0.0,
+                                        ]
+                                    ]
+                                ),
+                                axis=0,
+                            )
+                        else:
+                            data_out = np.append(
+                                data_out,
+                                np.array([[mjd, mag, mag_unc, filt, np.inf, 0.0]]),
+                                axis=0,
+                            )
+
+            columns = ["jd", "mag", "mag_unc", "filter", "limmag", "programid"]
+            lc = pd.DataFrame(data=data_out, columns=columns)
+            lc.sort_values("jd", inplace=True)
+            lc = lc.reset_index(drop=True)
+            lc.to_csv(args.injection_outfile)
+
+    else:
+        # load the lightcurve data
+        data = loadEvent(args.data)
+
+
+
 
     # # create the kilonova data if an injection set is given
     # if args.injection:
