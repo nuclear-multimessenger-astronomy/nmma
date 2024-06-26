@@ -1060,7 +1060,7 @@ def nnanalysis(args):
     current_points = int(round(args.t_max - args.t_min))/args.dt + 1
     num_points = 121
 
-    print('min t:', t_min, 'max t', t_max, 'time step', time_step, 'number of points', current_points)
+    print('min t:', args.t_min, 'max t', args.t_max, 'time step', args.dt, 'number of points', current_points)
 
     if args.log_space_time:
         if args.n_tstep:
