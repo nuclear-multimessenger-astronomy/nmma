@@ -1029,11 +1029,12 @@ def nnanalysis(args):
         filters = args.filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
         if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
+            print(filters)
             pass
         else:
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
-    print(filters)
+    
 
     # # need to interpolate between data points if time step is not 0.25
     # if args.dt != 0.25:
