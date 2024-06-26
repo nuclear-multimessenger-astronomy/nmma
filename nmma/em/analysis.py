@@ -1032,12 +1032,12 @@ def nnanalysis(args):
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
     # need to interpolate between data points if time step is not 0.25
-    if args.dt:
-        time_step = args.dt
-        if args.dt != 0.25:
-            do_lin_interpolation = True
-        else:
-            do_lin_interpolation = False
+    # if args.dt:
+    #     time_step = args.dt
+    #     if args.dt != 0.25:
+    #         do_lin_interpolation = True
+    #     else:
+    #         do_lin_interpolation = False
 
     refresh = False
     try:
@@ -1056,32 +1056,23 @@ def nnanalysis(args):
     print('Set up logger and storage directory')
 
     # initialize required parameters
-    if args.tmin:
-        t_min = args.tmin
-    else:
-        t_min = 0
-
-    if args.tmax:
-        t_max = args.tmax
-    else:
-        t_min = 20
-    
-    current_points = int(round(t_max - t_min))/time_step + 1
+    # the kilonova data needs to be 121 points long :/
+    current_points = int(round(args.t_max - args.t_min))/args.dt + 1
     num_points = 121
 
     print('min t:', t_min, 'max t', t_max, 'time step', time_step, 'number of points', current_points)
 
-    # if args.log_space_time:
-    #     if args.n_tstep:
-    #         n_step = args.n_tstep
-    #     else:
-    #         n_step = int((args.tmax - args.tmin) / args.dt)
-    #     sample_times = np.logspace(
-    #         np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
-    #     )
-    # else:
-    #     sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
-    # print("Creating light curve model for inference")
+    if args.log_space_time:
+        if args.n_tstep:
+            n_step = args.n_tstep
+        else:
+            n_step = int((args.tmax - args.tmin) / args.dt)
+        sample_times = np.logspace(
+            np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
+        )
+    else:
+        sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    print("Creating light curve model for inference")
 
     # create the kilonova data if an injection set is given
     if args.injection:
@@ -1091,6 +1082,9 @@ def nnanalysis(args):
             )
         injection_df = injection_dict["injections"]
         injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+
+        print('injection dictionary:', injection_dict)
+        print('injection parameters:', injection_parameters)
 
         if "geocent_time" in injection_parameters:
             tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
