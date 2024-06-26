@@ -1135,11 +1135,11 @@ def main(args=None):
                 analysis(args)
         else:
             analysis(args)
+    if args.sampler == "neuralnet":
+        nnanalysis(args)
     else:
         if args.sampler == "neuralnet":
             nnanalysis(args)
-        else:
+        else"
             analysis(args)
-
-
-
+    
