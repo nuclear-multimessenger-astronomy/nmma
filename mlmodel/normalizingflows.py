@@ -29,6 +29,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 num_dim = 7
 context_features = num_dim
 similarity_embedding = SimilarityEmbedding()
+num_points = 121
 
 class EmbeddingNet(nn.Module):
     """Wrapper around the similarity embedding defined above"""
