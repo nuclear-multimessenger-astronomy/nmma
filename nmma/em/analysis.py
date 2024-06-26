@@ -1118,6 +1118,31 @@ def nnanalysis(args):
     # fig = plot_flow_inference(truth, samples)
 
 
+# def main(args=None):
+#     if args is None:
+#         parser = get_parser()
+#         args = parser.parse_args()
+#         if args.config is not None:
+#             yaml_dict = yaml.safe_load(Path(args.config).read_text())
+#             for analysis_set in yaml_dict.keys():
+#                 params = yaml_dict[analysis_set]
+#                 for key, value in params.items():
+#                     key = key.replace("-", "_")
+#                     if key not in args:
+#                         print(f"{key} not a known argument... please remove")
+#                         exit()
+#                     setattr(args, key, value)
+#                 analysis(args)
+#         else:
+#             analysis(args)
+#     if args.sampler == "neuralnet":
+#         nnanalysis(args)
+#     else:
+#         if args.sampler == "neuralnet":
+#             nnanalysis(args)
+#         else:
+#             analysis(args)
+
 def main(args=None):
     if args is None:
         parser = get_parser()
@@ -1132,14 +1157,8 @@ def main(args=None):
                         print(f"{key} not a known argument... please remove")
                         exit()
                     setattr(args, key, value)
-                analysis(args)
-        else:
-            analysis(args)
     if args.sampler == "neuralnet":
         nnanalysis(args)
     else:
-        if args.sampler == "neuralnet":
-            nnanalysis(args)
-        else:
-            analysis(args)
+        analysis(args)
     
