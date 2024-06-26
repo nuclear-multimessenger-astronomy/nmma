@@ -1033,6 +1033,7 @@ def nnanalysis(args):
 
     # need to interpolate between data points if time step is not 0.25
     if args.dt:
+        time_step = args.dt
         if args.dt != 0.25:
             do_lin_interpolation = True
         else:
@@ -1055,11 +1056,14 @@ def nnanalysis(args):
     print('Set up logger and storage directory')
 
     # initialize required parameters
-    # t_min = args.tmin
-    # t_max = args.tmax
-    # time_step = args.dt
+    if args.tmin:
+        t_min = args.tmin
+
+    if args.tmax:
+        t_max = args.tmax
+    
     # current_points = int(round(t_max - t_min))/time_step + 1
-    # num_points = 121
+    num_points = 121
 
     # print('min t:', t_min, 'max t', t_max, 'time step', time_step, 'number of points', current_points)
 
