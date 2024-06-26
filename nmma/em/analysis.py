@@ -1038,19 +1038,21 @@ def nnanalysis(args):
         else:
             do_lin_interpolation = False
 
-    # refresh = False
-    # try:
-    #     refresh = args.refresh_models_list
-    # except AttributeError:
-    #     pass
-    # if refresh:
-    #     refresh_models_list(
-    #         models_home=args.svd_path if args.svd_path not in [None, ""] else None
-    #     )
+    refresh = False
+    try:
+        refresh = args.refresh_models_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
 
-    # # set up outdir
-    # bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
-    # bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+    # set up outdir
+    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
+    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+
+    print('Set up logger and storage directory')
 
     # initialize required parameters
     # t_min = args.tmin
