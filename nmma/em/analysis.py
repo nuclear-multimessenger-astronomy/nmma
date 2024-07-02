@@ -1031,14 +1031,6 @@ def nnanalysis(args):
         else:
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
 
-    # need to interpolate between data points if time step is not 0.25
-    # if args.dt:
-    #     time_step = args.dt
-    #     if args.dt != 0.25:
-    #         do_lin_interpolation = True
-    #     else:
-    #         do_lin_interpolation = False
-
     refresh = False
     try:
         refresh = args.refresh_models_list
@@ -1097,6 +1089,16 @@ def nnanalysis(args):
             injection_parameters["log10_mej_wind"]
         ):
             injection_parameters["log10_mej_wind"] = -3.0
+
+        # need to interpolate between data points if time step is not 0.25
+        if args.dt:
+            time_step = args.dt
+            if args.dt != 0.25:
+                raise ValueError("Need dt to be 0.25 until interpolation feature is incorporated.")
+                # currently no linear interpolation function
+                do_lin_interpolation = True
+            else:
+                do_lin_interpolation = False
 
         args.kilonova_tmin = args.tmin
         args.kilonova_tmax = args.tmax
@@ -1212,8 +1214,22 @@ def nnanalysis(args):
             trigger_time = args.trigger_time
 
     # now that we have the kilonova light curve, we need to pad it with non-detections
+    # this part is currently hard coded in terms of the times 
+    # (so that the 'fixed' and 'shifted' are properly represented)
     num_points = 121
     bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
+    t_zero = 44242.00021937881
+    t_min = 44240.00050450478
+    t_max = 44269.99958898723
+    days = int(round(t_max - t_min))
+    time_step = 0.25
+
+    if args.detection_limit:
+        detection_limit = args.detection_limit
+    else: 
+        detection_limit = 22.0
+
+    print(detection_limit)
 
     df = pd.DataFrame()
     t_list = []
@@ -1229,23 +1245,21 @@ def nnanalysis(args):
         df[key] = mag_list
     print(df)
 
+    days = int(round(args.tmax - args.tmin))
+    print(days)
+    column_list = df.columns.to_list()
+    print(column_list)
 
-        # print(data[key])
-    # df = pd.DataFrame.from_dict(data, orient="columns")
-    # df_unpacked = pd.DataFrame(columns=bands)
-    # for j in range(len(bands)):
-    #     df_unpacked[['t', bands[j], 'x']] = pd.DataFrame(df[bands[j]].tolist(), index= df.index)
-    #     for val in df_unpacked[bands[j]]:
-    #         if val != detection_limit:
-    #             counter += 1
-    #         else:
-    #             pass
-    #     df_unpacked['num_detections'] = np.full(len(df_unpacked), counter)
-    #     df_unpacked['sim_id'] = np.full(len(df_unpacked), i)
-    #     df_unpacked = df_unpacked.drop(columns=['x'])
-    # print(df_unpacked)
+    # ar = np.arange(start=t_min, stop=t_max, step=time_step)
+    # filler_dict = {'t':ar, 'ztfg':[data_filler]*len(ar), 'ztfr':[data_filler]*len(ar), 'ztfi':[data_filler]*len(ar),
+    #                'sim_id':[np.nan]*len(ar), 'num_detections':[np.nan]*len(ar)}
+    # filler_df = pd.DataFrame(filler_dict)
 
-    
+    # l = np.arange(start=t_min, stop=t_min+(count*step), step=step)
+    # filler_dict = {'t':l, 'ztfg':[data_filler]*len(l), 'ztfr':[data_filler]*len(l), 'ztfi':[data_filler]*len(l),
+    #                'sim_id':[np.nan]*len(l), 'num_detections':[np.nan]*len(l)}
+    # filler_df = pd.DataFrame(filler_dict)
+
 
     
     # # run the neural network analysis
