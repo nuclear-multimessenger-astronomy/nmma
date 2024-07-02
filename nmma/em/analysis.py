@@ -1072,7 +1072,6 @@ def nnanalysis(args):
         )
     else:
         sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
-    print("Creating light curve model for inference")
 
     # create the kilonova data if an injection set is given
     if args.injection:
@@ -1082,9 +1081,6 @@ def nnanalysis(args):
             )
         injection_df = injection_dict["injections"]
         injection_parameters = injection_df.iloc[args.injection_num].to_dict()
-
-        print('injection dictionary:', injection_dict)
-        print('injection parameters:', injection_parameters)
 
         if "geocent_time" in injection_parameters:
             tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
@@ -1206,76 +1202,25 @@ def nnanalysis(args):
         # load the lightcurve data
         data = loadEvent(args.data)
 
+        if args.trigger_time is None:
+            # load the minimum time as trigger time
+            min_time = np.inf
+            for key, array in data.items():
+                min_time = np.minimum(min_time, np.min(array[:, 0]))
+            trigger_time = min_time
+            print(
+                f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}"
+            )
+        else:
+            trigger_time = args.trigger_time
 
+    # now that we have the kilonova light curve, we need to pad it with non-detections
+    print(data)
 
-
-    # # create the kilonova data if an injection set is given
-    # if args.injection:
-    #     with open(args.injection, "r") as f:
-    #         injection_dict = json.load(
-    #             f, object_hook=bilby.core.utils.decode_bilby_json
-    #         )
-    #     injection_df = injection_dict["injections"]
-    #     injection_parameters = injection_df.iloc[args.injection_num].to_dict()
-
-    #     print(injection_df)
-    #     print(injection_parameters)
-
-    # #     # save injection parameters as a pytorch tensor as well:
-        
-
-    #     if "geocent_time" in injection_parameters:
-    #         tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
-    #     elif "geocent_time_x" in injection_parameters:
-    #         tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
-    #     else:
-    #         print("Need either geocent_time or geocent_time_x")
-    #         exit(1)
-    #     trigger_time = tc_gps.mjd
-
-    #     injection_parameters["kilonova_trigger_time"] = trigger_time
-    #     if args.prompt_collapse:
-    #         injection_parameters["log10_mej_wind"] = -3.0
-
-    #     # sanity check for eject masses
-    #     if "log10_mej_dyn" in injection_parameters and not np.isfinite(
-    #         injection_parameters["log10_mej_dyn"]
-    #     ):
-    #         injection_parameters["log10_mej_dyn"] = -3.0
-    #     if "log10_mej_wind" in injection_parameters and not np.isfinite(
-    #         injection_parameters["log10_mej_wind"]
-    #     ):
-    #         injection_parameters["log10_mej_wind"] = -3.0
-
+    
     # # run the neural network analysis
     # result = flow_analysis(lightcurvetensor)
     # fig = plot_flow_inference(truth, samples)
-
-
-# def main(args=None):
-#     if args is None:
-#         parser = get_parser()
-#         args = parser.parse_args()
-#         if args.config is not None:
-#             yaml_dict = yaml.safe_load(Path(args.config).read_text())
-#             for analysis_set in yaml_dict.keys():
-#                 params = yaml_dict[analysis_set]
-#                 for key, value in params.items():
-#                     key = key.replace("-", "_")
-#                     if key not in args:
-#                         print(f"{key} not a known argument... please remove")
-#                         exit()
-#                     setattr(args, key, value)
-#                 analysis(args)
-#         else:
-#             analysis(args)
-#     if args.sampler == "neuralnet":
-#         nnanalysis(args)
-#     else:
-#         if args.sampler == "neuralnet":
-#             nnanalysis(args)
-#         else:
-#             analysis(args)
 
 def main(args=None):
     if args is None:
