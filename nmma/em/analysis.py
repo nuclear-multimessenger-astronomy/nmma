@@ -1215,11 +1215,10 @@ def nnanalysis(args):
     num_points = 121
     bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
 
-    print(data)
-    print(res)
     for key in data:
         print(key)
         print(data[key])
+        print(data[key][0])
     # df = pd.DataFrame.from_dict(data, orient="columns")
     # df_unpacked = pd.DataFrame(columns=bands)
     # for j in range(len(bands)):
