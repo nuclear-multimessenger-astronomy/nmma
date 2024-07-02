@@ -1217,8 +1217,9 @@ def nnanalysis(args):
 
     for key in data:
         print(key)
-        print(data[key])
+        # print(data[key])
         print(data[key][0])
+        print(data[key][0][0])
     # df = pd.DataFrame.from_dict(data, orient="columns")
     # df_unpacked = pd.DataFrame(columns=bands)
     # for j in range(len(bands)):
