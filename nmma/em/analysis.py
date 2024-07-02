@@ -1056,11 +1056,11 @@ def nnanalysis(args):
     print('Set up logger and storage directory')
 
     # initialize required parameters
-    # the kilonova data needs to be 121 points long :/
-    current_points = int(round(args.t_max - args.t_min))/args.dt + 1
+    # the kilonova data needs to be 121 points long
+    current_points = int(round(args.tmax - args.tmin))/args.dt + 1
     num_points = 121
 
-    print('min t:', args.t_min, 'max t', args.t_max, 'time step', args.dt, 'number of points', current_points)
+    print('min t:', args.tmin, 'max t', args.tmax, 'time step', args.dt, 'number of points', current_points)
 
     if args.log_space_time:
         if args.n_tstep:
