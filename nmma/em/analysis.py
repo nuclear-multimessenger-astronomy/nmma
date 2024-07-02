@@ -1217,12 +1217,12 @@ def nnanalysis(args):
     df = pd.DataFrame.from_dict(data, orient="columns")
     df_unpacked = pd.DataFrame(columns=bands)
     for j in range(len(bands)):
-            df_unpacked[['t', bands[j], 'x']] = pd.DataFrame(df[bands[j]].tolist(), index= df.index)
-            for val in df_unpacked[bands[j]]:
-                if val != detection_limit:
-                    counter += 1
-                else:
-                    pass
+        df_unpacked[['t', bands[j], 'x']] = pd.DataFrame(df[bands[j]].tolist(), index= df.index)
+        for val in df_unpacked[bands[j]]:
+            if val != detection_limit:
+                counter += 1
+            else:
+                pass
         df_unpacked['num_detections'] = np.full(len(df_unpacked), counter)
         df_unpacked['sim_id'] = np.full(len(df_unpacked), i)
         df_unpacked = df_unpacked.drop(columns=['x'])
