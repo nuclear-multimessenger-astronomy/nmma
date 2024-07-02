@@ -1055,13 +1055,6 @@ def nnanalysis(args):
 
     print('Set up logger and storage directory')
 
-    # initialize required parameters
-    # the kilonova data needs to be 121 points long
-    current_points = int(round(args.tmax - args.tmin))/args.dt + 1
-    num_points = 121
-
-    print('min t:', args.tmin, 'max t', args.tmax, 'time step', args.dt, 'number of points', current_points)
-
     if args.log_space_time:
         if args.n_tstep:
             n_step = args.n_tstep
@@ -1109,6 +1102,8 @@ def nnanalysis(args):
         args.kilonova_tmax = args.tmax
         args.kilonova_tstep = args.dt
         args.kilonova_error = args.photometric_error_budget
+
+        current_points = int(round(args.tmax - args.tmin))/args.dt + 1
 
         if not args.injection_model:
             args.kilonova_injection_model = args.model
@@ -1201,6 +1196,10 @@ def nnanalysis(args):
     else:
         # load the lightcurve data
         data = loadEvent(args.data)
+        res = next(iter(data))
+        
+        current_points = len(data[res])
+        print(current_points)
 
         if args.trigger_time is None:
             # load the minimum time as trigger time
@@ -1218,6 +1217,8 @@ def nnanalysis(args):
     print(data)
     print(len(data))
     print(len(data['ztfg']))
+
+    num_points = 121
 
     
     # # run the neural network analysis
