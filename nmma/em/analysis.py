@@ -1216,7 +1216,10 @@ def nnanalysis(args):
     bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
 
     df = pd.DataFrame()
-    
+    t_list = []
+    for i in len(data[res]):
+        t_list.append(data[res][i][0])
+    df['t'] = t_list
     for key in data:
         print(key)
         mag_list = []
@@ -1224,7 +1227,9 @@ def nnanalysis(args):
             mag = data[key][i][1]
             mag_list.append(mag)
         df[key] = mag_list
-    print(df)    
+    print(df)
+
+
         # print(data[key])
     # df = pd.DataFrame.from_dict(data, orient="columns")
     # df_unpacked = pd.DataFrame(columns=bands)
