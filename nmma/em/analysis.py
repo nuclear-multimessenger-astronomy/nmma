@@ -1197,9 +1197,7 @@ def nnanalysis(args):
         # load the lightcurve data
         data = loadEvent(args.data)
         res = next(iter(data))
-        
         current_points = len(data[res])
-        print(current_points)
 
         if args.trigger_time is None:
             # load the minimum time as trigger time
@@ -1214,11 +1212,11 @@ def nnanalysis(args):
             trigger_time = args.trigger_time
 
     # now that we have the kilonova light curve, we need to pad it with non-detections
-    print(data)
-    print(len(data))
-    print(len(data['ztfg']))
-
     num_points = 121
+    data_df = pd.DataFrame.from_dict(data)
+    print(data_df)
+
+    
 
     
     # # run the neural network analysis
