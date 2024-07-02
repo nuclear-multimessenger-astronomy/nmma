@@ -1215,11 +1215,17 @@ def nnanalysis(args):
     num_points = 121
     bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
 
+    df = pd.DataFrame()
+    
     for key in data:
         print(key)
+        mag_list = []
+        for i, val in enumerate(data[key]):
+            mag = data[key][i][1]
+            mag_list.append(mag)
+        df[key] = mag_list
+    print(df)    
         # print(data[key])
-        print(data[key][0])
-        print(data[key][0][0])
     # df = pd.DataFrame.from_dict(data, orient="columns")
     # df_unpacked = pd.DataFrame(columns=bands)
     # for j in range(len(bands)):
