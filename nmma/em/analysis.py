@@ -1217,7 +1217,7 @@ def nnanalysis(args):
     # now that we have the kilonova light curve, we need to pad it with non-detections
     print(data)
     print(len(data))
-    print(len(data['ztfg'])
+    print(len(data['ztfg']))
 
     
     # # run the neural network analysis
