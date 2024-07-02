@@ -1214,19 +1214,25 @@ def nnanalysis(args):
     # now that we have the kilonova light curve, we need to pad it with non-detections
     num_points = 121
     bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
-    df = pd.DataFrame.from_dict(data, orient="columns")
-    df_unpacked = pd.DataFrame(columns=bands)
-    for j in range(len(bands)):
-        df_unpacked[['t', bands[j], 'x']] = pd.DataFrame(df[bands[j]].tolist(), index= df.index)
-        for val in df_unpacked[bands[j]]:
-            if val != detection_limit:
-                counter += 1
-            else:
-                pass
-        df_unpacked['num_detections'] = np.full(len(df_unpacked), counter)
-        df_unpacked['sim_id'] = np.full(len(df_unpacked), i)
-        df_unpacked = df_unpacked.drop(columns=['x'])
-    print(df_unpacked)
+
+    print(data)
+    print(res)
+    for key in data:
+        print(key)
+        print(data[key])
+    # df = pd.DataFrame.from_dict(data, orient="columns")
+    # df_unpacked = pd.DataFrame(columns=bands)
+    # for j in range(len(bands)):
+    #     df_unpacked[['t', bands[j], 'x']] = pd.DataFrame(df[bands[j]].tolist(), index= df.index)
+    #     for val in df_unpacked[bands[j]]:
+    #         if val != detection_limit:
+    #             counter += 1
+    #         else:
+    #             pass
+    #     df_unpacked['num_detections'] = np.full(len(df_unpacked), counter)
+    #     df_unpacked['sim_id'] = np.full(len(df_unpacked), i)
+    #     df_unpacked = df_unpacked.drop(columns=['x'])
+    # print(df_unpacked)
 
     
 
