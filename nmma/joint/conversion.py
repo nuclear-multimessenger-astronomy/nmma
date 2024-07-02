@@ -1,5 +1,4 @@
 from __future__ import division
-import sys
 
 import numpy as np
 import pandas as pd
@@ -41,16 +40,16 @@ def source_frame_masses(converted_parameters, added_keys):
     if "redshift" not in converted_parameters.keys():
         distance = converted_parameters["luminosity_distance"]
         if hasattr(distance, '__len__') and len(distance)>50: #luminosity_distance_to_redshift gets really slow if too many distances are put in at once
-             from astropy import units
-             from astropy import cosmology as cosmo
-             cosmology = cosmo.Planck15
-             zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance.min() * units.Mpc)
-             zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
-             zgrid = np.geomspace(zmin, zmax, 50)
-             distance_grid = cosmology.luminosity_distance(zgrid).value
-             converted_parameters["redshift"] = np.interp(distance, distance_grid, zgrid).value
+            from astropy import units
+            from astropy import cosmology as cosmo
+            cosmology = cosmo.Planck15
+            zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance.min() * units.Mpc)
+            zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
+            zgrid = np.geomspace(zmin, zmax, 50)
+            distance_grid = cosmology.luminosity_distance(zgrid).value
+            converted_parameters["redshift"] = np.interp(distance, distance_grid, zgrid).value
         else:
-             converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
+            converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
         added_keys = added_keys + ["redshift"]
 
     if "mass_1_source" not in converted_parameters.keys():
@@ -80,8 +79,7 @@ def radii_from_qur(converted_parameters, added_keys):
     lambda_1 = converted_parameters["lambda_1"]
     lambda_2 = converted_parameters["lambda_2"]
 
-    compactness_1 = lambda_to_compactness(lambda_1)
-    compactness_2 = lambda_to_compactness(lambda_2)
+    compactness_1, compactness_2=  lambda_to_compactness([lambda_1,lambda_2])
 
     converted_parameters["radius_1"] = mass_and_compactness_to_radius(
         mass_1_source, compactness_1)
@@ -131,16 +129,16 @@ def radii_from_eos(eos_data, converted_parameters, added_keys):
         R_14_list.append(R_14)
         R_16_list.append(R_16)
 
-        converted_parameters["TOV_radius"]  = np.array(TOV_radius_list)
-        converted_parameters["TOV_mass"]    = np.array(TOV_mass_list)
-        converted_parameters["radius_1"]    = np.array(radius_1_list)
-        converted_parameters["radius_2"]    = np.array(radius_2_list)
+    converted_parameters["TOV_radius"]  = np.array(TOV_radius_list)
+    converted_parameters["TOV_mass"]    = np.array(TOV_mass_list)
+    converted_parameters["radius_1"]    = np.array(radius_1_list)
+    converted_parameters["radius_2"]    = np.array(radius_2_list)
 
-        converted_parameters["lambda_1"]    = np.array(lambda_1_list)
-        converted_parameters["lambda_2"]    = np.array(lambda_2_list)
+    converted_parameters["lambda_1"]    = np.array(lambda_1_list)
+    converted_parameters["lambda_2"]    = np.array(lambda_2_list)
 
-        converted_parameters["R_14"]        = np.array(R_14_list)
-        converted_parameters["R_16"]        = np.array(R_16_list)
+    converted_parameters["R_14"]        = np.array(R_14_list)
+    converted_parameters["R_16"]        = np.array(R_16_list)
 
     added_keys +=["lambda_1", "lambda_2", "TOV_mass", "TOV_radius",
                 "radius_1", "radius_2", "R_14", "R_16"]
@@ -150,31 +148,31 @@ def radii_from_eos(eos_data, converted_parameters, added_keys):
 def EOS2Parameters(
     mass_val, radius_val, Lambda_val, mass_1_source, mass_2_source
 ):
-
+    ### FIXME: Under what circumstance would these not simply be mass_val[-1], radius_val[-1]?
     TOV_mass = mass_val.max()
     TOV_radius = radius_val[np.argmax(mass_val)]
-    minimum_mass = mass_val.min()
 
-    ### assume BH if outside EoS range
-    if mass_1_source < minimum_mass or mass_1_source > TOV_mass:
-        lambda_1 = np.array([0.0])
-        radius_1 = np.array([2.0 * mass_1_source * lal.MRSUN_SI / 1e3])
-    else:
-        lambda_1 = np.array(np.interp(mass_1_source, mass_val, Lambda_val)).reshape(1)
-        radius_1 = np.array(np.interp(mass_1_source, mass_val, radius_val)).reshape(1)
-        
-    if mass_2_source < minimum_mass or mass_2_source > TOV_mass:
-        lambda_2 = np.array([0.0])
-        radius_2 = np.array([2.0 * mass_2_source * lal.MRSUN_SI / 1e3])
-    else:
-        lambda_2 = np.array(np.interp(mass_2_source, mass_val, Lambda_val)).reshape(1)
-        radius_2 = np.array(np.interp(mass_2_source, mass_val, radius_val)).reshape(1)
-
-    ### FIXME : What to do if EOS generates TOV_mas lower than these?
-    R_14 = np.interp(1.4, mass_val, radius_val)
-    R_16 = np.interp(1.6, mass_val, radius_val)
+    (lambda_1, lambda_2) = np.interp(x=[mass_1_source, mass_2_source],
+                                   xp= mass_val, fp=Lambda_val, left=0, right=0)
+    (radius_1, radius_2, 
+     R_14, R_16) = np.interp(
+                            x=[mass_1_source, mass_2_source, 1.4, 1.6],
+                            xp=mass_val, fp= radius_val, left =0, right=0)
 
     return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
+
+
+class BBHEjectaFitting(object):
+    def __init__(self):
+        pass
+
+    def ejecta_parameter_conversion(self, converted_parameters, added_keys):
+        added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind"]
+        converted_parameters['log10mej_dyn'] = np.ones_like(converted_parameters['mass_1_source'])*(-np.inf)
+        converted_parameters['log10mej_wind'] =np.ones_like(converted_parameters['mass_1_source'])*(-np.inf)
+
+        return converted_parameters, added_keys
+    
 
 class NSBHEjectaFitting(object):
     def __init__(self):
@@ -532,20 +530,14 @@ class BNSEjectaFitting(object):
 
 class MultimessengerConversion(object):
     def __init__(self, args):
-        self.messenegers    = args.messengers
-        self.binary_type    = args.binary_type
+        self.messengers     = args.messengers
+        self.modifiers      = args.analysis_modifiers
         self.eos_to_ram     = args.eos_to_ram
         self.args           = args
+        self.BNSejectaFitting   = BNSEjectaFitting()
+        self.NSBHejectaFitting  = NSBHEjectaFitting()
+        self.BBHejectaFitting   = BBHEjectaFitting()
 
-        if self.binary_type == "BNS":
-            ejectaFitting = BNSEjectaFitting()
-
-        elif self.binary_type == "NSBH":
-            ejectaFitting = NSBHEjectaFitting()
-
-        else:
-            print("Unknown binary type, exiting")
-            sys.exit()
 
         if self.eos_to_ram:
             EOSdata = [None]*args.Neos
@@ -554,20 +546,20 @@ class MultimessengerConversion(object):
             self.EOSdata=np.array(EOSdata)
 
 
-        self.ejecta_parameter_conversion = ejectaFitting.ejecta_parameter_conversion
 
     def convert_to_multimessenger_parameters(self, parameters):
         converted_parameters = parameters.copy()
         original_keys = list(converted_parameters.keys())
+
+        if "Hubble" in self.modifiers:
+            converted_parameters, added_keys = Hubble_constant_to_distance(
+            converted_parameters, added_keys
+        )
         if "gw" in self.messengers:
             
             converted_parameters, added_keys = convert_to_lal_binary_black_hole_parameters(
                 converted_parameters
             )
-        if "Hubble" in self.messenegers:
-            converted_parameters, added_keys = Hubble_constant_to_distance(
-            converted_parameters, added_keys
-        )
 
         converted_parameters, added_keys = source_frame_masses(
             converted_parameters, added_keys
@@ -622,6 +614,27 @@ class MultimessengerConversion(object):
         return converted_parameters, added_keys
     
 
+    def ejecta_parameter_conversion(self, parameters, added_keys):
+        ## chose pointwise conditional ejecta_fitting
+        return np.where(
+            ## check if component 1 is a NS
+            parameters["radius_1"]>0., 
+                ## and check if component 2 is a NS, too
+                np.where(parameters["radius_2"]>0.,
+                         ## then compute BNS ejecta
+                         self.BNSejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
+                         ## else compute NSBH ejecta
+                         self.NSBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
+                        ),
+                ## if component 1 is a BH, check if component 2 is NS
+                np.where(parameters["radius_2"]>0.,
+                        ### then do NSBH ejecta
+                         self.NSBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
+                         ### otherwise assume BBH (i.e., no ejecta)
+                         self.BBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
+                        )
+                )
+    
     def generate_all_parameters(self, sample, likelihood=None, priors=None, npool=1):
         waveform_defaults = {
             "reference_frequency": 50.0,

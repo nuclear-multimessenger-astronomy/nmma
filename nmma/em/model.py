@@ -167,7 +167,7 @@ class SVDLightCurveModel(object):
     model: str
         Name of the model
     sample_times: np.array
-        An arry of time for the light curve to be evaluted on
+        An array of time for the light curve to be evaluated on
     svd_path: str
         Path to the svd directory
     parameter_conversion: func
@@ -184,8 +184,8 @@ class SVDLightCurveModel(object):
     Returns
     -------
     LightCurveModel: `nmma.em.model.SVDLightCurveModel`
-        A light curve model object, able to evalute the light curve
-        give a set of parameters
+        A light curve model object to evaluate the light curve
+        from a set of parameters
     """
 
     def __init__(
@@ -431,19 +431,19 @@ class GRBLightCurveModel(object):
     ):
         """A light curve model object
 
-        An object to evaluted the GRB light curve across filters
+        An object to evaluate the GRB light curve across filters
         with a set of parameters given based on afterglowpy
 
         Parameters
         ----------
         sample_times: np.array
-            An arry of time for the light curve to be evaluted on
+            An array of timesteps for  lightcurve evaluation
 
         Returns
         -------
         LightCurveModel: `nmma.em.model.GRBLightCurveModel`
-            A light curve model onject, able to evaluted the light curve
-            give a set of parameters
+            A light curve model object to evaluate the light curve
+            from a set of parameters
         """
 
         assert model in model_parameters_dict.keys(), (
@@ -617,7 +617,7 @@ class HostGalaxyLightCurveModel(object):
     ):
         """A light curve model object
 
-        An object to evaluted the host galaxy light curve across filters
+        An object to evaluate the host galaxy light curve across filters
         with a set of parameters given
 
         Based on arxiv:2303.12849
@@ -625,13 +625,13 @@ class HostGalaxyLightCurveModel(object):
         Parameters
         ----------
         sample_times: np.array
-            An arry of time for the light curve to be evaluted on
+            An array of timesteps for  lightcurve evaluation
 
         Returns
         -------
         LightCurveModel: `nmma.em.model.HostGalaxyLightCurveModel`
-            A light curve model onject, able to evaluted the light curve
-            give a set of parameters
+            A light curve model object to evaluate the light curve
+            from a set of parameters
         """
 
         self.sample_times = sample_times
@@ -674,19 +674,19 @@ class SupernovaLightCurveModel(object):
     ):
         """A light curve model object
 
-        An object to evaluted the supernova light curve across filters
+        An object to evaluate the supernova light curve across filters
         with a set of parameters given based on sncosmo
 
         Parameters
         ----------
         sample_times: np.array
-            An arry of time for the light curve to be evaluted on
+            An array of timesteps for  lightcurve evaluation
 
         Returns
         -------
         LightCurveModel: `nmma.em.model.GRBLightCurveModel`
-            A light curve model onject, able to evaluted the light curve
-            give a set of parameters
+            A light curve model object to evaluate the light curve
+            from a set of parameters
         """
 
         self.sample_times = sample_times
@@ -804,13 +804,13 @@ class ShockCoolingLightCurveModel(object):
         Parameters
         ----------
         sample_times: np.array
-            An arry of time for the light curve to be evaluted on
+            An array of timesteps for  lightcurve evaluation
 
         Returns
         -------
         LightCurveModel: `nmma.em.model.ShockCoolingLightCurveModel`
-            A light curve model onject, able to evaluted the light curve
-            give a set of parameters
+            A light curve model object to evaluate the light curve
+            from a set of parameters
         """
 
         assert model in model_parameters_dict.keys(), (
@@ -921,13 +921,13 @@ class SimpleKilonovaLightCurveModel(object):
         Parameters
         ----------
         sample_times: np.array
-            An arry of time for the light curve to be evaluted on
+            An array of timesteps for  lightcurve evaluation
 
         Returns
         -------
         LightCurveModel: `nmma.em.model.SimpleKilonovaLightCurveModel`
-            A light curve model onject, able to evaluted the light curve
-            give a set of parameters
+            A light curve model object to evaluate the light curve
+            from a set of parameters
         """
 
         assert model in model_parameters_dict.keys(), (

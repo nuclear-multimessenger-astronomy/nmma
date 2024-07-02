@@ -10,13 +10,13 @@ from gwpy.table import Table
 try:
     import ligo.lw  # noqa F401
 except ImportError:
-    raise ImportError("You do not have ligo.lw install: $ pip install python-ligo-lw")
+    raise ImportError("You do not have ligo.lw installed: $ pip install python-ligo-lw")
 
 from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
 
 from bilby_pipe.create_injections import InjectionCreator
 
-from ..joint.conversion import (
+from .conversion import (
     source_frame_masses,
     EOS2Parameters,
     NSBHEjectaFitting,
@@ -168,8 +168,8 @@ def get_parser():
         action="store_true",
         help="Whether the spin is aligned in the provide injection file",
     )
-    parser.add("-f", "--filename", type=str, default="injection")
-    parser.add_arg(
+    parser.add_argument("-f", "--filename", type=str, default="injection")
+    parser.add_argument(
         "-e",
         "--extension",
         type=str,
@@ -177,7 +177,7 @@ def get_parser():
         choices=["json", "dat"],
         help="Prior file format",
     )
-    parser.add_arg(
+    parser.add_argument(
         "-n",
         "--n-injection",
         type=int,
@@ -185,7 +185,7 @@ def get_parser():
         help="The number of injections to generate: not required if --gps-file or injection file is also given",
         required=False,
     )
-    parser.add_arg(
+    parser.add_argument(
         "-t",
         "--trigger-time",
         type=int,
@@ -196,7 +196,7 @@ def get_parser():
             "prior_file or --gps-file is given."
         ),
     )
-    parser.add_arg(
+    parser.add_argument(
         "-g",
         "--gps-file",
         type=str,
@@ -207,7 +207,7 @@ def get_parser():
             " start_time + duration - post_trigger_duration."
         ),
     )
-    parser.add(
+    parser.add_argument(
         "--deltaT",
         type=float,
         default=0.2,
@@ -217,7 +217,7 @@ def get_parser():
             " exists in the prior_file"
         ),
     )
-    parser.add_arg(
+    parser.add_argument(
         "--post-trigger-duration",
         type=float,
         default=2,
@@ -226,7 +226,7 @@ def get_parser():
             "with --gps-file"
         ),
     )
-    parser.add_arg(
+    parser.add_argument(
         "--duration",
         type=float,
         default=4,
@@ -235,7 +235,7 @@ def get_parser():
             "--gps-file"
         ),
     )
-    parser.add(
+    parser.add_argument(
         "-s",
         "--generation-seed",
         default=42,
@@ -269,7 +269,7 @@ def get_parser():
         action="store_true",
         help="Whether to only sample prior parameters in injection file",
     )
-    parser.add(
+    parser.add_argument(
         "-r",
         "--repeated-simulations",
         default=0,

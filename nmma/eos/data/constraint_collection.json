@@ -1,0 +1,32 @@
+{
+    "lower_mtov":{
+        "PSR J1614-2230":{
+            "mass":1.94,
+            "error":0.03,
+            "arxiv":"2212.04051"
+        },
+        "PSR J0348+0432":{
+            "mass":2.01,
+            "error":0.04,
+            "arxiv":"1304.6875"
+        },
+        "PSR J0740+6620":{
+            "mass":2.08,
+            "error":0.07,
+            "arxiv":"2104.00880"
+        }
+    },
+    "upper_mtov":{
+        "PSR J1614-2230":{
+            "mass":1.94,
+            "error":0.03,
+            "arxiv":"2212.04051"
+        }
+    },
+    "mass_radius":{
+        "NICERxxx":{
+            "file_path":"xxx",
+            "arxiv":"2212.04051"
+        }
+    }
+}

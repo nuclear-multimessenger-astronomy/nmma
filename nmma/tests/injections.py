@@ -15,7 +15,7 @@ from nmma.em.model import (
 
 from ..em import create_lightcurves
 from ..em.io import read_lightcurve_file
-from ..eos import create_injection
+from ..joint import create_injection
 
 
 def lightcurveInjectionTest(model_name, model_lightcurve_function):

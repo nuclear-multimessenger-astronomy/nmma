@@ -1,13 +1,75 @@
 from __future__ import division
-
+import inspect
 import numpy as np
 import scipy.stats
 from scipy.interpolate import interp1d
 from scipy.stats import truncnorm
 
 from bilby.core.likelihood import Likelihood
+from model import SVDLightCurveModel, GRBLightCurveModel, GenericCombineLightCurveModel
 from . import utils
 
+def setup_lightcurve_model(args, sample_times, param_conv_func, filters):
+    # initialize the EM likelihood
+
+    light_curve_model_kwargs = dict(
+        model=args.kilonova_model,
+        sample_times=sample_times,
+        svd_path=args.kilonova_model_svd,
+        parameter_conversion=param_conv_func,
+        mag_ncoeff=args.svd_mag_ncoeff,
+        lbol_ncoeff=args.svd_lbol_ncoeff,
+        interpolation_type=args.kilonova_interpolation_type,
+        filters=filters,
+        local_only=args.local_model_only,
+    )
+    return SVDLightCurveModel(**light_curve_model_kwargs)
+
+def setup_em_kwargs(param_conv_func, data_dump, args, logger, **kwargs):
+    signature = inspect.signature(super(EMTransientLikelihood)) 
+    default_em_kwargs= {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
+
+    tmin=args.kilonova_tmin
+    tmax=args.kilonova_tmax
+    sample_times = np.arange(tmin, tmax, 0.1)
+
+    light_curve_data= data_dump["light_curve_data"]
+    filters=args.filters
+    if not filters:
+        filters = list(light_curve_data.keys())
+    lightcurve_model=setup_lightcurve_model(args, sample_times, param_conv_func, filters)
+        
+    em_likelihood_kwargs = dict(
+        light_curve_model=lightcurve_model,
+        filters=filters,light_curve_data=light_curve_data,
+        trigger_time=args.kilonova_trigger_time,
+        error_budget=args.kilonova_error,
+        tmin=tmin,
+        tmax=tmax,
+    )
+    return default_em_kwargs.update(em_likelihood_kwargs)
+
+def setup_grb_kwargs(em_kwargs, grb_resolution, param_conv_func):
+    signature = inspect.signature(GRBLightCurveModel) 
+    default_grb_kwargs= {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
+    ###add grb afterglow to primary source lightcurve model
+    sample_times=em_kwargs['sample_times']
+    combined_lightcurve_model = GenericCombineLightCurveModel(
+        models=[
+            em_kwargs['light_curve_model'], 
+            GRBLightCurveModel(
+                sample_times=sample_times, 
+                filters = em_kwargs['filters'] , resolution=grb_resolution, parameter_conversion=param_conv_func
+                ) 
+            ], 
+        sample_times=sample_times
+    )
+    grb_kwargs = em_kwargs.update(
+        dict(
+            light_curve_model = combined_lightcurve_model
+        )
+    )
+    return default_grb_kwargs.update(grb_kwargs)
 
 def truncated_gaussian(m_det, m_err, m_est, lim):
 
@@ -16,6 +78,12 @@ def truncated_gaussian(m_det, m_err, m_est, lim):
 
     return logpdf
 
+class EMTransientLikelihood(OpticalLightCurve):
+    def __init__(
+            self, 
+
+        ):
+        pass
 
 class OpticalLightCurve(Likelihood):
     """A optical kilonova / GRB / kilonova-GRB afterglow likelihood object

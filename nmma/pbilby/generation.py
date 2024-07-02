@@ -9,6 +9,7 @@ import os
 import pickle
 import subprocess
 from argparse import Namespace
+import json
 
 import bilby
 import bilby_pipe
@@ -25,6 +26,7 @@ from .parser import (
     create_nmma_generation_parser,
     parse_generation_args,
 )
+from .parser.generation_parser import remove_argument_from_parser
 from ..em.io import loadEvent
 from ..em.injection import create_light_curve_data
 
@@ -71,6 +73,15 @@ def get_version_info():
         nmma_version=__version__,
     )
 
+def remove_expandable_args(parser, category, inp):
+    # for cat in msg_list:
+    #     if messenger not in inputs.messengers:
+    #         #  identify argument_group corresponding to non-sampled msg.
+    #         for ag in parser._action_groups:
+    #             if f'with_{messenger}' in [act.dest for act in ag._group_actions]:
+    #                 parser._action_groups.remove(ag)
+    for ag in parser._action_groups:
+        if 
 
 def write_complete_config_file(parser, args, inputs):
     """Wrapper function that uses bilby_pipe's complete config writer.
@@ -87,6 +98,20 @@ def write_complete_config_file(parser, args, inputs):
     inputs.sampler_kwargs = "{}"
     inputs.mpi_timing_interval = 0
     inputs.log_directory = None
+
+    ##eliminate args from config we do not use
+    #   iterate through possible messengers
+    msg_list =['em','eos', 'grb','gw']
+    ana_mod_list = ['Hubble', 'tabulated_eos']
+
+
+
+    for analysis_modifier in ana_mod_list:
+        if analysis_modifier in inputs.analysis_modifiers: 
+            for ag in parser._action_groups:
+                if f'with_{messenger}' in [act.dest for act in ag._group_actions]:
+                    parser._action_groups.remove(ag)
+
     try:
         bilby_pipe.main.write_complete_config_file(parser, args, inputs)
     except AttributeError:
@@ -102,6 +127,46 @@ def create_generation_logger(outdir, label):
     bilby_pipe.data_generation.logger = logger
     return logger
 
+def read_constraint_from_args(args, constraint_kind):
+    ##preferred: Have the dict with the subconstraints already set up
+    prep_dict= getattr(args, constraint_kind, None) 
+    if prep_dict is not None:
+        return bilby_pipe.utils.convert_string_to_dict(prep_dict)
+    
+    ###otherwise try to construct it:
+        ### read in provided attributes 
+    prel_dict= {key.removeprefix(constraint_kind+'_'): ##cut identifier
+                bilby_pipe.utils.convert_string_to_list(getattr(args, key)) ## read in list or float
+                for key in dir(args)            ## search args for attrs 
+                if key.startswith(constraint_kind+'_')} ## related with kind
+    new_constraints = prel_dict.pop('name', None)
+    if new_constraints is not None: ## there needs to be a unique label
+        ext_dict={} 
+        ### iterate through constrs.
+        for i, name in enumerate(new_constraints): 
+            ext_dict[name] ={k:v[i] for k,v in prel_dict.items()} 
+        return ext_dict
+
+def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
+    if args.eos_constraint_dict:
+        try:
+            with open(args.eos_constraint_dict, 'r') as f:
+                constraint_dict = json.load(f) 
+        except:
+            constraint_dict = {}
+
+        for constraint_kind in constraint_kinds:
+            new_dict= read_constraint_from_args(args,constraint_kind)
+            try:
+                constraint_dict[constraint_kind].update(new_dict)
+            except KeyError:
+                constraint_dict[constraint_kind] = new_dict
+            except AttributeError:
+                constraint_dict[constraint_kind] = new_dict
+
+    with open(args.eos_constraint_dict, "w") as f:
+        json.dump(constraint_dict, f, indent=4)
+    return constraint_dict
 
 class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
     ###FIXME get rid of compulsory GW structure
@@ -112,17 +177,27 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
 
+        ### identify messengers and modifiers, to be extended
         messengers=[]
-        if args.with_eos:
+        if args.with_eos_parameters:
             messengers.append("eos")
+        if args.with_em:
+            messengers.append('em')
         if args.with_grb:
             messengers.append("grb")
         if args.with_gw:
+            #### resetting likelihood type is an unpleasant bilby_pipe remnant
+            self.gw_likelihood_type = self.likelihood_type
             messengers.append("gw")
-        if args.with_Hubble:
-            messengers.append("Hubble")
-        
         self.messengers = messengers
+
+        analysis_modifiers= []
+        if args.with_Hubble:
+            analysis_modifiers.append("Hubble")
+        if args.with_tabulated_eos:
+            analysis_modifiers.append('tabulated_eos')
+        self.analysis_modifiers= analysis_modifiers
+
         self.setup_inputs()
 
     @property
@@ -140,7 +215,8 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         data_dump= dict(
                 prior_file=self.prior_file,
                 args=self.args,
-                messengers = self.messengers
+                messengers = self.messengers,
+                analysis_modifiers= self.analysis_modifiers,
                 data_dump_file=self.data_dump_file,
                 meta_data=self.meta_data,
                 injection_parameters=self.injection_parameters,
@@ -162,7 +238,10 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
                 waveform_generator=self.waveform_generator,
                 ifo_list=self.interferometers,
             )
-
+        if "eos" in self.messengers:
+            data_dump |= dict(
+                eos_constraint_dict=self.eos_constraint_dict
+            )
         with open(self.data_dump_file, "wb+") as file:
             pickle.dump(data_dump, file)
 
@@ -175,6 +254,9 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         # This is done before instantiating the likelihood so that it is the full prior
         self.priors.to_json(outdir=self.data_directory, label=self.label)
         self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
+
+        if "eos" in self.messengers:
+            self.eos_constraint_dict = compose_eos_constraints(self.args)
 
         # We build the likelihood here to ensure the distance marginalization exist
         # before sampling
@@ -222,6 +304,7 @@ def generate_runner(parser=None, **kwargs):
         logger.info(f"{package} version: {version}")
 
     inputs = NMMADataGenerationInput(args, [])
+
     logger.info(
         "Setting up likelihood with marginalizations: "
         f"distance={inputs.distance_marginalization}, "

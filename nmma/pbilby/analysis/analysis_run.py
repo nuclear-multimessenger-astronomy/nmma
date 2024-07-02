@@ -17,8 +17,7 @@ from bilby.core.sampler.dynesty_utils import (
 )
 from bilby.core.utils import logger
 from bilby_pipe.utils import convert_string_to_list
-from bilby.core.prior import Interped, DeltaFunction
-from bilby.gw.prior import PriorDict
+from bilby.core.prior import Interped, DeltaFunction, PriorDict
 
 from ...joint.joint_likelihood import setup_nmma_likelihood
 from ...joint.conversion import MultimessengerConversion
@@ -32,6 +31,8 @@ def compose_priors(prior_file, args, logger):
     ----------
     prior_file: str
         The path to the prior-file
+    args: Namespace
+        The parser arguments
 
     Returns
     -------
@@ -61,8 +62,11 @@ def compose_priors(prior_file, args, logger):
     # construct the eos prior
     if args.tabulated_eos:
         xx = np.arange(0, args.Neos + 1)
-        eos_weight = np.loadtxt(args.eos_weight)
-        yy = np.concatenate((eos_weight, [eos_weight[-1]]))
+        if args.eos_weight:
+            eos_weight = np.loadtxt(args.eos_weight)
+            yy = np.concatenate((eos_weight, [eos_weight[-1]]))
+        else: 
+            yy = np.ones_like(xx)/len(xx)
         eos_prior = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
         priors["EOS"] = eos_prior
 
@@ -98,6 +102,7 @@ class AnalysisRun(object):
         sampling_seed=0,
         proposals=None,
         bilby_zero_likelihood_mode=False,
+        **kwargs
     ):
         self.maxmcmc = maxmcmc
         self.nact = nact
@@ -114,6 +119,7 @@ class AnalysisRun(object):
         self.data_dump = data_dump
         self.args = data_dump["args"]
         self.messengers= data_dump["messengers"]
+        self.analysis_modifiers = data_dump['analysis_modifiers']
         self.injection_parameters = data_dump.get("injection_parameters", None)
 
         # If the run dir has not been specified, get it from the args
@@ -130,36 +136,16 @@ class AnalysisRun(object):
         self.label = label
 
         priors= compose_priors(data_dump["prior_file"], self.args, logger)
-       
-        param_conv=MultimessengerConversion(priors, self.args)
-        priors.conversion_function = param_conv.priors_conversion_function
-        
-        parameter_conversion = param_conv.convert_to_multimessenger_parameters
-    
-
-
-
-# ->->->############ MATCH ME TO setup_nmma_likelihood ##################### 
-
-        if "gw" in self.messengers:
-            ifo_list = data_dump["ifo_list"]
-            waveform_generator = data_dump["waveform_generator"]
-            waveform_generator.start_time = ifo_list[0].time_array[0]
-            waveform_generator.parameter_conversion = parameter_conversion
-
-            # ROQ-weight
-            self.args.weight_file = data_dump["meta_data"].get("weight_file", None)
-
-        if "em" in self.messengers:
-            light_curve_data = data_dump["light_curve_data"]
+        param_conv=MultimessengerConversion(priors, self.args).priors_conversion_function
+        priors.conversion_function = param_conv
 
         logger.setLevel(logging.WARNING)
         
-        self.likelihood= setup_nmma_likelihood(
-            self.args, logger, priors, messenger_dict)
-        logger.setLevel(logging.INFO)
-#<-<-<-############ MATCH ME TO setup_nmma_likelihood #####################
+        self.likelihood= setup_nmma_likelihood(data_dump,
+            priors, self.args, self.messengers, param_conv, logger, **kwargs
+            )
         
+        logger.setLevel(logging.INFO)
 
         sampling_keys = []
         for p in priors:

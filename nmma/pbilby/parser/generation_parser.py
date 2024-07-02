@@ -2,7 +2,6 @@ import bilby
 import bilby_pipe.data_generation
 
 from .base_parser import (
-    _create_base_nmma_gw_parser,
     _create_base_nmma_parser,
     _add_slurm_settings_to_parser
     )

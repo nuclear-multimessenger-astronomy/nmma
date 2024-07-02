@@ -6,6 +6,7 @@ from numpy import inf
 
 logger = bilby.core.utils.logger
 
+
 from ... import __version__  # noqa: E402
 
 
@@ -29,7 +30,7 @@ class StoreBoolean(argparse.Action):
 
 def _create_base_nmma_parser(sampler="dynesty"):
     base_parser = argparse.ArgumentParser("base", add_help=False)
-    base_parser.add(
+    base_parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
@@ -47,6 +48,12 @@ def _create_base_nmma_parser(sampler="dynesty"):
 def _add_em_settings_to_parser(parser):
     em_input_parser = parser.add_argument_group(
         title="EM analysis input arguments", description="Specify EM analysis inputs"
+    )
+    em_input_parser.add(
+        "--with-em",
+        action="store_true",
+        default = False,
+        help="Flag for including general EM features in analysis",
     )
     em_input_parser.add(
         "--light-curve-data", type=str, help="Path to the observed light curve data"
@@ -169,21 +176,26 @@ def _add_em_settings_to_parser(parser):
     return parser
 
 def _add_eos_settings_to_parser(parser):
+    
     eos_input_parser = parser.add_argument_group(
         title="EOS input arguments", description="Specify EOS inputs"
-    )    
-    eos_input_parser.add(
-        "--with-eos",
+    )
+
+    eos_inference_style = eos_input_parser.add_mutually_exclusive_group()
+    eos_inference_style.add(
+        "--with-tabulated-eos",
         action="store_true",
         default=False,
-        help="Flag for sampling over EOS (default:False)",
+        help="Flag for sampling over tabulated EOS (default:False)",
     )
-    eos_input_parser.add(
-        "--tabulated-eos",
+
+    eos_inference_style.add(
+        "--with-eos-parameters",
         action="store_true",
         default=False,
-        help="If EOS sampling is used (--with-eos = True), either tabulated EOSs or NEP sampling must be used."
+        help="Flag for sampling over nuclear empirical parameters from which we generate an EOS (default:False)"
     )
+
     eos_input_parser.add(
         "--eos-to-ram",
         action="store_true",
@@ -191,31 +203,115 @@ def _add_eos_settings_to_parser(parser):
         help="Depending on cluster architecture, it can be faster to load all EOS files directly to RAM"
     )
     eos_input_parser.add(
-        "--eos-data", type=str, required=False, help="Path to the EOS directory"
+        "--eos-data", 
+        help="Path to the EOS directory"
     )
     eos_input_parser.add(
-        "--Neos", type=int, required=False, help="Number of EOSs to be used"
+        "--Neos", type=int, 
+        help="Number of EOSs to be used"
     )
     eos_input_parser.add(
-        "--eos-weight",
-        type=str,
-        required=False,
-        help="Path to the precalculated EOS weighting",
-    )
-    eos_input_parser.add(
-        "--eos-from-neps",
-        default=False,
-        help="If EOS sampling is used (--with-eos = True), either tabulated EOSs or NEP sampling must be used"
-    )
-    eos_input_parser.add(
-        "--eos-crust-file",
-        type=str,
-        help="Path to data file for eos crust, to be used if --eos-from-neps is set to True"
+        "--eos-weight", help="Path to the precalculated EOS weighting",
     )
 
+    eos_input_parser.add(
+        "--eos-crust-file", help="Path to data file for eos crust, to be used if --eos-from-neps is set to True"
+    )
+
+    ### args to set up eos likelihood evaluation based on constraints
+    eos_input_parser.add(
+        "--eos-constraint-dict", 
+        help="path to .json-file from which eos-constraints are read and/or to which they should be stored. Can be appended with additional constraints."
+    )
+
+    ### setup LowerMTOVConstraint
+    eos_input_parser.add(
+        "--lower-mtov",
+        type=bilby_pipe.utils.nonestr,
+        help= "dict with additional lower mtov limits to consider, using style: {'name':{'mass':mass_val,'error':gaussian_error_val [, 'arxiv':'arxiv_id']},...}"
+    )
+    eos_input_parser.add(
+        "--lower-mtov-name",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of identifiers for further lower-mtov-values to consider"
+    )
+    eos_input_parser.add(
+        "--lower-mtov-mass",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of additional lower mtov limits to consider"
+    )
+    eos_input_parser.add(
+        "--lower-mtov-error",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of additional mtov limit errors to consider"
+    )
+    eos_input_parser.add(
+        "--lower-mtov-arxiv",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of arxiv-ids for additional lower mtov limits to consider"
+    )
+    
+    ### setup UpperMTOVConstraint
+    eos_input_parser.add(
+        "--upper-mtov",
+        type=bilby_pipe.utils.nonestr,
+        help= "dict with additional upper mtov limits to consider, using style: {'name':{'mass':mass_val,'error':gaussian_error_val [, 'arxiv':'arxiv_id']},...}"
+    )
+    eos_input_parser.add(
+        "--upper-mtov-name",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of identifiers for further upper-mtov-values to consider"
+    )
+    eos_input_parser.add(
+        "--upper-mtov-mass",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of additional upper mtov limits to consider"
+    )
+    eos_input_parser.add(
+        "--upper-mtov-error",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of additional mtov limit errors to consider"
+    )
+    eos_input_parser.add(
+        "--upper-mtov-arxiv",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of arxiv-ids for additional upper mtov limits to consider"
+    )
+
+    ### setup MassRadiusConstraint
+    eos_input_parser.add(
+        "--mass-radius",
+        type=bilby_pipe.utils.nonestr,
+        help= "dict with additional mass-radius constraints to consider, using style: {'name':{'file_path':path_to_R_M_posterior,[, 'arxiv':'arxiv_id']},...}"
+    )
+    eos_input_parser.add(
+        "--mass-radius-name",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of identifiers for further mass-radius-posteriors to consider"
+    )
+    eos_input_parser.add(
+        "--MR-posterior-file-path",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of files with additional radius-mass posteriors to consider"
+    )
+    eos_input_parser.add(
+        "--mass-radius-arxiv",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of arxiv-ids for additional R-M posteriors to consider"
+    )
+    
     return parser
-
-
 
 def _add_gw_settings_to_parser(parser):
     gw_input_parser = parser.add_argument_group(
@@ -228,7 +324,7 @@ def _add_gw_settings_to_parser(parser):
         help="Flag for sampling over GW parameters (default:True)",
     )
     gw_input_parser.add("--binary-type", type=str, help="The binary is BNS or NSBH")
-
+    return parser
 
 def _add_Hubble_settings_to_parser(parser):
     H0_input_parser = parser.add_argument_group(
