@@ -1217,7 +1217,7 @@ def nnanalysis(args):
 
     df = pd.DataFrame()
     t_list = []
-    for i in len(data[res]):
+    for i in range(len(data[res])):
         t_list.append(data[res][i][0])
     df['t'] = t_list
     for key in data:
