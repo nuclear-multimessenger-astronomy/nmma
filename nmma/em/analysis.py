@@ -1249,7 +1249,7 @@ def nnanalysis(args):
     ar = np.arange(start=t_min, stop=t_max, step=time_step)
     filler_dict = {}
     for col in column_list:
-        if col = 't':
+        if col == 't':
             filler_dict['t'] = ar
         else:
             filler_dict[col] = [detection_limit]*len(ar)
