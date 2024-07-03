@@ -1229,15 +1229,12 @@ def nnanalysis(args):
     else: 
         detection_limit = 22.0
 
-    print(detection_limit)
-
     df = pd.DataFrame()
     t_list = []
     for i in range(len(data[res])):
         t_list.append(data[res][i][0])
     df['t'] = t_list
     for key in data:
-        print(key)
         mag_list = []
         for i, val in enumerate(data[key]):
             mag = data[key][i][1]
@@ -1246,14 +1243,18 @@ def nnanalysis(args):
     print(df)
 
     days = int(round(args.tmax - args.tmin))
-    print(days)
     column_list = df.columns.to_list()
     print(column_list)
 
-    # ar = np.arange(start=t_min, stop=t_max, step=time_step)
-    # filler_dict = {'t':ar, 'ztfg':[data_filler]*len(ar), 'ztfr':[data_filler]*len(ar), 'ztfi':[data_filler]*len(ar),
-    #                'sim_id':[np.nan]*len(ar), 'num_detections':[np.nan]*len(ar)}
-    # filler_df = pd.DataFrame(filler_dict)
+    ar = np.arange(start=t_min, stop=t_max, step=time_step)
+    filler_dict = {}
+    for col in column_list:
+        if col = 't':
+            filler_dict['t'] = ar
+        else:
+            filler_dict[col] = [detection_limit]*len(ar)
+    filler_df = pd.DataFrame(filler_dict)
+    print(filler_df)
 
     # l = np.arange(start=t_min, stop=t_min+(count*step), step=step)
     # filler_dict = {'t':l, 'ztfg':[data_filler]*len(l), 'ztfr':[data_filler]*len(l), 'ztfi':[data_filler]*len(l),
