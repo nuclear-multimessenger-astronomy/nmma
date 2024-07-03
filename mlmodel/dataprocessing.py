@@ -88,7 +88,7 @@ def json_to_df(file_names, num_sims, detection_limit=detection_limit, bands=band
         df_list[i] = df_unpacked
     return df_list
 
-def gen_prepend_filler(data_filler, t_min, t_max, step = 0.25):
+def gen_prepend_filler(detection_limit, t_min, t_max, step = 0.25):
     '''
     front end padding
     Inputs:
@@ -100,13 +100,17 @@ def gen_prepend_filler(data_filler, t_min, t_max, step = 0.25):
         filler_df: dataframe to pad the existing data
     '''
     # Fill according to step size, regardless of count
-    ar = np.arange(start=t_min, stop=t_max, step=step)
-    filler_dict = {'t':ar, 'ztfg':[data_filler]*len(ar), 'ztfr':[data_filler]*len(ar), 'ztfi':[data_filler]*len(ar),
-                   'sim_id':[np.nan]*len(ar), 'num_detections':[np.nan]*len(ar)}
-    filler_df = pd.DataFrame(filler_dict)
-    return filler_df
+    pre = np.arange(start=t_min, stop=t_max, step=time_step)
+    prefill_dict = {}
+    for col in column_list:
+        if col == 't':
+            prefill_dict['t'] = pre
+        else:
+            prefill_dict[col] = [detection_limit]*len(pre)
+    prefill_df = pd.DataFrame(prefill_dict)
+    return prefill_df
 
-def gen_append_filler(data_filler, t_min, count, step=0.25):
+def gen_append_filler(detection_limit, t_min, count, step=0.25):
     '''
     back end padding
     Inputs:
@@ -118,11 +122,15 @@ def gen_append_filler(data_filler, t_min, count, step=0.25):
         filler_df: dataframe to pad the existing data
     '''
     # Fill according to min value and specified count
-    l = np.arange(start=t_min, stop=t_min+(count*step), step=step)
-    filler_dict = {'t':l, 'ztfg':[data_filler]*len(l), 'ztfr':[data_filler]*len(l), 'ztfi':[data_filler]*len(l),
-                   'sim_id':[np.nan]*len(l), 'num_detections':[np.nan]*len(l)}
-    filler_df = pd.DataFrame(filler_dict)
-    return filler_df
+    aft = np.arange(start=t_min, stop=t_min+(count*step), step=step)
+    aftfill_dict = {}
+    for col in column_list:
+        if col == 't':
+            aftfill_dict['t'] = aft
+        else:
+            aftfill_dict[col] = [detection_limit]*len(aft)
+    aftfill_df = pd.DataFrame(aftfill_dict)
+    return aftfill_df
 
 def pad_the_data(actual_df, desired_count=num_points, filler_time_step=time_step, filler_data=detection_limit):
     '''
