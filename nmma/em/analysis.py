@@ -23,7 +23,7 @@ from .prior import create_prior_from_args
 from .utils import getFilteredMag, dataProcess
 from .io import loadEvent
 
-from ...mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
+from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
 
 matplotlib.use("agg")
 
