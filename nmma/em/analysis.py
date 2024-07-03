@@ -23,6 +23,8 @@ from .prior import create_prior_from_args
 from .utils import getFilteredMag, dataProcess
 from .io import loadEvent
 
+from ...mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
+
 matplotlib.use("agg")
 
 
@@ -1241,32 +1243,29 @@ def nnanalysis(args):
             mag_list.append(mag)
         df[key] = mag_list
     print(df)
-
-    days = int(round(args.tmax - args.tmin))
     column_list = df.columns.to_list()
-    print(column_list)
 
     # create padding
 
-    pre = np.arange(start=t_min, stop=t_max, step=time_step)
-    prefill_dict = {}
-    for col in column_list:
-        if col == 't':
-            prefill_dict['t'] = pre
-        else:
-            prefill_dict[col] = [detection_limit]*len(pre)
-    prefill_df = pd.DataFrame(prefill_dict)
-    print(prefill_df)
+    # pre = np.arange(start=t_min, stop=t_max, step=time_step)
+    # prefill_dict = {}
+    # for col in column_list:
+    #     if col == 't':
+    #         prefill_dict['t'] = pre
+    #     else:
+    #         prefill_dict[col] = [detection_limit]*len(pre)
+    # prefill_df = pd.DataFrame(prefill_dict)
+    # print(prefill_df)
 
-    aft = np.arange(start=t_min, stop=t_min+(count*step), step=step)
-    aftfill_dict = {}
-    for col in column_list:
-        if col == 't':
-            aftfill_dict['t'] = aft
-        else:
-            aftfill_dict[col] = [detection_limit]*len(pre)
-    aftfill_df = pd.DataFrame(aftfill_dict)
-    print(aftfill_df)
+    # aft = np.arange(start=t_min, stop=t_min+(count*step), step=step)
+    # aftfill_dict = {}
+    # for col in column_list:
+    #     if col == 't':
+    #         aftfill_dict['t'] = aft
+    #     else:
+    #         aftfill_dict[col] = [detection_limit]*len(pre)
+    # aftfill_df = pd.DataFrame(aftfill_dict)
+    # print(aftfill_df)
 
     # add the padding to the data
 
