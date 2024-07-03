@@ -1214,7 +1214,7 @@ def nnanalysis(args):
             trigger_time = args.trigger_time
 
     # now that we have the kilonova light curve, we need to pad it with non-detections
-    # this part is currently hard coded in terms of the times 
+    # this part is currently hard coded in terms of the times !!!! likely will need the most work
     # (so that the 'fixed' and 'shifted' are properly represented)
     num_points = 121
     bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
@@ -1246,22 +1246,39 @@ def nnanalysis(args):
     column_list = df.columns.to_list()
     print(column_list)
 
-    ar = np.arange(start=t_min, stop=t_max, step=time_step)
-    filler_dict = {}
+    # create padding
+
+    pre = np.arange(start=t_min, stop=t_max, step=time_step)
+    prefill_dict = {}
     for col in column_list:
         if col == 't':
-            filler_dict['t'] = ar
+            prefill_dict['t'] = pre
         else:
-            filler_dict[col] = [detection_limit]*len(ar)
-    filler_df = pd.DataFrame(filler_dict)
-    print(filler_df)
+            prefill_dict[col] = [detection_limit]*len(pre)
+    prefill_df = pd.DataFrame(prefill_dict)
+    print(prefill_df)
 
-    # l = np.arange(start=t_min, stop=t_min+(count*step), step=step)
-    # filler_dict = {'t':l, 'ztfg':[data_filler]*len(l), 'ztfr':[data_filler]*len(l), 'ztfi':[data_filler]*len(l),
-    #                'sim_id':[np.nan]*len(l), 'num_detections':[np.nan]*len(l)}
-    # filler_df = pd.DataFrame(filler_dict)
+    aft = np.arange(start=t_min, stop=t_min+(count*step), step=step)
+    aftfill_dict = {}
+    for col in column_list:
+        if col == 't':
+            aftfill_dict['t'] = aft
+        else:
+            aftfill_dict[col] = [detection_limit]*len(pre)
+    aftfill_df = pd.DataFrame(aftfill_dict)
+    print(aftfill_df)
 
+    # add the padding to the data
 
+    # change the data into pytorch tensors
+
+    # set up the embedding 
+
+    # set up the normalizing flows
+
+    # pass the data through
+
+    # create and save the corner plot
     
     # # run the neural network analysis
     # result = flow_analysis(lightcurvetensor)
