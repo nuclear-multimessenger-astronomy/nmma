@@ -900,18 +900,28 @@ def analysis(args):
 
         colors = cm.Spectral(np.linspace(0, 1, len(filters_plot)))[::-1]
 
-        plotName = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
-        plt.figure(figsize=(20, 16))
-        color2 = "coral"
+        plotDir = os.path.join(args.outdir, f"{args.label}_lightcurves/")
+        os.makedirs(plotDir)
 
         cnt = 0
         for filt, color in zip(filters_plot, colors):
             cnt = cnt + 1
-            if cnt == 1:
-                ax1 = plt.subplot(len(filters_plot), 1, cnt)
-            else:
-                ax2 = plt.subplot(len(filters_plot), 1, cnt, sharex=ax1, sharey=ax1)
 
+            plotName = plotDir + f'{filt}.png'
+
+            f, (ax1, ax2) = plt.subplot(
+                2, 1, gridspec_kw={'height_ratios': [4, 1]},
+                sharex=True,
+            )
+
+            # remove the x-axis labels and ticks for subplot ax1
+            ax1.set_xticks([])
+            # configuring ax1 and ax2
+            ax1.set_ylabel("AB magnitude", rotation=90)
+            ax2.set_ylabel(r"$\Delta (\sigma)$")
+            ax2.set_xlabel("Time [days]")
+
+            # plotting the best-fit lc and the data in ax1
             samples = data[filt]
             t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
             t -= trigger_time
@@ -924,21 +934,42 @@ def analysis(args):
                 y[idx],
                 sigma_y[idx],
                 fmt="o",
-                color="k",
+                color=color,
                 markersize=16,
-            )  # or color=color
+            )
 
             idx = np.where(~np.isfinite(sigma_y))[0]
             plt.errorbar(
-                t[idx], y[idx], sigma_y[idx], fmt="v", color="k", markersize=16
-            )  # or color=color
+                t[idx],
+                y[idx],
+                sigma_y[idx],
+                fmt="v",
+                color=color,
+                markersize=16
+            )
 
             mag_plot = getFilteredMag(mag, filt)
+
+            # calculating the chi2
+            mag_per_data = np.interp(
+                t[idx],
+                mag["bestfit_sample_times"],
+                mag_plot)
+            diff_per_data = mag_per_data - y[idx]
+            sigma_per_data = np.sqrt((sigma_y[idx]**2 + error_budget[filt]**2))
+            chi2_per_data = diff_per_data**2
+            chi2_per_data /= sigma_per_data**2
+            chi2_total = np.sum(chi2_per_data)
+            N_data = len(idx)
+
+            # plot the mismatch between the model and the data
+            ax2.scatter(t[idx], diff_per_data / sigma_per_data, color=color)
+            ax2.axhline(0, linestyle='--', color='k')
 
             plt.plot(
                 mag["bestfit_sample_times"],
                 mag_plot,
-                color=color2,
+                color='coral',
                 linewidth=3,
                 linestyle="--",
             )
@@ -948,7 +979,7 @@ def analysis(args):
                     mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
                     mag_plot - error_budget[filt],
-                    facecolor=color2,
+                    facecolor='coral',
                     alpha=0.2,
                     label="Combined",
                 )
@@ -957,7 +988,7 @@ def analysis(args):
                     mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
                     mag_plot - error_budget[filt],
-                    facecolor=color2,
+                    facecolor='coral',
                     alpha=0.2,
                 )
 
@@ -967,7 +998,7 @@ def analysis(args):
                     plt.plot(
                         mag["bestfit_sample_times"],
                         mag_plot,
-                        color=color2,
+                        color='coral',
                         linewidth=3,
                         linestyle="--",
                     )
@@ -980,33 +1011,15 @@ def analysis(args):
                         label=models[ii].model,
                     )
 
-            plt.ylabel("%s" % filt, fontsize=48, rotation=0, labelpad=40)
+            plt.title(f'Filter {file}, ' + fr'$\chi^2 per dof  = {chi2_total / N_data}$')
 
-            plt.xlim([float(x) for x in args.xlim.split(",")])
-            plt.ylim([float(x) for x in args.ylim.split(",")])
-            plt.grid()
+            ax1.set_xlim([float(x) for x in args.xlim.split(",")])
+            ax2.set_xlim([float(x) for x in args.xlim.split(",")])
+            ax1.ylim([float(x) for x in args.ylim.split(",")])
 
-            if cnt == 1:
-                ax1.set_yticks([26, 22, 18, 14])
-                plt.setp(ax1.get_xticklabels(), visible=False)
-                if len(models) > 1:
-                    plt.legend(
-                        loc="upper right",
-                        prop={"size": 18},
-                        numpoints=1,
-                        shadow=True,
-                        fancybox=True,
-                    )
-            elif not cnt == len(filters_plot):
-                plt.setp(ax2.get_xticklabels(), visible=False)
-            plt.xticks(fontsize=36)
-            plt.yticks(fontsize=36)
-
-        ax1.set_zorder(1)
-        plt.xlabel("Time [days]", fontsize=48)
-        plt.tight_layout()
-        plt.savefig(plotName)
-        plt.close()
+            plt.tight_layout()
+            plt.savefig(plotName)
+            plt.close()
 
 
 def main(args=None):
