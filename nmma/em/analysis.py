@@ -901,7 +901,10 @@ def analysis(args):
         colors = cm.Spectral(np.linspace(0, 1, len(filters_plot)))[::-1]
 
         plotDir = os.path.join(args.outdir, f"{args.label}_lightcurves/")
-        os.makedirs(plotDir)
+        try:
+            os.makedirs(plotDir)
+        except FileExistsError:
+            print("Bestfit lightcurves directory already exist, overwriting figures in it")
 
         cnt = 0
         for filt, color in zip(filters_plot, colors):
