@@ -909,13 +909,13 @@ def analysis(args):
 
             plotName = plotDir + f'{filt}.png'
 
-            f, (ax1, ax2) = plt.subplot(
+            f, (ax1, ax2) = plt.subplots(
                 2, 1, gridspec_kw={'height_ratios': [4, 1]},
                 sharex=True,
             )
 
             # remove the x-axis labels and ticks for subplot ax1
-            ax1.set_xticks([])
+            # ax1.set_xticks([])
             # configuring ax1 and ax2
             ax1.set_ylabel("AB magnitude", rotation=90)
             ax2.set_ylabel(r"$\Delta (\sigma)$")
@@ -929,44 +929,45 @@ def analysis(args):
             t, y, sigma_y = t[idx], y[idx], sigma_y[idx]
 
             idx = np.where(np.isfinite(sigma_y))[0]
-            plt.errorbar(
+            det_idx = idx
+            ax1.errorbar(
                 t[idx],
                 y[idx],
                 sigma_y[idx],
                 fmt="o",
                 color=color,
-                markersize=16,
+                #markersize=16,
             )
 
             idx = np.where(~np.isfinite(sigma_y))[0]
-            plt.errorbar(
+            ax1.errorbar(
                 t[idx],
                 y[idx],
                 sigma_y[idx],
                 fmt="v",
                 color=color,
-                markersize=16
+                #markersize=16
             )
 
             mag_plot = getFilteredMag(mag, filt)
 
             # calculating the chi2
             mag_per_data = np.interp(
-                t[idx],
+                t[det_idx],
                 mag["bestfit_sample_times"],
                 mag_plot)
-            diff_per_data = mag_per_data - y[idx]
-            sigma_per_data = np.sqrt((sigma_y[idx]**2 + error_budget[filt]**2))
+            diff_per_data = mag_per_data - y[det_idx]
+            sigma_per_data = np.sqrt((sigma_y[det_idx]**2 + error_budget[filt]**2))
             chi2_per_data = diff_per_data**2
             chi2_per_data /= sigma_per_data**2
             chi2_total = np.sum(chi2_per_data)
-            N_data = len(idx)
+            N_data = len(det_idx)
 
             # plot the mismatch between the model and the data
-            ax2.scatter(t[idx], diff_per_data / sigma_per_data, color=color)
+            ax2.scatter(t[det_idx], diff_per_data / sigma_per_data, color=color)
             ax2.axhline(0, linestyle='--', color='k')
 
-            plt.plot(
+            ax1.plot(
                 mag["bestfit_sample_times"],
                 mag_plot,
                 color='coral',
@@ -975,16 +976,16 @@ def analysis(args):
             )
 
             if len(models) > 1:
-                plt.fill_between(
+                ax1.fill_between(
                     mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
                     mag_plot - error_budget[filt],
                     facecolor='coral',
                     alpha=0.2,
-                    label="Combined",
+                    label="combined",
                 )
             else:
-                plt.fill_between(
+                ax1.fill_between(
                     mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
                     mag_plot - error_budget[filt],
@@ -995,14 +996,14 @@ def analysis(args):
             if len(models) > 1:
                 for ii in range(len(mag_all)):
                     mag_plot = getFilteredMag(mag_all[ii], filt)
-                    plt.plot(
+                    ax1.plot(
                         mag["bestfit_sample_times"],
                         mag_plot,
                         color='coral',
                         linewidth=3,
                         linestyle="--",
                     )
-                    plt.fill_between(
+                    ax1.fill_between(
                         mag["bestfit_sample_times"],
                         mag_plot + error_budget[filt],
                         mag_plot - error_budget[filt],
@@ -1011,11 +1012,12 @@ def analysis(args):
                         label=models[ii].model,
                     )
 
-            plt.title(f'Filter {file}, ' + fr'$\chi^2 per dof  = {chi2_total / N_data}$')
+            ax1.set_title(f'Filter {filt}, ' + fr'$\chi^2 / d.o.f. = {chi2_total / N_data}$')
+
 
             ax1.set_xlim([float(x) for x in args.xlim.split(",")])
             ax2.set_xlim([float(x) for x in args.xlim.split(",")])
-            ax1.ylim([float(x) for x in args.ylim.split(",")])
+            ax1.set_ylim([float(x) for x in args.ylim.split(",")])
 
             plt.tight_layout()
             plt.savefig(plotName)
