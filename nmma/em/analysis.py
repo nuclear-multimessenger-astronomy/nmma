@@ -401,6 +401,12 @@ def get_parser(**kwargs):
         type=float,
         help="Distance of the location; to be used together with fits file"
     )
+    parser.add_argument(
+        "--fetch-Ebv-from-dustmap",
+        help="Fetching Ebv from dustmap, to be used as fixed-value prior",
+        action="store_true",
+        default=False,
+    )
 
     parser.add_argument(
         "--skip-sampling",
