@@ -76,6 +76,7 @@ def args():
         cosiota_node_num=10,
         ra=None,
         dec=None,
+        fetch_Ebv_from_dustmap=False
     )
 
     return args

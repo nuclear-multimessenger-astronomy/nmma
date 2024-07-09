@@ -235,4 +235,33 @@ def create_prior_from_args(model_names, args):
     if args.fits_file:
         priors = inclination_prior_from_fits(priors, args)
 
+    if args.fetch_Ebv_from_dustmap:
+        assert args.ra and args.dec, \
+            "sky location is needed for fetching Ebv from dustmap"
+        print("Fetching value of Ebv from dustmap, overwriting the original prior on Ebv")
+        try:
+            import dustmaps.sfd
+            from dustmaps.config import config
+            from astropy import coordinates
+        except ImportError:
+            print("Package dustmap is needed")
+            import sys
+            sys.exit(1)
+
+        # check if the dust fits are downloaded
+        import os
+        default_dir = os.path.join(os.path.dirname(__file__))
+        # config dustmaps to fetch and place fits from default_dir
+        config['data_dir'] = default_dir
+        required_files = ['sfd/SFD_dust_4096_ngp.fits', 'sfd/SFD_dust_4096_sgp.fits']
+        if any([
+            not os.path.isfile(os.path.join(default_dir, f)) for f in required_files]
+        ):
+            dustmaps.sfd.fetch()
+        # fetching the Ebv value
+        coord = coordinates.SkyCoord(args.ra, args.dec, unit='rad')
+        priors['Ebv'] = float(dustmaps.sfd.SFDQuery()(coord))
+
+        print(f"The prior on Ebv is set to fixed value of {priors['Ebv']}")
+
     return priors
