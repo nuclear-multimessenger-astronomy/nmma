@@ -92,7 +92,7 @@ def gen_prepend_filler(detection_limit, t_min, t_max, step = 0.25):
     '''
     front end padding
     Inputs:
-        data_filler: number that is used as the filler, ie the detection limit
+        detection_limit: number that is used as the filler, ie the detection limit
         t_min: minimum time
         t_max: maximum time
         step: time increment
@@ -100,7 +100,7 @@ def gen_prepend_filler(detection_limit, t_min, t_max, step = 0.25):
         filler_df: dataframe to pad the existing data
     '''
     # Fill according to step size, regardless of count
-    pre = np.arange(start=t_min, stop=t_max, step=time_step)
+    pre = np.arange(start=t_min, stop=t_max, step=step)
     prefill_dict = {}
     for col in column_list:
         if col == 't':
@@ -114,7 +114,7 @@ def gen_append_filler(detection_limit, t_min, count, step=0.25):
     '''
     back end padding
     Inputs:
-        data_filler: number that is used as the filler, ie the detection limit
+        detection_limit: number that is used as the filler, ie the detection limit
         t_min: minimum time
         t_max: maximum time
         step: time increment
