@@ -1231,43 +1231,30 @@ def nnanalysis(args):
     else: 
         detection_limit = 22.0
 
-    df = pd.DataFrame()
+    data_df = pd.DataFrame()
     t_list = []
     for i in range(len(data[res])):
         t_list.append(data[res][i][0])
-    df['t'] = t_list
+    data_df['t'] = t_list
     for key in data:
         mag_list = []
         for i, val in enumerate(data[key]):
             mag = data[key][i][1]
             mag_list.append(mag)
-        df[key] = mag_list
-    print(df)
-    column_list = df.columns.to_list()
+        data_df[key] = mag_list
+    print(data_df)
+    column_list = data_df.columns.to_list()
 
-    # create padding
+    # pad the data 
 
-    # pre = np.arange(start=t_min, stop=t_max, step=time_step)
-    # prefill_dict = {}
-    # for col in column_list:
-    #     if col == 't':
-    #         prefill_dict['t'] = pre
-    #     else:
-    #         prefill_dict[col] = [detection_limit]*len(pre)
-    # prefill_df = pd.DataFrame(prefill_dict)
-    # print(prefill_df)
+    padded_data_df = pad_the_data(
+        actual_data = data_df, 
+        desired_count=num_points, 
+        filler_time_step=time_step, 
+        filler_data=detection_limit
+    )
 
-    # aft = np.arange(start=t_min, stop=t_min+(count*step), step=step)
-    # aftfill_dict = {}
-    # for col in column_list:
-    #     if col == 't':
-    #         aftfill_dict['t'] = aft
-    #     else:
-    #         aftfill_dict[col] = [detection_limit]*len(pre)
-    # aftfill_df = pd.DataFrame(aftfill_dict)
-    # print(aftfill_df)
-
-    # add the padding to the data
+    print(padded_data_df)
 
     # change the data into pytorch tensors
 
