@@ -1361,7 +1361,6 @@ def nnanalysis(args):
     flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
 
     if args.injection:
-        injection_parameters = 
         param_tensor = torch.tensor(injection_parameters, dtype=torch.float32)
         
         # pass the data through
@@ -1371,12 +1370,13 @@ def nnanalysis(args):
         samples = samples.cpu().reshape(nsamples,3)
         truth = param_tensor.cpu()[...,0:3]
         truth = truth.squeeze(1)[0]
-        flow_result = cast_as_bilby_result(samples, truth, priors)
+        flow_result = cast_as_bilby_result(samples, truth, priors=priors)
 
         # create and save the corner plot
         fig = flow_result.plot_corner()
     else:
-        
+        flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
+        fig = flow_result.plot_corner()        
 
 def main(args=None):
     if args is None:
