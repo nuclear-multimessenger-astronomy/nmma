@@ -1308,6 +1308,7 @@ def nnanalysis(args):
     # this part is currently hard coded in terms of the times !!!! likely will need the most work
     # (so that the 'fixed' and 'shifted' are properly represented)
     num_points = 121
+    num_channels = 3
     bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
     t_zero = 44242.00021937881
     t_min = 44240.00050450478
