@@ -1345,37 +1345,38 @@ def nnanalysis(args):
     )
 
     # change the data into pytorch tensors
-    # data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
-    # param_tensor = torch.tensor(dtype=torch.float32)
+    data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
 
     # set up the embedding 
-    # similarity_embedding = SimilarityEmbedding(num_dim=7, num_hidden_layers_f=1, num_hidden_layers_h=1, num_blocks=4, kernel_size=5, num_dim_final=5).to(device)
-    # num_dim = 7
-    # SAVEPATH = '/nobackup/users/mmdesai/updated_weights/similarity-embedding-weights-4and5.pth'
-    # similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
-    # for name, param in similarity_embedding.named_parameters():
-    #     param.requires_grad = False
+    similarity_embedding = SimilarityEmbedding(num_dim=7, num_hidden_layers_f=1, num_hidden_layers_h=1, num_blocks=4, kernel_size=5, num_dim_final=5).to(device)
+    num_dim = 7
+    SAVEPATH = '/nobackup/users/mmdesai/updated_weights/similarity-embedding-weights-4and5.pth'
+    similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
+    for name, param in similarity_embedding.named_parameters():
+        param.requires_grad = False
 
     # set up the normalizing flows
-    # transform, base_dist, embedding_net = normflow_params(similarity_embedding, 9, 5, 90, context_features=context_features, num_dim=num_dim) 
-    # PATH_nflow = '/nobackup/users/mmdesai/bestflowweights/frozen-flow-weights.pth'
-    # flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
-    
-    # pass the data through
-    # nsamples = 20000
-    # with torch.no_grad():
-    #     samples = flow.sample(nsamples, context=data_tensor)
-    # samples = samples.cpu().reshape(nsamples,3)
-    # truth = param_tensor.cpu()[...,0:3]
-    # truth = truth.squeeze(1)[0]
-    # flow_result = cast_as_bilby_result(samples, truth, priors)
+    transform, base_dist, embedding_net = normflow_params(similarity_embedding, 9, 5, 90, context_features=context_features, num_dim=num_dim) 
+    PATH_nflow = '/nobackup/users/mmdesai/bestflowweights/frozen-flow-weights.pth'
+    flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
 
-    # create and save the corner plot
-    
-    
-    # # run the neural network analysis
-    # result = flow_analysis(lightcurvetensor)
-    # fig = plot_flow_inference(truth, samples)
+    if args.injection:
+        injection_parameters = 
+        param_tensor = torch.tensor(injection_parameters, dtype=torch.float32)
+        
+        # pass the data through
+        nsamples = 20000
+        with torch.no_grad():
+            samples = flow.sample(nsamples, context=data_tensor)
+        samples = samples.cpu().reshape(nsamples,3)
+        truth = param_tensor.cpu()[...,0:3]
+        truth = truth.squeeze(1)[0]
+        flow_result = cast_as_bilby_result(samples, truth, priors)
+
+        # create and save the corner plot
+        fig = flow_result.plot_corner()
+    else:
+        
 
 def main(args=None):
     if args is None:
