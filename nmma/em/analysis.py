@@ -28,6 +28,7 @@ from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_
 from ..mlmodel.resnet import ResNet
 from ..mlmodel.embedding import SimilarityEmbedding
 from ..mlmodel.normalizingflows import normflow_params
+from ..mlmodel.inference import cast_as_bilby_result
 
 # need to add these packages:
 import torch
@@ -1045,7 +1046,6 @@ def nnanalysis(args):
         filters = args.filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
         if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
-            print(filters)
             pass
         else:
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
@@ -1064,7 +1064,7 @@ def nnanalysis(args):
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
-    print('Set up logger and storage directory')
+    print('Setting up logger and storage directory')
 
     if args.log_space_time:
         if args.n_tstep:
@@ -1146,6 +1146,7 @@ def nnanalysis(args):
             injection_parameters, args, light_curve_model=injection_model
         )
         print("Injection generated")
+        print(injection_parameters)
 
         if args.injection_outfile is not None:
             if filters is not None:
@@ -1232,6 +1233,77 @@ def nnanalysis(args):
         else:
             trigger_time = args.trigger_time
 
+    if args.remove_nondetections:
+        filters_to_check = list(data.keys())
+        for filt in filters_to_check:
+            idx = np.where(np.isfinite(data[filt][:, 2]))[0]
+            data[filt] = data[filt][idx, :]
+            if len(idx) == 0:
+                del data[filt]
+
+    # check for detections
+    detection = False
+    notallnan = False
+    for filt in data.keys():
+        idx = np.where(np.isfinite(data[filt][:, 2]))[0]
+        if len(idx) > 0:
+            detection = True
+        idx = np.where(np.isfinite(data[filt][:, 1]))[0]
+        if len(idx) > 0:
+            notallnan = True
+        if detection and notallnan:
+            break
+    if (not detection) or (not notallnan):
+        raise ValueError("Need at least one detection to do fitting.")
+
+    if type(args.error_budget) in [float, int]:
+        error_budget = [args.error_budget]
+    else:
+        error_budget = [float(x) for x in args.error_budget.split(",")]
+    if args.filters:
+        if args.photometry_augmentation_filters:
+            filters = list(
+                set(
+                    args.filters.split(",")
+                    + args.photometry_augmentation_filters.split(",")
+                )
+            )
+        else:
+            filters = args.filters.split(",")
+
+        values_to_indices = {v: i for i, v in enumerate(filters)}
+        filters_to_analyze = sorted(
+            list(set(filters).intersection(set(list(data.keys())))),
+            key=lambda v: values_to_indices[v],
+        )
+
+        if len(error_budget) == 1:
+            error_budget = dict(
+                zip(filters_to_analyze, error_budget * len(filters_to_analyze))
+            )
+        elif len(args.filters.split(",")) == len(error_budget):
+            error_budget = dict(zip(args.filters.split(","), error_budget))
+        else:
+            raise ValueError("error_budget must be the same length as filters")
+
+    else:
+        filters_to_analyze = list(data.keys())
+        error_budget = dict(
+            zip(filters_to_analyze, error_budget * len(filters_to_analyze))
+        )
+
+    print("Running with filters {0}".format(filters_to_analyze))
+    model_names, models, light_curve_model = create_light_curve_model_from_args(
+        args.model,
+        args,
+        sample_times,
+        filters=filters_to_analyze,
+        sample_over_Hubble=args.sample_over_Hubble,
+    )
+
+    # setup the prior
+    priors = create_prior_from_args(model_names, args)
+    
     # now that we have the kilonova light curve, we need to pad it with non-detections
     # this part is currently hard coded in terms of the times !!!! likely will need the most work
     # (so that the 'fixed' and 'shifted' are properly represented)
@@ -1273,33 +1345,33 @@ def nnanalysis(args):
     )
 
     # change the data into pytorch tensors
-    data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
-    param_tensor = torch.tensor(dtype=torch.float32)
+    # data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
+    # param_tensor = torch.tensor(dtype=torch.float32)
 
     # set up the embedding 
-    similarity_embedding = SimilarityEmbedding(num_dim=7, num_hidden_layers_f=1, num_hidden_layers_h=1, num_blocks=4, kernel_size=5, num_dim_final=5).to(device)
-    num_dim = 7
-    SAVEPATH = '/nobackup/users/mmdesai/updated_weights/similarity-embedding-weights-4and5.pth'
-    similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
-    for name, param in similarity_embedding.named_parameters():
-        param.requires_grad = False
+    # similarity_embedding = SimilarityEmbedding(num_dim=7, num_hidden_layers_f=1, num_hidden_layers_h=1, num_blocks=4, kernel_size=5, num_dim_final=5).to(device)
+    # num_dim = 7
+    # SAVEPATH = '/nobackup/users/mmdesai/updated_weights/similarity-embedding-weights-4and5.pth'
+    # similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
+    # for name, param in similarity_embedding.named_parameters():
+    #     param.requires_grad = False
 
     # set up the normalizing flows
-    transform, base_dist, embedding_net = normflow_params(similarity_embedding, 9, 5, 90, context_features=context_features, num_dim=num_dim) 
-    PATH_nflow = '/nobackup/users/mmdesai/bestflowweights/frozen-flow-weights.pth'
-    flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
+    # transform, base_dist, embedding_net = normflow_params(similarity_embedding, 9, 5, 90, context_features=context_features, num_dim=num_dim) 
+    # PATH_nflow = '/nobackup/users/mmdesai/bestflowweights/frozen-flow-weights.pth'
+    # flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
     
     # pass the data through
-    nsamples = 20000
-    with torch.no_grad():
-        samples = flow.sample(nsamples, context=data_tensor)
-    samples = samples.cpu().reshape(nsamples,3)
-    truth = var_inf_dict['var_param{}'.format(i)].cpu()[...,0:3]
-    truth = truth.squeeze(1)[0]
-    flow_result = cast_as_bilby_result(samples, truth)
-    
+    # nsamples = 20000
+    # with torch.no_grad():
+    #     samples = flow.sample(nsamples, context=data_tensor)
+    # samples = samples.cpu().reshape(nsamples,3)
+    # truth = param_tensor.cpu()[...,0:3]
+    # truth = truth.squeeze(1)[0]
+    # flow_result = cast_as_bilby_result(samples, truth, priors)
 
     # create and save the corner plot
+    
     
     # # run the neural network analysis
     # result = flow_analysis(lightcurvetensor)
