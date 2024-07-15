@@ -23,7 +23,7 @@ from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform
 from nflows.transforms import CompositeTransform, RandomPermutation
 import nflows.utils as torchutils
 # functions
-from embedding import SimilarityEmbedding
+from .embedding import SimilarityEmbedding
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 num_dim = 7
