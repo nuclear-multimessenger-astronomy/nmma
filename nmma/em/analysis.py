@@ -1345,6 +1345,8 @@ def nnanalysis(args):
         filler_data=detection_limit
     )
 
+    print('padded df:', padded_data_df)
+
     # change the data into pytorch tensors
     data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
 
