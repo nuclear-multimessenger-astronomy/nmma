@@ -1339,6 +1339,7 @@ def nnanalysis(args):
     # pad the data 
     padded_data_df = pad_the_data(
         data_df, 
+        column_list,
         desired_count=num_points, 
         filler_time_step=time_step, 
         filler_data=detection_limit
