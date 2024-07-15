@@ -35,7 +35,7 @@ def cast_as_bilby_result(samples, truth, priors):
         result = bilby.result.Result(
             label="test_data",
             posterior=posterior,
-            search_parameter_keys=list(injections.keys()),
+            search_parameter_keys=list(posterior.keys()),
             priors=priors
         )
     else: 
@@ -48,7 +48,7 @@ def cast_as_bilby_result(samples, truth, priors):
             label="test_data",
             injection_parameters=injections,
             posterior=posterior,
-            search_parameter_keys=list(injections.keys()),
+            search_parameter_keys=list(posterior.keys()),
             priors=priors
         )
     
