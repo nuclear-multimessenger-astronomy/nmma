@@ -31,7 +31,7 @@ def cast_as_bilby_result(samples, truth, priors):
     posterior['log10_Xlan'] = samples_numpy.T[2].flatten()
     posterior = pd.DataFrame(posterior)
     
-    if truth = None:
+    if truth == None:
         result = bilby.result.Result(
             label="test_data",
             posterior=posterior,
