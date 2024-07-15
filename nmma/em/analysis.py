@@ -24,7 +24,7 @@ from .utils import getFilteredMag, dataProcess
 from .io import loadEvent
 
 from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
-from resnet import ResNet
+from ..mlmodel.resnet import ResNet
 
 # need to add these packages:
 import torch
