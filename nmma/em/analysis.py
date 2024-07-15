@@ -23,8 +23,11 @@ from .prior import create_prior_from_args
 from .utils import getFilteredMag, dataProcess
 from .io import loadEvent
 
+# import functions
 from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
 from ..mlmodel.resnet import ResNet
+from ..mlmodel.embedding import SimilarityEmbedding
+from ..mlmodel.normalizingflows import EmbeddingNet, normflow_params
 
 # need to add these packages:
 import torch
