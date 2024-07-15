@@ -1354,14 +1354,14 @@ def nnanalysis(args):
     # set up the embedding 
     similarity_embedding = SimilarityEmbedding(num_dim=7, num_hidden_layers_f=1, num_hidden_layers_h=1, num_blocks=4, kernel_size=5, num_dim_final=5).to(device)
     num_dim = 7
-    SAVEPATH = '/nobackup/users/mmdesai/updated_weights/similarity-embedding-weights-4and5.pth'
+    SAVEPATH = os.getcwd() + '/nmma/mlmodel/similarity_embedding_weights.pth'
     similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
     for name, param in similarity_embedding.named_parameters():
         param.requires_grad = False
 
     # set up the normalizing flows
     transform, base_dist, embedding_net = normflow_params(similarity_embedding, 9, 5, 90, context_features=context_features, num_dim=num_dim) 
-    PATH_nflow = '/nobackup/users/mmdesai/bestflowweights/frozen-flow-weights.pth'
+    PATH_nflow = os.getcwd() + '/nmma/mlmodel/frozen_flow_weights.pth'
     flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
 
     if args.injection:
