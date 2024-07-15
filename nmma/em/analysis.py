@@ -24,6 +24,20 @@ from .utils import getFilteredMag, dataProcess
 from .io import loadEvent
 
 from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
+from resnet import ResNet
+
+# need to add these packages:
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
+import torch.nn.functional as F
+from nflows.nn.nets.resnet import ResidualNet
+from nflows import transforms, distributions, flows
+from nflows.distributions import StandardNormal
+from nflows.flows import Flow
+from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform
+from nflows.transforms import CompositeTransform, RandomPermutation
+import nflows.utils as torchutils
 
 matplotlib.use("agg")
 
