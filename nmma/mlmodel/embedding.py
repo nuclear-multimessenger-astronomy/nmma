@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-from resnet import ResNet
+from .resnet import ResNet
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
