@@ -88,10 +88,11 @@ def json_to_df(file_names, num_sims, detection_limit=detection_limit, bands=band
         df_list[i] = df_unpacked
     return df_list
 
-def gen_prepend_filler(detection_limit, t_min, t_max, step = 0.25):
+def gen_prepend_filler(column_list, detection_limit, t_min, t_max, step = 0.25):
     '''
     front end padding
     Inputs:
+        column_list: list of columns of the dataframe
         detection_limit: number that is used as the filler, ie the detection limit
         t_min: minimum time
         t_max: maximum time
@@ -110,10 +111,11 @@ def gen_prepend_filler(detection_limit, t_min, t_max, step = 0.25):
     prefill_df = pd.DataFrame(prefill_dict)
     return prefill_df
 
-def gen_append_filler(detection_limit, t_min, count, step=0.25):
+def gen_append_filler(column_list, detection_limit, t_min, count, step=0.25):
     '''
     back end padding
     Inputs:
+        column_list: list of columns of the dataframe
         detection_limit: number that is used as the filler, ie the detection limit
         t_min: minimum time
         t_max: maximum time
@@ -132,7 +134,7 @@ def gen_append_filler(detection_limit, t_min, count, step=0.25):
     aftfill_df = pd.DataFrame(aftfill_dict)
     return aftfill_df
 
-def pad_the_data(actual_df, desired_count=num_points, filler_time_step=time_step, filler_data=detection_limit):
+def pad_the_data(actual_df, column_list, desired_count=num_points, filler_time_step=time_step, filler_data=detection_limit):
     '''
     pads both ends of the light curve dataframe to ensure consistent number of data points across all data
     Inputs:
@@ -149,7 +151,7 @@ def pad_the_data(actual_df, desired_count=num_points, filler_time_step=time_step
     prepended_count = 0
     if (actual_df['t'].min() >= filler_time_step):
         filler_max_time = actual_df['t'].min() - filler_time_step  # stop one time step before current min
-        prepend_filler_df = gen_prepend_filler(filler_data, 0, filler_max_time, filler_time_step)
+        prepend_filler_df = gen_prepend_filler(column_list, filler_data, 0, filler_max_time, filler_time_step)
         prepended_count = len(prepend_filler_df)
         cat_df = pd.concat([prepend_filler_df, actual_df], ignore_index=True)
         cat_count = len(cat_df)
@@ -158,7 +160,7 @@ def pad_the_data(actual_df, desired_count=num_points, filler_time_step=time_step
         max_t = cat_df['t'].max() 
         steps_per_count = 1/filler_time_step
         filler_min_time = int(max_t*steps_per_count)/steps_per_count + filler_time_step  # start at next time step
-        append_filler_df = gen_append_filler(filler_data, filler_min_time, append_count)
+        append_filler_df = gen_append_filler(column_list, filler_data, filler_min_time, append_count)
         cat_df = pd.concat([cat_df, append_filler_df], ignore_index=True)
         cat_count = len(cat_df)
     assert(len(cat_df) == desired_count)
