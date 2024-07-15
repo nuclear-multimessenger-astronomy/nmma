@@ -11,7 +11,7 @@ from time import sleep
 import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
 from os.path import exists
-from resnet import ResNet
+from .resnet import ResNet
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
