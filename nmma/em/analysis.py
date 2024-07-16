@@ -1152,7 +1152,6 @@ def nnanalysis(args):
             injection_parameters, args, light_curve_model=injection_model
         )
         print("Injection generated")
-        print(injection_parameters)
         res = next(iter(data))
 
         if args.injection_outfile is not None:
@@ -1376,14 +1375,15 @@ def nnanalysis(args):
         samples = samples.cpu().reshape(nsamples,3)
         
     if args.injection:
-        param_tensor = torch.tensor(injection_parameters, dtype=torch.float32)
-        print(param_tensor.shape)
-        with torch.no_grad():
-            truth = param_tensor.cpu()[...,0:3]
-            truth = truth.squeeze(1)[0]
-        flow_result = cast_as_bilby_result(samples, truth, priors=priors)
-        fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
-        print('saved posterior plot')
+        print(injection_parameters)
+        # param_tensor = torch.tensor(injection_parameters, dtype=torch.float32)
+        # print(param_tensor.shape)
+        # with torch.no_grad():
+        #    truth = param_tensor.cpu()[...,0:3]
+        #    truth = truth.squeeze(1)[0]
+        # flow_result = cast_as_bilby_result(samples, truth, priors=priors)
+        # fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
+        # print('saved posterior plot')
     else:
         flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
         fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
