@@ -1381,11 +1381,11 @@ def nnanalysis(args):
 
         # create and save the corner plot
         fig = flow_result.plot_corner()
-        plt.savefig(os.getcwd() + args.outdir + '{}.pdf'.format(args.label))
+        plt.savefig(os.getcwd() + args.outdir + '{}.pdf'.format(args.label), format='pdf', bbox_inches='tight')
     else:
         flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
         fig = flow_result.plot_corner()
-        plt.savefig(os.getcwd() + args.outdir + '{}.pdf'.format(args.label))
+        plt.savefig(os.getcwd() + args.outdir + '{}.pdf'.format(args.label), format='pdf', bbox_inches='tight')
 
 def main(args=None):
     if args is None:
