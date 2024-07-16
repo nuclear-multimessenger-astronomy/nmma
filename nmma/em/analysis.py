@@ -1053,7 +1053,7 @@ def nnanalysis(args):
     else: 
         print('Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters.')
         filters = 'ztfg,ztfi,ztfr'
-        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
 
     refresh = False
