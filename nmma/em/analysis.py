@@ -1347,11 +1347,8 @@ def nnanalysis(args):
         filler_data=detection_limit
     )
 
-    print(padded_data_df)
-
     # change the data into pytorch tensors
     data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
-    print(data_tensor.shape)
 
     # set up the embedding 
     similarity_embedding = SimilarityEmbedding(num_dim=7, num_hidden_layers_f=1, num_hidden_layers_h=1, num_blocks=4, kernel_size=5, num_dim_final=5).to(device)
@@ -1371,27 +1368,19 @@ def nnanalysis(args):
     with torch.no_grad():
         samples = flow.sample(nsamples, context=data_tensor)
         samples = samples.cpu().reshape(nsamples,3)
-
+        
     if args.injection:
         param_tensor = torch.tensor(injection_parameters, dtype=torch.float32)
+        print(param_tensor.shape)
         with torch.no_grad():
             truth = param_tensor.cpu()[...,0:3]
             truth = truth.squeeze(1)[0]
-        
         flow_result = cast_as_bilby_result(samples, truth, priors=priors)
-
-        # create and save the corner plot
-        fig = flow_result.plot_corner()
-        # PLOT_SAVEPATH = os.getcwd() + '/' + args.outdir + '/{}.pdf'.format(args.label)
-        # print(PLOT_SAVEPATH)
-        # corner.corner.savefig(os.getcwd() + '/' + args.outdir + '/{}.pdf'.format(args.label), format='pdf', bbox_inches='tight')
+        fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
         print('saved posterior plot')
     else:
         flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
         fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
-        # PLOT_SAVEPATH = os.getcwd() + '/' + args.outdir + '/{}.pdf'.format(args.label)
-        # print(PLOT_SAVEPATH)
-        # corner.corner.savefig(os.getcwd() + '/' + args.outdir + '/{}.pdf'.format(args.label), format='pdf', bbox_inches='tight')
         print('saved posterior plot')
 
 def main(args=None):
