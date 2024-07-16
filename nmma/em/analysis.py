@@ -1050,6 +1050,9 @@ def nnanalysis(args):
             pass
         else:
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
+    else: 
+        print('Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters.')
+        filters = 'ztfg,ztfi,ztfr'
 
     refresh = False
     try:
