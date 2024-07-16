@@ -1375,13 +1375,9 @@ def nnanalysis(args):
         samples = samples.cpu().reshape(nsamples,3)
         
     if args.injection:
-        print(injection_parameters)
         avail_parameters = injection_parameters.keys()
-        print(avail_parameters)
         if ('log10_mej' in avail_parameters) and ('log10_vej' in avail_parameters) and ('log10_Xlan' in avail_parameters):
             param_tensor = torch.tensor([injection_parameters['log10_mej'], injection_parameters['log10_vej'], injection_parameters['log10_Xlan']], dtype=torch.float32)
-            print(param_tensor)
-            print(param_tensor.shape)
             with torch.no_grad():
                truth = param_tensor
             flow_result = cast_as_bilby_result(samples, truth, priors=priors)
