@@ -1363,7 +1363,7 @@ def nnanalysis(args):
     # set up the normalizing flows
     transform, base_dist, embedding_net = normflow_params(similarity_embedding, 9, 5, 90, context_features=num_dim, num_dim=num_dim) 
     flow = Flow(transform, base_dist, embedding_net).to(device=device)
-    PATH_nflow = os.getcwd() + '/nmma/mlmodel/frozen_flow_weights.pth'
+    PATH_nflow = os.getcwd() + '/nmma/mlmodel/frozen-flow-weights.pth'
     flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
 
     if args.injection:
