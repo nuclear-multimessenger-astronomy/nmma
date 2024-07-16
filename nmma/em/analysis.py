@@ -1366,16 +1366,17 @@ def nnanalysis(args):
     PATH_nflow = os.getcwd() + '/nmma/mlmodel/frozen-flow-weights.pth'
     flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
 
+    nsamples = 20000
+    with torch.no_grad():
+        samples = flow.sample(nsamples, context=data_tensor)
+        samples = samples.cpu().reshape(nsamples,3)
+
     if args.injection:
         param_tensor = torch.tensor(injection_parameters, dtype=torch.float32)
-        
-        # pass the data through
-        nsamples = 20000
         with torch.no_grad():
-            samples = flow.sample(nsamples, context=data_tensor)
-        samples = samples.cpu().reshape(nsamples,3)
-        truth = param_tensor.cpu()[...,0:3]
-        truth = truth.squeeze(1)[0]
+            truth = param_tensor.cpu()[...,0:3]
+            truth = truth.squeeze(1)[0]
+        
         flow_result = cast_as_bilby_result(samples, truth, priors=priors)
 
         # create and save the corner plot
