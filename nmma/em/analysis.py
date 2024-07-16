@@ -1153,6 +1153,7 @@ def nnanalysis(args):
         )
         print("Injection generated")
         print(injection_parameters)
+        res = next(iter(data))
 
         if args.injection_outfile is not None:
             if filters is not None:
