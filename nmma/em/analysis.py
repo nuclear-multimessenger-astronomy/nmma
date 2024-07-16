@@ -1376,14 +1376,19 @@ def nnanalysis(args):
         
     if args.injection:
         print(injection_parameters)
-        # param_tensor = torch.tensor(injection_parameters, dtype=torch.float32)
-        # print(param_tensor.shape)
-        # with torch.no_grad():
-        #    truth = param_tensor.cpu()[...,0:3]
-        #    truth = truth.squeeze(1)[0]
-        # flow_result = cast_as_bilby_result(samples, truth, priors=priors)
-        # fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
-        # print('saved posterior plot')
+        avail_parameters = injection_parameters.keys()
+        print(avail_parameters)
+        if ('log10_mej' in avail_parameters) and ('log10_vej' in avail_parameters) and ('log10_Xlan' in avail_parameters):
+            param_tensor = torch.tensor([injection_parameters['log10_mej'], injection_parameters['log10_vej'], injection_parameters['log10_Xlan']], dtype=torch.float32)
+            print(param_tensor)
+            print(param_tensor.shape)
+            with torch.no_grad():
+               truth = param_tensor
+            flow_result = cast_as_bilby_result(samples, truth, priors=priors)
+            fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
+            print('saved posterior plot')
+        else:
+            raise ValueError('The injection parameters provided do not match the parameters the flow has been trained on')
     else:
         flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
         fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
