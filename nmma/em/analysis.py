@@ -14,6 +14,7 @@ from scipy.interpolate import interp1d
 import pandas as pd
 from astropy import time
 from bilby.core.likelihood import ZeroLikelihood
+import matplotlib.pyplot as plt
 
 from ..utils.models import refresh_models_list
 from .injection import create_light_curve_data
@@ -1383,7 +1384,7 @@ def nnanalysis(args):
         fig = flow_result.plot_corner()
         PLOT_SAVEPATH = os.getcwd() + args.outdir + '{}.pdf'.format(args.label)
         print(PLOT_SAVEPATH)
-        plt.savefig(PLOT_SAVEPATH, format='pdf', bbox_inches='tight')
+        plt.savefig(os.getcwd() + args.outdir + '{}.pdf'.format(args.label), format='pdf', bbox_inches='tight')
     else:
         flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
         fig = flow_result.plot_corner()
