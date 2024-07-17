@@ -96,7 +96,7 @@ def test_nn_analysis(args):
     args.model = "Ka2017"
     args.sampler = "neuralnet"
     args.prior = "priors/Ka2017.prior"
-    args.dT = "0.25"
+    args.dt = 0.25
     args.filters = "ztfg,ztfr,ztfi"
 
     analysis.main(args)
