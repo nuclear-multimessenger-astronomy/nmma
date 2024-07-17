@@ -91,6 +91,15 @@ def test_analysis_sklearn_gp(args):
     args.interpolation_type = "sklearn_gp"
     analysis.main(args)
 
+def test_nn_analysis(args):
+
+    args.model = "Ka2017"
+    args.sampler = "neuralnet"
+    args.prior = "priors/Ka2017.prior"
+    args.dT = "0.25"
+    args.filters = "ztfg,ztfr,ztfi"
+
+    analysis.main(args)
 
 def test_analysis_slurm(args):
 
