@@ -1,6 +1,6 @@
 # Perform Parameter Estimation Using Liklihood Free Inference (LFI)
 
-NMMA is adding machine learning functionality to its currently offered analysis methods. In this initial incorporation, a neural network approach will perform parameter estimation on light curves from BNS events. We will address the limitations first, and then provide an example run.
+NMMA is adding machine learning functionality to its currently offered analysis methods. In this initial incorporation, a neural network approach will perform parameter estimation on light curves from BNS events. We will address the limitations first, and then provide an example run. 
 
 ## Limitations
 
@@ -14,6 +14,10 @@ NMMA is adding machine learning functionality to its currently offered analysis 
 2. Returns a posterior when an injection file is given
 
 ## Example
+
+### Set up the environment
+
+In addition to installing the standard requirements.txt file, you must also run pip install -r ml_requirments.txt to fulfill the necessary package requirements.
 
 ### Generate a simulation set
 
