@@ -493,6 +493,8 @@ User Guide
    Cluster_Resources
    contributing
    changelog
+   lfi_analysis
+
 
 .. Indices and tables
 .. ==================
