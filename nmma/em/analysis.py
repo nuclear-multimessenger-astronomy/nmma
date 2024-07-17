@@ -908,10 +908,31 @@ def analysis(args):
             print("Bestfit lightcurves directory already exist, overwriting figures in it")
 
         # set up the geometry for the all-in-one figure
+        wspace = 0.6  # All in inches.
+        hspace = 0.3
+        lspace = 1.0
+        bspace = 0.7
+        trspace = 0.2
+        hpanel = 2.25
+        wpanel = 3.
+
         ncol = 2
-        nrow = np.ceil(len(filters_plot) / ncol)
-        fig, axes = plt.subplost(nrow, ncol)
+        nrow = int(np.ceil(len(filters_plot) / ncol))
+        fig, axes = plt.subplots(nrow, ncol)
         all_in_one_plotName = plotDir + 'summary.png'
+
+        figsize = (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace,
+                   bspace + hpanel * nrow + hspace * (nrow - 1) + trspace)
+    
+        # Create the figure and axes.
+        fig, axes = plt.subplots(nrow, ncol, figsize=figsize, squeeze=False)
+    
+        fig.subplots_adjust(left=lspace / figsize[0],
+                            bottom=bspace / figsize[1],
+                            right=1. - trspace / figsize[0],
+                            top=1. - trspace / figsize[1],
+                            wspace=wspace / wpanel,
+                            hspace=hspace / hpanel)
 
         cnt = 0
         for filt, color in zip(filters_plot, colors):
@@ -1092,7 +1113,7 @@ def analysis(args):
                     )
 
             #ax1.set_title(f'Filter {filt}, ' + fr'$\chi^2 / d.o.f. = {chi2_total / N_data}$')
-            ax_sum.set_title(f'Filter {filt}, ' + fr'$\chi^2 / d.o.f. = {chi2_total / N_data}$')
+            ax_sum.set_title(f'{filt}\n' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
 
             #ax1.set_xlim([float(x) for x in args.xlim.split(",")])
             #ax1.set_ylim([float(x) for x in args.ylim.split(",")])
@@ -1102,7 +1123,6 @@ def analysis(args):
             #ax2.set_xlim([float(x) for x in args.xlim.split(",")])
             ax_delta.set_xlim([float(x) for x in args.xlim.split(",")])
 
-        plt.tight_layout()
         plt.savefig(all_in_one_plotName)
         plt.close()
 
