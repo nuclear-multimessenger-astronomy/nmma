@@ -921,8 +921,8 @@ def analysis(args):
         fig, axes = plt.subplots(nrow, ncol)
         all_in_one_plotName = plotDir + 'summary.png'
 
-        figsize = (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace,
-                   bspace + hpanel * nrow + hspace * (nrow - 1) + trspace)
+        figsize = (1.5 * (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace),
+                   1.5 * (bspace + hpanel * nrow + hspace * (nrow - 1) + trspace))
     
         # Create the figure and axes.
         fig, axes = plt.subplots(nrow, ncol, figsize=figsize, squeeze=False)
@@ -933,6 +933,9 @@ def analysis(args):
                             top=1. - trspace / figsize[1],
                             wspace=wspace / wpanel,
                             hspace=hspace / hpanel)
+
+        if len(filters_plot) % 2:
+            axes[-1,-1].axis('off')
 
         cnt = 0
         for filt, color in zip(filters_plot, colors):
@@ -952,7 +955,7 @@ def analysis(args):
             # adding the ax for the Delta
             divider = make_axes_locatable(ax_sum)
             ax_delta = divider.append_axes('bottom',
-                                           size='20%',
+                                           size='30%',
                                            sharex=ax_sum)
 
             # remove the x-axis labels and ticks for subplot ax1
@@ -964,7 +967,10 @@ def analysis(args):
             # configuring ax_sum
             ax_sum.set_ylabel("AB magnitude", rotation=90)
             ax_delta.set_ylabel(r"$\Delta (\sigma)$")
-            ax_delta.set_xlabel("Time [days]")
+            if cnt == len(filters_plot) or cnt == len(filters_plot) - 1:
+                ax_delta.set_xlabel("Time [days]")
+            else:
+                ax_delta.set_xticklabels([])
 
             # plotting the best-fit lc and the data in ax1
             samples = data[filt]
@@ -1113,7 +1119,7 @@ def analysis(args):
                     )
 
             #ax1.set_title(f'Filter {filt}, ' + fr'$\chi^2 / d.o.f. = {chi2_total / N_data}$')
-            ax_sum.set_title(f'{filt}\n' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
+            ax_sum.set_title(f'{filt}:' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
 
             #ax1.set_xlim([float(x) for x in args.xlim.split(",")])
             #ax1.set_ylim([float(x) for x in args.ylim.split(",")])
@@ -1123,7 +1129,7 @@ def analysis(args):
             #ax2.set_xlim([float(x) for x in args.xlim.split(",")])
             ax_delta.set_xlim([float(x) for x in args.xlim.split(",")])
 
-        plt.savefig(all_in_one_plotName)
+        plt.savefig(all_in_one_plotName, bbox_inches='tight')
         plt.close()
 
 
