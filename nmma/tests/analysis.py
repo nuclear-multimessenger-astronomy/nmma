@@ -45,7 +45,8 @@ def args():
         injection_detection_limit=None,
         injection_outfile="outdir/lc.csv",
         injection_model=None,
-        remove_nondetections=True,
+        ignore_timeshift=False,
+	remove_nondetections=True,
         detection_limit=None,
         with_grb_injection=False,
         prompt_collapse=False,
@@ -76,6 +77,7 @@ def args():
         cosiota_node_num=10,
         ra=None,
         dec=None,
+        fetch_Ebv_from_dustmap=False
     )
 
     return args

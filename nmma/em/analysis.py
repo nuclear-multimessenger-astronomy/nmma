@@ -270,7 +270,7 @@ def get_parser(**kwargs):
         "--rubin-ToO-type",
         help="Type of ToO observation. Won't work w/o --rubin-ToO",
         type=str,
-        choices=["BNS", "NSBH"],
+        choices=["platinum","gold","gold_z","silver","silver_z"],
     )
     parser.add_argument(
         "--xlim",
@@ -369,7 +369,12 @@ def get_parser(**kwargs):
         default=False,
         help="only look for local svdmodels (ignore Gitlab)",
     )
-
+    parser.add_argument(
+        "--ignore-timeshift",
+        help="If you want to ignore the timeshift parameter in an injection file.",
+        action="store_true",
+        default=False,
+    )
     parser.add_argument(
         "--bestfit",
         help="Save the best fit parameters and magnitudes to JSON",
@@ -386,6 +391,13 @@ def get_parser(**kwargs):
         help="Number of cos-iota nodes used in the Bayestar fits (default: 10)",
         default=10,
     )
+
+    parser.add_argument(
+        "--skip-sampling",
+        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.",
+        action="store_true",
+        default=False,
+    )
     parser.add_argument(
         "--ra",
         type=float,
@@ -401,13 +413,13 @@ def get_parser(**kwargs):
         type=float,
         help="Distance of the location; to be used together with fits file"
     )
-
     parser.add_argument(
-        "--skip-sampling",
-        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.",
+        "--fetch-Ebv-from-dustmap",
+        help="Fetching Ebv from dustmap, to be used as fixed-value prior",
         action="store_true",
         default=False,
     )
+
     return parser
 
 
@@ -433,7 +445,27 @@ def analysis(args):
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
+    if args.filters:
+        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+        if len(filters) == 0:
+            raise ValueError("Need at least one valid filter.")
+    elif args.rubin_ToO_type == 'platinum':
+        filters = ["ps1__g","ps1__r","ps1__i","ps1__z","ps1__y"]
+    elif args.rubin_ToO_type == 'gold':
+        filters = ["ps1__g","ps1__r","ps1__i"]
+    elif args.rubin_ToO_type == 'gold_z':
+        filters = ["ps1__g","ps1__r","ps1__z"]
+    elif args.rubin_ToO_type == 'silver':
+        filters = ["ps1__g""ps1__i"]
+    elif args.rubin_ToO_type == 'silver_z':
+        filters = ["ps1__g","ps1__z"]
+    else:
+        filters = None
+
+
     # initialize light curve model
+    timeshift = 0
     if args.log_space_time:
         if args.n_tstep:
             n_step = args.n_tstep
@@ -444,6 +476,7 @@ def analysis(args):
         )
     else:
         sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+        
     print("Creating light curve model for inference")
 
     if args.filters:
@@ -470,8 +503,34 @@ def analysis(args):
         else:
             print("Need either geocent_time or geocent_time_x")
             exit(1)
-        trigger_time = tc_gps.mjd
+        
+        timeshift = 0       
+        trigger_time = tc_gps.mjd + timeshift
+        
+        if args.ignore_timeshift:
+            if "timeshift" in injection_parameters:
+                timeshift = injection_parameters["timeshift"]
+            else:
+                timeshift = 0
 
+            trigger_time = tc_gps.mjd + timeshift
+        
+        #print("the trigger time from the injection file is: ", trigger_time)
+        
+        # initialize light curve model
+        if args.log_space_time:
+            if args.n_tstep:
+                n_step = args.n_tstep
+            else:
+                n_step = int((args.tmax - args.tmin) / args.dt)
+                sample_times = np.logspace(
+                    np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
+                )
+        else:
+            sample_times = np.arange(args.tmin + timeshift, args.tmax + timeshift + args.dt, args.dt)
+        
+        print("Creating light curve model for inference")
+    
         injection_parameters["kilonova_trigger_time"] = trigger_time
         if args.prompt_collapse:
             injection_parameters["log10_mej_wind"] = -3.0
@@ -512,18 +571,38 @@ def analysis(args):
         )
         print("Injection generated")
 
+        #checking produced data for magnitudes dimmer than the detection limit
+        if filters is not None:
+            if args.detection_limit is None:
+                if args.rubin_ToO_type:
+                    detection_limit = {'ps1__g':25.8,'ps1__r':25.5,'ps1__i':24.8,'ps1__z':24.1,'ps1__y':22.9}
+                #elif args.ztf_sampling:
+                #    detection_limit = {}
+                else:
+                    detection_limit = {x: np.inf for x in filters}
+            else:
+                detection_limit = literal_eval(args.detection_limit)
+
+            #print("the detection limits for this run are: ", detection_limit)
+
+            for filt in filters:
+                i=0
+                for row in data[filt]:
+                    #print('the old data is {data}'.format(data=data[filt]))
+                    mjd, mag, mag_unc = row
+                    #print("the data for {f} is: ".format(f=filt), row)
+                    if mag > detection_limit[filt]:
+                        data[filt][i,:] = [mjd, detection_limit[filt], -np.inf]
+                    
+                    #print("the new data is: ", data[filt])
+                    i+=1
+
         if args.injection_outfile is not None:
             if filters is not None:
-                if args.injection_detection_limit is None:
+                if args.detection_limit is None:
                     detection_limit = {x: np.inf for x in filters}
                 else:
-                    detection_limit = {
-                        x: float(y)
-                        for x, y in zip(
-                            filters,
-                            args.injection_detection_limit.split(","),
-                        )
-                    }
+                    detection_limit = literal_eval(args.detection_limit)
             else:
                 detection_limit = {}
             data_out = np.empty((0, 6))
@@ -580,8 +659,15 @@ def analysis(args):
             lc.to_csv(args.injection_outfile)
 
     else:
-        # load the lightcurve data
-        data = loadEvent(args.data)
+        # load the kilonova afterglow data
+        try:
+            data = loadEvent(args.data)
+
+        except ValueError:
+            with open(args.data) as f:
+                data = json.load(f)
+                for key in data.keys():
+                    data[key] = np.array(data[key])
 
         if args.trigger_time is None:
             # load the minimum time as trigger time
@@ -606,6 +692,9 @@ def analysis(args):
     # check for detections
     detection = False
     notallnan = False
+
+    #print('data before checking for detections: ', data[filt])
+
     for filt in data.keys():
         idx = np.where(np.isfinite(data[filt][:, 2]))[0]
         if len(idx) > 0:
@@ -666,6 +755,8 @@ def analysis(args):
     # setup the prior
     priors = create_prior_from_args(model_names, args)
 
+    #print('the data passed to likelihood is: ', data)
+
     # setup the likelihood
     if args.detection_limit:
         args.detection_limit = literal_eval(args.detection_limit)
@@ -674,8 +765,8 @@ def analysis(args):
         filters=filters_to_analyze,
         light_curve_data=data,
         trigger_time=trigger_time,
-        tmin=args.tmin,
-        tmax=args.tmax,
+        tmin=args.tmin+timeshift,
+        tmax=args.tmax+timeshift,
         error_budget=error_budget,
         verbose=args.verbose,
         detection_limit=args.detection_limit,
@@ -708,6 +799,8 @@ def analysis(args):
             sampler_kwargs["niter"] = 1
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
+
+    #print("passing arguments to bilby")
 
     result = bilby.run_sampler(
         likelihood,
@@ -813,7 +906,7 @@ def analysis(args):
         # calculate the chi2 #
         ######################
         processed_data = dataProcess(
-            data, filters_to_analyze, trigger_time, args.tmin, args.tmax
+            data, filters_to_analyze, trigger_time, args.tmin+timeshift, args.tmax+timeshift
         )
         chi2 = 0.0
         dof = 0.0
@@ -826,11 +919,15 @@ def analysis(args):
             # fetch data
             samples = copy.deepcopy(processed_data[filt])
             t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
+            print("the time values before adding timeshift are: ", t)
             # shift t values by timeshift
             if "timeshift" in bestfit_params:
+                print("timeshift found in bestfit_params is: ",bestfit_params["timeshift"])
                 t += bestfit_params["timeshift"]
             # only the detection data are needed
             finite_idx = np.where(np.isfinite(sigma_y))[0]
+            print("the {f} data being analyzed is: ".format(f=filt), samples)
+            print("for {f} the length of the detections array is: ".format(f=filt), len(finite_idx))
             if len(finite_idx) > 0:
                 # fetch the erorr_budget
                 if "em_syserr" in bestfit_params:
@@ -842,13 +939,18 @@ def analysis(args):
                     y[finite_idx],
                     sigma_y[finite_idx],
                 )
+                print("the time passes into the interp is: ", t_det)
                 num = (y_det - interp(t_det)) ** 2
                 den = sigma_y_det**2 + err**2
                 chi2_per_filt = np.sum(num / den)
                 # store the data
                 chi2 += chi2_per_filt
                 dof += len(finite_idx)
+                print("the number of dof are: ", dof)
                 chi2_per_dof_dict[filt] = chi2_per_filt / len(finite_idx)
+
+        if dof == 0:
+            print("Uh oh! the dof is zero")
 
         chi2_per_dof = chi2 / dof
 
@@ -955,7 +1057,7 @@ def analysis(args):
             # plotting the best-fit lc and the data in ax1
             samples = data[filt]
             t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
-            t -= trigger_time
+            t -= trigger_time + timeshift
             idx = np.where(~np.isnan(y))[0]
             t, y, sigma_y = t[idx], y[idx], sigma_y[idx]
 
@@ -977,7 +1079,7 @@ def analysis(args):
                 fmt="v",
                 color=color,
             )
-
+  
             mag_plot = getFilteredMag(mag, filt)
 
             # calculating the chi2
