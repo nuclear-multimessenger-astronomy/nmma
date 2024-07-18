@@ -486,6 +486,7 @@ User Guide
    training
    data_inj_obs
    fitting
+   lfi_analysis
    gw_inference
    joint_inference
    GW-EM-resampling
@@ -493,7 +494,6 @@ User Guide
    Cluster_Resources
    contributing
    changelog
-   lfi_analysis
 
 
 .. Indices and tables
