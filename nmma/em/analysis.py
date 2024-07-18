@@ -901,11 +901,7 @@ def analysis(args):
 
         colors = cm.Spectral(np.linspace(0, 1, len(filters_plot)))[::-1]
 
-        plotDir = os.path.join(args.outdir, f"{args.label}_lightcurves/")
-        try:
-            os.makedirs(plotDir)
-        except FileExistsError:
-            print("Bestfit lightcurves directory already exist, overwriting figures in it")
+        plotName = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
 
         # set up the geometry for the all-in-one figure
         wspace = 0.6  # All in inches.
@@ -919,14 +915,11 @@ def analysis(args):
         ncol = 2
         nrow = int(np.ceil(len(filters_plot) / ncol))
         fig, axes = plt.subplots(nrow, ncol)
-        all_in_one_plotName = plotDir + 'summary.png'
 
         figsize = (1.5 * (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace),
                    1.5 * (bspace + hpanel * nrow + hspace * (nrow - 1) + trspace))
-    
         # Create the figure and axes.
         fig, axes = plt.subplots(nrow, ncol, figsize=figsize, squeeze=False)
-    
         fig.subplots_adjust(left=lspace / figsize[0],
                             bottom=bspace / figsize[1],
                             right=1. - trspace / figsize[0],
@@ -935,18 +928,11 @@ def analysis(args):
                             hspace=hspace / hpanel)
 
         if len(filters_plot) % 2:
-            axes[-1,-1].axis('off')
+            axes[-1, -1].axis('off')
 
         cnt = 0
         for filt, color in zip(filters_plot, colors):
             cnt = cnt + 1
-
-            # individual plot
-            #plotName = plotDir + f'{filt}.png'
-            #f, (ax1, ax2) = plt.subplots(
-            #    2, 1, gridspec_kw={'height_ratios': [4, 1]},
-            #    sharex=True,
-            #)
 
             # summary plot
             row = (cnt - 1) // ncol
@@ -958,12 +944,6 @@ def analysis(args):
                                            size='30%',
                                            sharex=ax_sum)
 
-            # remove the x-axis labels and ticks for subplot ax1
-            # ax1.set_xticks([])
-            # configuring ax1 and ax2
-            #ax1.set_ylabel("AB magnitude", rotation=90)
-            #ax2.set_ylabel(r"$\Delta (\sigma)$")
-            #ax2.set_xlabel("Time [days]")
             # configuring ax_sum
             ax_sum.set_ylabel("AB magnitude", rotation=90)
             ax_delta.set_ylabel(r"$\Delta (\sigma)$")
@@ -981,39 +961,21 @@ def analysis(args):
 
             idx = np.where(np.isfinite(sigma_y))[0]
             det_idx = idx
-            #ax1.errorbar(
-            #    t[idx],
-            #    y[idx],
-            #    sigma_y[idx],
-            #    fmt="o",
-            #    color=color,
-            #    #markersize=16,
-            #)
             ax_sum.errorbar(
                 t[idx],
                 y[idx],
                 sigma_y[idx],
                 fmt="o",
                 color=color,
-                #markersize=16,
             )
 
             idx = np.where(~np.isfinite(sigma_y))[0]
-            #ax1.errorbar(
-            #    t[idx],
-            #    y[idx],
-            #    sigma_y[idx],
-            #    fmt="v",
-            #    color=color,
-            #    #markersize=16
-            #)
             ax_sum.errorbar(
                 t[idx],
                 y[idx],
                 sigma_y[idx],
                 fmt="v",
                 color=color,
-                #markersize=16
             )
 
             mag_plot = getFilteredMag(mag, filt)
@@ -1031,18 +993,9 @@ def analysis(args):
             N_data = len(det_idx)
 
             # plot the mismatch between the model and the data
-            #ax2.scatter(t[det_idx], diff_per_data / sigma_per_data, color=color)
-            #ax2.axhline(0, linestyle='--', color='k')
             ax_delta.scatter(t[det_idx], diff_per_data / sigma_per_data, color=color)
             ax_delta.axhline(0, linestyle='--', color='k')
 
-            #ax1.plot(
-            #    mag["bestfit_sample_times"],
-            #    mag_plot,
-            #    color='coral',
-            #    linewidth=3,
-            #    linestyle="--",
-            #)
             ax_sum.plot(
                 mag["bestfit_sample_times"],
                 mag_plot,
@@ -1052,14 +1005,6 @@ def analysis(args):
             )
 
             if len(models) > 1:
-                #ax1.fill_between(
-                #    mag["bestfit_sample_times"],
-                #    mag_plot + error_budget[filt],
-                #    mag_plot - error_budget[filt],
-                #    facecolor='coral',
-                #    alpha=0.2,
-                #    label="combined",
-                #)
                 ax_sum.fill_between(
                     mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
@@ -1069,13 +1014,6 @@ def analysis(args):
                     label="combined",
                 )
             else:
-                #ax1.fill_between(
-                #    mag["bestfit_sample_times"],
-                #    mag_plot + error_budget[filt],
-                #    mag_plot - error_budget[filt],
-                #    facecolor='coral',
-                #    alpha=0.2,
-                #)
                 ax_sum.fill_between(
                     mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
@@ -1087,21 +1025,6 @@ def analysis(args):
             if len(models) > 1:
                 for ii in range(len(mag_all)):
                     mag_plot = getFilteredMag(mag_all[ii], filt)
-                    #ax1.plot(
-                    #    mag["bestfit_sample_times"],
-                    #    mag_plot,
-                    #    color='coral',
-                    #    linewidth=3,
-                    #    linestyle="--",
-                    #)
-                    #ax1.fill_between(
-                    #    mag["bestfit_sample_times"],
-                    #    mag_plot + error_budget[filt],
-                    #    mag_plot - error_budget[filt],
-                    #    facecolor=model_colors[ii],
-                    #    alpha=0.2,
-                    #    label=models[ii].model,
-                    #)
                     ax_sum.plot(
                         mag["bestfit_sample_times"],
                         mag_plot,
@@ -1118,18 +1041,13 @@ def analysis(args):
                         label=models[ii].model,
                     )
 
-            #ax1.set_title(f'Filter {filt}, ' + fr'$\chi^2 / d.o.f. = {chi2_total / N_data}$')
-            ax_sum.set_title(f'{filt}:' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
+            ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
 
-            #ax1.set_xlim([float(x) for x in args.xlim.split(",")])
-            #ax1.set_ylim([float(x) for x in args.ylim.split(",")])
             ax_sum.set_xlim([float(x) for x in args.xlim.split(",")])
             ax_sum.set_ylim([float(x) for x in args.ylim.split(",")])
-
-            #ax2.set_xlim([float(x) for x in args.xlim.split(",")])
             ax_delta.set_xlim([float(x) for x in args.xlim.split(",")])
 
-        plt.savefig(all_in_one_plotName, bbox_inches='tight')
+        plt.savefig(plotName, bbox_inches='tight')
         plt.close()
 
 
