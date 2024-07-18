@@ -98,6 +98,7 @@ def test_nn_analysis(args):
     args.prior = "priors/Ka2017.prior"
     args.dt = 0.25
     args.filters = "ztfg,ztfr,ztfi"
+    args.local_only = False
 
     analysis.main(args)
 
