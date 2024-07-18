@@ -14,6 +14,7 @@ from scipy.interpolate import interp1d
 import pandas as pd
 from astropy import time
 from bilby.core.likelihood import ZeroLikelihood
+import matplotlib.pyplot as plt
 
 from ..utils.models import refresh_models_list
 from .injection import create_light_curve_data
@@ -22,6 +23,26 @@ from .model import create_light_curve_model_from_args, model_parameters_dict
 from .prior import create_prior_from_args
 from .utils import getFilteredMag, dataProcess
 from .io import loadEvent
+
+# import functions
+from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
+from ..mlmodel.resnet import ResNet
+from ..mlmodel.embedding import SimilarityEmbedding
+from ..mlmodel.normalizingflows import normflow_params
+from ..mlmodel.inference import cast_as_bilby_result
+
+# need to add these packages:
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
+import torch.nn.functional as F
+from nflows.nn.nets.resnet import ResidualNet
+from nflows import transforms, distributions, flows
+from nflows.distributions import StandardNormal
+from nflows.flows import Flow
+from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform
+from nflows.transforms import CompositeTransform, RandomPermutation
+import nflows.utils as torchutils
 
 matplotlib.use("agg")
 
@@ -1152,6 +1173,366 @@ def analysis(args):
         plt.savefig(plotName, bbox_inches='tight')
         plt.close()
 
+def nnanalysis(args):
+
+    # only continue if the Kasen model is selected
+    if args.model != "Ka2017":
+        print(
+            "WARNING: model selected is not currently compatible with this inference method"
+        )
+        exit()
+    else: 
+        pass
+
+    print('Starting LFI')
+
+    # only can use ztfr, ztfg, and ztfi filters in the light curve data
+    if args.filters: 
+        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+        if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
+            pass
+        else:
+            raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
+    else: 
+        print('Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters.')
+        filters = 'ztfg,ztfi,ztfr'
+        filters = filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+
+    refresh = False
+    try:
+        refresh = args.refresh_models_list
+    except AttributeError:
+        pass
+    if refresh:
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
+
+    # set up outdir
+    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
+    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+
+    print('Setting up logger and storage directory')
+
+    if args.log_space_time:
+        if args.n_tstep:
+            n_step = args.n_tstep
+        else:
+            n_step = int((args.tmax - args.tmin) / args.dt)
+        sample_times = np.logspace(
+            np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
+        )
+    else:
+        sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+
+    # create the kilonova data if an injection set is given
+    if args.injection:
+        with open(args.injection, "r") as f:
+            injection_dict = json.load(
+                f, object_hook=bilby.core.utils.decode_bilby_json
+            )
+        injection_df = injection_dict["injections"]
+        injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+
+        if "geocent_time" in injection_parameters:
+            tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
+        elif "geocent_time_x" in injection_parameters:
+            tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
+        else:
+            print("Need either geocent_time or geocent_time_x")
+            exit(1)
+        trigger_time = tc_gps.mjd
+
+        injection_parameters["kilonova_trigger_time"] = trigger_time
+        if args.prompt_collapse:
+            injection_parameters["log10_mej_wind"] = -3.0
+
+        # sanity check for eject masses
+        if "log10_mej_dyn" in injection_parameters and not np.isfinite(
+            injection_parameters["log10_mej_dyn"]
+        ):
+            injection_parameters["log10_mej_dyn"] = -3.0
+        if "log10_mej_wind" in injection_parameters and not np.isfinite(
+            injection_parameters["log10_mej_wind"]
+        ):
+            injection_parameters["log10_mej_wind"] = -3.0
+
+        # need to interpolate between data points if time step is not 0.25
+        if args.dt:
+            time_step = args.dt
+            if args.dt != 0.25:
+                raise ValueError("Need dt to be 0.25 until interpolation feature is incorporated.")
+                # currently no linear interpolation function
+                do_lin_interpolation = True
+            else:
+                do_lin_interpolation = False
+
+        args.kilonova_tmin = args.tmin
+        args.kilonova_tmax = args.tmax
+        args.kilonova_tstep = args.dt
+        args.kilonova_error = args.photometric_error_budget
+
+        current_points = int(round(args.tmax - args.tmin))/args.dt + 1
+
+        if not args.injection_model:
+            args.kilonova_injection_model = args.model
+        else:
+            args.kilonova_injection_model = args.injection_model
+        args.kilonova_injection_svd = args.svd_path
+        args.injection_svd_mag_ncoeff = args.svd_mag_ncoeff
+        args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
+
+        print("Creating injection light curve model")
+        _, _, injection_model = create_light_curve_model_from_args(
+            args.kilonova_injection_model,
+            args,
+            sample_times,
+            filters=filters,
+            sample_over_Hubble=args.sample_over_Hubble,
+        )
+        data = create_light_curve_data(
+            injection_parameters, args, light_curve_model=injection_model
+        )
+        print("Injection generated")
+        res = next(iter(data))
+
+        if args.injection_outfile is not None:
+            if filters is not None:
+                if args.injection_detection_limit is None:
+                    detection_limit = {x: np.inf for x in filters}
+                else:
+                    detection_limit = {
+                        x: float(y)
+                        for x, y in zip(
+                            filters,
+                            args.injection_detection_limit.split(","),
+                        )
+                    }
+            else:
+                detection_limit = {}
+            data_out = np.empty((0, 6))
+            for filt in data.keys():
+                if filters:
+                    if args.photometry_augmentation_filters:
+                        filts = list(
+                            set(
+                                filters
+                                + args.photometry_augmentation_filters.split(",")
+                            )
+                        )
+                    else:
+                        filts = filters
+                    if filt not in filts:
+                        continue
+                for row in data[filt]:
+                    mjd, mag, mag_unc = row
+                    if not np.isfinite(mag_unc):
+                        data_out = np.append(
+                            data_out,
+                            np.array([[mjd, 99.0, 99.0, filt, mag, 0.0]]),
+                            axis=0,
+                        )
+                    else:
+                        if filt in detection_limit:
+                            data_out = np.append(
+                                data_out,
+                                np.array(
+                                    [
+                                        [
+                                            mjd,
+                                            mag,
+                                            mag_unc,
+                                            filt,
+                                            detection_limit[filt],
+                                            0.0,
+                                        ]
+                                    ]
+                                ),
+                                axis=0,
+                            )
+                        else:
+                            data_out = np.append(
+                                data_out,
+                                np.array([[mjd, mag, mag_unc, filt, np.inf, 0.0]]),
+                                axis=0,
+                            )
+
+            columns = ["jd", "mag", "mag_unc", "filter", "limmag", "programid"]
+            lc = pd.DataFrame(data=data_out, columns=columns)
+            lc.sort_values("jd", inplace=True)
+            lc = lc.reset_index(drop=True)
+            lc.to_csv(args.injection_outfile)
+
+    else:
+        # load the lightcurve data
+        data = loadEvent(args.data)
+        res = next(iter(data))
+        current_points = len(data[res])
+
+        if args.trigger_time is None:
+            # load the minimum time as trigger time
+            min_time = np.inf
+            for key, array in data.items():
+                min_time = np.minimum(min_time, np.min(array[:, 0]))
+            trigger_time = min_time
+            print(
+                f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}"
+            )
+        else:
+            trigger_time = args.trigger_time
+
+    if args.remove_nondetections:
+        filters_to_check = list(data.keys())
+        for filt in filters_to_check:
+            idx = np.where(np.isfinite(data[filt][:, 2]))[0]
+            data[filt] = data[filt][idx, :]
+            if len(idx) == 0:
+                del data[filt]
+
+    # check for detections
+    detection = False
+    notallnan = False
+    for filt in data.keys():
+        idx = np.where(np.isfinite(data[filt][:, 2]))[0]
+        if len(idx) > 0:
+            detection = True
+        idx = np.where(np.isfinite(data[filt][:, 1]))[0]
+        if len(idx) > 0:
+            notallnan = True
+        if detection and notallnan:
+            break
+    if (not detection) or (not notallnan):
+        raise ValueError("Need at least one detection to do fitting.")
+
+    if type(args.error_budget) in [float, int]:
+        error_budget = [args.error_budget]
+    else:
+        error_budget = [float(x) for x in args.error_budget.split(",")]
+    if args.filters:
+        if args.photometry_augmentation_filters:
+            filters = list(
+                set(
+                    args.filters.split(",")
+                    + args.photometry_augmentation_filters.split(",")
+                )
+            )
+        else:
+            filters = args.filters.split(",")
+
+        values_to_indices = {v: i for i, v in enumerate(filters)}
+        filters_to_analyze = sorted(
+            list(set(filters).intersection(set(list(data.keys())))),
+            key=lambda v: values_to_indices[v],
+        )
+
+        if len(error_budget) == 1:
+            error_budget = dict(
+                zip(filters_to_analyze, error_budget * len(filters_to_analyze))
+            )
+        elif len(args.filters.split(",")) == len(error_budget):
+            error_budget = dict(zip(args.filters.split(","), error_budget))
+        else:
+            raise ValueError("error_budget must be the same length as filters")
+
+    else:
+        filters_to_analyze = list(data.keys())
+        error_budget = dict(
+            zip(filters_to_analyze, error_budget * len(filters_to_analyze))
+        )
+
+    print("Running with filters {0}".format(filters_to_analyze))
+    model_names, models, light_curve_model = create_light_curve_model_from_args(
+        args.model,
+        args,
+        sample_times,
+        filters=filters_to_analyze,
+        sample_over_Hubble=args.sample_over_Hubble,
+    )
+
+    # setup the prior
+    priors = create_prior_from_args(model_names, args)
+    
+    # now that we have the kilonova light curve, we need to pad it with non-detections
+    # this part is currently hard coded in terms of the times !!!! likely will need the most work
+    # (so that the 'fixed' and 'shifted' are properly represented)
+    num_points = 121
+    num_channels = 3
+    bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
+    t_zero = 44242.00021937881
+    t_min = 44240.00050450478
+    t_max = 44269.99958898723
+    days = int(round(t_max - t_min))
+    time_step = 0.25
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using {device}")
+
+    if args.detection_limit:
+        detection_limit = args.detection_limit
+    else: 
+        detection_limit = 22.0
+
+    data_df = pd.DataFrame()
+    t_list = []
+    for i in range(len(data[res])):
+        t_list.append(data[res][i][0])
+    data_df['t'] = t_list
+    for key in data:
+        mag_list = []
+        for i, val in enumerate(data[key]):
+            mag = data[key][i][1]
+            mag_list.append(mag)
+        data_df[key] = mag_list
+    column_list = data_df.columns.to_list()
+
+    # pad the data 
+    padded_data_df = pad_the_data(
+        data_df, 
+        column_list,
+        desired_count=num_points, 
+        filler_time_step=time_step, 
+        filler_data=detection_limit
+    )
+
+    # change the data into pytorch tensors
+    data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
+
+    # set up the embedding 
+    similarity_embedding = SimilarityEmbedding(num_dim=7, num_hidden_layers_f=1, num_hidden_layers_h=1, num_blocks=4, kernel_size=5, num_dim_final=5).to(device)
+    num_dim = 7
+    SAVEPATH = os.getcwd() + '/nmma/mlmodel/similarity_embedding_weights.pth'
+    similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
+    for name, param in similarity_embedding.named_parameters():
+        param.requires_grad = False
+
+    # set up the normalizing flows
+    transform, base_dist, embedding_net = normflow_params(similarity_embedding, 9, 5, 90, context_features=num_dim, num_dim=num_dim) 
+    flow = Flow(transform, base_dist, embedding_net).to(device=device)
+    PATH_nflow = os.getcwd() + '/nmma/mlmodel/frozen-flow-weights.pth'
+    flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
+
+    nsamples = 20000
+    with torch.no_grad():
+        samples = flow.sample(nsamples, context=data_tensor)
+        samples = samples.cpu().reshape(nsamples,3)
+        
+    if args.injection:
+        avail_parameters = injection_parameters.keys()
+        if ('log10_mej' in avail_parameters) and ('log10_vej' in avail_parameters) and ('log10_Xlan' in avail_parameters):
+            param_tensor = torch.tensor([injection_parameters['log10_mej'], injection_parameters['log10_vej'], injection_parameters['log10_Xlan']], dtype=torch.float32)
+            with torch.no_grad():
+               truth = param_tensor
+            flow_result = cast_as_bilby_result(samples, truth, priors=priors)
+            fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
+            print('saved posterior plot')
+        else:
+            raise ValueError('The injection parameters provided do not match the parameters the flow has been trained on')
+    else:
+        flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
+        fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
+        print('saved posterior plot')
 
 def main(args=None):
     if args is None:
@@ -1167,8 +1548,8 @@ def main(args=None):
                         print(f"{key} not a known argument... please remove")
                         exit()
                     setattr(args, key, value)
-                analysis(args)
-        else:
-            analysis(args)
+    if args.sampler == "neuralnet":
+        nnanalysis(args)
     else:
         analysis(args)
+    
