@@ -15,7 +15,6 @@ arviz
 p_tqdm
 ultranest
 tornado
-tensorflow<=2.15.0
 notebook
 ligo.skymap
 healpy
