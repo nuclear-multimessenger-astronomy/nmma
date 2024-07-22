@@ -40,7 +40,7 @@ optional-dependencies.grb = { file = ["grb_requirements.txt"] }
 optional-dependencies.production = { file = ["production_requirements.txt"] }
 optional-dependencies.neuralnet = { file = ["ml_requirements.txt"] }
 optional-dependencies.tf = { file = ["tf_requirements.txt"] }
-optional-dependencies.sampler = { file = ["sampelr_requirements.txt"] }
+optional-dependencies.sampler = { file = ["sampler_requirements.txt"] }
 
 [project.scripts]
 nmma-generation = "nmma.pbilby.generation:main_nmma"
