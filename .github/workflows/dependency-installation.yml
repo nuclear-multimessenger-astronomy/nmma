@@ -3,10 +3,10 @@ name: Check NMMA dependencies installation
 on:
   push:
     branches: [main]
-    paths: ['*_requirements.txt']
+    paths: ['*_requirements.txt', 'pyproject.toml']
   pull_request:
     branches: [main]
-    paths: ['*_requirements.txt']
+    paths: ['*_requirements.txt', 'pyproject.toml']
   workflow_dispatch:
 
 jobs:
