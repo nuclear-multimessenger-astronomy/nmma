@@ -1,5 +1,4 @@
 name: Check NMMA dependencies installation
-
 on:
   push:
     branches: [main]
@@ -8,7 +7,7 @@ on:
     branches: [main]
     paths: ['*_requirements.txt', 'pyproject.toml']
   workflow_dispatch:
-
+  
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,21 +16,42 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
         nmma-extra: ["", "grb", "production", "neuralnet", "tf", "sampler"]
-
+        
     steps:
       - name: Checkout branch being tested
         uses: actions/checkout@v4
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      
       - name: Install linux packages
         run: |
           sudo apt-get update
           sudo apt-get install -y openmpi-bin libopenmpi-dev
-
       - name: Install NMMA
         run: |
           python -m pip install 'nmma${{ matrix.nmma-extra && format('[{0}]', matrix.nmma-extra) }} @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
+      - name: Verify package installation
+        run: |
+          pip list
+          python -c "import nmma; print(f'NMMA version: {nmma.__version__}')"
+          if [ "${{ matrix.nmma-extra }}" != "" ]; then
+            echo "Verifying extra dependencies for ${{ matrix.nmma-extra }}"
+            case "${{ matrix.nmma-extra }}" in
+              "grb")
+                python -c "import nmma, afterglowpy; print(f'Successfully imported {nmma.__name__}, {afterglowpy.__name__}')"
+                ;;
+              "production")
+                python -c "import  nmma, parallel_bilby, nestcheck, mpi4py; print(f'Successfully imported {nmma.__name__}, {parallel_bilby.__name__}, {nestcheck.__name__}, {mpi4py.__name__}')"
+                ;;
+              "neuralnet")
+                python -c "import nmma, torch, nflows, torchvision; print(f'Successfully imported {nmma.__name__}, {torch.__name__}, {nflows.__name__}, {torchvision.__name__}')"
+                ;;
+              "tf")
+                python -c "import nmma, tensorflow; print(f'Successfully imported {nmma.__name__}, {tensorflow.__name__}')"
+                ;;
+              "sampler")
+                python -c "import nmma, ultranest; print(f'Successfully imported {nmma.__name__}, {ultranest.__name__}')"
+                ;;
+            esac
+          fi
