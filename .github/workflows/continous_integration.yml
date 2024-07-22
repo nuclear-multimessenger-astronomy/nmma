@@ -57,7 +57,7 @@ jobs:
         packages: openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
         execute_install_scripts: true
 
-    - name: Install dependenciesßßßßß
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
