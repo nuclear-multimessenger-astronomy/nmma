@@ -29,7 +29,6 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'pip'
 
     - name: Restore SVD models from cache
       uses: actions/cache@v4
@@ -37,6 +36,20 @@ jobs:
         path: svdmodels
         key: svdmodels-${{ runner.os }}-${{ hashFiles('**/LICENSE') }}
         restore-keys: svdmodels-${{ runner.os }}-
+
+    - name: Get pip cache dir
+      id: pip-cache
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        echo "::set-output name=dir::$(pip cache dir)"
+    - name: pip cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pip-cache.outputs.dir }}
+        key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-2-
+        save-always: true
 
     - name: Install Linux Packages with caching
       uses: awalsh128/cache-apt-pkgs-action@latest
