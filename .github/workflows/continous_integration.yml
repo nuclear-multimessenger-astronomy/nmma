@@ -30,7 +30,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
-        save-always: true
 
     - name: Restore SVD models from cache
       uses: actions/cache@v4
