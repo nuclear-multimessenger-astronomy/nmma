@@ -330,7 +330,8 @@ class SVDLightCurveModel(LightCurveMixin):
                         self.svd_mag_model[filt]["model"] = None
                     else:
                         print(f"Loaded filter {filt}")
-                        self.svd_mag_model[filt]["model"] = load_model(outfile)
+                        self.svd_mag_model[filt]["model"] = load_model(outfile, compile=False)
+                        self.svd_mag_model[filt]["model"].compile(optimizer="adam", loss="mse")
                 self.svd_lbol_model = None
             else:
                 if local_only:

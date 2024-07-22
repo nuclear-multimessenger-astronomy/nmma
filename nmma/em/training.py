@@ -571,7 +571,8 @@ class SVDTrainingModel(object):
             outdir = os.path.join(self.svd_path, f"{self.model}_tf")
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.h5")
-                self.svd_model[filt]["model"] = load_tf_model(outfile)
+                self.svd_model[filt]["model"] = load_tf_model(outfile, compile=False)
+                self.svd_model[filt]["model"].compile(optimizer="adam", loss="mse")
         elif self.interpolation_type == "api_gp":
             get_model(self.svd_path, f"{self.model}_api", self.filters)
             self.svd_model = joblib.load(modelfile)
