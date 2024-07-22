@@ -13,9 +13,7 @@ sncosmo
 dust_extinction
 arviz
 p_tqdm
-ultranest
 tornado
 notebook
 ligo.skymap
 healpy
-tensorflow

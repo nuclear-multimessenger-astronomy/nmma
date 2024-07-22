@@ -1,0 +1,37 @@
+name: Check NMMA dependencies installation
+
+on:
+  push:
+    branches: [main]
+    paths: ['*_requirements.txt']
+  pull_request:
+    branches: [main]
+    paths: ['*_requirements.txt']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        nmma-extra: ["", "grb", "production", "neuralnet", "tf", "sampler"]
+
+    steps:
+      - name: Checkout branch being tested
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install linux packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openmpi-bin libopenmpi-dev
+
+      - name: Install NMMA
+        run: |
+          python -m pip install 'nmma${{ matrix.nmma-extra && format('[{0}]', matrix.nmma-extra) }} @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
