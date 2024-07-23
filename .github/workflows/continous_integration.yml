@@ -80,8 +80,8 @@ jobs:
             ~/Library/Caches/Homebrew/downloads/*--openblas-*
             ~/Library/Caches/Homebrew/lapack--*
             ~/Library/Caches/Homebrew/downloads/*--lapack-*
-            ~/Library/Caches/Homebrew/basictex--*
-            ~/Library/Caches/Homebrew/downloads/*--basictex-*
+            ~/Library/Caches/Homebrew/texlive--*
+            ~/Library/Caches/Homebrew/downloads/*--texlive-*
             ~/Library/Caches/Homebrew/cmake--*
             ~/Library/Caches/Homebrew/downloads/*--cmake-*
 
@@ -92,13 +92,7 @@ jobs:
       - name: Install Homebrew dependencies
         if: matrix.os == 'macos-latest'
         run: |
-          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack basictex cmake
-          sudo tlmgr update --self
-          sudo tlmgr install latex-recommended
-          sudo tlmgr install latex-extra
-          sudo tlmgr install fonts-recommended
-          sudo tlmgr install dvipng
-          sudo tlmgr install cm-super
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack texlive cmake
 
       - name: Install Linux Dependencies
         if: matrix.os == 'ubuntu-latest'
