@@ -4,85 +4,144 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'doc/**'
+      - "doc/**"
   pull_request:
     branches: [main]
     paths-ignore:
-      - 'doc/**'
+      - "doc/**"
   workflow_dispatch:
 
 jobs:
-
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -el {0}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        os: ["ubuntu-latest", "macos-latest"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-    - name: Checkout branch being tested
-      uses: actions/checkout@v4
+      - name: Checkout branch being tested
+        uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python with Conda ${{ matrix.python-version }}
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.os == 'macos-latest' && 'arm64' || 'x86_64' }}
+          miniforge-version: latest
+          use-mamba: true
+          mamba-version: "*"
+          activate-environment: nmma_env
 
-    - name: Restore SVD models from cache
-      uses: actions/cache@v4
-      with:
-        path: svdmodels
-        key: svdmodels-${{ runner.os }}-${{ hashFiles('**/LICENSE') }}
-        restore-keys: svdmodels-${{ runner.os }}-
+      - name: Restore SVD models from cache
+        uses: actions/cache@v4
+        with:
+          path: svdmodels
+          key: svdmodels-${{ hashFiles('**/LICENSE') }}
+          restore-keys: svdmodels-
+          save-always: true
 
-    - name: Get pip cache dir
-      id: pip-cache
-      run: |
-        python -m pip install --upgrade pip setuptools wheel
-        echo "::set-output name=dir::$(pip cache dir)"
-    - name: pip cache
-      uses: actions/cache@v4
-      with:
-        path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-2-
-        save-always: true
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          echo "::set-output name=dir::$(pip cache dir)"
+          
+      - name: pip cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-2-
+          save-always: true
 
-    - name: Install Linux Packages with caching
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
-        execute_install_scripts: true
+      - name: Update Homebrew
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update --preinstall
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
-        python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
-        python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib coveralls
-        python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r tf_requirements.txt
-        python -m pip install .
-        git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && cmake .. && make && cd ../..
-        pwd
+      - name: Configure Homebrew cache
+        if: matrix.os == 'macos-latest'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/openmpi--*
+            ~/Library/Caches/Homebrew/downloads/*--openmpi-*
+            ~/Library/Caches/Homebrew/hdf5--*
+            ~/Library/Caches/Homebrew/downloads/*--hdf5-*
+            ~/Library/Caches/Homebrew/gcc--*
+            ~/Library/Caches/Homebrew/downloads/*--gcc-*
+            ~/Library/Caches/Homebrew/openblas--*
+            ~/Library/Caches/Homebrew/downloads/*--openblas-*
+            ~/Library/Caches/Homebrew/lapack--*
+            ~/Library/Caches/Homebrew/downloads/*--lapack-*
+            ~/Library/Caches/Homebrew/basictex--*
+            ~/Library/Caches/Homebrew/downloads/*--basictex-*
+            ~/Library/Caches/Homebrew/cmake--*
+            ~/Library/Caches/Homebrew/downloads/*--cmake-*
 
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude docs
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude docs,versioneer.py,nmma/_version.py,nmma/tests,nmma/*/__init__.py
+          key: brew-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: brew-
+          save-always: true
 
-    - name: Test with pytest
-      run: |
-        python -m coverage run --source nmma -m pytest nmma/tests/*.py
-      env:
-        LD_LIBRARY_PATH: .:/home/runner/work/nmma/nmma/MultiNest/lib # for Linux
-    - name: Run Coveralls
-      if: ${{ success() }}
-      run: |
-        coveralls --service=github
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Homebrew dependencies
+        if: matrix.os == 'macos-latest'
+        run: |
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack basictex cmake
+
+      - name: Install Linux Dependencies
+        if: matrix.os == 'ubuntu-latest'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
+          execute_install_scripts: true
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          conda install -c conda-forge pyfftw c-compiler
+          echo "FC=$(which gfortran-11)" >> $GITHUB_ENV
+          echo "CC=$(which gcc)" >> $GITHUB_ENV
+          echo "CXX=$(which g++)" >> $GITHUB_ENV
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
+          python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib coveralls
+          python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r tf_requirements.txt
+          python -m pip install .
+          git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake .. && make && cd ../..
+          pwd
+
+      - name: Export Libraries
+        run: |
+          echo "LD_LIBRARY_PATH=$HOME/work/nmma/nmma/MultiNest/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=$HOME/work/nmma/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude docs
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude docs,versioneer.py,nmma/_version.py,nmma/tests,nmma/*/__init__.py
+
+      - name: Test with pytest
+        run: |
+          python -m coverage run --source nmma -m pytest nmma/tests/*.py
+
+      - name: Run Coveralls
+        if: ${{ success() }}
+        run: |
+          coveralls --service=github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

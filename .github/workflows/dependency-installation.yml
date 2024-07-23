@@ -10,48 +10,76 @@ on:
   
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -el {0}
     strategy:
       fail-fast: false
       matrix:
+        os: ["ubuntu-latest", "macos-latest"]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
-        nmma-extra: ["", "grb", "production", "neuralnet", "tf", "sampler"]
-        
+
     steps:
       - name: Checkout branch being tested
         uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+
+      - name: Set up Python with Conda ${{ matrix.python-version }}
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.os == 'macos-latest' && 'arm64' || 'x86_64' }}
+          miniforge-version: latest
+          use-mamba: true
+          mamba-version: "*"
+          activate-environment: nmma_env
+
       - name: Install linux packages
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y openmpi-bin libopenmpi-dev
-      - name: Install NMMA
+
+      - name: Install Homebrew packages
+        if: matrix.os == 'macos-latest'
         run: |
-          python -m pip install 'nmma${{ matrix.nmma-extra && format('[{0}]', matrix.nmma-extra) }} @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
-      - name: Verify package installation
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5
+
+      - name: Install NMMA (base)
         run: |
-          pip list
+          python -m pip install --no-cache-dir 'nmma @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
+          pip install pip-autoremove
+
+      - name: Verify base NMMA installation
+        run: |
           python -c "import nmma; print(f'NMMA version: {nmma.__version__}')"
-          if [ "${{ matrix.nmma-extra }}" != "" ]; then
-            echo "Verifying extra dependencies for ${{ matrix.nmma-extra }}"
-            case "${{ matrix.nmma-extra }}" in
-              "grb")
-                python -c "import nmma, afterglowpy; print(f'Successfully imported {nmma.__name__}, {afterglowpy.__name__}')"
-                ;;
-              "production")
-                python -c "import  nmma, parallel_bilby, nestcheck, mpi4py; print(f'Successfully imported {nmma.__name__}, {parallel_bilby.__name__}, {nestcheck.__name__}, {mpi4py.__name__}')"
-                ;;
-              "neuralnet")
-                python -c "import nmma, torch, nflows, torchvision; print(f'Successfully imported {nmma.__name__}, {torch.__name__}, {nflows.__name__}, {torchvision.__name__}')"
-                ;;
-              "tf")
-                python -c "import nmma, tensorflow; print(f'Successfully imported {nmma.__name__}, {tensorflow.__name__}')"
-                ;;
-              "sampler")
-                python -c "import nmma, ultranest; print(f'Successfully imported {nmma.__name__}, {ultranest.__name__}')"
-                ;;
-            esac
-          fi
+          pip-autoremove nmma -y
+
+      - name: Install and verify NMMA [grb]
+        run: |
+          python -m pip install --no-cache-dir 'nmma[grb] @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
+          python -c "import nmma, afterglowpy; print(f'Successfully imported {nmma.__name__}, {afterglowpy.__name__}')"
+          pip-autoremove nmma -y
+
+      - name: Install and verify NMMA [production]
+        run: |
+          python -m pip install --no-cache-dir 'nmma[production] @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
+          python -c "import nmma, parallel_bilby, nestcheck, mpi4py; print(f'Successfully imported {nmma.__name__}, {parallel_bilby.__name__}, {nestcheck.__name__}, {mpi4py.__name__}')"
+          pip-autoremove nmma -y
+
+      - name: Install and verify NMMA [neuralnet]
+        run: |
+          python -m pip install --no-cache-dir 'nmma[neuralnet] @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
+          python -c "import nmma, torch, nflows, torchvision; print(f'Successfully imported {nmma.__name__}, {torch.__name__}, {nflows.__name__}, {torchvision.__name__}')"
+          pip-autoremove nmma -y
+
+      - name: Install and verify NMMA [tf]
+        run: |
+          python -m pip install --no-cache-dir 'nmma[tf] @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
+          python -c "import nmma, tensorflow; print(f'Successfully imported {nmma.__name__}, {tensorflow.__name__}')"
+          pip-autoremove nmma -y
+
+      - name: Install and verify NMMA [sampler]
+        run: |
+          python -m pip install --no-cache-dir 'nmma[sampler] @ git+https://github.com/sahiljhawar/nmma.git@dependencies'
+          python -c "import nmma, ultranest; print(f'Successfully imported {nmma.__name__}, {ultranest.__name__}')"
