@@ -5,12 +5,13 @@ RUN apt update && apt install gcc -y && apt clean
 COPY api/environment.yml .
 COPY requirements.txt .
 
-RUN mamba env create -f environment.yml && conda clean -afy && \
-        find -name '__pycache__' -type d -exec rm -rf '{}' '+' && \
-        rm -rf /opt/conda/envs/nmma/lib/python3.9/site-packages/pip && \
-        rm -rf /opt/conda/envs/nmma/lib/python3.9/i{dlelib, ensurepip} && \
-        rm -rf /opt/conda/envs/nmma/lib{a,t,l,u}san.so && \
-        find -name '*.a' -delete
+RUN mamba env create -f environment.yml
+RUN conda clean -afy
+RUN find -name '__pycache__' -type d -exec rm -rf '{}' '+'
+RUN rm -rf /opt/conda/envs/nmma/lib/python3.9/site-packages/pip
+RUN rm -rf /opt/conda/envs/nmma/lib/python3.9/i{dlelib, ensurepip}
+RUN rm -rf /opt/conda/envs/nmma/lib{a,t,l,u}san.so
+RUN find -name '*.a' -delete
 
 FROM gcr.io/distroless/base-debian10
 
