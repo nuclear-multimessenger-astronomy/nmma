@@ -110,7 +110,7 @@ jobs:
       - name: Install dependencies (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          conda install -c conda-forge pyfftw c-compiler
+          conda install -c conda-forge pyfftw c-compiler ligo-segments python-ligo-lw
           echo "FC=$(which gfortran-11)" >> $GITHUB_ENV
           echo "CC=$(which gcc)" >> $GITHUB_ENV
           echo "CXX=$(which g++)" >> $GITHUB_ENV
