@@ -24,26 +24,6 @@ from .prior import create_prior_from_args
 from .utils import getFilteredMag, dataProcess
 from .io import loadEvent
 
-# import functions
-from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
-from ..mlmodel.resnet import ResNet
-from ..mlmodel.embedding import SimilarityEmbedding
-from ..mlmodel.normalizingflows import normflow_params
-from ..mlmodel.inference import cast_as_bilby_result
-
-# need to add these packages:
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
-import torch.nn.functional as F
-from nflows.nn.nets.resnet import ResidualNet
-from nflows import transforms, distributions, flows
-from nflows.distributions import StandardNormal
-from nflows.flows import Flow
-from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform
-from nflows.transforms import CompositeTransform, RandomPermutation
-import nflows.utils as torchutils
-
 matplotlib.use("agg")
 
 
@@ -1174,6 +1154,26 @@ def analysis(args):
         plt.close()
 
 def nnanalysis(args):
+
+    # import functions
+    from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
+    from ..mlmodel.resnet import ResNet
+    from ..mlmodel.embedding import SimilarityEmbedding
+    from ..mlmodel.normalizingflows import normflow_params
+    from ..mlmodel.inference import cast_as_bilby_result
+
+    # need to add these packages:
+    import torch
+    import torch.nn as nn
+    from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
+    import torch.nn.functional as F
+    from nflows.nn.nets.resnet import ResidualNet
+    from nflows import transforms, distributions, flows
+    from nflows.distributions import StandardNormal
+    from nflows.flows import Flow
+    from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform
+    from nflows.transforms import CompositeTransform, RandomPermutation
+    import nflows.utils as torchutils
 
     # only continue if the Kasen model is selected
     if args.model != "Ka2017":
