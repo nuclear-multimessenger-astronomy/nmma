@@ -97,6 +97,11 @@ model_parameters_dict = {
         "vej_wind",
         "KNtheta",
     ],
+    "LANL1D": [
+        "Ye_wind",
+        "log10_mej_dyn",
+        "vej_dyn",
+    ],
 }
 
 
