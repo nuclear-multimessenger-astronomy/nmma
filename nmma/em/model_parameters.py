@@ -405,7 +405,7 @@ def LANL1D(data):
         "vej_dyn",
         #"log10_mej_wind",
         #"vej_wind",
-        "KNtheta",
+        #"KNtheta",
     ]
 
     data_out = {}
