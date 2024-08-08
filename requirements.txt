@@ -11,7 +11,7 @@ pymultinest
 sncosmo
 dust_extinction
 arviz
-p_tqdm<1.4.1
+p_tqdm
 tornado
 notebook
 ligo.skymap
