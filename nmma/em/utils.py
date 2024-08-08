@@ -1643,13 +1643,24 @@ def get_knprops_from_LANLfilename(filename):
 
             # Record mass
             elif "m" == info[0] and info != "mags":
-                md = float(info[2:])
-                # Recast masses
-                if md in [1, 5]:
-                    md /= 100
-                elif md in [2]:
-                    md /= 1000
-
+                if info[1].isdigit():
+                    md = float(info[1:])
+                    # Recast masses
+                    if len(info[1:]) == 1:
+                        md /= 10
+                    if len(info[1:]) == 2:
+                        md /= 100
+                    if len(info[1:]) == 3:
+                        md /= 1000
+                else:
+                    md = float(info[2:])
+                    # Recast masses
+                    if md in [1, 5]:
+                        md /= 100
+                    elif md in [2]:
+                        md /= 1000
+            
+            
             # Record velocity
             elif "v" == info[0]:
                 vd = float(info[1:]) / 100
