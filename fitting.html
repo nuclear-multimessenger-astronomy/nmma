@@ -1,0 +1,618 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Inference of electromagnetic signals &#8212; nmma 0.2.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/nmma-docs.css?v=4c393c42" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=c480a563"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'fitting';</script>
+    <link rel="icon" href="_static/favicon-light.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Perform Parameter Estimation Using Liklihood Free Inference (LFI)" href="lfi_analysis.html" />
+    <link rel="prev" title="Injections &amp; observational data" href="data_inj_obs.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/light-logo.svg" class="logo__image only-light" alt="nmma 0.2.1 documentation - Home"/>
+    <script>document.write(`<img src="_static/light-logo.svg" class="logo__image only-dark" alt="nmma 0.2.1 documentation - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_inj_obs.html">Injections &amp; observational data</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joint_inference.html">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/edit/main/doc/fitting.md" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new?title=Issue%20on%20page%20%2Ffitting.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/fitting.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Inference of electromagnetic signals</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#filters">Filters</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example-fit-to-simulated-data">Example fit to simulated data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#analysis-of-a-real-object">Analysis of a real object</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inference-of-multiple-em-signals">Inference of multiple EM signals</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="inference-of-electromagnetic-signals">
+<h1>Inference of electromagnetic signals<a class="headerlink" href="#inference-of-electromagnetic-signals" title="Link to this heading">#</a></h1>
+<p>Given a light curve from an optical survey telescope (and potential follow-up), the goal is to analyze the light curve to perform parameter inference. Within NMMA, there are a number of <a class="reference internal" href="#./models.html"><span class="xref myst">models</span></a> available. Some are analytic / semi-analytic models that can be sampled, others rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks).</p>
+<p>In many cases, the lightcurve predicted by each set of parameters is <strong>extremely high-dimensional</strong>, given the number of measurements made. Our goal for this example is to to determine the best-fit model parameters for an object based on its observed lightcurve.</p>
+<section id="filters">
+<h2>Filters<a class="headerlink" href="#filters" title="Link to this heading">#</a></h2>
+<p>Often you will see that lightcurve may contain data from SDSS, for example <code class="docutils literal notranslate"><span class="pre">sdssr</span></code>, <code class="docutils literal notranslate"><span class="pre">sdssg</span></code>, <code class="docutils literal notranslate"><span class="pre">sdssr</span></code>, etc. Since the current SVD models are only trained for <code class="docutils literal notranslate"><span class="pre">sdssu</span></code> filter, it is advised that the following filter names should be changed to that of Pan-STARRS1 in the lightcurve data file.</p>
+<div class="pst-scrollable-table-container"><table class="table table-center" style="width: 50%">
+<thead>
+<tr class="row-odd"><th class="head text-center"><p>SDSS</p></th>
+<th class="head text-center"><p>Pan-STARRS1</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td class="text-center"><p>sdssg</p></td>
+<td class="text-center"><p>ps1__g</p></td>
+</tr>
+<tr class="row-odd"><td class="text-center"><p>sdssr</p></td>
+<td class="text-center"><p>ps1__r</p></td>
+</tr>
+<tr class="row-even"><td class="text-center"><p>sdssi</p></td>
+<td class="text-center"><p>ps1__i</p></td>
+</tr>
+<tr class="row-odd"><td class="text-center"><p>sdssz</p></td>
+<td class="text-center"><p>ps1__z</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>And corresponding to this, the filter flag should be <code class="docutils literal notranslate"><span class="pre">--filter</span> <span class="pre">ps1__g,ps1__r,ps__i,ps1__z</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The same is applicable for LSST filters.</p>
+</div>
+</section>
+<section id="example-fit-to-simulated-data">
+<h2>Example fit to simulated data<a class="headerlink" href="#example-fit-to-simulated-data" title="Link to this heading">#</a></h2>
+<p>Following the quick start, we assume that an injection file has been made generated and made available. For example, there are a number of extra parameters available to modify the light curve sampling, including:</p>
+<p>If one is interested in realistic ZTF-like light curves, one should use:</p>
+<ul class="simple">
+<li><p>–ztf-sampling: Uses a gaussian KDE to simulate ZTF pointing set for ZTF-II in g and r, and private/partnernship in i</p></li>
+<li><p>–ztf-uncertainties: Simulates magnitude uncertainties using skew normal fits to forced photometry uncertainties in mag_bins=[12,18,20,21,23]</p></li>
+<li><p>–ztf-ToO: Adds realistic ToO pointings during the first one or two days (1/2 randomly chosen) for specified exposure times: either 180s (valid for skymaps &lt;1000sq deg) or 300s (skymaps &gt;1000sq deg). Has no effect if –ztf-sampling is not turned on.</p></li>
+</ul>
+<p>If instead one is interested in potential Rubin-like ToO light curves, one should use:</p>
+<ul class="simple">
+<li><p>–rubin-ToO: Adds ToO obeservations based on the strategy presented in <a class="reference external" href="http://arxiv.org/abs/2111.01945">arxiv.org/abs/2111.01945</a>.</p></li>
+<li><p>–rubin-ToO-type: Type of ToO observation. Has no effect if –rubin-ToO is not turned on.</p></li>
+</ul>
+<p>One may also be interested in a custom strategy. For this, one can use the flags:</p>
+<ul class="simple">
+<li><p>–photometry-augmentation: A flag to augment photometry to improve parameter recovery</p></li>
+<li><p>–photometry-augmentation-seed: Set a seed for the augmentation</p></li>
+</ul>
+<p>There are a few different forms this may take, for example, specifying:</p>
+<ul class="simple">
+<li><p>–optimal-augmentation-filters: Provide a comma seperated list of filters to use for augmentation (e.g. ztfg,ztfr,ztfi). If none is provided, will use all the filters available.
+with</p></li>
+<li><p>–photometry-augmentation-N-points: Specify the number of augmented points to include taken randomly from –optimal-augmentation-filters</p></li>
+</ul>
+<p>However, if you specify:</p>
+<ul class="simple">
+<li><p>–optimal-augmentation-times: Provide a comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax).
+You can choose the times to simulate for a given filter.</p></li>
+</ul>
+<p>We can use these flags as follows.</p>
+<p>Taking ZTF as an example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>    lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --outdir outdir --label injection --prior priors/Bu2019lm.prior --tmin 0.1 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --injection ./injection.json --injection-num 0 --injection-outfile outdir/lc.csv --generation-seed 42 --filters ztfg,ztfr,ztfi --plot --remove-nondetections --ztf-uncertainties --ztf-sampling --ztf-ToO 180
+</pre></div>
+</div>
+<p>This produces a light curve and parameter inference of the form:</p>
+<p><img alt="ZTF sampling corner plot" src="_images/ZTF_corner.png" />
+<img alt="ZTF sampling light curve fit" src="_images/ZTF_lightcurves.png" /></p>
+<p>Taking Rubin as an example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --outdir outdir --label injection --prior priors/Bu2019lm.prior --tmin 0.05 --tmax 20 --dt 0.1 --error-budget 1 --nlive 512 --Ebv-max 0 --injection ./injection.json --injection-num 0 --injection-outfile outdir/lc.csv --generation-seed 42 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y --plot --remove-nondetections --rubin-ToO --rubin-ToO-type BNS --injection-detection-limit 23.9,25.0,24.7,24.0,23.3,22.1
+</pre></div>
+</div>
+</section>
+<section id="analysis-of-a-real-object">
+<h2>Analysis of a real object<a class="headerlink" href="#analysis-of-a-real-object" title="Link to this heading">#</a></h2>
+<p>Of course, analysis of simulated objects are not the ultimate goal for the analysis. However, we can also analyze real light curves. We take as an example one of the files in example_files/candidate_data/ (ZTF21abjvfbc.dat) and run:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --interpolation-type tensorflow --outdir outdir --label injection --prior priors/Bu2019lm.prior --tmin 0.1 --tmax 20 --dt 0.5 --error-budget 1 --nlive 512 --Ebv-max 0 --trigger-time 59397.28347219899 --data example_files/candidate_data/ZTF21abjvfbc.dat --plot
+</pre></div>
+</div>
+<p>One might note that the –trigger-time is set specifically here in MJD, taken in this example to be the first detection of the object.</p>
+<p>This produces a light curve and parameter inference of the form:</p>
+<p><img alt="ZTF21abjvfbc corner plot" src="_images/ZTF21abjvfbc_corner.png" />
+<img alt="ZTF21abjvfbc light curve fit" src="_images/ZTF21abjvfbc_lightcurves.png" /></p>
+</section>
+<section id="inference-of-multiple-em-signals">
+<h2>Inference of multiple EM signals<a class="headerlink" href="#inference-of-multiple-em-signals" title="Link to this heading">#</a></h2>
+<p>Whereas the examples above dealt with stand-alone Bayesian inferences of just one model or astrophysical source, NMMA enables to run a combined inference using multiple models. Below, we show examples for 2 different types of sources:</p>
+<ul class="simple">
+<li><p>Binary Neutron Star (BNS)</p></li>
+<li><p>Neutron-Star-Black-Hole (NSBH)</p></li>
+</ul>
+<p>Here, we use the observed <a class="reference external" href="https://arxiv.org/pdf/2204.10864.pdf">GRB211211A</a> signal as a case study to run Bayesian inference with multiple models. In principle, this sort of signal can originate from a BNS source, but also a NSBH source could be explain the observed signature.</p>
+<p><strong>Example: BNS source</strong></p>
+<p>If we assume a BNS source, we can use the model <code class="docutils literal notranslate"><span class="pre">TrPi2018</span></code> for modelling Gamma-ray burst afterglows along with the kilonova model <code class="docutils literal notranslate"><span class="pre">Bu2019lm</span></code>. To run a joint inference with these 2 models, we use the observed data <code class="docutils literal notranslate"><span class="pre">GRB211211A.txt</span></code>, an adapted prior file which includes prior settings for both models and the model grid for the <code class="docutils literal notranslate"><span class="pre">Bu2019lm</span></code> kilonova model. The joint inference can be started using the command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mpiexec -np 16 lightcurve-analysis --model Bu2019lm,TrPi2018 --svd-path /nmma/svdmodels/ --interpolation-type sklearn_gp --outdir outdir --label GRB211211A --prior ./Bu2019lm_TrPi2018GRB211211A.prior --tmin 0.01 --tmax 10 --dt 0.01 --error-budget 1 --nlive 1024 --Ebv-max 0 --trigger-time 59559.54791666667 --data ./GRB211211A.txt --plot
+</pre></div>
+</div>
+<p>The joint Bayesian inference using both model yields posterior samples for the source parameters describing the kilonova and GRB afterglow. Some of the source parameter posteriors are shown below.</p>
+<p><img alt="BNS corner plot GRB211211A" src="_images/Corner_narrow_Bulla.png" /></p>
+<p><strong>Example: NSBH source</strong></p>
+<p>For the assumption that also a NSBH source could produce a signal such as GRB211211A, we use a NSBH-kilonova model <code class="docutils literal notranslate"><span class="pre">Bu2019nsbh</span></code> and again the model <code class="docutils literal notranslate"><span class="pre">TrPi2018</span></code> for modelling gamma-ray burst afterglows. We use the same observational data and adapt the prior setting for the <code class="docutils literal notranslate"><span class="pre">Bu2019nsbh</span></code> model. To run tje joint inference with these 2 models, run the command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mpiexec -np 16 lightcurve-analysis --model Bu2019nsbh,TrPi2018 --svd-path /nmma/svdmodels/ --interpolation-type sklearn_gp --outdir outdir --label GRB211211A_NSBH --prior ./Bu2019nsbh_TrPi2018_GRB211211A.prior --tmin 0.01 --tmax 10 --dt 0.01 --error-budget 1 --nlive 1024 --Ebv-max 0 --trigger-time 59559.54791666667 --data ./GRB211211A.txt --plot
+</pre></div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="data_inj_obs.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Injections &amp; observational data</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="lfi_analysis.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#filters">Filters</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example-fit-to-simulated-data">Example fit to simulated data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#analysis-of-a-real-object">Analysis of a real object</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inference-of-multiple-em-signals">Inference of multiple EM signals</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The NMMA Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023, The NMMA Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,636 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Models &#8212; nmma 0.2.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/nmma-docs.css?v=4c393c42" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=c480a563"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'models';</script>
+    <link rel="icon" href="_static/favicon-light.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Training" href="training.html" />
+    <link rel="prev" title="Quick Start" href="quick-start-guide.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/light-logo.svg" class="logo__image only-light" alt="nmma 0.2.1 documentation - Home"/>
+    <script>document.write(`<img src="_static/light-logo.svg" class="logo__image only-dark" alt="nmma 0.2.1 documentation - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_inj_obs.html">Injections &amp; observational data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joint_inference.html">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/edit/main/doc/models.md" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new?title=Issue%20on%20page%20%2Fmodels.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/models.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Models</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#kilonovae">Kilonovae</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kasen-et-al-2017">Kasen et al. 2017</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#dietrich-et-al-2020">Dietrich et al. 2020</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#anand-coughlin-et-al-2021">Anand &amp; Coughlin et al. 2021</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#anand-et-al-2023">Anand et al. 2023</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#wollaeger-et-al-2021">Wollaeger et al. 2021</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#r-process-generation-in-collapsars">r-process generation in collapsars</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#gamma-ray-burst-afterglows">Gamma-ray burst afterglows</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#shock-cooling-supernovae">Shock Cooling supernovae</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#supernovae">Supernovae</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="models">
+<h1>Models<a class="headerlink" href="#models" title="Link to this heading">#</a></h1>
+<p>NMMA will be under continuous development meaning that new astrophysical models such as for kilonovae, supernovae, gamma-ray bursts and so on will be implemented over time. Therefore, it is worthwhile to check out the <code class="docutils literal notranslate"><span class="pre">model_parameters_dict</span></code> in <a class="reference external" href="http://models.py">models.py</a> from time to time.</p>
+<p>We make the interpolated models available here: <a class="gitlab reference external" href="https://gitlab.com/Theodlz/nmma-models">Theodlz/nmma-models</a> which are automatically downloaded upon their first request.</p>
+<section id="kilonovae">
+<h2>Kilonovae<a class="headerlink" href="#kilonovae" title="Link to this heading">#</a></h2>
+<p>These are optical counterparts to binary neutron star mergers generated by r-process material produced <a class="reference external" href="https://arxiv.org/abs/1910.01617">(Metzger 2017)</a>. In this framework, we use a few different sources for the models:</p>
+<section id="kasen-et-al-2017">
+<h3>Kasen et al. 2017<a class="headerlink" href="#kasen-et-al-2017" title="Link to this heading">#</a></h3>
+<p>We use a model from <a class="reference external" href="https://arxiv.org/abs/1710.05463">Kasen et al. 2017</a>. The model is named Ka2017 in the code. The parameters are:</p>
+<ul class="simple">
+<li><p>ejecta mass <span class="math notranslate nohighlight">\(M_{\rm ej}\)</span></p></li>
+<li><p>ejecta velocity <span class="math notranslate nohighlight">\(v_{\rm ej}\)</span></p></li>
+<li><p>lathanide fraction <span class="math notranslate nohighlight">\(X_{\rm lan}\)</span></p></li>
+</ul>
+<p>The original light curves are available on GitHub <a class="reference external" href="https://github.com/dnkasen/Kasen_Kilonova_Models_2017">here</a>.</p>
+</section>
+<section id="dietrich-et-al-2020">
+<h3>Dietrich et al. 2020<a class="headerlink" href="#dietrich-et-al-2020" title="Link to this heading">#</a></h3>
+<p>We use a model from <a class="reference external" href="https://arxiv.org/abs/2002.11355">Dietrich et al. 2020</a>, which is derived from <a class="reference external" href="https://arxiv.org/abs/1906.04205">POSSIS</a>, spanning the plausible binary neutron star parameter space. The model is named Bu2019lm in the code. The model parameters are:</p>
+<ul class="simple">
+<li><p>dynamical ejecta mass <span class="math notranslate nohighlight">\(M^{\rm dyn}_{\rm ej}\)</span></p></li>
+<li><p>disk wind ejecta mass <span class="math notranslate nohighlight">\(M_{\rm ej}^{\mathrm{wind}}\)</span></p></li>
+<li><p>half opening angle <span class="math notranslate nohighlight">\(\Phi\)</span></p></li>
+<li><p>observation angle <span class="math notranslate nohighlight">\(\Theta_{\rm{obs}}\)</span></p></li>
+</ul>
+<p>The original light curves are available on GitHub
+<a class="reference external" href="https://github.com/mbulla/kilonova_models/tree/master/bns/bns_grids/bns_m3_3comp">here</a>.</p>
+</section>
+<section id="anand-coughlin-et-al-2021">
+<h3>Anand &amp; Coughlin et al. 2021<a class="headerlink" href="#anand-coughlin-et-al-2021" title="Link to this heading">#</a></h3>
+<p>We use a model from <a class="reference external" href="https://arxiv.org/abs/2009.07210">Anand &amp; Coughlin et al. 2021</a>, which is derived from <a class="reference external" href="https://arxiv.org/abs/1906.04205">POSSIS</a>, spanning the plausible neutron star - black hole space. The model is named Bu2019nsbh in the code. The model parameters are:</p>
+<ul class="simple">
+<li><p>the dynamical ejecta <span class="math notranslate nohighlight">\(M^{\rm dyn}_{\rm ej}\)</span></p></li>
+<li><p>disk wind ejecta <span class="math notranslate nohighlight">\(M_{\rm ej}^{\mathrm{wind}}\)</span></p></li>
+<li><p>observation angle <span class="math notranslate nohighlight">\(\Theta_{\rm{obs}}\)</span></p></li>
+</ul>
+<p>The half opening angle <span class="math notranslate nohighlight">\(\Phi\)</span> is fixed to 30 deg. The original light curves are available on GitHub <a class="reference external" href="https://github.com/mbulla/kilonova_models/tree/master/bhns/bhns_grids/bhns_m1_2comp">here</a>.</p>
+</section>
+<section id="anand-et-al-2023">
+<h3>Anand et al. 2023<a class="headerlink" href="#anand-et-al-2023" title="Link to this heading">#</a></h3>
+<p>We use a model from <a class="reference external" href="https://arxiv.org/abs/2307.11080">Anand et al. 2023</a>, which is derived from <a class="reference external" href="https://arxiv.org/abs/1906.04205">POSSIS</a>, spanning the plausible binary neutron star parameter space. The model is named Bu2022mv in the code. The model parameters are:</p>
+<ul class="simple">
+<li><p>dynamical ejecta mass <span class="math notranslate nohighlight">\(M^{\rm dyn}_{\rm ej}\)</span></p></li>
+<li><p>dynamical ejecta velocity <span class="math notranslate nohighlight">\(v^{\rm dyn}_{\rm ej}\)</span></p></li>
+<li><p>disk wind ejecta mass <span class="math notranslate nohighlight">\(M^{\rm wind}_{\rm ej}\)</span>$</p></li>
+<li><p>disk wind ejecta velocity $<span class="math notranslate nohighlight">\(v^{\rm wind}_{\rm ej}\)</span></p></li>
+<li><p>observation angle <span class="math notranslate nohighlight">\(\Theta_{\rm{obs}}\)</span></p></li>
+</ul>
+<p>The original light curves are available on GitHub <a class="reference external" href="https://github.com/mbulla/kilonova_models">here</a>.</p>
+</section>
+<section id="wollaeger-et-al-2021">
+<h3>Wollaeger et al. 2021<a class="headerlink" href="#wollaeger-et-al-2021" title="Link to this heading">#</a></h3>
+<p>We use a model from <a class="reference external" href="https://arxiv.org/abs/2105.11543">Wollaeger et al. 2021</a> spanning the plausible binary neutron star parameter space. The models are named LANLTS1, LANLTS2, LANLTP1, and LANLTP2 in the code, representing the different geometries to choose from (see <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/em/model.py#L72">here</a> for LANL list). The model parameters are:</p>
+<ul class="simple">
+<li><p>dynamical ejecta mass <span class="math notranslate nohighlight">\(M^{\rm dyn}_{\rm ej}\)</span></p></li>
+<li><p>dynamical ejecta velocity <span class="math notranslate nohighlight">\(v^{\rm dyn}_{\rm ej}\)</span></p></li>
+<li><p>disk wind ejecta mass <span class="math notranslate nohighlight">\(M^{\rm wind}_{\rm ej}\)</span></p></li>
+<li><p>disk wind ejecta velocity <span class="math notranslate nohighlight">\(v^{\rm wind}_{\rm ej}\)</span></p></li>
+<li><p>observation angle <span class="math notranslate nohighlight">\(\Theta_{\rm{obs}}\)</span></p></li>
+</ul>
+<p>The original light curves are available on Zenodo <a class="reference external" href="https://zenodo.org/record/5745556#.YaaNH8ZlBBw">here</a>.</p>
+</section>
+</section>
+<section id="r-process-generation-in-collapsars">
+<h2>r-process generation in collapsars<a class="headerlink" href="#r-process-generation-in-collapsars" title="Link to this heading">#</a></h2>
+<p>We use a model from <a class="reference external" href="https://arxiv.org/abs/2302.09226">Anand et al. 2023</a>, which is derived from the model presented in <a class="reference external" href="https://arxiv.org/abs/2205.10421">Barnes &amp; Metzger 2022</a>, studying r-process generation in broadlined stripped-envelope (Ic-BL) supernovae associated with collapsars. The model is named AnBa2022 in the code. The model parameters are:</p>
+<ul class="simple">
+<li><p>total mass <span class="math notranslate nohighlight">\(M_{\rm ej}\)</span></p></li>
+<li><p>Nickel 56 mass <span class="math notranslate nohighlight">\(M_{\rm 56}\)</span></p></li>
+<li><p>ejecta velocity <span class="math notranslate nohighlight">\(v_{\rm ej}\)</span></p></li>
+<li><p>r-process mass <span class="math notranslate nohighlight">\(M_{\rm rp}\)</span></p></li>
+<li><p>fraction of r-process material mixed into the ejecta <span class="math notranslate nohighlight">\(x_{\rm mix}\)</span></p></li>
+</ul>
+</section>
+<section id="gamma-ray-burst-afterglows">
+<h2>Gamma-ray burst afterglows<a class="headerlink" href="#gamma-ray-burst-afterglows" title="Link to this heading">#</a></h2>
+<p>We use <a class="reference external" href="https://github.com/geoffryan/afterglowpy">afterglowpy</a> <a class="reference external" href="https://arxiv.org/abs/1909.11691">(Ryan et al. 2020)</a>, an open-source computational tool modeling forward shock synchrotron emission from relativistic blast waves as a function of jet structure and viewing angle. The
+model is named TrPi2018 in the code. The model parameters are:</p>
+<ul class="simple">
+<li><p>isotropic kinetic energy <span class="math notranslate nohighlight">\(E_{\mathrm{K,iso}}\)</span></p></li>
+<li><p>jet collimation angle <span class="math notranslate nohighlight">\(\theta_c\)</span></p></li>
+<li><p>viewing angle <span class="math notranslate nohighlight">\(\theta_v\)</span></p></li>
+<li><p>circumburst constant density <span class="math notranslate nohighlight">\(n\)</span></p></li>
+<li><p>spectral slope of the electron distribution <span class="math notranslate nohighlight">\(p\)</span></p></li>
+<li><p>fraction of energy imparted to the electrons by the shock <span class="math notranslate nohighlight">\(\epsilon_e\)</span></p></li>
+<li><p>fraction of energy imparted to the magnetic field <span class="math notranslate nohighlight">\(\epsilon_B\)</span></p></li>
+</ul>
+</section>
+<section id="shock-cooling-supernovae">
+<h2>Shock Cooling supernovae<a class="headerlink" href="#shock-cooling-supernovae" title="Link to this heading">#</a></h2>
+<p>We use a model from <a class="reference external" href="https://arxiv.org/abs/2007.08543">Piro et al. 2021</a>. Following shock breakout, the radiation of shock heated material expands and cools, known as shock cooling emission. The model parameters are:</p>
+<ul class="simple">
+<li><p>mass of extended material <span class="math notranslate nohighlight">\(M_e\)</span></p></li>
+<li><p>radius of extended material <span class="math notranslate nohighlight">\(R_e\)</span></p></li>
+<li><p>energy of material as the shock passes through it <span class="math notranslate nohighlight">\(E_e\)</span></p></li>
+</ul>
+</section>
+<section id="supernovae">
+<h2>Supernovae<a class="headerlink" href="#supernovae" title="Link to this heading">#</a></h2>
+<p>We rely on models for supernovae from <a class="reference external" href="https://github.com/sncosmo/sncosmo">sncosmo</a>. For example, the nugent-hyper model <a class="reference external" href="https://arxiv.org/abs/astro-ph/0403450">(Levan et al. 2005)</a> used for SN Ib/c supernovae with the stretch and scale set to match the intrinsic (dereddened, rest frame) <span class="math notranslate nohighlight">\(R\)</span>-band luminosity of SN 1998bw at maximum light. The main free parameter is the absolute magnitude.</p>
+<p>All models listed <a class="reference external" href="https://sncosmo.readthedocs.io/en/stable/source-list.html">here</a> can be used. We provide a prior file called sncosmo-generic.prior that only provides:</p>
+<ul class="simple">
+<li><p>luminosity distance</p></li>
+<li><p>timeshift</p></li>
+<li><p>supernova_mag_boost</p></li>
+</ul>
+<p>The latter parameter shifts the absolute magnitude up and down.</p>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="quick-start-guide.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Quick Start</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="training.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Training</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#kilonovae">Kilonovae</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kasen-et-al-2017">Kasen et al. 2017</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#dietrich-et-al-2020">Dietrich et al. 2020</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#anand-coughlin-et-al-2021">Anand &amp; Coughlin et al. 2021</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#anand-et-al-2023">Anand et al. 2023</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#wollaeger-et-al-2021">Wollaeger et al. 2021</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#r-process-generation-in-collapsars">r-process generation in collapsars</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#gamma-ray-burst-afterglows">Gamma-ray burst afterglows</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#shock-cooling-supernovae">Shock Cooling supernovae</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#supernovae">Supernovae</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The NMMA Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023, The NMMA Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
