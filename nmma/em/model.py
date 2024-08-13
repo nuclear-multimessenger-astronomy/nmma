@@ -99,7 +99,7 @@ model_parameters_dict = {
     ],
     "LANL1D": [
         "Ye_wind",
-        "mej_dyn",
+        "log10_mej_dyn",
         "vej_dyn",
     ],
 }
