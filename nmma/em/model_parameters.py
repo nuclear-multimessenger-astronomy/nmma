@@ -401,7 +401,7 @@ def LANL1D(data):
 
     parameters = [
         "Ye_wind",
-        "mej_dyn",
+        "log10_mej_dyn",
         "vej_dyn",
         #"log10_mej_wind",
         #"vej_wind",
@@ -415,9 +415,9 @@ def LANL1D(data):
         knprops = get_knprops_from_LANLfilename(key)
 
         # best to interpolate masses in log10
-        #knprops["log10_mej_dyn"] = np.log10(knprops["mej_dyn"])
+        knprops["log10_mej_dyn"] = np.log10(knprops["mej_dyn"])
         #knprops["log10_mej_wind"] = np.log10(knprops["mej_wind"])
-        #del knprops["mej_dyn"]
+        del knprops["mej_dyn"]
         #del knprops["mej_wind"]
         # del knprops["morphology"]
 
