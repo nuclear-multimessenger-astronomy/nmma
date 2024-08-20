@@ -218,14 +218,14 @@ class NSBHEjectaFitting(object):
 
         if isinstance(compactness_2, (list, tuple, pd.core.series.Series, np.ndarray)):
             BH_index = np.where(compactness_2 == 0.5)[0]
-            negative_mdisk_index = np.where(mdisk_fit <= 0.0)[0]
-            converted_parameters["log10_mej_dyn"][BH_index] = -np.inf
-            converted_parameters["log10_mej_dyn"][negative_mdisk_index] = -np.inf
-            converted_parameters["log10_mej_wind"][BH_index] = -np.inf
-            converted_parameters["log10_mej_wind"][negative_mdisk_index] = -np.inf
+            negative_mdisk_index = np.where(~np.isfinite(log_mej_dyn))[0]
+            invalid_index = list(set(BH_index) | set(negative_mdisk_index))
+
+            converted_parameters["log10_mej_dyn"][invalid_index] = -np.inf
+            converted_parameters["log10_mej_wind"][invalid_index] = -np.inf
 
         else:
-            if compactness_2 == 0.5 or mdisk_fit < 0.0:
+            if compactness_2 == 0.5 or (not np.isfinite(log_mej_dyn)):
                 converted_parameters["log10_mej_dyn"] = -np.inf
                 converted_parameters["log10_mej_wind"] = -np.inf
 
