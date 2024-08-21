@@ -126,7 +126,7 @@ class NSBHEjectaFitting(object):
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
         bayon_mass_2 = (
-            mass_2_source * (1.0 + 0.6 * compactness_2) / (1.0 - 0.5 * compactness_2)
+            mass_2_source * (1.0 + 0.6 * compactness_2 / (1.0 - 0.5 * compactness_2))
         )
 
         remant_mass = (
