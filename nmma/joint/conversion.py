@@ -105,6 +105,13 @@ class NSBHEjectaFitting(object):
 
         return 3.0 + Z2 - np.sign(chi_bh) * np.sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2))
 
+    def baryon_mass_NS(self, source_mass, compactness):
+        """
+        equation (7) in https://arxiv.org/abs/2002.07728
+        """
+
+        return source_mass * (1.0 + 0.6 * compactness / (1.0 - 0.5 * compactness))
+
     def remnant_disk_mass_fitting(
         self,
         mass_1_source,
@@ -125,9 +132,7 @@ class NSBHEjectaFitting(object):
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
-        bayon_mass_2 = (
-            mass_2_source * (1.0 + 0.6 * compactness_2 / (1.0 - 0.5 * compactness_2))
-        )
+        baryon_mass_2 = self.baryon_mass_NS(mass_2_source, compactness_2)
 
         remant_mass = (
             a * np.power(symm_mass_ratio, -1.0 / 3.0) * (1.0 - 2.0 * compactness_2)
@@ -138,7 +143,7 @@ class NSBHEjectaFitting(object):
 
         remant_mass = np.power(remant_mass, 1.0 + d)
 
-        remant_mass *= bayon_mass_2
+        remant_mass *= baryon_mass_2
 
         return remant_mass
 
@@ -163,9 +168,7 @@ class NSBHEjectaFitting(object):
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
-        bayon_mass_2 = (
-            mass_2_source * (1.0 + 0.6 * compactness_2 / (1.0 - 0.5 * compactness_2))
-        )
+        baryon_mass_2 = self.baryon_mass_NS(mass_2_source, compactness_2)
 
         mdyn = (
             a1
@@ -174,7 +177,7 @@ class NSBHEjectaFitting(object):
             / compactness_2
         )
         mdyn += -a2 * np.power(mass_ratio_invert, n2) * risco + a4
-        mdyn *= bayon_mass_2
+        mdyn *= baryon_mass_2
 
         mdyn = np.maximum(0.0, mdyn)
 
