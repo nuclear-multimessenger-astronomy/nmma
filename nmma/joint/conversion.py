@@ -202,10 +202,10 @@ class NSBHEjectaFitting(object):
         chi_eff = (mass_1_source * chi_1 + mass_2_source * chi_2) / total_mass_source
 
         mdyn_fit = self.dynamic_mass_fitting(
-            mass_1_source, mass_2_source, compactness_2, chi_eff
+            mass_1_source, mass_2_source, compactness_2, chi_1
         )
         remnant_disk_fit = self.remnant_disk_mass_fitting(
-            mass_1_source, mass_2_source, compactness_2, chi_eff
+            mass_1_source, mass_2_source, compactness_2, chi_1
         )
         mdisk_fit = remnant_disk_fit - mdyn_fit
 
