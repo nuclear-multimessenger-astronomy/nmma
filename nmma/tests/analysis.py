@@ -1,6 +1,7 @@
 from argparse import Namespace
 import os
 import pytest
+import shutil
 
 
 from ..em import analysis
@@ -9,6 +10,13 @@ from tools import analysis_slurm
 
 WORKING_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(WORKING_DIR, "data")
+
+
+@pytest.fixture(autouse=True)
+def cleanup_outdir(args):
+    yield
+    if os.path.exists(args.outdir):
+        shutil.rmtree(args.outdir)
 
 
 @pytest.fixture(scope="module")
