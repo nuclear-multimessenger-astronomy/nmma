@@ -420,6 +420,12 @@ def get_parser(**kwargs):
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--systematics-file",
+        metavar="PATH",
+        help="Path to systematics configuration file",
+        default=None,
+    )
 
     return parser
 
@@ -771,6 +777,7 @@ def analysis(args):
         error_budget=error_budget,
         verbose=args.verbose,
         detection_limit=args.detection_limit,
+        systematics_file=args.systematics_file
     )
 
     likelihood = OpticalLightCurve(**likelihood_kwargs)

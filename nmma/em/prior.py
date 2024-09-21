@@ -1,9 +1,31 @@
 import bilby
 import bilby.core
 from bilby.core.prior import Prior
+from bilby.core.prior import PriorDict as _PriorDict
 from bilby.core.prior.interpolated import Interped
 from bilby.core.prior.conditional import ConditionalTruncatedGaussian
 
+from . import systematics
+
+def from_list(self, systematics):
+    """
+    Similar to `from_file` but instead of file buffer, takes a list of Prior strings
+    See `from_file` for more details
+    """
+
+    comments = ["#", "\n"]
+    prior = dict()
+    for line in systematics:
+        if line[0] in comments:
+            continue
+        line.replace(" ", "")
+        elements = line.split("=")
+        key = elements[0].replace(" ", "")
+        val = "=".join(elements[1:]).strip()
+        prior[key] = val
+    self.from_dictionary(prior)
+
+setattr(_PriorDict, "from_list", from_list)
 
 class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
     """
@@ -264,4 +286,7 @@ def create_prior_from_args(model_names, args):
 
         print(f"The prior on Ebv is set to fixed value of {priors['Ebv']}")
 
+    if args.systematics_file is not None:
+        systematics_priors = systematics.main(args.systematics_file)
+        priors.from_list(systematics_priors)
     return priors

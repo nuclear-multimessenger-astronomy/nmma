@@ -1,0 +1,19 @@
+#boilerplate for systematics prior
+
+config:
+  withTime:
+    value: true
+    filters:
+      - sdssu
+      - 2massks
+      - [2massj, 2massh]
+      - null # you can keep it or remove it, it will still be parsed as None (filter independent)
+    time_nodes: 2
+    type: "Uniform"
+    min: 0
+    max: 2
+  withoutTime:
+    value: false
+    type: "Uniform"
+    min: 0
+    max: 2
