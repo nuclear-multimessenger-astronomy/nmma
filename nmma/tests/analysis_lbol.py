@@ -44,7 +44,8 @@ def args():
         cosiota_node_num=10,
         ra=None,
         dec=None,
-        fetch_Ebv_from_dustmap=False
+        fetch_Ebv_from_dustmap=False,
+        systematics_file=None
     )
 
     return args
