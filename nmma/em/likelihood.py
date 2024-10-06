@@ -4,10 +4,12 @@ import numpy as np
 import scipy.stats
 from scipy.interpolate import interp1d
 from scipy.stats import truncnorm
+from pathlib import Path
+import yaml
+
 
 from bilby.core.likelihood import Likelihood
-from . import utils
-
+from . import utils, systematics
 
 def truncated_gaussian(m_det, m_err, m_est, lim):
 
@@ -55,6 +57,7 @@ class OpticalLightCurve(Likelihood):
         filters,
         light_curve_data,
         trigger_time,
+        systematics_file,
         detection_limit=None,
         error_budget=1.0,
         tmin=0.0,
@@ -81,6 +84,7 @@ class OpticalLightCurve(Likelihood):
             light_curve_data, self.filters, self.trigger_time, self.tmin, self.tmax
         )
         self.light_curve_data = processedData
+        self.systematics_file = systematics_file
 
         self.detection_limit = {}
         if detection_limit:
@@ -144,6 +148,40 @@ class OpticalLightCurve(Likelihood):
                     bounds_error=False,
                 )
 
+        if self.systematics_file is not None:
+            yaml_dict = yaml.safe_load(Path(self.systematics_file).read_text())
+            systematics.validate_only_one_true(yaml_dict)
+
+            if yaml_dict["config"]["withTime"]["value"]:
+                n = yaml_dict["config"]["withTime"]["time_nodes"]
+                time_array = np.round(np.linspace(self.tmin, self.tmax, n), 2)
+                yaml_filters = yaml_dict["config"]["withTime"]["filters"]
+                systematics.validate_filters(yaml_filters)
+
+                for filter_group in yaml_filters:
+                    if isinstance(filter_group, list):
+                        filt = "___".join(filter_group)
+                    elif filter_group is None:
+                        filt = "all"
+                    else:
+                        filt = filter_group
+
+                    globals()[f"sys_err_{filt}_array"] = np.array([])
+
+                    for i in range(1, n + 1):
+                        value = self.parameters.get(f"sys_err_{filt}{i}")
+                        globals()[f"sys_err_{filt}_array"] = np.append(globals()[f"sys_err_{filt}_array"], value)
+
+                for filter_group in yaml_dict["config"]["withTime"]["filters"]:
+                    if isinstance(filter_group, list):
+                        filt = "___".join(filter_group)
+                    elif filter_group is None:
+                        filt = "all"
+                    else:
+                        filt = filter_group
+                    globals()[f"sys_err_{filt}_interped"] = interp1d(time_array, globals()[f"sys_err_{filt}_array"], fill_value="extrapolate", bounds_error=False)
+        
+
         # compare the estimated light curve and the measured data
         minus_chisquare_total = 0.0
         gaussprob_total = 0.0
@@ -153,9 +191,31 @@ class OpticalLightCurve(Likelihood):
             data_mag = self.light_curve_data[filt][:, 1]
             data_sigma = self.light_curve_data[filt][:, 2]
 
+            if self.systematics_file is not None:
+                if yaml_dict["config"]["withTime"]["value"]:
+                    yaml_filters = yaml_dict["config"]["withTime"]["filters"]
+
+                    filter_group_finite_idx_match = False
+
+                    if yaml_filters is not None and yaml_filters != []:
+                        for yaml_filt in yaml_filters:
+                            if yaml_filt is not None and filt in yaml_filt:
+                                if len(yaml_filt) == 1:
+                                    filters_to_use = yaml_filt[0]
+                                else:
+                                    filters_to_use = "___".join(yaml_filt)
+                                filter_group_finite_idx_match = True
+                                break
+                    if not filter_group_finite_idx_match:
+                        filters_to_use = "all"
+                    data_sigma = np.sqrt(data_sigma**2 + (globals()[f"sys_err_{filters_to_use}_interped"](data_time)) ** 2)
+                    
+                elif yaml_dict["config"]["withoutTime"]["value"]:
+                    data_sigma = np.sqrt(data_sigma**2 + self.parameters["sys_err"] ** 2)
+
             # include the error budget into calculation
-            if 'em_syserr' in self.parameters:
-                data_sigma = np.sqrt(data_sigma**2 + self.parameters['em_syserr']**2)
+            elif 'sys_err' in self.parameters:
+                data_sigma = np.sqrt(data_sigma**2 + self.parameters['sys_err']**2)
             else:
                 data_sigma = np.sqrt(data_sigma**2 + self.error_budget[filt]**2)
 
@@ -186,15 +246,36 @@ class OpticalLightCurve(Likelihood):
 
             # evaluate the data with infinite error
             if len(infIdx) > 0:
-                if 'em_syserr' in self.parameters:
-                    upperlim_sigma = self.parameters['em_syserr']
-                    gausslogsf = scipy.stats.norm.logsf(
-                        data_mag[infIdx], mag_est[infIdx], upperlim_sigma
-                    )
+                if self.systematics_file is not None:
+                    if yaml_dict["config"]["withTime"]["value"]:
+                        yaml_filters = yaml_dict["config"]["withTime"]["filters"]
+
+                        filter_group_infinite_idx_match = False
+
+                        if yaml_filters is not None and yaml_filters != []:
+                            for yaml_filt in yaml_filters:
+                                if yaml_filt is not None and filt in yaml_filt:
+                                    if len(yaml_filt) == 1:
+                                        upperlim_sigma = globals()[f"sys_err_{yaml_filt}_interped"](data_time)[infIdx]
+                                    else:
+                                        filters_to_use = "___".join(yaml_filt)
+                                        upperlim_sigma = globals()[f"sys_err_{filters_to_use}_interped"](data_time)[infIdx]
+                                    filter_group_infinite_idx_match = True
+                                    break
+                        if not filter_group_infinite_idx_match:
+                            filters_to_use = "all"
+                            upperlim_sigma = globals()[f"sys_err_{filters_to_use}_interped"](data_time)[infIdx]
+
+                        gausslogsf = scipy.stats.norm.logsf(data_mag[infIdx], mag_est[infIdx], upperlim_sigma)
+
+                    elif yaml_dict["config"]["withoutTime"]["value"]:
+                        upperlim_sigma = self.parameters["sys_err"]
+                        gausslogsf = scipy.stats.norm.logsf(data_mag[infIdx], mag_est[infIdx], upperlim_sigma)
+                elif 'sys_err' in self.parameters:
+                    upperlim_sigma = self.parameters['sys_err']
+                    gausslogsf = scipy.stats.norm.logsf(data_mag[infIdx], mag_est[infIdx], upperlim_sigma)
                 else:
-                    gausslogsf = scipy.stats.norm.logsf(
-                        data_mag[infIdx], mag_est[infIdx], self.error_budget[filt]
-                    )
+                    gausslogsf = scipy.stats.norm.logsf(data_mag[infIdx], mag_est[infIdx], self.error_budget[filt])
                 gaussprob_total += np.sum(gausslogsf)
 
         log_prob = minus_chisquare_total + gaussprob_total
