@@ -1,0 +1,560 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Light Curves Simulation Using the injections.dat from the observing-scenarios-simulations &#8212; nmma 0.2.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/nmma-docs.css?v=4c393c42" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=c480a563"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'observing-scenarios-light-curves';</script>
+    <link rel="icon" href="_static/favicon-light.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/light-logo.svg" class="logo__image only-light" alt="nmma 0.2.1 documentation - Home"/>
+    <script>document.write(`<img src="_static/light-logo.svg" class="logo__image only-dark" alt="nmma 0.2.1 documentation - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_inj_obs.html">Injections &amp; observational data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joint_inference.html">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/edit/main/doc/observing-scenarios-light-curves.md" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new?title=Issue%20on%20page%20%2Fobserving-scenarios-light-curves.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/observing-scenarios-light-curves.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Light Curves Simulation Using the injections.dat from the observing-scenarios-simulations</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">Light Curves Simulation Using the <strong>injections.dat</strong> from the <strong>observing-scenarios-simulations</strong></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#creating-a-json-injection-file-gw-conversion-to-kn">1. Creating a JSON Injection File: GW Conversion to KN</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#command-to-run-nmma-create-injection">Command to Run nmma-create-injection:</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#simulating-light-curve-posteriors-run-the-lightcurve-analysis">2. Simulating Light Curve Posteriors : Run the lightcurve-analysis</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#run-this-command-to-simulate-the-light-curves-for-the-ztf-telescope">Run this command to simulate the light curves for the ZTF telescope:</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#run-this-command-to-simulate-the-light-curves-for-the-vera-c-rubin-observatory-lsst">Run this command to simulate the light curves for the Vera C. Rubin Observatory (LSST):</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#for-deep-detailed-steps">For Deep: Detailed Steps</a></li>
+</ul>
+
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="light-curves-simulation-using-the-injections-dat-from-the-observing-scenarios-simulations">
+<h1>Light Curves Simulation Using the <strong>injections.dat</strong> from the <strong><a class="reference external" href="https://github.com/lpsinger/observing-scenarios-simulations">observing-scenarios-simulations</a></strong><a class="headerlink" href="#light-curves-simulation-using-the-injections-dat-from-the-observing-scenarios-simulations" title="Link to this heading">#</a></h1>
+<p>This document provides a detailed description of how to use the <strong>injections.dat</strong> file, which contains gravitational wave parameters simulated for generating light curves, specifically kilonova light curves.</p>
+<section id="creating-a-json-injection-file-gw-conversion-to-kn">
+<h2>1. Creating a JSON Injection File: GW Conversion to KN<a class="headerlink" href="#creating-a-json-injection-file-gw-conversion-to-kn" title="Link to this heading">#</a></h2>
+<p>Running the following command will generate a JSON file (<code class="docutils literal notranslate"><span class="pre">injection_Bu2019lm.json</span></code>) with the BILBY processing of compact binary merger events. Here, we consider binaries of type BNS (Binary Neutron Stars), although NSBH (Neutron Star-Black Hole) is also an option. This injection contains a simulation set of parameters: <code class="docutils literal notranslate"><span class="pre">luminosity_distance</span></code>, <code class="docutils literal notranslate"><span class="pre">log10_mej_wind</span></code>, <code class="docutils literal notranslate"><span class="pre">KNphi</span></code>, <code class="docutils literal notranslate"><span class="pre">inclination_EM</span></code>, <code class="docutils literal notranslate"><span class="pre">timeshift</span></code>, <code class="docutils literal notranslate"><span class="pre">geocent_time</span></code> for the Bu2019lm model.</p>
+<section id="command-to-run-nmma-create-injection">
+<h3>Command to Run <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/eos/create_injection.py">nmma-create-injection</a>:<a class="headerlink" href="#command-to-run-nmma-create-injection" title="Link to this heading">#</a></h3>
+<p>Run this command to create the JSON injection file:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nmma-create-injection --prior-file ./priors/Bu2019lm.prior --injection-file ./example_files/sim_events/bns_O4_injections.dat --eos-file ./example_files/eos/ALF2.dat --binary-type BNS --extension json -f ./outdir/injection_Bu2019lm --generation-seed 42 --aligned-spin
+</pre></div>
+</div>
+<p>To get a “dat” format, replace –extension json with <code class="docutils literal notranslate"><span class="pre">--extension</span> <span class="pre">dat</span></code>.
+You can add the <code class="docutils literal notranslate"><span class="pre">--eject</span></code> flag, which is better as it removes events that do not generate enough ejecta or are too heavy and will become quickly a black hole. Adding the <code class="docutils literal notranslate"><span class="pre">--eject</span></code> flag requires adding alpha, ratio_zeta, and ratio_epsilon in the Bu2019lm.prior file:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>alpha = Gaussian(mu=0., sigma=4e-4, name=&#39;alpha&#39;, latex_label=&#39;$\\alpha$&#39;)
+ratio_zeta = Uniform(minimum=0., maximum=1.0, name=&#39;zeta&#39;, latex_label=&#39;$\\zeta$&#39;)
+ratio_epsilon = 0.04
+</pre></div>
+</div>
+</section>
+</section>
+<section id="simulating-light-curve-posteriors-run-the-lightcurve-analysis">
+<h2>2. Simulating Light Curve Posteriors : Run the <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/em/analysis.py">lightcurve-analysis</a><a class="headerlink" href="#simulating-light-curve-posteriors-run-the-lightcurve-analysis" title="Link to this heading">#</a></h2>
+<section id="run-this-command-to-simulate-the-light-curves-for-the-ztf-telescope">
+<h3>Run this command to simulate the light curves for the ZTF telescope:<a class="headerlink" href="#run-this-command-to-simulate-the-light-curves-for-the-ztf-telescope" title="Link to this heading">#</a></h3>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --interpolation-type sklearn_gp --outdir ./outdir/BNS/0 --label injection_Bu2019lm_0 --prior ./Bu2019lm.prior --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 2048 --Ebv-max 0 --injection ./outdir/injection_Bu2019lm.json --injection-num 0 --injection-detection-limit 21.7,21.4,20.9 --injection-outfile ./outdir/BNS/0/lc.csv --generation-seed 42 --filters ztfg,ztfr,ztfi --plot --remove-nondetections --local-only --ztf-ToO 300 --ztf-uncertainties --ztf-sampling --ztf-ToO 300
+</pre></div>
+</div>
+<p>Here, <code class="docutils literal notranslate"><span class="pre">--injection-num</span> <span class="pre">0</span></code> means to simulate the first event (simulation_id=39) in the JSON file, and <code class="docutils literal notranslate"><span class="pre">/outdir/BNS/0</span></code> is the output directory. For the second event, use <code class="docutils literal notranslate"><span class="pre">--injection-num</span> <span class="pre">1</span></code> and <code class="docutils literal notranslate"><span class="pre">/outdir/BNS/1</span></code>, and so on. The <strong>simulation_id</strong> is the number of the CBC which passed the threshold cut during the observing scenarios simulation, which includes all the subpopulation. Here, <code class="docutils literal notranslate"><span class="pre">bns_O4_injections.dat</span></code> is a subset containing only the BNS events, so <strong>simulation_id</strong> is different from the <code class="docutils literal notranslate"><span class="pre">--injection-num</span></code>.</p>
+</section>
+<section id="run-this-command-to-simulate-the-light-curves-for-the-vera-c-rubin-observatory-lsst">
+<h3>Run this command to simulate the light curves for the Vera C. Rubin Observatory (LSST):<a class="headerlink" href="#run-this-command-to-simulate-the-light-curves-for-the-vera-c-rubin-observatory-lsst" title="Link to this heading">#</a></h3>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --interpolation-type sklearn_gp --outdir ./outdir/BNS/0 --label injection_Bu2019lm_0 --prior ./Bu2019lm.prior --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 2048 --Ebv-max 0 --injection ./outdir/injection_Bu2019lm.json --injection-num 0 --injection-detection-limit 23.9,25.0,24.7,24.0,23.3,22.1 --injection-outfile ./outdir/BNS/0/lc.csv --generation-seed 42 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__y,ps1__z --plot --remove-nondetections --local-only --rubin-ToO-type BNS --rubin-ToO
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section class="tex2jax_ignore mathjax_ignore" id="for-deep-detailed-steps">
+<h1>For Deep: Detailed Steps<a class="headerlink" href="#for-deep-detailed-steps" title="Link to this heading">#</a></h1>
+<p>The latest update of the <strong><a class="reference external" href="https://github.com/lpsinger/observing-scenarios-simulations">Observing-Scenarios-Simulations</a></strong> for the runs O4 and O5 is located in <strong><a class="reference external" href="https://zenodo.org/doi/10.5281/zenodo.10061254">10.5281/zenodo.10061254</a></strong>, and a published <strong><a class="reference external" href="https://doi.org/10.3847/1538-4357/acfcb1">paper</a></strong> of this work is available.</p>
+<p>Download or use this Python script <strong><a class="reference external" href="https://github.com/weizmannk/ObservingScenariosInsights/blob/main/src/Zenodo_Downloader.py">downloader</a></strong> to do it easily, then unzip it.</p>
+<p>The next process is to split the <strong>injections.dat</strong> located in <code class="docutils literal notranslate"><span class="pre">runs/*/*/farah</span></code> into BNS and NSBH. Note that the injections.dat includes all the CBC populations (BNS, NSBH, and BBH). To split them properly, use the <strong><a class="reference external" href="https://github.com/weizmannk/ObservingScenariosInsights/blob/main/src/Subpopulation_Splitter.py">subpopulation-splitting</a></strong> tool and ensure the input directory is correct.</p>
+<p>The CBCs masses recorded by the <strong>injections.dat</strong> are the detector masses, so to split them, we need to convert the component masses to their real masses first. The <strong><a class="reference external" href="https://github.com/weizmannk/ObservingScenariosInsights/blob/main/src/Subpopulation_Splitter.py">subpopulation-splitting</a></strong> script is readable and understandable. It also allows adding ‘GPS times’ and other parameters useful for BILBY. The GPS times are already present in the ‘.fits’ skymap events, adding them might prolong reading times. The formula for <code class="docutils literal notranslate"><span class="pre">gps_time</span></code> is: <code class="docutils literal notranslate"><span class="pre">gps_time</span> <span class="pre">=</span> <span class="pre">geocent_end_time</span> <span class="pre">+</span> <span class="pre">(geocent_end_time_ns</span> <span class="pre">*</span> <span class="pre">10^(-9))</span></code>, where <code class="docutils literal notranslate"><span class="pre">geocent_end_time</span></code> is in seconds (s) and <code class="docutils literal notranslate"><span class="pre">geocent_end_time_ns</span></code> is in nanoseconds, easily obtainable from the XML files. Set <code class="docutils literal notranslate"><span class="pre">GPS_TIME</span> <span class="pre">=</span> <span class="pre">False</span></code>.
+In <code class="docutils literal notranslate"><span class="pre">True</span></code> means read the GPS times from ‘.fits’ files which is will take so long to process.</p>
+<p>In the output, you will have a <code class="docutils literal notranslate"><span class="pre">subpopulations</span></code> folder, which contains the split BNS and NSBH events. This is useful for those who need quick parameters of BNS and NSBH for their light curve simulations or EM counterpart statistical estimation, as shown above.</p>
+<p>Install  <code class="docutils literal notranslate"><span class="pre">gwpy</span></code> in your NMMA environment before splitting the BNS and NSBH events, use the following command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pip install gwpy
+</pre></div>
+</div>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">Light Curves Simulation Using the <strong>injections.dat</strong> from the <strong>observing-scenarios-simulations</strong></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#creating-a-json-injection-file-gw-conversion-to-kn">1. Creating a JSON Injection File: GW Conversion to KN</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#command-to-run-nmma-create-injection">Command to Run nmma-create-injection:</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#simulating-light-curve-posteriors-run-the-lightcurve-analysis">2. Simulating Light Curve Posteriors : Run the lightcurve-analysis</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#run-this-command-to-simulate-the-light-curves-for-the-ztf-telescope">Run this command to simulate the light curves for the ZTF telescope:</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#run-this-command-to-simulate-the-light-curves-for-the-vera-c-rubin-observatory-lsst">Run this command to simulate the light curves for the Vera C. Rubin Observatory (LSST):</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#for-deep-detailed-steps">For Deep: Detailed Steps</a></li>
+</ul>
+
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The NMMA Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023, The NMMA Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

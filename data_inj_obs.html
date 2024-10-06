@@ -1,0 +1,578 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Injections &amp; observational data &#8212; nmma 0.2.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/nmma-docs.css?v=4c393c42" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=c480a563"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'data_inj_obs';</script>
+    <link rel="icon" href="_static/favicon-light.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Inference of electromagnetic signals" href="fitting.html" />
+    <link rel="prev" title="Training" href="training.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/light-logo.svg" class="logo__image only-light" alt="nmma 0.2.1 documentation - Home"/>
+    <script>document.write(`<img src="_static/light-logo.svg" class="logo__image only-dark" alt="nmma 0.2.1 documentation - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Injections &amp; observational data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joint_inference.html">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/edit/main/doc/data_inj_obs.md" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new?title=Issue%20on%20page%20%2Fdata_inj_obs.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/data_inj_obs.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Injections & observational data</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#injections">Injections</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#observational-data">Observational data</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="injections-observational-data">
+<h1>Injections &amp; observational data<a class="headerlink" href="#injections-observational-data" title="Link to this heading">#</a></h1>
+<section id="injections">
+<h2>Injections<a class="headerlink" href="#injections" title="Link to this heading">#</a></h2>
+<p>For a parameter estimation run on simulated data (i.e., when no observational data is available), an injection-file line is required in your config.ini-file
+pointing a <code class="docutils literal notranslate"><span class="pre">dat</span></code> or <code class="docutils literal notranslate"><span class="pre">json</span></code> injection file. The injection file itself contains a list of values for each source parameter (such as masses, distance etc.) and
+is used to generate synthetic electromagnetic or gravitational-wave signals for particular sources (e.g. BNS, NSBH).</p>
+<p>To generate an injection file, NMMA provides the command-line utility <code class="docutils literal notranslate"><span class="pre">nmma-create-injection</span></code>. This generates a json style injection file by drawing from a prior file.</p>
+<p><strong>Create GW signal injection</strong></p>
+<p>For a binary neutron star merger, we can use the <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/priors/GWBNS.prior">GWBNS.prior</a> file to generate
+synthetic signals. Running the command</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nmma-create-injection --prior-file GWBNS.prior -n 10 -s 42 --eos-file &lt;EOSdata.dat&gt; --binary-type BNS -e json -f injection_bns --duration 128
+</pre></div>
+</div>
+<p>will create an injection file <code class="docutils literal notranslate"><span class="pre">injection_bns.json</span></code> for 10 BNS sources each having a duration of 128 s. The <code class="docutils literal notranslate"><span class="pre">eos-file</span></code> command is useful, when information from a
+particular EOS should be used. Here, the path and file name to the EOS file needs to be provided.</p>
+<p><strong>Create EM signal injection</strong></p>
+<p>Taking the Metzger (2017) blue kilonova model as an example, a set of injections can be generated by using this <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/priors/Me2017.prior">Me2017.prior</a> file.
+Here, we include information from an EOS called <code class="docutils literal notranslate"><span class="pre">ALF2.dat</span></code> for the generation of 100 synthetic electromagnetic kilonova signals:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nmma-create-injection --prior-file priors/Me2017.prior --eos-file example_files/eos/ALF2.dat --binary-type BNS --n-injection 100 --original-parameters --extension json
+</pre></div>
+</div>
+<p>or for the <code class="docutils literal notranslate"><span class="pre">Bu2019lm</span></code> model:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nmma-create-injection --prior-file priors/Bu2019lm.prior --eos-file example_files/eos/ALF2.dat --binary-type BNS --n-injection 100 --original-parameters --extension json --aligned-spin
+</pre></div>
+</div>
+<p>There are other options for creating an injection file, such as a pre-computed simulation set. In this case a prior is still needed, but it will only be applied
+where it is necessary. Taking the Petrov et al. 2022 samples and the Bu2019lm prior as an example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nmma-create-injection --injection-file example_files/sim_events/injections.dat --prior-file priors/Bu2019lm.prior --eos-file example_files/eos/ALF2.dat --binary-type BNS --n-injection 100 --original-parameters --extension json --aligned-spin
+</pre></div>
+</div>
+</section>
+<section id="observational-data">
+<h2>Observational data<a class="headerlink" href="#observational-data" title="Link to this heading">#</a></h2>
+<p>In contrast to synthetic data, NMMA can make use of observational data both from electromagnetic and gravitational-wave observations. In order to make sure that
+the NMMA framework can smoothly read in and interpret observed signals, a short description of the data structure can be found below.</p>
+<p><strong>Electromagnetic data</strong></p>
+<p>Observatories provide observational data as a measured flux or as spectral flux density which needs to be converted to the AB magnitude system in order to be
+used within NMMA. It is important to distinguish between different spectral filters in order to run a consistent analysis. Current available filters can be
+checked in <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/blob/baf85f600a6e7369608c7bd6e76b9f1f4ec3d1cd/nmma/em/utils.py#L48">utils.py</a>.
+A specific flux or respective magnitude measurement comes along with a specific time stamp which needs to be in the ISOT time format.
+For further details, see <a class="reference external" href="https://docs.astropy.org/en/stable/api/astropy.time.TimeISOT.html">here</a>.</p>
+<p>Example: AT2017gfo data excerpt</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>2017-08-18T00:00:00.000 ps1::g 17.41000 0.02000
+2017-08-18T00:00:00.000 ps1::r 17.56000 0.04000
+2017-08-18T00:00:00.000 ps1::i 17.48000 0.03000
+2017-08-18T00:00:00.000 ps1::z 17.59000 0.03000
+2017-08-18T00:00:00.000 ps1::y 17.46000 0.01000
+2017-08-18T00:00:00.000 2massj 17.88000 0.03000
+2017-08-18T00:00:00.000 2massh 18.26000 0.15000
+2017-08-18T00:00:00.000 2massk 18.62000 0.11000
+2017-08-18T05:32:38.400 ps1::i 17.24000 0.06000
+2017-08-18T05:32:38.400 ps1::z 17.26000 0.06000
+2017-08-18T05:32:38.400 ps1::y 17.38000 0.10000
+2017-08-18T10:04:48.000 ps1::g 17.46000 0.08000
+2017-08-18T10:04:48.000 ps1::r 17.32000 0.07000
+2017-08-18T10:04:48.000 ps1::i 17.42000 0.05000
+2017-08-18T18:11:31.200 ps1::g 18.05000 0.12000
+2017-08-18T18:11:31.200 ps1::r 17.89000 0.03000
+2017-08-18T18:11:31.200 2massj 17.51000 0.03000
+2017-08-18T18:11:31.200 2massh 17.64000 0.04000
+2017-08-18T18:11:31.200 2massk 17.91000 0.05000
+</pre></div>
+</div>
+<p>The first column represents the ISOT time, followed by the filter or spectral band in the second column, the measured AB magnitude and its respective error are given in the third and fourth column. This data structure detailed above is also applicable for other astrophysical sources (SNe, GRBs) or models implemented in NMMA.</p>
+<p>Example: transient data downloaded from <a class="reference external" href="https://github.com/skyportal/skyportal">SkyPortal</a>/fritz:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&quot;id&quot;,&quot;mjd&quot;,&quot;mag&quot;,&quot;magerr&quot;,&quot;limiting_mag&quot;,&quot;filter&quot;,&quot;instrument_name&quot;,&quot;instrument_id&quot;,&quot;snr&quot;,&quot;magsys&quot;,&quot;origin&quot;,&quot;altdata&quot;,&quot;ra&quot;,&quot;dec&quot;,&quot;ra_unc&quot;,&quot;dec_unc&quot;,&quot;created_at&quot;,&quot;annotations&quot;,&quot;owner&quot;,&quot;Edit&quot;,&quot;Delete&quot;
+&quot;518817455&quot;,&quot;60257.28104169993&quot;,&quot;&quot;,&quot;&quot;,&quot;19.30739974975586&quot;,&quot;ztfr&quot;,&quot;ZTF&quot;,&quot;1&quot;,&quot;&quot;,&quot;ab&quot;,&quot;None&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;2023-12-07T05:49:42.369500&quot;,&quot;&quot;,&quot;[object Object]&quot;,&quot;&quot;,&quot;&quot;
+&quot;518817456&quot;,&quot;60257.282500000205&quot;,&quot;&quot;,&quot;&quot;,&quot;19.347900390625&quot;,&quot;ztfr&quot;,&quot;ZTF&quot;,&quot;1&quot;,&quot;&quot;,&quot;ab&quot;,&quot;None&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;2023-12-07T05:49:42.369555&quot;,&quot;&quot;,&quot;[object Object]&quot;,&quot;&quot;,&quot;&quot;
+&quot;518817457&quot;,&quot;60257.36459490005&quot;,&quot;&quot;,&quot;&quot;,&quot;20.112499237060547&quot;,&quot;ztfg&quot;,&quot;ZTF&quot;,&quot;1&quot;,&quot;&quot;,&quot;ab&quot;,&quot;None&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;&quot;,&quot;2023-12-07T05:49:42.369574&quot;,&quot;&quot;,&quot;[object Object]&quot;,&quot;&quot;,&quot;&quot;
+</pre></div>
+</div>
+<p>Data downloaded from a source’s photometry table on SkyPortal take the comma-separated format above. These files must be converted to NMMA format (see first example above) before running analyses. Run <code class="docutils literal notranslate"><span class="pre">convert-skyportal-lcs</span> <span class="pre">--filepath</span> <span class="pre">&lt;path/to/lcs.csv&gt;</span></code> to perform the conversion.</p>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="training.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Training</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="fitting.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Inference of electromagnetic signals</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#injections">Injections</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#observational-data">Observational data</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The NMMA Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023, The NMMA Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

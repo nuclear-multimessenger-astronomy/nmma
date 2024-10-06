@@ -1,0 +1,911 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The Nuclear Multimessenger Astronomy (NMMA) framework &#8212; nmma 0.2.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/nmma-docs.css?v=4c393c42" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=c480a563"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <link rel="icon" href="_static/favicon-light.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quick Start" href="quick-start-guide.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="#">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/light-logo.svg" class="logo__image only-light" alt="nmma 0.2.1 documentation - Home"/>
+    <script>document.write(`<img src="_static/light-logo.svg" class="logo__image only-dark" alt="nmma 0.2.1 documentation - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_inj_obs.html">Injections &amp; observational data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joint_inference.html">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/edit/main/doc/index.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new?title=Issue%20on%20page%20%2Findex.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/index.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>The Nuclear Multimessenger Astronomy (NMMA) framework</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#instructions-for-nmma-installation">Instructions For NMMA Installation</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#for-science-users">For science users</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#for-developers-and-contributors">For developers and contributors</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#for-arm64-macs">For arm64 Macs</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#building-custom-lalsuite-from-source">Building custom lalsuite from source</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#installation-on-expanse-and-other-cluster-resources">Installation on expanse and other cluster resources</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#internetless-clusters">Internetless Clusters</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#matplotlib-fonts">Matplotlib fonts</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#contributing">Contributing</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-guide">User Guide</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="the-nuclear-multimessenger-astronomy-nmma-framework">
+<h1>The Nuclear Multimessenger Astronomy (NMMA) framework<a class="headerlink" href="#the-nuclear-multimessenger-astronomy-nmma-framework" title="Link to this heading">#</a></h1>
+<p>nmma is a fully featured, Bayesian multi-messenger pipeline targeting
+joint analyses of gravitational-wave and electromagnetic data (focusing
+on the optical). Using bilby as the back-end, the software is capable of
+sampling these data sets using a variety of samplers. It uses chiral
+effective field theory based neutron star equation of states when
+performing inference, and is also capable of estimating the Hubble Constant.</p>
+<section id="instructions-for-nmma-installation">
+<h2>Instructions For NMMA Installation<a class="headerlink" href="#instructions-for-nmma-installation" title="Link to this heading">#</a></h2>
+<section id="for-science-users">
+<h3>For science users<a class="headerlink" href="#for-science-users" title="Link to this heading">#</a></h3>
+<p>If you are a science user and want to use NMMA for your analysis, you
+can install NMMA using conda as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">--</span><span class="n">name</span> <span class="n">nmma_env</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.10</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">nmma</span>
+</pre></div>
+</div>
+<p>If you have an issue, such as <code class="docutils literal notranslate"><span class="pre">Solving</span> <span class="pre">environment:</span> <span class="pre">failed</span> <span class="pre">with</span> <span class="pre">initial</span> <span class="pre">frozen</span> <span class="pre">solve</span></code>, an option could be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">--</span><span class="n">name</span> <span class="n">nmma_env</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.10</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="n">mamba</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+<span class="n">mamba</span> <span class="n">install</span> <span class="n">nmma</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span>
+</pre></div>
+</div>
+<p>If you are a developer or you want to build NMMA from source, please
+refer to the developer section below.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The above may not work for arm64 Macs; see specifc instructions <a class="reference external" href="#arm64mac">below</a>.</p>
+</div>
+</section>
+<section id="for-developers-and-contributors">
+<h3>For developers and contributors<a class="headerlink" href="#for-developers-and-contributors" title="Link to this heading">#</a></h3>
+<p>The steps highlighted below are primarily for Linux systems and Windows
+users are advised to use WSL (preferrably Ubuntu 20.04) for smooth
+installation. Ubuntu 20.04 is available for free download on Microsoft
+Store.</p>
+<p><strong>Installing Anaconda3</strong></p>
+<p>On your Linux/WSL terminal, run the following commands to install
+anaconda (replace 5.3.1 by the latest version):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">wget</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">repo</span><span class="o">.</span><span class="n">anaconda</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">archive</span><span class="o">/</span><span class="n">Anaconda3</span><span class="o">-</span><span class="mf">5.3.1</span><span class="o">-</span><span class="n">Linux</span><span class="o">-</span><span class="n">x86_64</span><span class="o">.</span><span class="n">sh</span>
+<span class="n">bash</span> <span class="n">Anaconda3</span><span class="o">-</span><span class="mf">5.3.1</span><span class="o">-</span><span class="n">Linux</span><span class="o">-</span><span class="n">x86_64</span><span class="o">.</span><span class="n">sh</span>
+</pre></div>
+</div>
+<p>(For 32-bit installation, skip the <code class="docutils literal notranslate"><span class="pre">\_64</span></code> in both commands)</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you already have Anaconda3 installed, please make sure that it is updated to the latest version using <cite>conda update –all</cite>. Also check that you do not have multiple versions of Python installed in <cite>usr/lib/</cite> directory as it can cause version conflicts while installing dependencies.</p>
+</div>
+<p>Now do:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">update</span> <span class="o">--</span><span class="nb">all</span>
+</pre></div>
+</div>
+<p><strong>Cloning the NMMA repository</strong></p>
+<p>Fork the NMMA repository: <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma">NMMA Github Repo</a></p>
+<p>Note that we link above to the main branch, but suggest making changes
+on your own fork (please also see our <a class="reference external" href="./contributing.html">contributing
+guide</a>). Now, after forking, run the following
+command to clone the repository into your currently directory (by
+default, in your home directory):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">your_github_username</span><span class="o">/</span><span class="n">nmma</span>
+</pre></div>
+</div>
+<p>Change directory to the nmma folder:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">nmma</span>
+</pre></div>
+</div>
+<p>Create a new environment using this command (environment name is
+nmma_env in this case):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">--</span><span class="n">name</span> <span class="n">nmma_env</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.10</span>
+<span class="n">conda</span> <span class="n">activate</span> <span class="n">nmma_env</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If this gives an error like: <code class="docutils literal notranslate"><span class="pre">CommandNotFoundError:</span> <span class="pre">Your</span> <span class="pre">shell</span> <span class="pre">has</span> <span class="pre">not</span> <span class="pre">been</span> <span class="pre">properly</span> <span class="pre">configured</span> <span class="pre">to</span> <span class="pre">use</span> <span class="pre">'conda</span> <span class="pre">activate'</span></code>, then run:</p>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">source</span> <span class="o">~/</span><span class="n">anaconda3</span><span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">profile</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">conda</span><span class="o">.</span><span class="n">sh</span>
+</pre></div>
+</div>
+<p>then proceed with <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span> <span class="pre">nmma_env</span></code>.</p>
+<p>Get the latest pip version</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">--</span><span class="n">upgrade</span> <span class="n">pip</span>
+</pre></div>
+</div>
+<p>Check python and pip version like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">--</span><span class="n">version</span>
+<span class="n">pip</span> <span class="o">--</span><span class="n">version</span>
+</pre></div>
+</div>
+<p>Python 3.9 and above and Pip 21.2 and above is ideal for this
+installation. It is recommended to update these for your installation.</p>
+<p>Install mpi4py:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">mpi4py</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>We discourage installing mpi4py with pip. The installation does not work properly due to issues with MPI header files, etc.</p>
+</div>
+<p>Install parallel-bilby:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">parallel</span><span class="o">-</span><span class="n">bilby</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Installing parallel-bilby takes quite some time. Please be patient. If you encounter any errors, please check the <a class="reference external" href="https://lscsoft.docs.ligo.org/parallel_bilby/installation">parallel-bilby installation guide</a> for more details.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
+This can be resolved by installing gcc with the following command:</p>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">gcc</span>
+</pre></div>
+</div>
+<p>and attempting to install parallel-bilby again.</p>
+<p>Install pymultinest (note this line may not work for arm64 Macs; see
+specifc instructions below)</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">pymultinest</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>In case an error comes up during an NMMA analysis of the form:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>ERROR: Could not load MultiNest library &quot;libmultinest.so&quot;
+ERROR: You have to build it first
+ERROR: and point the LD_LIBRARY_PATH environment variable to it!
+</pre></div>
+</div>
+</div>
+<p>Then, for using the PyMultinest library, it is required to get and
+compile the Multinest library separately. Instructions for the same are
+given here:</p>
+<p><a class="reference external" href="https://johannesbuchner.github.io/PyMultiNest/install.html">https://johannesbuchner.github.io/PyMultiNest/install.html</a></p>
+<p>Use the commands below to install the dependencies given in
+requirements.txt file which are necessary for NMMA:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">.</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>There is an issue pip installing <code class="docutils literal notranslate"><span class="pre">pyfftw</span></code> on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:</p>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">importlib_resources</span>
+<span class="n">pip</span> <span class="n">install</span>  <span class="n">extinction</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">dill</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">multiprocess</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">lalsuite</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">python</span><span class="o">-</span><span class="n">ligo</span><span class="o">-</span><span class="n">lw</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">sncosmo</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">scikit</span><span class="o">-</span><span class="n">learn</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">joblib</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">p</span><span class="o">-</span><span class="n">tqdm</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If everything has gone smoothly, all of these above mentioned “pip install something” commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies if not covered by <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">.</span></code>. Also, if running <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">.</span></code> shows something on the lines of “cannot cythonize without cython”, do:</p>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">anaconda</span> <span class="n">cython</span><span class="o">==</span><span class="mf">0.29.24</span>
+<span class="n">pip</span> <span class="n">install</span>
+</pre></div>
+</div>
+</section>
+<section id="for-arm64-macs">
+<span id="arm64mac"></span><h3>For arm64 Macs<a class="headerlink" href="#for-arm64-macs" title="Link to this heading">#</a></h3>
+<p>Follow the instructions above, but with the following modifications:</p>
+<p>Install C compiler and cmake:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">c</span><span class="o">-</span><span class="n">compiler</span>
+<span class="n">brew</span> <span class="n">install</span> <span class="n">cmake</span>
+</pre></div>
+</div>
+<p><strong>Known arm64 Mac issues</strong></p>
+<ol class="arabic">
+<li><p>For arm64 Macs (e.g. M1, M2), there is an issue installing <code class="docutils literal notranslate"><span class="pre">pyfftw</span></code>
+with pip (see
+<a class="github reference external" href="https://github.com/pyFFTW/pyFFTW/issues/349#issuecomment-1468638458">pyFFTW/pyFFTW#349</a>).
+To address, first try running</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">pyfftw</span>
+</pre></div>
+</div>
+<p>If this completes successfully, re-run any failed installations and continue. Otherwise, use <code class="docutils literal notranslate"><span class="pre">Homebrew</span></code> to run</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">install</span> <span class="n">fftw</span>
+</pre></div>
+</div>
+<p>then add the following lines to your <code class="docutils literal notranslate"><span class="pre">.zprofile</span></code> or <code class="docutils literal notranslate"><span class="pre">.bash_profile</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">export</span> <span class="n">PATH</span><span class="o">=</span><span class="s2">&quot;/opt/homebrew/bin:$PATH&quot;</span>
+<span class="n">export</span> <span class="n">DYLD_LIBRARY_PATH</span><span class="o">=/</span><span class="n">opt</span><span class="o">/</span><span class="n">homebrew</span><span class="o">/</span><span class="n">opt</span><span class="o">/</span><span class="n">fftw</span><span class="o">/</span><span class="n">lib</span>
+<span class="n">export</span> <span class="n">LDFLAGS</span><span class="o">=</span><span class="s2">&quot;-Wl,-S,-rpath,/opt/homebrew/opt/fftw/lib -L/opt/homebrew/opt/fftw/lib&quot;</span>
+<span class="n">export</span> <span class="n">CFLAGS</span><span class="o">=</span><span class="s2">&quot;-Wno-implicit-function-declaration -I/opt/homebrew/opt/fftw/include&quot;</span>
+</pre></div>
+</div>
+<p>Close and reopen your terminal and run</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">pyfftw</span>
+</pre></div>
+</div>
+<p>You may then need to rerun <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-r</span> <span class="pre">requirements.txt</span></code> to
+complete the dependency installations.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>FFTW installation can also be attempted using conda as follows</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>conda install -c conda-forge fftw
+DYLD_LIBRARY_PATH=$HOME/anaconda3/envs/nmma_env
+pip install pyfftw
+</pre></div>
+</div>
+<p>Replace <code class="docutils literal notranslate"><span class="pre">DYLD_LIBRARY</span></code> path by your NMMA virtual environment path if it is not same as give here</p>
+</div>
+</li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">osx-arm64</span></code> conda-forge channel does not include
+<code class="docutils literal notranslate"><span class="pre">pymultinest</span></code>. Running <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-r</span> <span class="pre">requirements.txt</span></code> should
+have installed <code class="docutils literal notranslate"><span class="pre">pymultinest</span></code>, but you will still need to install
+and compile <code class="docutils literal notranslate"><span class="pre">Multinest</span></code> from the source. Within the <code class="docutils literal notranslate"><span class="pre">nmma</span></code>
+directory, run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">JohannesBuchner</span><span class="o">/</span><span class="n">MultiNest</span>
+<span class="n">cd</span> <span class="n">MultiNest</span><span class="o">/</span><span class="n">build</span>
+<span class="n">cmake</span> <span class="o">..</span>
+<span class="n">make</span>
+</pre></div>
+</div>
+<p>Next, add the following lines to your <code class="docutils literal notranslate"><span class="pre">.zprofile</span></code> or
+<code class="docutils literal notranslate"><span class="pre">.bash_profile</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>export LD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=$HOME/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Modify these paths as appropriate for the location of your <code class="docutils literal notranslate"><span class="pre">MultiNest</span></code> installation. You can also combine the <code class="docutils literal notranslate"><span class="pre">DYLD_LIBRARY_PATH</span></code> lines for <code class="docutils literal notranslate"><span class="pre">MultiNest</span></code> and <code class="docutils literal notranslate"><span class="pre">fftw</span></code> (above) into a single line</p>
+</div>
+</li>
+<li><p>There are also issues with <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> and arm64 Macs. If using
+<code class="docutils literal notranslate"><span class="pre">tensorflow</span></code>, install it with the following commands:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">tensorflow</span><span class="o">-</span><span class="n">macos</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">tensorflow</span><span class="o">-</span><span class="n">metal</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p><strong>First Test for NMMA</strong></p>
+<p>Run the following commands:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ipython</span>
+<span class="kn">import</span> <span class="nn">nmma</span>
+<span class="kn">import</span> <span class="nn">nmma.em.analysis</span>
+<span class="kn">import</span> <span class="nn">nmma.eos.create_injection</span>
+</pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>(Okay, last one!): if everything is ok, it’s the end of the installation. But in case it shows that such-and-such modules are absent, feel free to install those modules by visiting their anaconda documentation and install
+those with their given commands. In case modules like afterglowpy and dust_extinction are needed, don’t hesitate to do it with pip (normally it shouldn’t happen), but some modules may not install correctly in case of disturbance.</p>
+</div>
+<p>Please pay special attention to the <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">nmma.em.analysis</span></code> and make
+sure that it does not generate any errors.</p>
+<p>Unfortunately, due to the web of package requirements that NMMA depends
+on, running setup.py does not typically finish without errors the first
+time through. Experience has shown that in the vast majority of cases,
+simply pinning versions such as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">astropy</span><span class="o">==</span><span class="mf">4.3.1</span>
+</pre></div>
+</div>
+<p>and then trying again is sufficient for completion of the installation.
+This instruction file will likely cover the issues you might face during
+your installation. However, please open issues on GitHub if there appear
+to be unresolvable conflicts.</p>
+</section>
+<section id="building-custom-lalsuite-from-source">
+<h3>Building custom lalsuite from source<a class="headerlink" href="#building-custom-lalsuite-from-source" title="Link to this heading">#</a></h3>
+<p>If you want to install a custom lalsuite version (e.g. with a certain GW template model), then lalsuite needs to be build from scratch. This requires setting up the conda environment through conda-forge</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="o">--</span><span class="n">prefix</span><span class="o">=</span><span class="n">YOUR_PREFIX</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.9</span>
+<span class="n">conda</span> <span class="n">activate</span> <span class="n">YOUR_PREFIX</span>
+</pre></div>
+</div>
+<p>and then installing mpi4py first before installing the required packages for the build process (here the second line):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="n">mpi4py</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="s2">&quot;astropy&gt;=1.1.1&quot;</span> <span class="n">autoconf</span> <span class="n">automake</span> <span class="n">bc</span> <span class="n">cfitsio</span> <span class="n">doxygen</span> <span class="n">fftw</span> <span class="n">freezegun</span> <span class="n">c</span><span class="o">-</span><span class="n">compiler</span> <span class="n">gsl</span> <span class="n">h5py</span> <span class="n">hdf5</span> <span class="n">healpy</span> <span class="s2">&quot;help2man&gt;=1.37&quot;</span> <span class="s2">&quot;ldas-tools-framecpp&lt;3.0.0a0&quot;</span> <span class="s2">&quot;libframel&lt;9.0.0a0&quot;</span> <span class="n">ligo</span><span class="o">-</span><span class="n">gracedb</span> <span class="n">ligo</span><span class="o">-</span><span class="n">segments</span> <span class="s2">&quot;lscsoft-glue&gt;=2.0.0&quot;</span> <span class="n">make</span> <span class="n">matplotlib</span><span class="o">-</span><span class="n">base</span> <span class="n">metaio</span> <span class="s2">&quot;mpmath&gt;=1.0.0&quot;</span> <span class="n">numpy</span> <span class="n">pillow</span> <span class="s2">&quot;pkg-config&gt;=0.18.0&quot;</span> <span class="n">pytest</span> <span class="s2">&quot;scipy&gt;=0.9.0&quot;</span> <span class="n">six</span> <span class="s2">&quot;swig&gt;=3.0.10&quot;</span> <span class="n">zlib</span>
+</pre></div>
+</div>
+<p>When this is done, you can proceed installing nmma as above (i.e. via requirements.txt etc.) but note that from the dependencies lalsuite is then installed via pip. This installation needs to be removed</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">uninstall</span> <span class="n">lalsuite</span>
+</pre></div>
+</div>
+<p>Then the build process for the custom lalsuite can be started</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">YOUR_CUSTOM_LALSUITE</span>
+<span class="o">./</span><span class="mi">00</span><span class="n">boot</span>
+<span class="o">./</span><span class="n">configure</span> <span class="o">--</span><span class="n">prefix</span><span class="o">=</span><span class="n">YOUR_PREFIX</span> <span class="o">--</span><span class="n">disable</span><span class="o">-</span><span class="nb">all</span><span class="o">-</span><span class="n">lal</span> <span class="o">--</span><span class="n">enable</span><span class="o">-</span><span class="n">swig</span><span class="o">-</span><span class="n">python</span>  <span class="o">--</span><span class="n">enable</span><span class="o">-</span><span class="n">lalsimulation</span> <span class="o">--</span><span class="n">enable</span><span class="o">-</span><span class="n">lalframe</span>
+<span class="n">make</span><span class="p">;</span> <span class="n">make</span> <span class="n">install</span>
+</pre></div>
+</div>
+<p>It might happen that in the course of this some packages will be downgraded. You can just update them afterwards to a sufficient version, e.g.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">astropy</span><span class="o">&gt;=</span><span class="mf">5.2.2</span>
+</pre></div>
+</div>
+</section>
+<section id="installation-on-expanse-and-other-cluster-resources">
+<h3>Installation on expanse and other cluster resources<a class="headerlink" href="#installation-on-expanse-and-other-cluster-resources" title="Link to this heading">#</a></h3>
+<p>When installation on cluster resources, it is common that all modules
+required for installing NMMA out of the box are not available. However,
+most will make it possible to import the required modules (most
+commonly, these are software like gfortran or mpi).</p>
+<p>For example, on XSEDE’s Expanse cluster, one can start a terminal
+session with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">sdsc</span>
+<span class="n">module</span> <span class="n">load</span> <span class="n">openmpi</span>
+</pre></div>
+</div>
+<p>and follow the instructions above.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">module</span> <span class="pre">load</span> <span class="pre">openmpi</span></code> does not execute directly and it asks for dependencies, one can proceed with:</p>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">sdsc</span>
+<span class="n">module</span> <span class="n">load</span> <span class="n">cpu</span><span class="o">/</span><span class="mf">0.15.4</span>
+<span class="n">module</span> <span class="n">load</span> <span class="n">gcc</span><span class="o">/</span><span class="mf">9.2.0</span>
+<span class="n">module</span> <span class="n">load</span> <span class="n">openmpi</span><span class="o">/</span><span class="mf">4.1.1</span>
+</pre></div>
+</div>
+</section>
+<section id="internetless-clusters">
+<h3>Internetless Clusters<a class="headerlink" href="#internetless-clusters" title="Link to this heading">#</a></h3>
+<p>Some cluster resources may not have access to the internet or could block some forms of data transfer. This will cause some difficulties with certain packages and will require some fixes to how NMMA interacts with them and changes to how you call some commands in NMMA. This can also affect how you install NMMA on the cluster. Because the cluster is in some way restricted, it may be that the <cite>conda install nmma -c conda-forge</cite> or the <cite>pip install nmma</cite> commands don’t work. Thus to install NMMA, you will need to install from the source. To begin, you will want to copy the NMMA repository from your local to the cluster using an <cite>scp</cite> or <cite>rsync</cite> commmand because likely the git commands will fail. Once NMMA is downloaded to the cluster, navigate to the main directory and run</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">r</span> <span class="n">requirements</span><span class="o">.</span><span class="n">txt</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="o">.</span>
+</pre></div>
+</div>
+<p>and check that the installation was successful by running the first check for NMMA given above. After installation, the next most likely difference is how NMMA uses the trained kilonova models during any form of EM analysis. When running any analysis that requires the use of the trained grid of models you will need to add the <cite>–local-only</cite> flag to the analysis command. For example,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">lightcurve</span><span class="o">-</span><span class="n">analysis</span> \
+     <span class="o">--</span><span class="n">model</span> <span class="n">LANLTP2</span> \
+     <span class="o">--</span><span class="n">svd</span><span class="o">-</span><span class="n">path</span> <span class="n">svdmodels</span><span class="o">/</span> \
+     <span class="o">--</span><span class="n">filters</span> <span class="n">ztfg</span><span class="p">,</span><span class="n">ztfi</span><span class="p">,</span><span class="n">ztfr</span> \
+     <span class="o">--</span><span class="n">ztf</span><span class="o">-</span><span class="n">sampling</span> \
+     <span class="o">--</span><span class="n">ztf</span><span class="o">-</span><span class="n">uncertainties</span> \
+     <span class="o">--</span><span class="n">ztf</span><span class="o">-</span><span class="n">ToO</span> <span class="mi">180</span> \
+     <span class="o">--</span><span class="n">local</span><span class="o">-</span><span class="n">only</span> \
+     <span class="o">--</span><span class="n">interpolation</span><span class="o">-</span><span class="nb">type</span> <span class="n">tensorflow</span> \
+     <span class="o">--</span><span class="n">outdir</span> <span class="n">outdir</span><span class="o">/</span><span class="n">TP2_ztf</span> \
+     <span class="o">--</span><span class="n">label</span> <span class="n">TP2_ztf</span> \
+     <span class="o">--</span><span class="n">prior</span> <span class="n">priors</span><span class="o">/</span><span class="n">LANL2022</span><span class="o">.</span><span class="n">prior</span> \
+     <span class="o">--</span><span class="n">tmin</span> <span class="mf">0.</span> \
+     <span class="o">--</span><span class="n">tmax</span> <span class="mi">14</span> \
+     <span class="o">--</span><span class="n">dt</span> <span class="mf">0.1</span> \
+     <span class="o">--</span><span class="n">error</span><span class="o">-</span><span class="n">budget</span> <span class="mi">1</span> \
+     <span class="o">--</span><span class="n">nlive</span> <span class="mi">1024</span> \
+</pre></div>
+</div>
+</section>
+<section id="matplotlib-fonts">
+<h3>Matplotlib fonts<a class="headerlink" href="#matplotlib-fonts" title="Link to this heading">#</a></h3>
+<p>On new Linux installations, we sometimes come across the warning:
+<code class="docutils literal notranslate"><span class="pre">findfont:</span> <span class="pre">Font</span> <span class="pre">family</span> <span class="pre">['Times</span> <span class="pre">New</span> <span class="pre">Roman']</span> <span class="pre">not</span> <span class="pre">found.</span> <span class="pre">Falling</span> <span class="pre">back</span> <span class="pre">to</span> <span class="pre">DejaVu</span> <span class="pre">Sans</span></code>.
+If you do prefer to use ‘Times New Roman’ for all of your plotting
+needs, you can install <code class="docutils literal notranslate"><span class="pre">msttcorefonts</span></code> with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">msttcorefonts</span> <span class="o">-</span><span class="n">qq</span>
+</pre></div>
+</div>
+<p>After removing the matplotlib cache:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">rm</span> <span class="o">~/.</span><span class="n">cache</span><span class="o">/</span><span class="n">matplotlib</span> <span class="o">-</span><span class="n">rf</span>
+</pre></div>
+</div>
+<p>Beautiful fonts should be yours.</p>
+</section>
+</section>
+<section id="contributing">
+<h2>Contributing<a class="headerlink" href="#contributing" title="Link to this heading">#</a></h2>
+<p>nmma is released under the MIT license.  We encourage you to
+modify it, reuse it, and contribute changes back for the benefit of
+others.  We follow standard open source development practices: changes
+are submitted as pull requests and, once they pass the test suite,
+reviewed by the team before inclusion.  Please also see
+<a class="reference external" href="./contributing.html">our contributing guide</a>.</p>
+</section>
+<section id="user-guide">
+<h2>User Guide<a class="headerlink" href="#user-guide" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_inj_obs.html">Injections &amp; observational data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joint_inference.html">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="right-next"
+       href="quick-start-guide.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Quick Start</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#instructions-for-nmma-installation">Instructions For NMMA Installation</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#for-science-users">For science users</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#for-developers-and-contributors">For developers and contributors</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#for-arm64-macs">For arm64 Macs</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#building-custom-lalsuite-from-source">Building custom lalsuite from source</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#installation-on-expanse-and-other-cluster-resources">Installation on expanse and other cluster resources</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#internetless-clusters">Internetless Clusters</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#matplotlib-fonts">Matplotlib fonts</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#contributing">Contributing</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-guide">User Guide</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The NMMA Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023, The NMMA Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
