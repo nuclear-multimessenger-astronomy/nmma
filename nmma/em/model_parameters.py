@@ -396,3 +396,26 @@ def LANLTS2(data):
         data_out[key] = {**data_out[key], **data[key]}
 
     return data_out, parameters
+
+def LANL1D(data):
+
+    parameters = [
+        "Ye_wind",
+        "log10_mej_dyn",
+        "vej_dyn",
+    ]
+
+    data_out = {}
+
+    magkeys = data.keys()
+    for jj, key in enumerate(magkeys):
+        knprops = get_knprops_from_LANLfilename(key)
+
+        # best to interpolate masses in log10
+        knprops["log10_mej_dyn"] = np.log10(knprops["mej_dyn"])
+        del knprops["mej_dyn"]
+
+        data_out[key] = knprops
+        data_out[key] = {**data_out[key], **data[key]}
+
+    return data_out, parameters
