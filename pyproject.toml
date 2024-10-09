@@ -73,6 +73,7 @@ gwem-Hubble-estimate = "nmma.em.gwem_Hubble_estimate:main"
 maximum-mass-constraint = "nmma.joint.maximum_mass_constraint:main"
 convert-skyportal-lcs = "tools.convert_skyportal_lcs:main"
 resample-grid = "tools.resample_grid:main"
+multi-config-analysis = "nmma.em.multi_config_analysis:main"
 
 [project.urls]
 Homepage = "https://github.com/nuclear-multimessenger-astronomy/nmma"
