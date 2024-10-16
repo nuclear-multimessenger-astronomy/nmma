@@ -26,7 +26,7 @@ def args():
     os.environ["WORKING_DIR"] = WORKING_DIR
     config = os.path.join(WORKING_DIR, "data/multi_config_analysis/config.yaml")
 
-    args = Namespace(config=config, process=4, parallel=True)
+    args = Namespace(config=config, process=2, parallel=True)
 
     return args
 
