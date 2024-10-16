@@ -1,10 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import os
 import numpy as np
 import sncosmo
 import argparse
 from astropy.cosmology import Planck18 as cosmo
+from nmma.em.utils import DEFAULT_FILTERS
 
 
 def parse():
@@ -12,7 +13,7 @@ def parse():
     parser.add_argument(
         "--filters",
         type=str,
-        default="sdss::u,sdss::g,sdss::r,sdss::i,sdss::z,swope2::y,swope2::J,swope2::H,cspk,bessellux,bessellb,bessellv,bessellr,besselli,uvot::b,uvot::u,uvot::uvm2,uvot::uvw1,uvot::uvw2,uvot::v,uvot::white,ultrasat",
+        default=DEFAULT_FILTERS,
         help="comma-separated list of filters for photometric lcs; must be from the bandpasses listed here: \
     https://sncosmo.readthedocs.io/en/stable/bandpass-list.html",
     )
@@ -59,7 +60,12 @@ def parse():
 
 args = parse()
 
-filters = args.filters.split(",")
+if isinstance(args.filters, str):
+    filters = args.filters.replace(" ", "")
+    filters = filters.split(",")
+else:
+    filters = args.filters
+
 lcdir = args.lcdir
 if not os.path.isdir(lcdir):
     os.makedirs(lcdir)

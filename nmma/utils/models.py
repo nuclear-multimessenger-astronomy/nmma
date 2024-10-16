@@ -1,20 +1,27 @@
 from .models_tools import SOURCES, get_models_home, get_parser  # noqa
 
+try:
+    from mpi4py import MPI
+    mpi_enabled = True
+except ImportError:
+    mpi_enabled = False
+
+def mpi_barrier(comm):
+    if mpi_enabled:
+        comm.Barrier()
 
 def refresh_models_list(models_home=None, source=None):
 
     if source is None:
         source = SOURCES[0]
-    if source not in ["zenodo", "gitlab"]:
-        raise ValueError(f"source must be one of ['gitlab', 'zenodo'], got {source}")
+    if source not in ["gitlab"]:
+        raise ValueError(f"source must be one of ['gitlab'], got {source}")
 
     sources_tried = []
     while True:
         try:
             if source == "gitlab":
                 from .gitlab import refresh_models_list
-            elif source == "zenodo":
-                from .zenodo import refresh_models_list
             models = refresh_models_list(models_home=models_home)
             break
         except Exception as e:
@@ -39,26 +46,41 @@ def get_model(
     source=None,
 ):
 
+    comm = None
+    if mpi_enabled:
+        try:
+            comm = MPI.COMM_WORLD
+        except Exception as e:
+            print("MPI could not be initialized:", e)
+            comm = None
+
+    rank = 0
+    if comm:
+        try:
+            rank = comm.Get_rank()
+        except Exception as e:
+            print("Error getting MPI rank:", e)
+
     if source is None:
         source = SOURCES[0]
-    if source not in ["zenodo", "gitlab"]:
-        raise ValueError(f"source must be one of ['gitlab', 'zenodo'], got {source}")
+    if source not in ["gitlab"]:
+        raise ValueError(f"source must be one of ['gitlab'], got {source}")
 
     sources_tried = []
     while True:
         try:
             if source == "gitlab":
                 from .gitlab import get_model
-            elif source == "zenodo":
-                from .zenodo import get_model
 
-            files, filters = get_model(
-                models_home=models_home,
-                model_name=model_name,
-                filters=filters,
-                download_if_missing=download_if_missing,
-                filters_only=filters_only,
-            )
+            if rank == 0 or not MPI.Is_initialized():
+                files, filters = get_model(
+                    models_home=models_home,
+                    model_name=model_name,
+                    filters=filters,
+                    download_if_missing=download_if_missing,
+                    filters_only=filters_only,
+                )
+            mpi_barrier(comm)
             break
         except Exception as e:
             print(f"Error while getting model from {source}: {str(e)}")
@@ -81,10 +103,8 @@ def main(args=None):
 
     if args.source is None:
         args.source = SOURCES[0]
-    if args.source not in ["zenodo", "gitlab"]:
-        raise ValueError(
-            f"source must be one of ['gitlab', 'zenodo'], got {args.source}"
-        )
+    if args.source not in ["gitlab"]:
+        raise ValueError(f"source must be one of ['gitlab'], got {args.source}")
 
     refresh = False
     try:
@@ -117,5 +137,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-
-# python nmma/utils/models.py --model="Bu2019lm" --filters=ztfr,ztfg,ztfi --svd-path='./svdmodels' --source='gitlab'

@@ -120,7 +120,7 @@ def main(args=None):
         "label": "$LABEL",
         "trigger_time": "$TT",
         "data": "$DATA",
-        "prior": "priors/$MODEL.prior",
+        "prior": "priors/$PRIOR.prior",
         "tmin": "$TMIN",
         "tmax": "$TMAX",
         "dt": "$DT",

@@ -40,6 +40,12 @@ def args():
         sampler_kwargs="{}",
         verbose=False,
         skip_sampling=False,
+        fits_file=None,
+        cosiota_node_num=10,
+        ra=None,
+        dec=None,
+        fetch_Ebv_from_dustmap=False,
+        systematics_file=None
     )
 
     return args

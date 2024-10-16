@@ -4,6 +4,7 @@ import argparse
 import glob
 import inspect
 from p_tqdm import p_map
+import json
 
 from .model import SVDLightCurveModel
 from .io import read_photometry_files
@@ -32,9 +33,7 @@ def get_parser():
     parser.add_argument(
         "--svd-path",
         type=str,
-        help="Path to the SVD directory, \
-              with {model}_mag.pkl, {model}_lbol.pkl or {model_tf.pkl}",
-        required=True,
+        help="Path to the SVD directory with {model}.joblib",
     )
     parser.add_argument(
         "--data-path",
@@ -86,9 +85,8 @@ def get_parser():
     )
     parser.add_argument(
         "--filters",
-        nargs="+",
         type=str,
-        help="A space-seperated list of filters to use (e.g. g r i). If none is provided, will use all the filters available",
+        help="A comma-seperated list of filters to use (e.g. ztfg,ztfr,ztfi). If none is provided, will use all the filters available",
     )
     parser.add_argument(
         "--ncpus",
@@ -112,7 +110,7 @@ def get_parser():
         "--local-only",
         action="store_true",
         default=False,
-        help="only look for local svdmodels (ignore Zenodo)",
+        help="only look for local svdmodels (ignore Gitlab)",
     )
 
     return parser
@@ -135,10 +133,6 @@ def create_benchmark(
     ignore_bolometric=True,
     local_only=False,
 ):
-
-    # make the outdir
-    if not os.path.isdir(outdir):
-        os.makedirs(outdir)
 
     # get the grid data file path
     file_extensions = ["dat", "csv", "dat.gz", "h5"]
@@ -163,6 +157,22 @@ def create_benchmark(
     model_function = MODEL_FUNCTIONS[model]
     grid_training_data, parameters = model_function(grid_data)
 
+    # get the filts
+    if not filters:
+        first_entry_name = list(grid_training_data.keys())[0]
+        first_entry = grid_training_data[first_entry_name]
+        filts = first_entry.keys() - set(["t"] + parameters)
+        filts = list(filts)
+    elif isinstance(filters, str):
+        filts = filters.replace(" ", "")  # remove all whitespace
+        filts = filts.split(",")
+    else:
+        # list input from analysis test code
+        filts = filters
+
+    if len(filts) == 0:
+        raise ValueError("Need at least one valid filter.")
+
     # create the SVDlight curve model
     sample_times = np.arange(tmin, tmax + dt, dt)
     light_curve_model = SVDLightCurveModel(
@@ -171,18 +181,9 @@ def create_benchmark(
         svd_path=svd_path,
         mag_ncoeff=svd_ncoeff,
         interpolation_type=interpolation_type,
-        filters=filters,
+        filters=filts,
         local_only=local_only,
     )
-
-    # get the filts
-    if not filters:
-        first_entry_name = list(grid_training_data.keys())[0]
-        first_entry = grid_training_data[first_entry_name]
-        filts = first_entry.keys() - set(["t"] + parameters)
-        filts = list(filts)
-    else:
-        filts = filters
 
     print(f"Benchmarking model {model} on filter {filts} with {ncpus} cpus")
 
@@ -235,13 +236,29 @@ def create_benchmark(
         chi2_dict_array = p_map(
             chi2_func,
             grid_entry_names,
-            data_time_unit=data_time_unit,
+            data_time_unit,
             num_cpus=ncpus,
         )
 
     chi2_array_by_filt = {}
     for filt in chi2_dict_array[0].keys():
         chi2_array_by_filt[filt] = [dict_entry[filt] for dict_entry in chi2_dict_array]
+
+    results_dct = {}
+    results_dct[model] = {}
+
+    print(
+        "Stats below are reduced chi2 distribution percentiles (0, 25, 50, 75, 100) for each filter:"
+    )
+
+    model_subscript = ""
+    if interpolation_type == "tensorflow":
+        model_subscript = "_tf"
+
+    # make the outdir
+    outpath = f"{outdir}/{model}{model_subscript}"
+    if not os.path.isdir(outpath):
+        os.makedirs(outpath)
 
     # make the plots
     for figidx, filt in enumerate(filts):
@@ -250,8 +267,26 @@ def create_benchmark(
         plt.ylabel("Count")
         plt.hist(chi2_array_by_filt[filt], label=filt, bins=51, histtype="step")
         plt.legend()
-        plt.savefig(f"{outdir}/{filt}.pdf", bbox_inches="tight")
+        plt.savefig(f"{outpath}/{filt}.pdf", bbox_inches="tight")
         plt.close()
+
+        percentiles_list = [
+            np.round(np.percentile(chi2_array_by_filt[filt], 0), 2),
+            np.round(np.percentile(chi2_array_by_filt[filt], 25), 2),
+            np.round(np.percentile(chi2_array_by_filt[filt], 50), 2),
+            np.round(np.percentile(chi2_array_by_filt[filt], 75), 2),
+            np.round(np.percentile(chi2_array_by_filt[filt], 100), 2),
+        ]
+
+        print(filt, percentiles_list)
+
+        results_dct[model][filt] = percentiles_list
+
+    with open(f"{outpath}/benchmark_chi2_percentiles_0_25_50_75_100.json", "w") as f:
+        # save json file with filter-by-filter details
+        json.dump(results_dct, f)
+
+    print("Saved json file containing reduced chi2 percentiles.")
 
 
 def main():

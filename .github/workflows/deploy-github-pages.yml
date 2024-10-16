@@ -6,7 +6,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -40,15 +39,18 @@ jobs:
         python -m pip install .[doc]
 
     - name: Make dependencies
+      env:
+        SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.SPHINX_GITHUB_CHANGELOG_TOKEN }}
       run: |
         cd doc && make html; cd ../
         touch doc/_build/html/.nojekyll
 
     - name: Deploy to GitHub Pages
-      if: success()
+      if: success() && github.repository_owner == 'nuclear-multimessenger-astronomy'
       uses: crazy-max/ghaction-github-pages@v2
       with:
         target_branch: gh-pages
         build_dir: doc/_build/html/
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.SPHINX_GITHUB_CHANGELOG_TOKEN }}

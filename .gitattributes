@@ -20,7 +20,7 @@
 
 # not sure about .prior files or .json files
 
-# image files 
+# image files
 *.png binary
 *.jpg binary
 *.gif binary
@@ -28,6 +28,7 @@
 *.pdf binary
 
 # binary files
+*.joblib binary
 *.pkl binary
 *.pickle binary
 *.h5 binary

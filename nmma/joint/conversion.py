@@ -96,34 +96,43 @@ class NSBHEjectaFitting(object):
     def __init__(self):
         pass
 
-    def chieff2risco(self, chi_eff):
+    def chibh2risco(self, chi_bh):
 
-        Z1 = 1.0 + (1.0 - chi_eff ** 2) ** (1.0 / 3) * (
-            (1 + chi_eff) ** (1.0 / 3) + (1 - chi_eff) ** (1.0 / 3)
+        Z1 = 1.0 + (1.0 - chi_bh ** 2) ** (1.0 / 3) * (
+            (1 + chi_bh) ** (1.0 / 3) + (1 - chi_bh) ** (1.0 / 3)
         )
-        Z2 = np.sqrt(3.0 * chi_eff ** 2 + Z1 ** 2.0)
+        Z2 = np.sqrt(3.0 * chi_bh ** 2 + Z1 ** 2.0)
 
-        return 3.0 + Z2 - np.sign(chi_eff) * np.sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2))
+        return 3.0 + Z2 - np.sign(chi_bh) * np.sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2))
+
+    def baryon_mass_NS(self, source_mass, compactness):
+        """
+        equation (7) in https://arxiv.org/abs/2002.07728
+        """
+
+        return source_mass * (1.0 + 0.6 * compactness / (1.0 - 0.5 * compactness))
 
     def remnant_disk_mass_fitting(
         self,
         mass_1_source,
         mass_2_source,
         compactness_2,
-        chi_eff,
+        chi_bh,
         a=0.40642158,
         b=0.13885773,
         c=0.25512517,
         d=0.761250847,
     ):
+        '''
+        equation (4) in https://arxiv.org/pdf/1807.00011
+        '''
 
         mass_ratio_invert = mass_1_source / mass_2_source
         symm_mass_ratio = mass_ratio_invert / np.power(1.0 + mass_ratio_invert, 2.0)
 
-        risco = self.chieff2risco(chi_eff)
-        bayon_mass_2 = (
-            mass_2_source * (1.0 + 0.6 * compactness_2) / (1.0 - 0.5 * compactness_2)
-        )
+        #  use the BH spin to find the normalized risco
+        risco = self.chibh2risco(chi_bh)
+        baryon_mass_2 = self.baryon_mass_NS(mass_2_source, compactness_2)
 
         remant_mass = (
             a * np.power(symm_mass_ratio, -1.0 / 3.0) * (1.0 - 2.0 * compactness_2)
@@ -134,7 +143,7 @@ class NSBHEjectaFitting(object):
 
         remant_mass = np.power(remant_mass, 1.0 + d)
 
-        remant_mass *= bayon_mass_2
+        remant_mass *= baryon_mass_2
 
         return remant_mass
 
@@ -143,7 +152,7 @@ class NSBHEjectaFitting(object):
         mass_1_source,
         mass_2_source,
         compactness_2,
-        chi_eff,
+        chi_bh,
         a1=7.11595154e-03,
         a2=1.43636803e-03,
         a4=-2.76202990e-02,
@@ -157,10 +166,9 @@ class NSBHEjectaFitting(object):
 
         mass_ratio_invert = mass_1_source / mass_2_source
 
-        risco = self.chieff2risco(chi_eff)
-        bayon_mass_2 = (
-            mass_2_source * (1.0 + 0.6 * compactness_2) / (1.0 - 0.5 * compactness_2)
-        )
+        #  use the BH spin to find the normalized risco
+        risco = self.chibh2risco(chi_bh)
+        baryon_mass_2 = self.baryon_mass_NS(mass_2_source, compactness_2)
 
         mdyn = (
             a1
@@ -169,7 +177,7 @@ class NSBHEjectaFitting(object):
             / compactness_2
         )
         mdyn += -a2 * np.power(mass_ratio_invert, n2) * risco + a4
-        mdyn *= bayon_mass_2
+        mdyn *= baryon_mass_2
 
         mdyn = np.maximum(0.0, mdyn)
 
@@ -194,10 +202,10 @@ class NSBHEjectaFitting(object):
         chi_eff = (mass_1_source * chi_1 + mass_2_source * chi_2) / total_mass_source
 
         mdyn_fit = self.dynamic_mass_fitting(
-            mass_1_source, mass_2_source, compactness_2, chi_eff
+            mass_1_source, mass_2_source, compactness_2, chi_1
         )
         remnant_disk_fit = self.remnant_disk_mass_fitting(
-            mass_1_source, mass_2_source, compactness_2, chi_eff
+            mass_1_source, mass_2_source, compactness_2, chi_1
         )
         mdisk_fit = remnant_disk_fit - mdyn_fit
 
@@ -213,14 +221,14 @@ class NSBHEjectaFitting(object):
 
         if isinstance(compactness_2, (list, tuple, pd.core.series.Series, np.ndarray)):
             BH_index = np.where(compactness_2 == 0.5)[0]
-            negative_mdisk_index = np.where(mdisk_fit <= 0.0)[0]
-            converted_parameters["log10_mej_dyn"][BH_index] = -np.inf
-            converted_parameters["log10_mej_dyn"][negative_mdisk_index] = -np.inf
-            converted_parameters["log10_mej_wind"][BH_index] = -np.inf
-            converted_parameters["log10_mej_wind"][negative_mdisk_index] = -np.inf
+            negative_mdisk_index = np.where(~np.isfinite(log_mej_dyn))[0]
+            invalid_index = list(set(BH_index) | set(negative_mdisk_index))
+
+            converted_parameters["log10_mej_dyn"][invalid_index] = -np.inf
+            converted_parameters["log10_mej_wind"][invalid_index] = -np.inf
 
         else:
-            if compactness_2 == 0.5 or mdisk_fit < 0.0:
+            if compactness_2 == 0.5 or (not np.isfinite(log_mej_dyn)):
                 converted_parameters["log10_mej_dyn"] = -np.inf
                 converted_parameters["log10_mej_wind"] = -np.inf
 

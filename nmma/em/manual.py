@@ -41,7 +41,7 @@ def get_parser():
     parser.add_argument(
         "--svd-path",
         type=str,
-        help="Path to the SVD directory, with {model}_mag.pkl and {model}_lbol.pkl",
+        help="Path to the SVD directory with {model}.joblib",
         default="svdmodels",
     )
     parser.add_argument(
@@ -290,7 +290,7 @@ def get_parser():
         "--refresh-models-list",
         type=bool,
         default=False,
-        help="Refresh the list of models available on Zenodo",
+        help="Refresh the list of models available on Gitlab",
     )
 
     return parser

@@ -222,6 +222,13 @@ def get_parser(**kwargs):
         action="store_true",
         default=False,
     )
+    parser.add_argument( #no use in this script
+        "--systematics-file",
+        metavar="PATH",
+        help="Path to systematics configuration file",
+        default=None,
+    )
+
     return parser
 
 

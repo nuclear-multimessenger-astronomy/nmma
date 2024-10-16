@@ -6,6 +6,8 @@ channels:
 dependencies:
 - python=3.9.*
 - numpy
+- numcodecs
+- h5py
 - mpi4py
 
 - pip:

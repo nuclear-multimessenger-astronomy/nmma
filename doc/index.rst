@@ -190,31 +190,27 @@ requirements.txt file which are necessary for NMMA:
 
    There is an issue pip installing ``pyfftw`` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
-``$ pip install importlib_resources``
-
-``$ pip install  extinction``
-
-``$ pip install dill``
-
-``$ pip install multiprocess``
-
-``$ pip install lalsuite``
-
-``$ pip install python-ligo-lw``
-
-``$ pip install sncosmo``
-
-``$ pip install scikit-learn``
-
-``$ pip install joblib``
-
-``$ conda install -c conda-forge p-tqdm``
+.. code::
+   
+   pip install importlib_resources
+   pip install  extinction
+   pip install dill
+   pip install multiprocess
+   pip install lalsuite
+   pip install python-ligo-lw
+   pip install sncosmo
+   pip install scikit-learn
+   pip install joblib
+   conda install -c conda-forge p-tqdm
 
 .. note::
 
    If everything has gone smoothly, all of these above mentioned "pip install something" commands will show that the requirements have already been satisfied. Otherwise, these will cover the dependencies if not covered by ``pip install .``. Also, if running ``pip install .`` shows something on the lines of "cannot cythonize without cython", do:
 
-``conda install -c anaconda cython==0.29.24`` and redo ``pip install .``.
+.. code::
+
+   conda install -c anaconda cython==0.29.24
+   pip install
 
 .. _arm64mac:
 
@@ -414,6 +410,39 @@ and follow the instructions above.
    module load gcc/9.2.0
    module load openmpi/4.1.1
 
+Internetless Clusters
+^^^^^^^^^^^^^^^^^^^^^
+
+Some cluster resources may not have access to the internet or could block some forms of data transfer. This will cause some difficulties with certain packages and will require some fixes to how NMMA interacts with them and changes to how you call some commands in NMMA. This can also affect how you install NMMA on the cluster. Because the cluster is in some way restricted, it may be that the `conda install nmma -c conda-forge` or the `pip install nmma` commands don't work. Thus to install NMMA, you will need to install from the source. To begin, you will want to copy the NMMA repository from your local to the cluster using an `scp` or `rsync` commmand because likely the git commands will fail. Once NMMA is downloaded to the cluster, navigate to the main directory and run
+
+.. code::
+
+   pip install -r requirements.txt
+   pip install .
+
+and check that the installation was successful by running the first check for NMMA given above. After installation, the next most likely difference is how NMMA uses the trained kilonova models during any form of EM analysis. When running any analysis that requires the use of the trained grid of models you will need to add the `--local-only` flag to the analysis command. For example,
+
+.. code::
+
+   lightcurve-analysis \
+        --model LANLTP2 \
+        --svd-path svdmodels/ \
+        --filters ztfg,ztfi,ztfr \
+        --ztf-sampling \
+        --ztf-uncertainties \
+        --ztf-ToO 180 \
+        --local-only \
+        --interpolation-type tensorflow \
+        --outdir outdir/TP2_ztf \
+        --label TP2_ztf \
+        --prior priors/LANL2022.prior \
+        --tmin 0. \
+        --tmax 14 \
+        --dt 0.1 \
+        --error-budget 1 \
+        --nlive 1024 \
+
+
 Matplotlib fonts
 ^^^^^^^^^^^^^^^^
 
@@ -457,12 +486,15 @@ User Guide
    training
    data_inj_obs
    fitting
+   lfi_analysis
    gw_inference
    joint_inference
    GW-EM-resampling
    combined_analysis
    Cluster_Resources
    contributing
+   changelog
+
 
 .. Indices and tables
 .. ==================

@@ -1,8 +1,7 @@
 import json
 import os
-import pickle
+import joblib
 import warnings
-
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import interpolate as interp
@@ -492,14 +491,14 @@ class SVDTrainingModel(object):
 
         model_exists = True
 
-        modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+        modelfile = os.path.join(self.svd_path, f"{self.model}.joblib")
 
         if self.interpolation_type == "sklearn_gp":
             if not os.path.isfile(modelfile):
                 model_exists = False
             outdir = os.path.join(self.svd_path, f"{self.model}")
             for filt in self.filters:
-                outfile = os.path.join(outdir, f"{filt}.pkl")
+                outfile = os.path.join(outdir, f"{filt}.joblib")
                 if not os.path.isfile(outfile):
                     model_exists = False
         elif self.interpolation_type == "tensorflow":
@@ -518,21 +517,20 @@ class SVDTrainingModel(object):
 
     def save_model(self):
 
-        modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+        modelfile = os.path.join(self.svd_path, f"{self.model}.joblib")
 
         if self.interpolation_type == "sklearn_gp":
             outdir = os.path.join(self.svd_path, f"{self.model}")
             if not os.path.isdir(outdir):
                 os.makedirs(outdir)
             for filt in self.svd_model.keys():
-                outfile = os.path.join(outdir, f"{filt}.pkl")
-                with open(outfile, "wb") as handle:
-                    pickle.dump(
-                        self.svd_model[filt]["gps"],
-                        handle,
-                        protocol=pickle.HIGHEST_PROTOCOL,
-                    )
-                    del self.svd_model[filt]["gps"]
+                outfile = os.path.join(outdir, f"{filt}.joblib")
+                joblib.dump(
+                    self.svd_model[filt]["gps"],
+                    outfile,
+                    compress=9,
+                )
+                del self.svd_model[filt]["gps"]
         elif self.interpolation_type == "tensorflow":
             outdir = os.path.join(self.svd_path, f"{self.model}_tf")
             if not os.path.isdir(outdir):
@@ -544,25 +542,22 @@ class SVDTrainingModel(object):
         elif self.interpolation_type == "api_gp":
             get_model(self.svd_path, f"{self.model}_api", self.svd_model.keys())
 
-        with open(modelfile, "wb") as handle:
-            pickle.dump(self.svd_model, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        joblib.dump(self.svd_model, modelfile, compress=9)
 
     def load_model(self):
 
-        modelfile = os.path.join(self.svd_path, f"{self.model}.pkl")
+        modelfile = os.path.join(self.svd_path, f"{self.model}.joblib")
 
         if self.interpolation_type == "sklearn_gp":
             get_model(self.svd_path, f"{self.model}", self.filters)
-            with open(modelfile, "rb") as handle:
-                self.svd_model = pickle.load(handle)
+            self.svd_model = joblib.load(modelfile)
 
             outdir = os.path.join(self.svd_path, f"{self.model}")
             for filt in self.svd_model.keys():
-                outfile = os.path.join(outdir, f"{filt}.pkl")
+                outfile = os.path.join(outdir, f"{filt}.joblib")
                 if not os.path.isfile(outfile):
                     continue
-                with open(outfile, "rb") as handle:
-                    self.svd_model[filt]["gps"] = pickle.load(handle)
+                self.svd_model[filt]["gps"] = joblib.load(outfile)
 
         elif self.interpolation_type == "tensorflow":
             try:
@@ -571,17 +566,16 @@ class SVDTrainingModel(object):
                 print("Install tensorflow if you want to use it...")
                 return
             get_model(self.svd_path, f"{self.model}_tf", self.filters)
-            with open(modelfile, "rb") as handle:
-                self.svd_model = pickle.load(handle)
+            self.svd_model = joblib.load(modelfile)
 
             outdir = os.path.join(self.svd_path, f"{self.model}_tf")
             for filt in self.svd_model.keys():
                 outfile = os.path.join(outdir, f"{filt}.h5")
-                self.svd_model[filt]["model"] = load_tf_model(outfile)
+                self.svd_model[filt]["model"] = load_tf_model(outfile, compile=False)
+                self.svd_model[filt]["model"].compile(optimizer="adam", loss="mse")
         elif self.interpolation_type == "api_gp":
             get_model(self.svd_path, f"{self.model}_api", self.filters)
-            with open(modelfile, "rb") as handle:
-                self.svd_model = pickle.load(handle)
+            self.svd_model = joblib.load(modelfile)
             for filt in self.svd_model.keys():
                 for ii in range(len(self.svd_model[filt]["gps"])):
                     self.svd_model[filt]["gps"][ii] = load_api_gp_model(

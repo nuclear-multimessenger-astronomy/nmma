@@ -1,0 +1,85 @@
+name: Check NMMA dependencies installation
+on:
+  push:
+    branches: [main]
+    paths: ["*_requirements.txt", "pyproject.toml"]
+  pull_request:
+    branches: [main]
+    paths: ["*_requirements.txt", "pyproject.toml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -el {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout branch being tested
+        uses: actions/checkout@v4
+
+      - name: Set up Python with Conda ${{ matrix.python-version }}
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.os == 'macos-latest' && 'arm64' || 'x86_64' }}
+          miniforge-version: latest
+          use-mamba: true
+          mamba-version: "*"
+          activate-environment: nmma_env
+
+      - name: Install linux packages
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openmpi-bin libopenmpi-dev
+
+      - name: Install Homebrew packages
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install openmpi hdf5
+          conda install ligo-segments python-ligo-lw
+
+      - name: Install NMMA (base)
+        run: |
+          python -m pip install nmma
+
+      - name: Verify base NMMA installation
+        run: |
+          python -c "import nmma; print(f'NMMA version: {nmma.__version__}')"
+
+      - name: Install and verify NMMA [grb]
+        run: |
+          python -m pip install 'nmma[grb]'
+          python -c "import nmma, afterglowpy; print(f'Successfully imported {nmma.__name__}, {afterglowpy.__name__}')"
+
+      - name: Install and verify NMMA [production]
+        run: |
+          python -m pip install 'nmma[production]'
+          python -c "import nmma, parallel_bilby, nestcheck, mpi4py; print(f'Successfully imported {nmma.__name__}, {parallel_bilby.__name__}, {nestcheck.__name__}, {mpi4py.__name__}')"
+
+      - name: Install and verify NMMA [neuralnet]
+        run: |
+          python -m pip install 'nmma[neuralnet]'
+          python -c "import nmma, torch, nflows, torchvision; print(f'Successfully imported {nmma.__name__}, {torch.__name__}, {nflows.__name__}, {torchvision.__name__}')"
+
+      - name: Install and verify NMMA [tf]
+        run: |
+          python -m pip install 'nmma[tf]'
+          python -c "import nmma, tensorflow; print(f'Successfully imported {nmma.__name__}, {tensorflow.__name__}')"
+
+      - name: Install and verify NMMA [sklearn]
+        run: |
+          python -m pip install 'nmma[sklearn]'
+          python -c "import nmma, sklearn; print(f'Successfully imported {nmma.__name__}, {sklearn.__name__}')"
+
+      - name: Install and verify NMMA [sampler]
+        run: |
+          python -m pip install 'nmma[sampler]'
+          python -c "import nmma, ultranest; print(f'Successfully imported {nmma.__name__}, {ultranest.__name__}')"
