@@ -118,6 +118,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
+          update-alternatives --list mpi|grep "${{ matrix.MPI }}" | xargs -rt sudo update-alternatives --set mpi
+          update-alternatives --list mpirun|grep "${{ matrix.MPI }}" | xargs -rt sudo update-alternatives --set mpirun
+      - name: MPI location
+        run: which mpiexec
+          
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
