@@ -10,6 +10,12 @@ import os
 
 def get_parser_here():
     parser = argparse.ArgumentParser(description="Multi config analysis script for NMMA.")
+    
+    parser.add_argument(
+        "--config",
+        type=str,
+        help="Name of the configuration file containing parameter values.",
+    )
 
     parser.add_argument(
         "--parallel",
@@ -47,19 +53,16 @@ def run_cmd_in_subprocess(cmd):
 
 
 def main(args=None):
-    if args is None:
-        parser2 = get_parser_here()
-        args = parser2.parse_args()
-    parser = get_parser()
+    parser = get_parser_here()
     args, _ = parser.parse_known_args(namespace=args)
+
+    _parser = get_parser()
+    main_args = _parser.parse_args([])
 
     yaml_dict = yaml.safe_load(os.path.expandvars(Path(args.config).read_text()))
 
-
     total_configs = len(list(yaml_dict.keys()))
-
     futures = []
-
 
     with ThreadPoolExecutor() as executor:
         for analysis_set in yaml_dict.keys():
@@ -80,7 +83,7 @@ def main(args=None):
                 if key == "process_per_config":
                     continue
 
-                if key not in args:
+                if key not in main_args:
                     print(f"{key} not a known argument... please remove")
                     exit()
                 key = key.replace("_", "-")
