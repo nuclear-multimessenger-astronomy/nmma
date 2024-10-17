@@ -118,17 +118,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
-      - name: MPI location
-        run: which mpiexec
           
       - name: Install Python dependencies
         run: |
+          conda install mpi4py
           python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
           python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib coveralls
           python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r tf_requirements.txt -r sklearn_requirements.txt
           python -m pip install .
           git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake .. && make && cd ../..
           pwd
+
+      - name: MPI location
+        run: which mpiexec
 
       - name: Export Libraries
         run: |
