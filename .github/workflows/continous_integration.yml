@@ -129,9 +129,6 @@ jobs:
           git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake .. && make && cd ../..
           pwd
 
-      - name: MPI location
-        run: which mpiexec
-
       - name: Export Libraries
         run: |
           echo "LD_LIBRARY_PATH=$HOME/work/nmma/nmma/MultiNest/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
