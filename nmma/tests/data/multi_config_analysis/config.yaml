@@ -1,0 +1,35 @@
+Me2017_1:
+  model: Me2017
+  outdir: ${WORKING_DIR}/outdir_1
+  label: injection
+  prior: ${WORKING_DIR}/data/multi_config_analysis/Me2017.prior
+  tmin: 0.1
+  tmax: 5
+  dt: 0.5
+  error-budget: 1
+  nlive: 40
+  Ebv-max: 0
+  injection: ${WORKING_DIR}/data/multi_config_analysis/injection.json
+  injection-num: 0
+  injection-outfile: ${WORKING_DIR}/outdir_1/lc.csv
+  generation-seed: 42
+  filters: ztfg,ztfr,ztfi
+  remove-nondetections: True
+
+Me2017_2:
+  model: Me2017
+  outdir: ${WORKING_DIR}/outdir_2
+  label: injection
+  prior: ${WORKING_DIR}/data/multi_config_analysis/Me2017.prior
+  tmin: 0.1
+  tmax: 5
+  dt: 0.5
+  error-budget: 1
+  nlive: 40
+  Ebv-max: 0
+  injection: ${WORKING_DIR}/data/multi_config_analysis/injection.json
+  injection-num: 0
+  injection-outfile: ${WORKING_DIR}/outdir_2/lc.csv
+  generation-seed: 42
+  filters: ztfg,ztfr,ztfi
+  remove-nondetections: True
