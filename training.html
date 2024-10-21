@@ -1,0 +1,606 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Training &#8212; nmma 0.2.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/nmma-docs.css?v=4c393c42" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=c480a563"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'training';</script>
+    <link rel="icon" href="_static/favicon-light.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Injections &amp; observational data" href="data_inj_obs.html" />
+    <link rel="prev" title="Models" href="models.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/light-logo.svg" class="logo__image only-light" alt="nmma 0.2.1 documentation - Home"/>
+    <script>document.write(`<img src="_static/light-logo.svg" class="logo__image only-dark" alt="nmma 0.2.1 documentation - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_inj_obs.html">Injections &amp; observational data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joint_inference.html">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/edit/main/doc/training.md" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new?title=Issue%20on%20page%20%2Ftraining.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/training.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Training</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#training-details">Training details</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evaluating-training-results">Evaluating training results</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#spectral-grids">Spectral grids</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="training">
+<h1>Training<a class="headerlink" href="#training" title="Link to this heading">#</a></h1>
+<p>It is common to have light curves on “grids”, for which you have a discrete set of parameters for which the lightcurves were simulated. For example, we may know the lightcurves to expect for specific masses m_1 and m_2, but not for any masses between the two.</p>
+<p>We rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks). The PCA serves to represent each light curve by a small number of “eigenvalues”, rather than the full lightcurve. After performing PCA, you will have a discrete grid of models that relate merger parameters to a few <strong>lightcurve eigenvalues</strong> rather than the whole lightcurve.</p>
+<p>At this point, you can model this grid as either a Gaussian process or Neural Network. This will allow you to form a <strong>continuous map</strong> from merger parameters to lightcurve eigenvalues, which are then converted directly to the set of light curve parameters that most likely resulted in this lightcurve.</p>
+<p>For a list of example training calls on various model grids using tensorflow, see <code class="docutils literal notranslate"><span class="pre">tools/tf_training_calls.sh</span></code>.</p>
+<section id="training-details">
+<h2>Training details<a class="headerlink" href="#training-details" title="Link to this heading">#</a></h2>
+<p>There are helper functions within NMMA to support this. In particular, <code class="docutils literal notranslate"><span class="pre">nmma.em.training.SVDTrainingModel</span></code> is designed to take in a grid of models and return an interpolation class.</p>
+<p>There are two types of interpolations supported within NMMA currently: scikit-learn’s Gaussian Process (sklearn_gp) and tensorflow. In the following, we take tensorflow as our example, but these are interchangable. To start out with, you will need a grid of files in a mildly idiosyncratic format:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># t[days] sdss::u sdss::g sdss::r sdss::i sdss::z swope2::y swope2::J swope2::H cspk
+0.103 -13.939 -13.680 -13.929 -14.843 -14.631 -14.398 -11.944 -10.784 -3.702
+0.109 -14.373 -14.430 -14.922 -15.113 -15.187 -14.642 -13.457 -11.719 -7.482
+0.116 -14.727 -15.018 -15.670 -15.338 -15.589 -14.870 -14.624 -12.553 -10.453
+0.122 -15.007 -15.459 -16.202 -15.522 -15.858 -15.081 -15.484 -13.288 -12.702
+0.130 -15.222 -15.773 -16.545 -15.669 -16.014 -15.275 -16.079 -13.930 -14.321
+0.137 -15.377 -15.976 -16.729 -15.783 -16.079 -15.449 -16.447 -14.482 -15.397
+0.145 -15.481 -16.086 -16.782 -15.869 -16.072 -15.605 -16.630 -14.947 -16.021
+0.154 -15.540 -16.122 -16.733 -15.931 -16.016 -15.740 -16.667 -15.330 -16.281
+0.163 -15.561 -16.099 -16.610 -15.972 -15.931 -15.853 -16.599 -15.633 -16.268
+</pre></div>
+</div>
+<p>Typically, the file parameter values are encoded in the file header name. Therefore, we have a helper set of functions defined here: nmma/em/model_parameters.py, one for each model, that translates the filenames into dictionaries with the parameters encoded. For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>def Bu2022mv(data):
+    data_out = {}
+    parameters = [&quot;log10_mej_dyn&quot;, &quot;vej_dyn&quot;, &quot;log10_mej_wind&quot;, &quot;vej_wind&quot;, &quot;KNtheta&quot;]
+    parameters_idx = [0, 1, 3, 4, 6]
+    magkeys = data.keys()
+    for jj, key in enumerate(magkeys):
+        rr = [np.abs(float(x)) for x in re.findall(r&quot;[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?&quot;, key)]
+
+	# Best to interpolate mass in log10 space
+	rr[0] = np.log10(rr[0])
+	rr[3] = np.log10(rr[3])
+
+	data_out[key] = {param:rr[idx] for param,idx in zip(parameters, parameters_idx)}
+	data_out[key] = {**data_out[key], **data[key]}
+    return data_out, parameters
+</pre></div>
+</div>
+<p>A new function will need to be added to nmma/em/model_parameters.py to each model grid that is desired. Once this is done, training can begin:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>create-svdmodel --model Bu2022mv --svd-path svdmodels --interpolation-type tensorflow --tmin 0.0 --tmax 21.0 --dt 0.1 --data-path output/bulla_2Comp_mv --plot --tensorflow-nepochs 100
+</pre></div>
+</div>
+<p>The output will look something like:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Training new model
+Normalizing mag filter u...
+Normalizing mag filter g...
+Normalizing mag filter r...
+Normalizing mag filter i...
+Normalizing mag filter z...
+Normalizing mag filter y...
+Normalizing mag filter J...
+Normalizing mag filter H...
+Normalizing mag filter K...
+Computing NN for filter u...
+
+Epoch 1/50
+61/61 [==============================] - 0s 5ms/step - loss: 2.6934 - val_loss: 0.7583
+Epoch 2/50
+61/61 [==============================] - 0s 943us/step - loss: 0.5029 - val_loss: 0.3023
+Epoch 3/50
+61/61 [==============================] - 0s 896us/step - loss: 0.2313 - val_loss: 0.1542
+</pre></div>
+</div>
+<p>and so on. The model files are then written to the path given by –svd-path. As a crosscheck, an example interpolated model is plotted over one of the grid points automatically:</p>
+<p><img alt="Training light curve" src="_images/training_lightcurves.png" /></p>
+<p>This model is then ready to use in an analysis.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lightcurve-analysis --model Bu2022mv --interpolation-type tensorflow --svd-path svdmodels --outdir outdir --label AT2017gfo --trigger-time 57982.5285236896 --data example_files/lightcurves/GW170817.dat --prior priors/Bu2022mv.prior
+</pre></div>
+</div>
+<p>To continue training an existing tensorflow model (e.g. on additional data), set the –continue-training flag.</p>
+<p>For the HDF5 file format, the <code class="docutils literal notranslate"><span class="pre">resample-grid</span></code> script enables downsampling and fragmentation into smaller components to make training less computationally demanding. For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>resample-grid --gridpath nmma/tests/data/lowmass_collapsar_updated.h5 --factor 5 --do-downsample
+</pre></div>
+</div>
+</section>
+<section id="evaluating-training-results">
+<h2>Evaluating training results<a class="headerlink" href="#evaluating-training-results" title="Link to this heading">#</a></h2>
+<p>While the neural network training output includes diagnostic plots like loss functions, we recommend using <code class="docutils literal notranslate"><span class="pre">svdmodel-benchmark</span></code> to perform a more thorough evaluation. This code uses the trained NN to re-generate each light curve in the grid used for training and computes a reduced chi-squared value between the two. The distribution of these reduced chi-squared values are plotted filter-by-filter and saved in a json file.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">plot-svdmodel-benchmarks</span></code> script reads the json file associated with each model in a directory and creates a single bar plot per model showing the 25th, 50th and 75th percentiles of the reduced chi-squared distributions for each filter. The plots also list the maximum chi-squared value across all filters. This output provides a useful summary of training for each model, and these plots are included on the gitlab repo that contains the latest trained models.</p>
+</section>
+<section id="spectral-grids">
+<h2>Spectral grids<a class="headerlink" href="#spectral-grids" title="Link to this heading">#</a></h2>
+<p>Often, the simulations come on spectral grids rather than as light curves, and it could be useful to create surrogate models for these spectral grids instead. In this case, the software expects files of the form:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>4900.000011931588,0.1,0.001246
+5100.000012418592,0.1,0.00084008
+5300.000012905595,0.1,0.00075228
+...
+4900.000011931588,0.30000000000000004,0.003116
+5100.000012418592,0.30000000000000004,0.0036693
+5300.000012905595,0.30000000000000004,0.0028557
+</pre></div>
+</div>
+<p>with columns of wavelength, time in days, and flux.</p>
+<p>These can be trained in a similar form to the light curves with:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>create-svdmodel --model Bu2019lm --data-type spectroscopy --svd-path svdmodels --interpolation-type tensorflow --tmin 0.0 --tmax 21.0 --dt 0.1 --data-path output/m3_spectra --plot --tensorflow-nepochs 20
+</pre></div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="models.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Models</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="data_inj_obs.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Injections &amp; observational data</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#training-details">Training details</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evaluating-training-results">Evaluating training results</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#spectral-grids">Spectral grids</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The NMMA Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023, The NMMA Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

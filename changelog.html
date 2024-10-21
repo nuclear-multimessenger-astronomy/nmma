@@ -1,0 +1,795 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Changelog &#8212; nmma 0.2.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/nmma-docs.css?v=4c393c42" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=c480a563"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'changelog';</script>
+    <link rel="icon" href="_static/favicon-light.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="How to Contribute" href="contributing.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/light-logo.svg" class="logo__image only-light" alt="nmma 0.2.1 documentation - Home"/>
+    <script>document.write(`<img src="_static/light-logo.svg" class="logo__image only-dark" alt="nmma 0.2.1 documentation - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_inj_obs.html">Injections &amp; observational data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="joint_inference.html">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Changelog</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/edit/main/doc/changelog.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new?title=Issue%20on%20page%20%2Fchangelog.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/changelog.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Changelog</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-2-1">Release version 0.2.1</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-2-0">Release version 0.2.0</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-1-4">Release version 0.1.4</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-1-3">Release version 0.1.3</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-1-2">Release version 0.1.2</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-v0-1-0">v0.1.0: Release version 0.1.0</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="changelog">
+<h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading">#</a></h1>
+<section id="release-0-2-1">
+<h2>Release version 0.2.1<a class="headerlink" href="#release-0-2-1" title="Link to this heading">#</a></h2>
+<p><em>Released on 2024-07-31 - <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/0.2.1">GitHub</a> - <a class="reference external" href="https://pypi.org/project/nmma/0.2.1/">PyPI</a></em></p>
+<h2>What's Changed</h2>
+<ul>
+<li>add changelog by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2176412921" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/331" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/331/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/331">#331</a></li>
+<li>add changelog by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2176429564" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/332" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/332/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/332">#332</a></li>
+<li>Allow user specify ra,dec for fits input by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tsunhopang/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tsunhopang">@tsunhopang</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2177918312" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/333" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/333/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/333">#333</a></li>
+<li>Restrict tensorflow to &lt;=2.15.0 to avoid new errors by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2184520834" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/334" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/334/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/334">#334</a></li>
+<li>Modify analysis slurm script to include PRIOR variable by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2185871275" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/336" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/336/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/336">#336</a></li>
+<li>Update docker/build-push-action from v4 to v5 by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2191828359" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/339" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/339/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/339">#339</a></li>
+<li>Save json file with benchmark chi2 percentiles by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2195167907" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/340" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/340/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/340">#340</a></li>
+<li>More consistent loading of lightcurve files by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tylerbarna/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tylerbarna">@tylerbarna</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2195268156" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/341" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/341/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/341">#341</a></li>
+<li>Restructure sncosmo.get_bandpass block in get_default_filts_lambdas by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2197266535" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/343" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/343/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/343">#343</a></li>
+<li>Utility to validate lightcurves are observed adequately by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tylerbarna/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tylerbarna">@tylerbarna</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2195574357" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/342" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/342/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/342">#342</a></li>
+<li>Add script to plot all benchmark results for a model by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2200572535" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/345" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/345/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/345">#345</a></li>
+<li>Update of resampling methods by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2206088642" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/348" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/348/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/348">#348</a></li>
+<li>Remove LANL2022 model in favor of specific morphologies by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2214140615" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/349" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/349/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/349">#349</a></li>
+<li>Update index.rst by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bking-astro/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bking-astro">@bking-astro</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2228445693" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/350" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/350/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/350">#350</a></li>
+<li>add <code>rst</code> linter by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2228743847" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/351" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/351/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/351">#351</a></li>
+<li>update filter doc by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2231862961" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/353" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/353/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/353">#353</a></li>
+<li>add numcodecs to yml by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2234498173" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/355" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/355/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/355">#355</a></li>
+<li>Add example slurm script used by nmma API by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2235818308" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/356" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/356/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/356">#356</a></li>
+<li>Prevent parallel model download when using MPI by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2276254039" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/361" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/361/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/361">#361</a></li>
+<li>Fix NSBH disk mass fit by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/atoivonen13/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/atoivonen13">@atoivonen13</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2272213435" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/360" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/360/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/360">#360</a></li>
+<li>add support for citations attribute by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2368559119" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/364" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/364/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/364">#364</a></li>
+<li>Fetching Ebv from dustmap by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tsunhopang/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tsunhopang">@tsunhopang</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2398067163" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/366" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/366/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/366">#366</a></li>
+<li>adding new rubin ToO strategy into nmma by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bking-astro/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bking-astro">@bking-astro</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2347191302" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/363" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/363/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/363">#363</a></li>
+<li>Observing scenarios lightcurves sim by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/weizmannk/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/weizmannk">@weizmannk</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2401712266" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/368" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/368/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/368">#368</a></li>
+<li>Better summary plot for lightcurve-analysis by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tsunhopang/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tsunhopang">@tsunhopang</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2390423076" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/365" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/365/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/365">#365</a></li>
+<li>Adding neural network inference to NMMA by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/malinadesai/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/malinadesai">@malinadesai</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2409926563" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/370" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/370/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/370">#370</a></li>
+<li>Add support for Python 3.12 by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2423443384" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/371" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/371/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/371">#371</a></li>
+<li>Fix pyproject.toml by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/mcdavis62/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/mcdavis62">@mcdavis62</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2436544097" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/373" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/373/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/373">#373</a></li>
+<li>Additional Dependencies by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2423811822" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/372" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/372/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/372">#372</a></li>
+</ul>
+<h2>New Contributors</h2>
+<ul>
+<li><a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/malinadesai/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/malinadesai">@malinadesai</a> made their first contribution in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2409926563" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/370" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/370/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/370">#370</a></li>
+<li><a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/mcdavis62/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/mcdavis62">@mcdavis62</a> made their first contribution in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2436544097" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/373" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/373/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/373">#373</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/nuclear-multimessenger-astronomy/nmma/compare/0.2.0...0.2.1"><tt>0.2.0...0.2.1</tt></a></p></section>
+<section id="release-0-2-0">
+<h2>Release version 0.2.0<a class="headerlink" href="#release-0-2-0" title="Link to this heading">#</a></h2>
+<p><em>Released on 2024-03-11 - <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/0.2.0">GitHub</a> - <a class="reference external" href="https://pypi.org/project/nmma/0.2.0/">PyPI</a></em></p>
+<h2>Major changes in v0.2.0</h2>
+<ul>
+<li>SVD model files previously stored in <code>.pkl</code> format now use <code>.joblib</code> to save space, (de)compress implicitly and increase read/write speed</li>
+<li>The gitlab repo has been updated with these files but also retains the <code>pkl</code> files for backward-compatibility</li>
+<li>The zenodo repo has been deprecated due to file size/number limitations. The repo is still up but will not be accessed by NMMA code</li>
+<li>The latest code will raise an error if <code>--local-only</code> is set and no <code>joblib</code> files have been downloaded. Local workflows should remove this flag temporarily to download the needed files from gitlab</li>
+</ul>
+<h2>What's Changed</h2>
+<ul>
+<li>change the order of urls in pyproject.toml by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2132936902" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/321" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/321/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/321">#321</a></li>
+<li>Add cff by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2139037711" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/324" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/324/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/324">#324</a></li>
+<li>Doker file for NMMA by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/FabioRagosta/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/FabioRagosta">@FabioRagosta</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2133883144" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/322" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/322/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/322">#322</a></li>
+<li>Only run docker CI/website deploy workflows on primary repo by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2154601338" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/325" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/325/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/325">#325</a></li>
+<li>Redefine default filters for make_lcs scripts by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2157353085" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/327" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/327/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/327">#327</a></li>
+<li>Restrict to Python &lt; 3.12 by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2167686874" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/328" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/328/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/328">#328</a></li>
+<li>Update pyproject.toml by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2169256731" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/329" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/329/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/329">#329</a></li>
+<li>Switch pickle model format to joblib by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2044003439" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/290" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/290/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/290">#290</a></li>
+<li>Adding functionality for using Bayestar fit input for inclination by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tsunhopang/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tsunhopang">@tsunhopang</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2175864201" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/330" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/330/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/330">#330</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/nuclear-multimessenger-astronomy/nmma/compare/0.1.4...0.2.0"><tt>0.1.4...0.2.0</tt></a></p></section>
+<section id="release-0-1-4">
+<h2>Release version 0.1.4<a class="headerlink" href="#release-0-1-4" title="Link to this heading">#</a></h2>
+<p><em>Released on 2024-02-13 - <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/0.1.4">GitHub</a> - <a class="reference external" href="https://pypi.org/project/nmma/0.1.4/">PyPI</a></em></p>
+<h2>What's Changed</h2>
+<ul>
+<li>Versioning change by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/Theodlz/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/Theodlz">@Theodlz</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2038190373" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/286" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/286/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/286">#286</a></li>
+<li>Require scipy &lt; 1.10 by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2040192163" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/287" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/287/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/287">#287</a></li>
+<li>Require scipy &gt;= 1.10 by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2040309370" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/288" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/288/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/288">#288</a></li>
+<li>local SVD models using<code>--local-only</code> for LC generation by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2043709163" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/289" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/289/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/289">#289</a></li>
+<li>Update README.md by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2044165324" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/291" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/291/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/291">#291</a></li>
+<li>Add new version of Bulla model: Bu2023Ye by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/shreyasahasram08/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/shreyasahasram08">@shreyasahasram08</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2049076880" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/292" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/292/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/292">#292</a></li>
+<li>adding functions to model_parameters by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bking-astro/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bking-astro">@bking-astro</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2057773637" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/297" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/297/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/297">#297</a></li>
+<li>Remove 'old-style' _mag model code by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2060355800" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/298" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/298/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/298">#298</a></li>
+<li>Add local-model-only flag to joint analyses by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2049435156" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/294" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/294/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/294">#294</a></li>
+<li>Adding capcability for Lbol inference by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tsunhopang/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tsunhopang">@tsunhopang</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2063973026" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/300" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/300/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/300">#300</a></li>
+<li>Fix svdmodel_benchmark filter specification, add unit test by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2066416884" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/303" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/303/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/303">#303</a></li>
+<li>Enhancements for EM Counterpart Detection and Bandpass Interpolation (sncosmo) by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/weizmannk/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/weizmannk">@weizmannk</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2072095728" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/305" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/305/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/305">#305</a></li>
+<li>Add tool to convert skyportal lightcurves to nmma format by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2067804725" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/304" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/304/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/304">#304</a></li>
+<li>Add example script containing tf training calls by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2094589933" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/309" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/309/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/309">#309</a></li>
+<li>Refactor convert_skyportal_lcs.py for script installation by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2096646201" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/310" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/310/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/310">#310</a></li>
+<li>Update LANL model in tf_training_calls.sh by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2096669320" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/311" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/311/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/311">#311</a></li>
+<li>Remove duplicate line from Bu2023Ye prior by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2096717371" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/312" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/312/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/312">#312</a></li>
+<li>Refactor resample_grid.py to enable script installation by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2098596340" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/313" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/313/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/313">#313</a></li>
+<li>changes to filters flag in LC gen. Check MPI in analysis.py by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2098912617" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/314" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/314/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/314">#314</a></li>
+<li>Let svdmodel-benchmark take comma-separated filters by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2106504350" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/315" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/315/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/315">#315</a></li>
+<li>minor update to documentation formatting by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tylerbarna/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tylerbarna">@tylerbarna</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2131123645" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/320" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/320/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/320">#320</a></li>
+<li>Refactor unit tests to support local pytest runs by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2127790521" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/319" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/319/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/319">#319</a></li>
+</ul>
+<h2>New Contributors</h2>
+<ul>
+<li><a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tsunhopang/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tsunhopang">@tsunhopang</a> made their first contribution in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2063973026" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/300" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/300/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/300">#300</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/nuclear-multimessenger-astronomy/nmma/compare/0.1.3...0.1.4"><tt>0.1.3...0.1.4</tt></a></p></section>
+<section id="release-0-1-3">
+<h2>Release version 0.1.3<a class="headerlink" href="#release-0-1-3" title="Link to this heading">#</a></h2>
+<p><em>Released on 2023-12-07 - <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/0.1.3">GitHub</a> - <a class="reference external" href="https://pypi.org/project/nmma/0.1.3/">PyPI</a></em></p>
+<h2>What's Changed</h2>
+<ul>
+<li>Change how version is written to NMMA by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1930811475" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/261" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/261/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/261">#261</a></li>
+<li>check and set trigger time by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1930206588" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/259" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/259/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/259">#259</a></li>
+<li>Multimessenger Inference updates by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1934775854" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/262" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/262/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/262">#262</a></li>
+<li>Add documentation of analysis_slurm.py to Cluster Resources guide by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1938870512" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/264" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/264/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/264">#264</a></li>
+<li>Add flag to skip sampling in analysis.py by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1974810298" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/266" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/266/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/266">#266</a></li>
+<li>Add --skip-sampling flag to analysis slurm script generator by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1979914435" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/267" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/267/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/267">#267</a></li>
+<li>Improved documentation, added tutorial notebook by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/ThibeauWouters/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/ThibeauWouters">@ThibeauWouters</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1983858912" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/268" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/268/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/268">#268</a></li>
+<li>Update lightcurve_simulation tutorial notebook and bulla files by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1988569542" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/269" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/269/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/269">#269</a></li>
+<li>Modify --skip-sampling behavior to successfully generate plots by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1993549803" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/270" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/270/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/270">#270</a></li>
+<li>Remove temporary line in utils/models.py by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1993681607" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/271" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/271/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/271">#271</a></li>
+<li>Enable continued training of existing tensorflow model by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1995305450" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/272" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/272/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/272">#272</a></li>
+<li>Update app.py for new syntax, easier use by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1997868689" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/273" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/273/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/273">#273</a></li>
+<li>Add tensorflow requirement by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1997903336" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/274" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/274/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/274">#274</a></li>
+<li>Remove more code made obsolote by Zenodo model updates by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2003177509" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/277" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/277/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/277">#277</a></li>
+<li>Add code to downsample/fragment large hdf5 grids by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2000023143" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/275" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/275/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/275">#275</a></li>
+<li>Add reduced lightcurve data by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2015032812" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/278" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/278/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/278">#278</a></li>
+<li>NMMA models - multiple sources by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/Theodlz/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/Theodlz">@Theodlz</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2015548248" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/279" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/279/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/279">#279</a></li>
+<li>Add timeshift to time values to fix analysis error by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2017526842" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/281" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/281/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/281">#281</a></li>
+<li>Add ZTF23aaxeacr lightcurve to example_files by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2021511037" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/282" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/282/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/282">#282</a></li>
+<li>Add notebook requirement by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2021577708" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/283" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/283/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/283">#283</a></li>
+</ul>
+<h2>New Contributors</h2>
+<ul>
+<li><a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/ThibeauWouters/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/ThibeauWouters">@ThibeauWouters</a> made their first contribution in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1983858912" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/268" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/268/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/268">#268</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/nuclear-multimessenger-astronomy/nmma/compare/0.1.2...0.1.3"><tt>0.1.2...0.1.3</tt></a></p></section>
+<section id="release-0-1-2">
+<h2>Release version 0.1.2<a class="headerlink" href="#release-0-1-2" title="Link to this heading">#</a></h2>
+<p><em>Released on 2023-10-06 - <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/0.1.2">GitHub</a> - <a class="reference external" href="https://pypi.org/project/nmma/0.1.2/">PyPI</a></em></p>
+<h2>What's Changed</h2>
+<ul>
+<li>Add simpler install option for pyfftw on arm64 Mac by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1905613633" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/246" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/246/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/246">#246</a></li>
+<li>Switch underscore to hyphen for all NMMA args by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1907736481" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/247" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/247/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/247">#247</a></li>
+<li>Add code to generate slurm script for lightcurve-analysis on HPC by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1912397970" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/248" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/248/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/248">#248</a></li>
+<li>Allow analysis_slurm.py to handle a mix of slurm and analysis.py arguments by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1914385784" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/249" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/249/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/249">#249</a></li>
+<li>Fixes for multimessenger analysis by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1917085026" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/252" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/252/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/252">#252</a></li>
+<li>write bayesfactor to json by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1922668308" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/255" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/255/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/255">#255</a></li>
+<li>Update analysis_slurm.py code for smoother analyses on Expanse by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1929167787" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/258" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/258/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/258">#258</a></li>
+<li>Python version upgrade by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1930667124" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/260" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/260/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/260">#260</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/nuclear-multimessenger-astronomy/nmma/compare/v0.1.0...0.1.2"><tt>v0.1.0...0.1.2</tt></a></p></section>
+<section id="release-v0-1-0">
+<h2>v0.1.0: Release version 0.1.0<a class="headerlink" href="#release-v0-1-0" title="Link to this heading">#</a></h2>
+<p><em>Released on 2023-09-20 - <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/v0.1.0">GitHub</a> - <a class="reference external" href="https://pypi.org/project/nmma/v0.1.0/">PyPI</a></em></p>
+<h3>NMMA Release Notes - Version 0.1.0</h3>
+<p><strong>Previous Version</strong>: 0.0.19</p>
+<hr>
+<h4>Overview:</h4>
+<p>In our commitment to continuous improvement, we're excited to announce the release of NMMA v0.1.0. This release introduces significant changes to the NMMA project's packaging configuration, aligning with the latest best practices in the Python community.</p>
+<hr>
+<h4>Key Changes:</h4>
+<ol>
+<li>
+<p><strong>Transition to <code>pyproject.toml</code></strong>:</p>
+<ul>
+<li>We have transitioned from using <code>setup.py</code> to the modern standard, <code>pyproject.toml</code>, for our project configuration. This ensures our project remains maintainable and easy to contribute to.</li>
+</ul>
+</li>
+<li>
+<p><strong>Entry Points Update</strong>:</p>
+<ul>
+<li>
+<p>The definition of our project's entry points (console scripts) has been modernized.</p>
+<ul>
+<li>Previously: Defined in <code>setup.py</code> under <code>entry_points</code>.</li>
+<li>Now: Defined in <code>pyproject.toml</code> under <code>[project.scripts]</code>.</li>
+</ul>
+</li>
+<li>
+<p>The new entry points:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="nmma-generation = &quot;nmma.pbilby.generation:main_nmma&quot;
+nmma-gw-generation = &quot;nmma.pbilby.generation:main_nmma_gw&quot;
+nmma-analysis = &quot;nmma.pbilby.analysis:main_nmma&quot;
+nmma-gw-analysis = &quot;nmma.pbilby.analysis:main_nmma_gw&quot;
+lightcurve-analysis = &quot;nmma.em.analysis:main&quot;
+lightcurve-analysis-condor = &quot;nmma.em.analysis_condor:main&quot;
+lightcurve-injection-summary = &quot;nmma.em.injection_summary:main&quot;
+lightcurve-injection-slurm-setup = &quot;nmma.em.create_injection_slurm:main&quot;
+lightcurve-injection-condor-setup = &quot;nmma.em.create_injection_condor:main&quot;
+lightcurve-manual = &quot;nmma.em.manual:main&quot;
+lightcurve-marginalization = &quot;nmma.em.lightcurve_marginalization:main&quot;
+combine-EOS = &quot;nmma.em.combine_EOS:main&quot;
+create-lightcurve-slurm = &quot;nmma.em.create_lightcurves_slurm:main&quot;
+create-lightcurve-condor = &quot;nmma.em.create_lightcurves_condor:main&quot;
+create-svdmodel = &quot;nmma.em.create_svdmodel:main&quot;
+svdmodel-benchmark = &quot;nmma.em.svdmodel_benchmark:main&quot;
+svdmodel-download = &quot;nmma.utils.models:main&quot;
+lightcurve-generation = &quot;nmma.em.create_lightcurves:main&quot;
+lightcurve-detection = &quot;nmma.em.detect_lightcurves:main&quot;
+nmma-create-injection = &quot;nmma.eos.create_injection:main&quot;
+gwem-resampling = &quot;nmma.em.gwem_resampling:main&quot;
+gwem-resampling-condor = &quot;nmma.em.gwem_resampling_condor:main&quot;
+gwem-Hubble-estimate = &quot;nmma.em.gwem_Hubble_estimate:main&quot;"><pre>nmma-generation = <span class="pl-s"><span class="pl-pds">"</span>nmma.pbilby.generation:main_nmma<span class="pl-pds">"</span></span>
+nmma-gw-generation = <span class="pl-s"><span class="pl-pds">"</span>nmma.pbilby.generation:main_nmma_gw<span class="pl-pds">"</span></span>
+nmma-analysis = <span class="pl-s"><span class="pl-pds">"</span>nmma.pbilby.analysis:main_nmma<span class="pl-pds">"</span></span>
+nmma-gw-analysis = <span class="pl-s"><span class="pl-pds">"</span>nmma.pbilby.analysis:main_nmma_gw<span class="pl-pds">"</span></span>
+lightcurve-analysis = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.analysis:main<span class="pl-pds">"</span></span>
+lightcurve-analysis-condor = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.analysis_condor:main<span class="pl-pds">"</span></span>
+lightcurve-injection-summary = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.injection_summary:main<span class="pl-pds">"</span></span>
+lightcurve-injection-slurm-setup = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.create_injection_slurm:main<span class="pl-pds">"</span></span>
+lightcurve-injection-condor-setup = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.create_injection_condor:main<span class="pl-pds">"</span></span>
+lightcurve-manual = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.manual:main<span class="pl-pds">"</span></span>
+lightcurve-marginalization = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.lightcurve_marginalization:main<span class="pl-pds">"</span></span>
+combine-EOS = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.combine_EOS:main<span class="pl-pds">"</span></span>
+create-lightcurve-slurm = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.create_lightcurves_slurm:main<span class="pl-pds">"</span></span>
+create-lightcurve-condor = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.create_lightcurves_condor:main<span class="pl-pds">"</span></span>
+create-svdmodel = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.create_svdmodel:main<span class="pl-pds">"</span></span>
+svdmodel-benchmark = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.svdmodel_benchmark:main<span class="pl-pds">"</span></span>
+svdmodel-download = <span class="pl-s"><span class="pl-pds">"</span>nmma.utils.models:main<span class="pl-pds">"</span></span>
+lightcurve-generation = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.create_lightcurves:main<span class="pl-pds">"</span></span>
+lightcurve-detection = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.detect_lightcurves:main<span class="pl-pds">"</span></span>
+nmma-create-injection = <span class="pl-s"><span class="pl-pds">"</span>nmma.eos.create_injection:main<span class="pl-pds">"</span></span>
+gwem-resampling = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.gwem_resampling:main<span class="pl-pds">"</span></span>
+gwem-resampling-condor = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.gwem_resampling_condor:main<span class="pl-pds">"</span></span>
+gwem-Hubble-estimate = <span class="pl-s"><span class="pl-pds">"</span>nmma.em.gwem_Hubble_estimate:main<span class="pl-pds">"</span></span></pre></div>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Installation from Source</strong>:</p>
+<ul>
+<li>The method to install the project from source has been updated:
+<ul>
+<li>Previously: <code>python setup.py install</code>.</li>
+<li>Now:
+<ul>
+<li><code>pip install .</code></li>
+<li>Or, for a development install: <code>pip install -e .</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h4>Implications:</h4>
+<ul>
+<li>Users will need to adapt to the new entry points and installation method.</li>
+<li>While the functionalities remain consistent, the command syntax has been updated. Users are encouraged to update their workflows accordingly.</li>
+</ul>
+<hr>
+<h4>Additional Information:</h4>
+<ul>
+<li><code>KNtimeshift</code> has now been renamed to <code>timeshift</code>, make sure to use the new name since no more deprecation warning will be raised for this.</li>
+<li>For a detailed overview of the NMMA library, its purpose, and usage instructions, refer to the <a href="https://nuclear-multimessenger-astronomy.github.io/nmma/" rel="nofollow">documentation</a>.</li>
+<li>NMMA now saves/loads the same core <code>.pkl</code> file regardless of interpolation type. Note that existing core files of the form <code>model_tf.pkl</code> are identical to <code>model.pkl</code>.</li>
+</ul>
+<hr>
+<p>We believe these changes enhance the robustness of our project and simplify its management. We appreciate your continued support and understanding. For any queries or feedback regarding this release, please reach out to our team.</p>
+<hr>
+<h2>What's Changed</h2>
+<ul>
+<li>Update docs by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1828036530" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/185" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/185/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/185">#185</a></li>
+<li>restructured docs by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1837471852" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/191" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/191/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/191">#191</a></li>
+<li>support for coveralls by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1838455007" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/192" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/192/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/192">#192</a></li>
+<li>Update python-package.yml by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1838792935" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/193" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/193/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/193">#193</a></li>
+<li>Fix datatype of redshift by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1839519608" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/195" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/195/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/195">#195</a></li>
+<li>Add coveralls by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1839389104" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/194" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/194/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/194">#194</a></li>
+<li>Fix bug from redshift datatype conversion by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1839868223" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/198" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/198/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/198">#198</a></li>
+<li>corner plot script by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1833594691" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/186" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/186/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/186">#186</a></li>
+<li>Update index.rst by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/np699/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/np699">@np699</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1842154342" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/199" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/199/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/199">#199</a></li>
+<li>Fix API photometry filter naming and plot filename by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1844050416" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/200" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/200/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/200">#200</a></li>
+<li>Add ultranest and tornado requirements by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1847250247" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/201" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/201/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/201">#201</a></li>
+<li>rejection_sampling_argument in main.py by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1857021525" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/204" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/204/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/204">#204</a></li>
+<li>Add installation guide for custom lalsuite by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1861846972" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/205" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/205/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/205">#205</a></li>
+<li>Explain how the EM prior file needs to be updated by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1866922700" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/207" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/207/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/207">#207</a></li>
+<li>Rename Bu2022Ye KNtimeshift prior by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1867412631" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/208" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/208/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/208">#208</a></li>
+<li>KNtimeshift -&gt; timeshift by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/mcoughlin/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/mcoughlin">@mcoughlin</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1868184493" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/209" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/209/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/209">#209</a></li>
+<li>Changes to gwem_resampling_utils by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/haukekoehn/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/haukekoehn">@haukekoehn</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1869785815" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/212" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/212/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/212">#212</a></li>
+<li>Update filter docs by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/mcoughlin/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/mcoughlin">@mcoughlin</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1882424121" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/223" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/223/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/223">#223</a></li>
+<li>Caching and test for GP by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1887866042" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/224" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/224/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/224">#224</a></li>
+<li>adds warning that KNtimeshift is deprecated by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tylerbarna/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tylerbarna">@tylerbarna</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1888095930" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/226" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/226/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/226">#226</a></li>
+<li>pinning GRB parameters by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1888227906" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/228" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/228/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/228">#228</a></li>
+<li>Restrict scikit-learn version to &lt;1.2 by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1890877119" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/231" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/231/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/231">#231</a></li>
+<li>updated mac installation by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1893246572" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/232" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/232/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/232">#232</a></li>
+<li>NMMA 2023 by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sahiljhawar/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sahiljhawar">@sahiljhawar</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1893267626" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/233" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/233/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/233">#233</a></li>
+<li>Fixed missing Sr2023 model by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/weizmannk/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/weizmannk">@weizmannk</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1896735227" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/235" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/235/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/235">#235</a></li>
+<li>Set random seed for python/numpy/tf during nn training by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1897104562" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/236" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/236/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/236">#236</a></li>
+<li>Limit pandas to &lt;2.0 for .pkl file compatibility by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/bfhealy/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/bfhealy">@bfhealy</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1898792306" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/238" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/238/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/238">#238</a></li>
+<li>Fix refresh models list typo by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tylerbarna/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tylerbarna">@tylerbarna</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1901698052" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/239" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/239/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/239">#239</a></li>
+<li>Replace setup.py with pyproject.toml by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/mcoughlin/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/mcoughlin">@mcoughlin</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1903416812" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/242" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/242/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/242">#242</a></li>
+<li>remove KNTimeshift deprecation warning by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/tylerbarna/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/tylerbarna">@tylerbarna</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1903670454" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/243" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/243/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/243">#243</a></li>
+</ul>
+<h2>New Contributors</h2>
+<ul>
+<li><a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/np699/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/np699">@np699</a> made their first contribution in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1842154342" data-permission-text="Title is private" data-url="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/199" data-hovercard-type="pull_request" data-hovercard-url="/nuclear-multimessenger-astronomy/nmma/pull/199/hovercard" href="https://github.com/nuclear-multimessenger-astronomy/nmma/pull/199">#199</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/nuclear-multimessenger-astronomy/nmma/compare/v0.0.19...0.1.0"><tt>v0.0.19...0.1.0</tt></a></p></section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="contributing.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">How to Contribute</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-2-1">Release version 0.2.1</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-2-0">Release version 0.2.0</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-1-4">Release version 0.1.4</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-1-3">Release version 0.1.3</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-0-1-2">Release version 0.1.2</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release-v0-1-0">v0.1.0: Release version 0.1.0</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The NMMA Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023, The NMMA Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,630 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Multi-messenger inference &#8212; nmma 0.2.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/nmma-docs.css?v=4c393c42" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="_static/documentation_options.js?v=c480a563"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'joint_inference';</script>
+    <link rel="icon" href="_static/favicon-light.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Connecting Electromagnetic signals to Binary Source Properties" href="GW-EM-resampling.html" />
+    <link rel="prev" title="Inference of gravitational-wave signals" href="gw_inference.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/light-logo.svg" class="logo__image only-light" alt="nmma 0.2.1 documentation - Home"/>
+    <script>document.write(`<img src="_static/light-logo.svg" class="logo__image only-dark" alt="nmma 0.2.1 documentation - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quick-start-guide.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_inj_obs.html">Injections &amp; observational data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fitting.html">Inference of electromagnetic signals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lfi_analysis.html">Perform Parameter Estimation Using Liklihood Free Inference (LFI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gw_inference.html">Inference of gravitational-wave signals</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Multi-messenger inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GW-EM-resampling.html">Connecting Electromagnetic signals to Binary Source Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="combined_analysis.html">Perform combined analyses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Cluster_Resources.html">Cluster Resources (Expanse)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">How to Contribute</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/edit/main/doc/joint_inference.md" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/nuclear-multimessenger-astronomy/nmma/issues/new?title=Issue%20on%20page%20%2Fjoint_inference.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/joint_inference.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Multi-messenger inference</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="multi-messenger-inference">
+<h1>Multi-messenger inference<a class="headerlink" href="#multi-messenger-inference" title="Link to this heading">#</a></h1>
+<p>A joint inference on gravitational-wave and electromagnetic signals requires NMMA to run on a supercomputer cluster because large memory space are required and need to be shared across many CPU cores. Here, we consider a full joint inference on the binary neutron star merger observed on 17th August 2017.</p>
+<p>In order to run a multi-messenger inference, we need to follow to main steps:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nmma-generation config.ini
+</pre></div>
+</div>
+<p>Perform the analysis or parameter estimation using:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nmma-analysis --data-dump &lt;name_of_analysis&gt;_data_dump.pickle
+</pre></div>
+</div>
+<p>First of all, we set up the <code class="docutils literal notranslate"><span class="pre">config.ini</span></code> file and provide all required data and information.</p>
+<p><strong>Observational data</strong></p>
+<p>Firstly, all observational data is required that means observational data from single observed events:</p>
+<ul class="simple">
+<li><p>GW170817,</p></li>
+<li><p>GRB170817A,</p></li>
+<li><p>AT2017gfo.</p></li>
+</ul>
+<p>These observational data need to be provided in the <code class="docutils literal notranslate"><span class="pre">config.ini</span></code> file for the joint inference.</p>
+<p><strong>Prior</strong></p>
+<p>Moreover, a prior on all observed messengers is required and needs to be tailored to the models used in the inference. Here, we use the GRB afterglow light curve model <code class="docutils literal notranslate"><span class="pre">TrPi2018</span></code> from afterglowpy and the kilonova model <code class="docutils literal notranslate"><span class="pre">Bu2019lm</span></code>. For the gravitational-wave signal, we assume the model <code class="docutils literal notranslate"><span class="pre">IMRPhenomPv2_NRTidalv2</span></code> for a precessing neutron star binary. A prior for the joint inference can be found <a class="reference external" href="https://github.com/nuclear-multimessenger-astronomy/nmma/tree/main/example_files/prior">here</a>, called <code class="docutils literal notranslate"><span class="pre">GW170817_AT2017gfo_GRB170817A.prior</span></code>.</p>
+<p><strong>Electroamagnetic data and models</strong></p>
+<p>In order to not only sample on gravitational-wave data, we provide further electromagnetic signal related flags. The flag <code class="docutils literal notranslate"><span class="pre">with-grb=True</span></code> will turn on the sampling on a GRB data. As NMMA currently only includes one GRB model, this model does not need to be further specified. If <code class="docutils literal notranslate"><span class="pre">with-grb=False</span></code>, a joint inference of GW+KN data is possible, excluding the GRB part. With regard to the kilonova model, we need to provide a specific model under <code class="docutils literal notranslate"><span class="pre">kilonova-model</span></code>, its respective reduced model grid (if applicable) under <code class="docutils literal notranslate"><span class="pre">kilonova-model-svd</span></code> and a <code class="docutils literal notranslate"><span class="pre">kilonova-interpolation-type</span></code> which can be either <code class="docutils literal notranslate"><span class="pre">sklearn_gp</span></code> or <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code>. The <code class="docutils literal notranslate"><span class="pre">light-curve-data</span></code> flag should include both GRB and kilonova data if a joint inference on GW-GRB-KN is desired (meaning use: <code class="docutils literal notranslate"><span class="pre">with-grb=True</span></code>) or should just include the kilonova data if a GW-KN inference is targeted (meaning use: <code class="docutils literal notranslate"><span class="pre">with-grb=False</span></code>). The kilonova start/end time and time steps apply to both the GRB and kilonova model which will generate light curves during the inference to match the observed data provided.</p>
+<p><strong>Including EOS information</strong></p>
+<p>NMMA enables to include nuclear information by using equations-of-state (EOS) and sample over the EOS during the inference. In order to include a set of EOSs, each EOS.dat file needs to include information on Mass, Radius and Tidal deformability. For the example shown in the <code class="docutils literal notranslate"><span class="pre">config.ini</span></code> file below, we see that <code class="docutils literal notranslate"><span class="pre">Neos</span> <span class="pre">=</span> <span class="pre">5000</span></code> meaning that we include 5000 EOS.dat files each containing information on mass, radius and tidal deformability. We also see that a constraint from NICER measurements has been folded in and thus the <code class="docutils literal notranslate"><span class="pre">eos-weight</span></code> reflects this in a weighting. The EOS set should be sorted according to this weighting in order to reduce runtime for the sampling on the EOSs.</p>
+<p><strong>Running the config.ini generation</strong></p>
+<p>In order to prepare the joint inference, a <code class="docutils literal notranslate"><span class="pre">config.ini</span></code> file is required which specifies all kind of models, observational data and inference settings. An example adjusted to the observed BNS merger can be found below:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>################################################################################
+## Data generation arguments
+################################################################################
+
+trigger_time = 1187008882.43
+
+################################################################################
+## Detector arguments
+################################################################################
+
+detectors = [H1, L1, V1]
+psd_dict = {H1=data/GW170817/h1_psd.txt, L1=data/GW170817/l1_psd.txt, V1=data/GW170817/v1_psd.txt}
+channel_dict = {H1=LOSC-STRAIN, L1=LOSC-STRAIN, V1=LOSC-STRAIN}
+data_dict = {H1=data/GW170817/H-H1_LOSC_CLN_16_V1-1187007040-2048.gwf, L1=data/GW170817/L-L1_LOSC_CLN_16_V1-1187007040-2048.gwf, V1=data/GW170817/V-V1_LOSC_CLN_16_V1-1187007040-2048.gwf}
+duration = 128
+
+################################################################################
+## Calibration arguments
+################################################################################
+
+calibration-model = CubicSpline
+spline-calibration-nodes = 10
+spline-calibration-envelope-dict = {H1:data/GW170817/Feb-20-2018_O2_LHO_GPSTime_1187008882_C02_RelativeResponseUncertainty_FinalResults.txt, L1:data/GW170817/Feb-20-2018_O2_LLO_GPSTime_1187008882_C02_RelativeResponseUncertainty_FinalResults.txt, V1:data/GW170817/V_calibrationUncertaintyEnvelope_magnitude5p1percent_phase40mraddeg20microsecond.txt}
+
+################################################################################
+## Job submission arguments
+################################################################################
+
+label = GW170817-AT2017gfo-GRB170817A
+outdir = outdir
+
+################################################################################
+## Likelihood arguments
+################################################################################
+
+distance-marginalization=False
+phase-marginalization=False
+time-marginalization=False
+
+################################################################################
+## Prior arguments
+################################################################################
+
+prior-file = GW170817_AT2017gfo_GRB170817A.prior
+
+################################################################################
+## Waveform arguments
+################################################################################
+
+frequency-domain-source-model = lal_binary_neutron_star
+waveform_approximant = IMRPhenomPv2_NRTidalv2
+
+################################################################################
+## EM arguments
+################################################################################
+    
+binary-type=BNS
+light-curve-data=data/AT2017gfo-GRB170817A/AT2017gfo_GRB170817A.dat
+kilonova-model=Bu2019lm
+kilonova-model-svd=data/AT2017gfo-GRB170817A/svdmodels_reduced
+svd-mag-ncoeff=10
+svd-lbol-ncoeff=10
+kilonova-trigger-time=57982.5285236896
+kilonova-tmin=0.1
+kilonova-tmax=950
+kilonova-error=1
+kilonova-tstep=0.1
+kilonova-interpolation-type=sklearn_gp
+grb-resolution=12
+with-grb=True
+
+################################################################################
+## EOS arguments
+################################################################################
+
+with-eos=True 
+eos-data=eos/with_NICER_J0740/EOS_024_uniform_5k_sorted
+Neos=5000
+eos-weight=eos/with_NICER_J0740/EOS_sorted_weight.dat
+</pre></div>
+</div>
+<p>The joint inference generation can be performed by running:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nmma-generation config.ini
+</pre></div>
+</div>
+<p>This will generate a <code class="docutils literal notranslate"><span class="pre">GW170817-AT2017gfo-GRB170817A_data_dump.pickle</span></code> file under <code class="docutils literal notranslate"><span class="pre">outdir/data/</span></code> which need to be provided for the joint inference function <code class="docutils literal notranslate"><span class="pre">nmma-analysis</span></code>.</p>
+<p><strong>Running the analysis</strong></p>
+<p>As detailed above, running the analysis with the command <code class="docutils literal notranslate"><span class="pre">nmma-analysis</span> <span class="pre">--data-dump</span> <span class="pre">outidr/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle</span></code> requires computational resources on a larger cluster. Below we show an example script for job submission called <code class="docutils literal notranslate"><span class="pre">jointinf.pbs</span></code> on a German cluster:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>#!/bin/bash
+#PBS -N &lt;name of simulation&gt;
+#PBS -l select=16:node_type=rome:mpiprocs=128
+#PBS -l walltime=24:00:00
+#PBS -e ./outdir/log_data_analysis/err.txt
+#PBS -o ./outdir/log_data_analysis/out.txt
+#PBS -m abe
+#PBS -M &lt;email adress&gt;
+
+module load python
+module load mpt
+module load mpi4py
+source &lt;provide path to venv&gt;
+
+export MPI_UNBUFFERED_STDIO=true
+export MPI_LAUNCH_TIMEOUT=240
+
+cd $PBS_O_WORKDIR
+mpirun -np 512 omplace -c 0-127:st=4 nmma-analysis --data-dump &lt;absolute path to folder&gt;/outdir/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle --nlive 1024 --nact 10 --maxmcmc 10000 --sampling-seed 20210213 --no-plot --outdir &lt;absolute path to outdir/result folder&gt;
+</pre></div>
+</div>
+<p>Note that settings might differ from cluster to cluster and also the installation of NMMA might be changed (conda vs. python installation).</p>
+<p><strong>Maximum mass constraint from a joint analysis</strong></p>
+<p>From a joint posterior of GW and lightcurve data from a BNS, one can derive an upper limit on the TOV mass, if one assumes that the remnant collapsed to a black hole. The idea is to determine the posterior distribution on the remnant’s mass from the posterior distribution of the individual neutron star masses <span class="math notranslate nohighlight">\(m_1\)</span>, <span class="math notranslate nohighlight">\(m_2\)</span> and the ejecta and compare this to the TOV mass of EOSs.</p>
+<p>This can be done via the command</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>maximum-mass-constraint --outdir &lt;path to folder&gt; --joint-posterior &lt;path to the file with samples from GW+EM analysis&gt;  --prior &lt;path to a bilby prior file&gt; --eos-path-macro &lt;path to macroscopic EOS&gt; --eos-path-micro &lt;path to microscopic EOS&gt; [--use-M-Kepler]
+</pre></div>
+</div>
+<p>The last flag determines whether the remnant mass is compared against the TOV mass or the maximum mass limit for a rotating NS (Kepler limit). The latter is less conservative. The joint posterior should contain the parameters chirp mass, eta_star, log10_mdisk, log10_mej_dyn as named columns. Here, eta_star is <span class="math notranslate nohighlight">\(η* = \ln(0.25-η)\)</span> from the symmetric mass ratio <span class="math notranslate nohighlight">\(η\)</span>. The macroscopic EOS curves must have the central pressure p0 in MeV/fm³ of each NS mass as last column.</p>
+<p>If –use-M-Kepler is set, the prior file needs to contain two additional fiducial paramters for the quasi-universal relations:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ratio_R = Gaussian(name = &quot;R&quot;, mu = 1.255, sigma = 0.024)
+delta = Uniform(name=&quot;delta&quot;, minimum = -0.0125, maximum = 0.0125)
+</pre></div>
+</div>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="gw_inference.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Inference of gravitational-wave signals</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="GW-EM-resampling.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Connecting Electromagnetic signals to Binary Source Properties</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By The NMMA Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2023, The NMMA Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
