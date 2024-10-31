@@ -509,6 +509,11 @@ class GRBLightCurveModel(LightCurveMixin):
         grb_param_dict["epsilon_B"] = 10 ** new_parameters["log10_epsilon_B"]
         grb_param_dict["z"] = z
 
+        # make sure L0, q and ts are also passed
+        for param in ['L0', 'q', 'ts']:
+            if param in new_parameters:
+                grb_param_dict[param] = new_parameters[param]
+
         if "thetaWing" in new_parameters:
             grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
             if new_parameters["thetaWing"] / new_parameters["thetaCore"] > self.resolution:
