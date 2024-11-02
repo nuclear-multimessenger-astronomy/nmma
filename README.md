@@ -54,6 +54,18 @@ When utilizing this code for a publication, kindly make a reference to the packa
       url={https://doi.org/10.1038/s41467-023-43932-6}
 }
 ```
+If you are using the systematics error, please also cite the paper [A data-driven approach for modeling the temporal and spectral evolution of kilonova systematic uncertainties](https://arxiv.org/abs/2410.21978). The BibTeX entry for the paper is:
+```bibtex
+@article{Jhawar:2024ezm,
+    author = "Jhawar, Sahil and Wouters, Thibeau and Pang, Peter T. H. and Bulla, Mattia and Coughlin, Michael W. and Dietrich, Tim",
+    title = "{A data-driven approach for modeling the temporal and spectral evolution of kilonova systematic uncertainties}",
+    eprint = "2410.21978",
+    archivePrefix = "arXiv",
+    primaryClass = "astro-ph.HE",
+    month = "10",
+    year = "2024"
+}
+```
 
 ### Acknowledgments
 If you benefited from participating in our community, we ask that you please acknowledge the Nuclear Multi-Messenger Astronomy collaboration, and particular individuals who helped you, in any publications.
