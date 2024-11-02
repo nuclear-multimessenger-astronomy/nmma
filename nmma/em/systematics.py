@@ -133,7 +133,7 @@ def validate_distribution(distribution):
 
 def create_prior_string(name, distribution):
     dist_type = distribution.pop("type")
-    _ = distribution.pop("value")
+    _ = distribution.pop("value", None)
     _ = distribution.pop("time_nodes", None)
     _ = distribution.pop("filters", None)
     prior_class = ALLOWED_DISTRIBUTIONS[dist_type]
