@@ -485,6 +485,7 @@ User Guide
    models
    training
    data_inj_obs
+   systematics
    fitting
    lfi_analysis
    gw_inference
