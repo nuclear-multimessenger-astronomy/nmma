@@ -484,8 +484,8 @@ def calc_lc(
                 y_pred, sigma2_pred = gp.predict(
                     np.atleast_2d(param_list_postprocess), return_std=True
                 )
-                cAproj[i] = y_pred
-                cAstd[i] = sigma2_pred
+                cAproj[i] = np.squeeze(y_pred)
+                cAstd[i] = np.squeeze(sigma2_pred)
 
         # coverrors = np.dot(VA[:, :n_coeff], np.dot(np.power(np.diag(cAstd[:n_coeff]), 2), VA[:, :n_coeff].T))
         # errors = np.diag(coverrors)

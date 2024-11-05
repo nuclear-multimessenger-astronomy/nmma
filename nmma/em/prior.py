@@ -7,6 +7,7 @@ from bilby.core.prior.conditional import ConditionalTruncatedGaussian
 
 from . import systematics
 
+
 def from_list(self, systematics):
     """
     Similar to `from_file` but instead of file buffer, takes a list of Prior strings

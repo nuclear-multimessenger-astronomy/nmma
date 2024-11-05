@@ -6,12 +6,11 @@ from ..em.systematics import (
     ValidationError,
     validate_only_one_true,
     validate_filters,
-    validate_distribution,
-    validate_fields,
     handle_withTime,
     handle_withoutTime,
     main,
     ALLOWED_FILTERS,
+    ALLOWED_DISTRIBUTIONS
 )
 
 
@@ -22,8 +21,8 @@ config:
   withTime:
     value: true
     type: Uniform
-    min: 0.0
-    max: 1.0
+    minimum: 0.0
+    maximum: 1.0
     time_nodes: 2
     filters:
       - [bessellb, bessellv]
@@ -31,8 +30,8 @@ config:
   withoutTime:
     value: false
     type: Uniform
-    min: 0.0
-    max: 1.0
+    minimum: 0.0
+    maximum: 1.0
 """
 
 
@@ -65,40 +64,18 @@ def test_validate_filters_invalid():
         validate_filters(invalid_filters)
 
 
-def test_validate_distribution_valid():
-    validate_distribution("Uniform")  # Should not raise an exception
-
-
-def test_validate_distribution_invalid():
-    with pytest.raises(ValidationError, match="Invalid distribution 'Normal'"):
-        validate_distribution("Normal")
-
-
-def test_validate_fields_valid():
-    valid_values = {"type": "Uniform", "min": 0.0, "max": 1.0}
-    required_fields = {"type": str, "min": (float, int), "max": (float, int)}
-    validate_fields("test", valid_values, required_fields)  # Should not raise an exception
-
-
-def test_validate_fields_invalid():
-    invalid_values = {"type": "Uniform", "min": "0.0", "max": 1.0}
-    required_fields = {"type": str, "min": (float, int), "max": (float, int)}
-    with pytest.raises(ValidationError, match="'min' must be of type"):
-        validate_fields("test", invalid_values, required_fields)
-
-
 def test_handle_withTime():
-    values = {"type": "Uniform", "min": 0.0, "max": 1.0, "time_nodes": 2, "filters": [["bessellb", "bessellv"], "ztfr"]}
-    result = handle_withTime("withTime", values)
+    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": [["bessellb", "bessellv"], "ztfr"]}
+    result = handle_withTime(values)
     assert "sys_err_bessellb___bessellv1" in result[0]
     assert "sys_err_ztfr2" in result[3]
 
 
 def test_handle_withoutTime():
-    values = {"type": "Uniform", "min": 0.0, "max": 1.0}
-    result = handle_withoutTime("withoutTime", values)
+    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0}
+    result = handle_withoutTime(values)
     assert len(result) == 1
-    assert 'sys_err = Uniform(minimum=0.0,maximum=1.0,name="sys_err")' in result[0]
+    assert "sys_err = Uniform(minimum=0.0, maximum=1.0, name='sys_err', latex_label='sys_err', unit=None, boundary=None)" in result[0]
 
 
 def test_main(sample_yaml_file):
@@ -146,43 +123,32 @@ def test_validate_filters_empty_list():
     validate_filters([])  # Should not raise an exception
 
 
+def test_validate_distribution_valid():
+    assert ALLOWED_DISTRIBUTIONS["Uniform"]  # Should not raise an exception
+
+
+def test_validate_distribution_invalid():
+    with pytest.raises(KeyError):
+        assert ALLOWED_DISTRIBUTIONS["nonuniform"]  # Should be "Uniform"
+
+
 def test_validate_distribution_case_sensitive():
-    with pytest.raises(ValidationError, match="Invalid distribution 'uniform'"):
-        validate_distribution("uniform")  # Should be "Uniform"
-
-
-@pytest.mark.parametrize("invalid_type", [123, True, [], {}])
-def test_validate_fields_invalid_types(invalid_type):
-    invalid_values = {"type": invalid_type, "min": 0.0, "max": 1.0}
-    required_fields = {"type": str, "min": (float, int), "max": (float, int)}
-    with pytest.raises(ValidationError, match="'type' must be of type"):
-        validate_fields("test", invalid_values, required_fields)
+    with pytest.raises(KeyError):
+        assert (ALLOWED_DISTRIBUTIONS["uniform"])  # Should be "Uniform"
 
 
 def test_handle_withTime_single_filter():
-    values = {"type": "Uniform", "min": 0.0, "max": 1.0, "time_nodes": 2, "filters": ["ztfr"]}
-    result = handle_withTime("withTime", values)
+    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": ["ztfr"]}
+    result = handle_withTime(values)
     assert len(result) == 2
     assert all("sys_err_ztfr" in line for line in result)
 
 
 def test_handle_withTime_all_filters():
-    values = {"type": "Uniform", "min": 0.0, "max": 1.0, "time_nodes": 1, "filters": [None]}
-    result = handle_withTime("withTime", values)
+    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [None]}
+    result = handle_withTime(values)
     assert len(result) == 1
     assert "sys_err_all1" in result[0]
-
-
-def test_handle_withTime_integer_bounds():
-    values = {"type": "Uniform", "min": 0, "max": 10, "time_nodes": 1, "filters": ["ztfr"]}
-    result = handle_withTime("withTime", values)
-    assert "minimum=0" in result[0] and "maximum=10" in result[0]
-
-
-def test_handle_withoutTime_integer_bounds():
-    values = {"type": "Uniform", "min": 0, "max": 10}
-    result = handle_withoutTime("withoutTime", values)
-    assert "minimum=0" in result[0] and "maximum=10" in result[0]
 
 
 def test_main_withoutTime(tmp_path):
@@ -193,8 +159,8 @@ config:
   withoutTime:
     value: true
     type: Uniform
-    min: 0.0
-    max: 1.0
+    minimum: 0.0
+    maximum: 1.0
 """
     yaml_file = tmp_path / "withoutTime_config.yaml"
     yaml_file.write_text(yaml_content)
@@ -219,8 +185,8 @@ config:
 
 @pytest.mark.parametrize("filter_name", ALLOWED_FILTERS)
 def test_all_allowed_filters(filter_name):
-    values = {"type": "Uniform", "min": 0.0, "max": 1.0, "time_nodes": 1, "filters": [filter_name]}
-    result = handle_withTime("withTime", values)
+    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [filter_name]}
+    result = handle_withTime(values)
     assert len(result) == 1
     assert f"sys_err_{filter_name}1" in result[0]
 

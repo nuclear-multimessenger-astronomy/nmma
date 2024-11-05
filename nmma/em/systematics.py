@@ -1,6 +1,9 @@
-import yaml
-from pathlib import Path
+import inspect
 import warnings
+from pathlib import Path
+
+import yaml
+from bilby.core.prior import analytical
 
 warnings.simplefilter("module", DeprecationWarning)
 
@@ -39,6 +42,24 @@ ALLOWED_FILTERS = [
     "ztfr",
 ]
 
+ALLOWED_DISTRIBUTIONS = dict(inspect.getmembers(analytical, inspect.isclass))
+
+
+def get_positional_args(cls):
+    init_method = cls.__init__
+
+    signature = inspect.signature(init_method)
+    params = [
+        param.name
+        for param in signature.parameters.values()
+        if param.name != "self" and param.default == inspect.Parameter.empty
+    ]
+
+    return params
+
+
+DISTRIBUTION_PARAMETERS = {k: get_positional_args(v) for k, v in ALLOWED_DISTRIBUTIONS.items()}
+
 
 def load_yaml(file_path):
     return yaml.safe_load(Path(file_path).read_text())
@@ -46,19 +67,13 @@ def load_yaml(file_path):
 
 def validate_only_one_true(yaml_dict):
     for key, values in yaml_dict["config"].items():
-        if "value" not in values or type(values["value"]) is not bool:
-            raise ValidationError(
-                key, "'value' key must be present and be a boolean"
-            )
+        if "value" not in values or not isinstance(values["value"], bool):
+            raise ValidationError(key, "'value' key must be present and be a boolean")
     true_count = sum(value["value"] for value in yaml_dict["config"].values())
     if true_count > 1:
-        raise ValidationError(
-            "config", "Only one configuration key can be set to True at a time"
-        )
+        raise ValidationError("config", "Only one configuration key can be set to True at a time")
     elif true_count == 0:
-        raise ValidationError(
-            "config", "At least one configuration key must be set to True"
-        )
+        raise ValidationError("config", "At least one configuration key must be set to True")
 
 
 def validate_filters(filter_groups):
@@ -100,44 +115,46 @@ def validate_filters(filter_groups):
 
 
 def validate_distribution(distribution):
-    if distribution != "Uniform":
+    dist_type = distribution.get("type")
+    if dist_type not in ALLOWED_DISTRIBUTIONS:
         raise ValidationError(
-            "type",
-            f"Invalid distribution '{distribution}'. Only 'Uniform' distribution is supported",
+            "distribution type",
+            f"Invalid distribution '{dist_type}'. Allowed values are {', '.join([str(f) for f in ALLOWED_DISTRIBUTIONS])}",
+        )
+
+    required_params = DISTRIBUTION_PARAMETERS[dist_type]
+
+    missing_params = set(required_params) - set(distribution.keys())
+    if missing_params:
+        raise ValidationError(
+            "distribution", f"Missing required parameters for {dist_type} distribution: {', '.join(missing_params)}"
         )
 
 
-def validate_fields(key, values, required_fields):
-    missing_fields = [
-        field for field in required_fields if values.get(field) is None
-    ]
-    if missing_fields:
-        raise ValidationError(
-            key, f"Missing fields: {', '.join(missing_fields)}"
-        )
-    for field, expected_type in required_fields.items():
-        if not isinstance(values[field], expected_type):
-            raise ValidationError(
-                key, f"'{field}' must be of type {expected_type}"
-            )
+def create_prior_string(name, distribution):
+    dist_type = distribution.pop("type")
+    _ = distribution.pop("value", None)
+    _ = distribution.pop("time_nodes", None)
+    _ = distribution.pop("filters", None)
+    prior_class = ALLOWED_DISTRIBUTIONS[dist_type]
+    required_params = DISTRIBUTION_PARAMETERS[dist_type]
+    params = distribution.copy()
+
+    extra_params = set(params.keys()) - set(required_params)
+    if extra_params:
+        warnings.warn(f"Distribution parameters {extra_params} are not used by {dist_type} distribution and will be ignored")
+
+    params = {k: params[k] for k in required_params if k in params}
+
+    return f"{name} = {repr(prior_class(**params, name=name))}"
 
 
-def handle_withTime(key, values):
-    required_fields = {
-        "type": str,
-        "min": (float, int),
-        "max": (float, int),
-        "time_nodes": int,
-        "filters": list,
-    }
-
-
-    validate_fields(key, values, required_fields)
+def handle_withTime(values):
+    validate_distribution(values)
     filter_groups = values.get("filters", [])
     validate_filters(filter_groups)
-    distribution = values.get("type")
-    validate_distribution(distribution)
     result = []
+    time_nodes = values["time_nodes"]
 
     for filter_group in filter_groups:
         if isinstance(filter_group, list):
@@ -145,22 +162,16 @@ def handle_withTime(key, values):
         else:
             filter_name = filter_group if filter_group is not None else "all"
 
-        for n in range(1, values["time_nodes"] + 1):
-            result.append(
-                f'sys_err_{filter_name}{n} = {values["type"]}(minimum={values["min"]},maximum={values["max"]},name="sys_err_{filter_name}{n}")'
-            )
+        for n in range(1, time_nodes + 1):
+            prior_name = f"sys_err_{filter_name}{n}"
+            result.append(create_prior_string(prior_name, values.copy()))
 
     return result
 
 
-def handle_withoutTime(key, values):
-    required_fields = {"type": str, "min": (float, int), "max": (float, int)}
-    validate_fields(key, values, required_fields)
-    distribution = values.get("type")
-    validate_distribution(distribution)
-    return [
-        f'sys_err = {values["type"]}(minimum={values["min"]},maximum={values["max"]},name="sys_err")'
-    ]
+def handle_withoutTime(values):
+    validate_distribution(values)
+    return [create_prior_string("sys_err", values)]
 
 
 config_handlers = {
@@ -175,5 +186,5 @@ def main(yaml_file_path):
     results = []
     for key, values in yaml_dict["config"].items():
         if values["value"] and key in config_handlers:
-            results.extend(config_handlers[key](key, values))
+            results.extend(config_handlers[key](values))
     return results

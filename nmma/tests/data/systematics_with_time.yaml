@@ -5,10 +5,10 @@ config:
       - null # you can keep it or remove it, it will still be parsed as None (filter independent)
     time_nodes: 4
     type: "Uniform"
-    min: 0
-    max: 2
+    minimum: 0
+    maximum: 2
   withoutTime:
     value: false
     type: "Uniform"
-    min: 0
-    max: 2
+    minimum: 0
+    maximum: 2
