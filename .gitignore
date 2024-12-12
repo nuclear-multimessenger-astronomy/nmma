@@ -10,3 +10,7 @@ nmma.egg-info/
 
 # models
 svdmodels/
+
+##custom files
+stable_eos_241205.txt
+nmma/eos/data

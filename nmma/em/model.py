@@ -407,41 +407,47 @@ class GRBLightCurveModel(LightCurveModelContainer):
         super().__init__(model, parameter_conversion, filters, model_parameters)
         self.resolution = resolution
         self.jetType = jetType
+        self.default_parameters = {"xi_N": 1.0, "d_L": 3.086e19, "jetType": jetType, "specType": 0}  # d_L=10pc in cm
+        self.def_keys = self.default_parameters.keys()
+        #keys we typically sample in log space, but need to convert to linear space
+        self.log_sampling_keys = ["E0", "n0", "epsilon_e", "epsilon_B"]
+    
+    def grb_parameter_setup(self, new_parameters):
 
-    def generate_lightcurve(self, sample_times, parameters):
-        new_parameters = self.em_parameter_setup(parameters, extinction=True)
-        default_parameters = {"xi_N": 1.0, "d_L": 3.086e19}  # 10pc in cm
+        # set the default parameters preferentially from sampling
+        grb_param_dict = {k: new_parameters.get(k, self.default_parameters[k]) for k in self.def_keys}
 
-        grb_param_dict = {}
-
-        for key in default_parameters.keys():
-            if key not in new_parameters.keys():
-                grb_param_dict[key] = default_parameters[key]
-            else:
-                grb_param_dict[key] = new_parameters[key]
-
-        grb_param_dict["jetType"] = self.jetType
-        grb_param_dict["specType"] = 0
-
-        grb_param_dict["thetaObs"] = new_parameters["inclination_EM"]
-        grb_param_dict["E0"] = 10 ** new_parameters["log10_E0"]
-        grb_param_dict["thetaCore"] = new_parameters["thetaCore"]
-        grb_param_dict["n0"] = 10 ** new_parameters["log10_n0"]
-        grb_param_dict["p"] = new_parameters["p"]
-        grb_param_dict["epsilon_e"] = 10 ** new_parameters["log10_epsilon_e"]
-        grb_param_dict["epsilon_B"] = 10 ** new_parameters["log10_epsilon_B"]
         grb_param_dict["z"] = new_parameters['redshift']
-        if "thetaWing" in new_parameters:
-            grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
-            if new_parameters["thetaWing"] / new_parameters["thetaCore"] > self.resolution:
-                return np.zeros(len(sample_times)), {}
+        grb_param_dict["thetaObs"] = new_parameters["inclination_EM"]
 
-        if grb_param_dict["epsilon_e"] + grb_param_dict["epsilon_B"] > 1.0:
-            return np.zeros(len(sample_times)), {}
+        for key in self.log_sampling_keys:
+            try:
+                grb_param_dict[key] = new_parameters[key]
+            except KeyError:
+                grb_param_dict[key] = 10 ** new_parameters[f"log10_{key}"]
+
+        # make sure L0, q and ts are also passed
+        for param in ["thetaCore","thetaWing", "p", 'L0', 'q', 'ts']:
+            try:
+                grb_param_dict[param] = new_parameters[param]
+            except KeyError:
+                pass
 
         if self.jetType == 1 or self.jetType == 4:
             grb_param_dict["b"] = new_parameters["b"]
 
+    def generate_lightcurve(self, sample_times, parameters):
+        new_parameters = self.em_parameter_setup(parameters, extinction=True)
+        grb_param_dict = self.grb_parameter_setup(new_parameters)
+
+        #sanity checks
+        if "thetaWing" in grb_param_dict.keys():
+            if grb_param_dict["thetaWing"] / grb_param_dict["thetaCore"] > self.resolution:
+                return np.zeros(len(sample_times)), {}
+
+        if grb_param_dict["epsilon_e"] + grb_param_dict["epsilon_B"] > 1.0:
+            return np.zeros(len(sample_times)), {}
+        
         filts, nu_0s, ext_mag = self.get_extinction_mags(new_parameters['redshift'], new_parameters.get("Ebv", 0.0), self.filters)
         _, lbol, mag = utils.grb_lc(
             sample_times, grb_param_dict, filters=filts, obs_frequencies= nu_0s

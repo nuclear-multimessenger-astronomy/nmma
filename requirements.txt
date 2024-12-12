@@ -1,12 +1,13 @@
 future
 bilby>=2.1.1
-bilby_pipe>=1.1.0
+bilby_pipe>=1.4.0
+schwimmbad<0.4.0
 colorcet
 numpy>=1.9
 matplotlib>=3.0
 scipy>=1.10
 pandas>=2.0
-astropy>=5.3.4
+astropy>=6.0
 pymultinest
 sncosmo
 dust_extinction
