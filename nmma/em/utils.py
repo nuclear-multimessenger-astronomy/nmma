@@ -13,7 +13,7 @@ from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
 import sncosmo
 import dust_extinction.shapes as dustShp
 
-from astropy.cosmology import Planck18, z_at_value
+from astropy.cosmology import Planck18
 import astropy.units
 import astropy.constants
 
@@ -44,6 +44,24 @@ except ImportError:
 import warnings
 
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
+
+
+
+### some frequently used constants:
+
+# convert time from day to second
+seconds_a_day = 86400.0  # in seconds
+msun_cgs = astropy.constants.M_sun.cgs.value
+c_cgs = astropy.constants.c.cgs.value
+h = astropy.constants.h.cgs.value
+kb = astropy.constants.k_B.cgs.value
+sigSB = astropy.constants.sigma_sb.cgs.value
+arad = 4 * sigSB / c_cgs
+Mpc = astropy.constants.pc.cgs.value * 1e6
+D = 10 * astropy.constants.pc.cgs.value  # ref distance for absolute magnitude
+abs_mag_dist_factor = D**2
+dummy_lum = 1 # 1e43   ### dummy value returned for conformity that should never be used further
+
 
 # Define default filters variable for import in other parts of the code
 DEFAULT_FILTERS = [
@@ -76,17 +94,24 @@ DEFAULT_FILTERS = [
     "ultrasat",
 ]
 
+def setup_sample_times(args):
+    if args.log_space_time:
+        if args.n_tstep:
+            n_step = args.n_tstep
+        else:
+            n_step = int((args.tmax - args.tmin) / args.dt)
+        return np.logspace(np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step)
+    else:
+        return np.arange(args.tmin, args.tmax + args.dt, args.dt)
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
-
-    speed_of_light_cm_s = scipy.constants.c * 100.0
 
     # Return the extinction factor (e ^ -0.4 * Ax) for the
     # Pei 1992 SMC model
 
     # Get model wavelength range
-    ext_range_nu_lo = dustShp.P92.x_range[0] * 1e4 * speed_of_light_cm_s
-    ext_range_nu_hi = min(cutoff_hi, dustShp.P92.x_range[1] * 1e4 * speed_of_light_cm_s)
+    ext_range_nu_lo = dustShp.P92.x_range[0] * 1e4 * c_cgs
+    ext_range_nu_hi = min(cutoff_hi, dustShp.P92.x_range[1] * 1e4 * c_cgs)
 
     # host-frame frequencies
     nu_host = nu * (1 + z)
@@ -95,7 +120,7 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
     opt = (nu_host >= ext_range_nu_lo) & (nu_host <= ext_range_nu_hi)
 
     # host-frame wavelengths
-    lam_host = (speed_of_light_cm_s / nu_host[opt]) * astropy.units.cm
+    lam_host = (c_cgs / nu_host[opt]) * astropy.units.cm
 
     # amplitudes have to be converted from B reference to V
     abav = dustShp.P92.AbAv
@@ -135,26 +160,6 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
     ext[opt] = np.power(10.0, -0.4 * Ax_o_Av * Av)
 
     return ext
-
-
-def getRedShift(parameters):
-
-    if "redshift" in parameters:
-        z = parameters["redshift"]
-    else:
-        if parameters["luminosity_distance"] > 0:
-            z = z_at_value(
-                Planck18.luminosity_distance,
-                parameters["luminosity_distance"] * astropy.units.Mpc,
-                zmin=0.0,
-                zmax=2.0,
-            )
-            if hasattr(z, "value"):
-                z = z.value
-        else:
-            z = 0.0
-    return z
-
 
 def get_all_bandpass_metadata():
     """
@@ -253,36 +258,69 @@ def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
     return processedData
 
 
-def interpolate_nans(data: dict) -> dict:
+def interpolate_nans(data_dict: dict) -> dict:
     """
     Interpolates the NaN values in a photometric data.
 
     Args:
-        data (dict): Dictionary containing photometric data. The keys correspond to the filenames
+        data_dict (dict): Dictionary containing photometric data. The keys correspond to the filenames
         of the data. The values are dictionaries of which the keys correspond to time (t) or the filters considered.
         The corresponding values are the time grid (in days) and the magnitudes of the different filters.
     """
 
     # Iterate over all the data files
-    for name in data.keys():
+    for name, sub_dict in data_dict.items():
         # For each file, iterate over the time or the filters present
-        for d in data[name].keys():
+        for key, val in sub_dict.items():
             # Skip over the time grid and filters which have no NaN values
-            if d == "t":
+            if key == "t":
+                time_array = val
                 continue
-            if not any(np.isnan(data[name][d])):
+            if not any(np.isnan(val)):
                 continue
 
-            # Find indices where the data is not NaN for interpolation values
-            ii = np.where(~np.isnan(data[name][d]))[0]
-            if len(ii) > 1:
-                f = interp.interp1d(
-                    data[name]["t"][ii], data[name][d][ii], fill_value="extrapolate"
-                )
-                # Do the interpolation
-                data[name][d] = f(data[name]["t"])
+            interpolated_data = autocomplete_data(time_array, time_array, val)
+            ##interpolated_data contains only nans, if there were not at least 2 usable data points
+            if np.isnan(interpolated_data[0]):
+                continue
+            
+            data_dict[name][key] = interpolated_data
+                
 
-    return data
+    return data_dict
+
+def autocomplete_data( interp_points, ref_points, ref_data, extrapolate='linear'):
+    """
+    Interpolates and extrapolates reference data to a 1-D array of arguments. This can be wide off!
+    This basically extends np.interp to ignore nans and provide linear extrapolations. 
+    """
+    
+    ii = np.where(np.isfinite(ref_data))[0]
+    if len(ii) < 2:
+        return np.full_like(interp_points, np.nan)
+    
+    fin_ref= np.asarray(ref_points)[ii]
+    fin_data=np.asarray(ref_data)[ii]
+    interp_points=np.atleast_1d(interp_points)
+
+    if isinstance(extrapolate, (float , int)):
+        interp_data = np.interp(interp_points, fin_ref, fin_data,
+                                 left=extrapolate, right=extrapolate)
+    elif isinstance(extrapolate, str):
+        interp_data = np.interp(interp_points, fin_ref, fin_data)
+        if extrapolate=='linear':
+            x0, x1, xm, xn = fin_ref[[0,1,-2,-1]]
+            y0, y1, ym, yn = fin_data[[0,1,-2,-1]]
+            lower_extrap_args= np.argwhere(interp_points<x0)
+            interp_data[lower_extrap_args] = y0 + (y1-y0)/(x1-x0)*(interp_points[lower_extrap_args]-x0)
+            upper_extrap_args = np.argwhere(interp_points>xn)
+            interp_data[upper_extrap_args] = yn + (yn-ym)/(xn-xm)*(interp_points[upper_extrap_args]-xn)
+        ## TODO Allow more sophisticated treatment of extrapolation
+    
+    else:
+        interp_data = np.interp(interp_points, fin_ref, fin_data,
+                                 left=extrapolate[0], right=extrapolate[-1])   
+    return interp_data
 
 
 def get_default_filts_lambdas(filters=None):
@@ -381,6 +419,30 @@ def get_default_filts_lambdas(filters=None):
         lambdas = np.array(lambdas_slice)
 
     return filts, lambdas
+
+def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared = abs_mag_dist_factor):
+    exp = np.exp(h * nu * inv_temp / kb)
+    bb_factor = 2.* h/ c_cgs**2
+    return bb_factor * nu**3 /(exp-1) * R_photo * R_photo / dist_squared
+
+def flux_to_ABmag(flux, unit='cgs', residual_mag = None):
+    # see https://en.wikipedia.org/wiki/AB_magnitude
+    if unit=='cgs':
+        residual_magnitude =  - 48.6
+    elif unit == 'Jy':
+        residual_magnitude = 8.9
+    elif unit == 'mJy':
+        residual_magnitude = 16.4
+    if residual_mag:
+        residual_magnitude = residual_mag
+
+    suff_flux = np.argwhere(flux> 0)
+    if len(suff_flux)< 2:
+        return np.full_like(flux, np.nan)
+    mAB = np.full_like(flux, np.inf)
+
+    mAB[suff_flux] = -2.5 * np.log10(flux [suff_flux]) + residual_magnitude
+    return mAB
 
 
 def calc_lc(
@@ -487,13 +549,8 @@ def calc_lc(
         mag_back = mag_back * (maxs - mins) + mins
         # mag_back = scipy.signal.medfilt(mag_back, kernel_size=3)
 
-        ii = np.where((~np.isnan(mag_back)) * (tt_interp < 20.0))[0]
-        if len(ii) < 2:
-            maginterp = np.nan * np.ones(tt.shape)
-        else:
-            f = interp.interp1d(tt_interp[ii], mag_back[ii], fill_value="extrapolate")
-            maginterp = f(tt)
-        mAB[filt] = maginterp
+        mag_back[tt_interp>=20]= np.inf ### FIXME quick-fix to not trust lightcurve after 20 days 
+        mAB[filt] = autocomplete_data(tt, tt_interp, mag_back )
 
     if svd_lbol_model is not None:
         if lbol_ncoeff:
@@ -533,87 +590,12 @@ def calc_lc(
         lbol_back = lbol_back * (maxs - mins) + mins
         # lbol_back = scipy.signal.medfilt(lbol_back, kernel_size=3)
 
-        ii = np.where(~np.isnan(lbol_back))[0]
-        if len(ii) < 2:
-            lbolinterp = np.nan * np.ones(tt.shape)
-        else:
-            f = interp.interp1d(tt_interp[ii], lbol_back[ii], fill_value="extrapolate")
-            lbolinterp = 10 ** f(tt)
-        lbol = lbolinterp
+        lbol = 10**autocomplete_data(tt, tt_interp, lbol_back)
     else:
-        lbol = np.inf * np.ones(len(tt))
+        lbol = np.full_like(tt, np.nan)
 
     return np.squeeze(tt), np.squeeze(lbol), mAB
 
-
-def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=None):
-
-    # lambdas = np.arange(lambdaini, lambdamax+dlambda, dlambda)
-    lambdas = np.arange(lambdaini, lambdamax, dlambda)
-
-    spec = np.zeros((len(lambdas), len(tt)))
-    for jj, lambda_d in enumerate(lambdas):
-        n_coeff = svd_spec_model[lambda_d]["n_coeff"]
-        # param_array = svd_spec_model[lambda_d]["param_array"]
-        # cAmat = svd_spec_model[lambda_d]["cAmat"]
-        # cAstd = svd_spec_model[lambda_d]["cAstd"]
-        VA = svd_spec_model[lambda_d]["VA"]
-        param_mins = svd_spec_model[lambda_d]["param_mins"]
-        param_maxs = svd_spec_model[lambda_d]["param_maxs"]
-        mins = svd_spec_model[lambda_d]["mins"]
-        maxs = svd_spec_model[lambda_d]["maxs"]
-        gps = svd_spec_model[lambda_d]["gps"]
-        tt_interp = svd_spec_model[lambda_d]["tt"]
-
-        param_list_postprocess = np.array(param_list)
-        for i in range(len(param_mins)):
-            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
-                param_maxs[i] - param_mins[i]
-            )
-
-        cAproj = np.zeros((n_coeff,))
-        for i in range(n_coeff):
-            gp = gps[i]
-            y_pred, sigma2_pred = gp.predict(
-                np.atleast_2d(param_list_postprocess), return_std=True
-            )
-            cAproj[i] = y_pred
-
-        spectra_back = np.dot(VA[:, :n_coeff], cAproj)
-        spectra_back = spectra_back * (maxs - mins) + mins
-        # spectra_back = scipy.signal.medfilt(spectra_back, kernel_size=3)
-
-        N = 3  # Filter order
-        Wn = 0.1  # Cutoff frequency
-        B, A = scipy.signal.butter(N, Wn, output="ba")
-        # spectra_back = scipy.signal.filtfilt(B, A, spectra_back)
-
-        ii = np.where(~np.isnan(spectra_back))[0]
-        if len(ii) < 2:
-            specinterp = np.nan * np.ones(tt.shape)
-        else:
-            f = interp.interp1d(
-                tt_interp[ii], spectra_back[ii], fill_value="extrapolate"
-            )
-            specinterp = 10 ** f(tt)
-        spec[jj, :] = specinterp
-
-    for jj, t in enumerate(tt):
-        spectra_back = np.log10(spec[:, jj])
-        spectra_back[~np.isfinite(spectra_back)] = -99.0
-        if t < 7.0:
-            spectra_back[1:-1] = scipy.signal.medfilt(spectra_back, kernel_size=5)[1:-1]
-        else:
-            spectra_back[1:-1] = scipy.signal.medfilt(spectra_back, kernel_size=5)[1:-1]
-        ii = np.where((spectra_back != 0) & ~np.isnan(spectra_back))[0]
-        if len(ii) < 2:
-            specinterp = np.nan * np.ones(lambdas.shape)
-        else:
-            f = interp.interp1d(lambdas[ii], spectra_back[ii], fill_value="extrapolate")
-            specinterp = 10 ** f(lambdas)
-        spec[:, jj] = specinterp
-
-    return np.squeeze(tt), np.squeeze(lambdas), spec
 
 
 @timeout(60)
@@ -625,82 +607,62 @@ def fluxDensity(t, nu, **params):
     return mJy
 
 
-def grb_lc(t_day, Ebv, param_dict, filters=None):
-    day = 86400.0  # in seconds
-    tStart = (np.amin(t_day)) * day
-    tStart = max(10 ** (-5) * day, tStart)
-    tEnd = (np.amax(t_day) + 1) * day
+def grb_lc(t_day, param_dict, filters, obs_frequencies):
+    tStart = max(10 ** (-5), np.amin(t_day)) * seconds_a_day
+    tEnd = (np.amax(t_day) + 1) * seconds_a_day
     tnode = min(len(t_day), 201)
     default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
-    nu_0s = scipy.constants.c / lambdas
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_0s, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_0s))
-
-    times = np.empty((len(default_time), len(filts)))
-    nus = np.empty((len(default_time), len(filts)))
+    times = np.empty((len(default_time), len(filters)))
+    nus = np.empty((len(default_time), len(filters)))
 
     times[:, :] = default_time[:, None]
-    for nu_idx, nu_0 in enumerate(nu_0s):
+    for nu_idx, nu_0 in enumerate(obs_frequencies):
         nus[:, nu_idx] = nu_0
 
+    mag = {}
+    lbol = np.full_like(t_day, dummy_lum)
     # output flux density is in milliJansky
     try:
         mJys = fluxDensity(times, nus, **param_dict)
-
     except TimeoutError:
-        return t_day, np.zeros(t_day.shape), {}
+        return t_day, lbol, mag
 
-    Jys = 1e-3 * mJys
+    if np.any(mJys <= 0.0):
+        return t_day, lbol, mag
 
-    if np.any(Jys <= 0.0):
-        return t_day, np.zeros(t_day.shape), {}
+    for filt_idx, filt in enumerate(filters):
+        mag_d = flux_to_ABmag(mJys[:, filt_idx], unit= 'mJy')
+        mag[filt] = autocomplete_data(t_day, default_time / seconds_a_day, mag_d)
 
+    return lbol, mag
+
+def host_lc(sample_times, parameters, filters, host_mag):
+    # Based on arxiv:2303.12849
     mag = {}
-    lbol = 1e43 * np.ones(t_day.shape)
+    lbol = np.full_like(sample_times, dummy_lum)  # random
 
-    for filt_idx, filt in enumerate(filts):
-
-        Jy = Jys[:, filt_idx] * ext[filt_idx]
-
-        # see https://en.wikipedia.org/wiki/AB_magnitude
-        mag_d = -48.6 + -1 * np.log10(Jy / 1e23) * 2.5
-
-        ii = np.where(np.isfinite(mag_d))[0]
-        if len(ii) >= 2:
-            f = interp.interp1d(
-                default_time[ii] / day, mag_d[ii], fill_value="extrapolate"
-            )
-            maginterp = f(t_day)
-        else:
-            maginterp = np.nan * np.ones(t_day.shape)
-            lbol = np.zeros(t_day.shape)
-
-        mag[filt] = maginterp
-
-    return t_day, lbol, mag
-
+    alpha = parameters["alpha_AG"]
+    for i, filt in enumerate(filters):
+        # assumed to be in unit of muJy
+        a_AG = parameters[f"a_AG_{filt}"]
+        f_nu_filt = parameters[f"f_nu_{filt}"]
+        flux_per_filt = a_AG * np.power(sample_times, -alpha) + f_nu_filt
+        mag[filt] = flux_to_ABmag(flux_per_filt, residual_mag=host_mag[i])
+    return lbol, mag
 
 def sn_lc(
     tt,
-    z,
-    Ebv,
+    parameters,
+    cosmology,
     abs_mag=-19.35,
     regularize_band="bessellv",
     regularize_system="vega",
     model_name="nugent-hyper",
-    parameters={},
     filters=None,
+    lambdas=None,
 ):
-
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nus = scipy.constants.c / (1e-10 * lambdas)
-
+    z= parameters['redshift']
     model = sncosmo.Model(source=model_name)
     if model_name in ["salt2", "salt3"]:
         model.set(
@@ -714,32 +676,25 @@ def sn_lc(
         model.set(z=z)
 
     # regularize the absolute magnitude
-    abs_mag -= Planck18.distmod(z).value
+    abs_mag -= cosmology.distmod(z).value
     model.set_source_peakabsmag(
-        abs_mag, regularize_band, regularize_system, cosmo=Planck18
+        abs_mag, regularize_band, regularize_system, cosmo=cosmology
     )
 
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nus, Ebv, z)
-    else:
-        ext = np.ones(len(nus))
-
     mag = {}
-    lbol = 1e43 * np.ones(tt.shape)
+    lbol = np.full_like(tt, dummy_lum)
 
-    for filt_idx, (filt, lambda_A) in enumerate(zip(filts, lambdas)):
+    for filt, lambda_A in zip(filters, lambdas):
         # convert back to AA
         lambda_AA = 1e10 * lambda_A
         if lambda_AA < model.minwave() or lambda_AA > model.maxwave():
             mag[filt] = np.inf * np.ones(tt.shape)
         else:
             try:
-                # the output is in ergs / s / cm^2 / Angstrom
-                flux = model.flux(tt, [lambda_AA]) * ext[filt_idx]
+                flux = model.flux(tt, [lambda_AA])[:, 0]
                 # see https://en.wikipedia.org/wiki/AB_magnitude
                 flux_jy = 3.34e4 * np.power(lambda_AA, 2.0) * flux
-                mag_per_filt = -2.5 * np.log10(flux_jy) + 8.9
-                mag[filt] = mag_per_filt[:, 0]
+                mag[filt] = flux_to_ABmag(flux_jy, unit='Jy')
             except Exception:
                 mag[filt] = np.ones(tt.shape) * np.nan
                 lbol = np.zeros(tt.shape)
@@ -747,44 +702,29 @@ def sn_lc(
     return tt, lbol, mag
 
 
-def sc_lc(t_day, param_dict, filters=None):
+def sc_lc(t_day, param_dict,nus, filters):
 
-    day = 86400.0  # in seconds
-    t = t_day * day
+    t = t_day * seconds_a_day
 
     # fetch parameter values
-    Me = 10 ** param_dict["log10_Menv"] * astropy.constants.M_sun.cgs.value
+    Me = 10 ** param_dict["log10_Menv"] * msun_cgs
     Renv = 10 ** param_dict["log10_Renv"]
     Ee = 10 ** param_dict["log10_Ee"]
-    Ebv = param_dict["Ebv"]
-    z = param_dict["z"]
+    z = param_dict["redshift"]
 
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nu_obs = scipy.constants.c / lambdas
-    nu_host = nu_obs * (1 + z)
+    nu_host = nus * (1 + z)
     t /= 1 + z
 
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
 
-    # define relevant constants
-    c = astropy.constants.c.cgs.value
-    h = astropy.constants.h.cgs.value
-    kb = astropy.constants.k_B.cgs.value
-    sb = astropy.constants.sigma_sb.cgs.value
-    D = 10 * astropy.constants.pc.cgs.value
     n = 10
     delta = 1.1
     K = (n - 3) * (3 - delta) / (4 * np.pi * (n - delta))  # K = 0.119
     kappa = 0.2
     vt = np.sqrt(((n - 5) * (5 - delta) / ((n - 3) * (3 - delta))) * (2 * Ee / Me))
-    td = np.sqrt((3 * kappa * K * Me) / ((n - 1) * vt * c))
+    td = np.sqrt((3 * kappa * K * Me) / ((n - 1) * vt * c_cgs))
 
     # evalute the model, lbol first
-    prefactor = np.pi * (n - 1) / (3 * (n - 5)) * c * Renv * vt * vt / kappa
+    prefactor = np.pi * (n - 1) / (3 * (n - 5)) * c_cgs * Renv * vt * vt / kappa
     L_early = prefactor * np.power(td / t, 4 / (n - 2))
     L_late = prefactor * np.exp(-0.5 * (t * t / td / td - 1))
     lbol = np.zeros(len(t))
@@ -805,122 +745,71 @@ def sc_lc(t_day, param_dict, filters=None):
     Rs[t >= td] = R_late[t >= td]
 
     sigmaT4 = lbol / (4 * np.pi * Rs * Rs)
-    T = np.power(sigmaT4 / sb, 0.25)
+    T = np.power(sigmaT4 / sigSB, 0.25)
     T[T == 0.0] = np.nan
     one_over_T = 1.0 / T
     one_over_T[~np.isfinite(one_over_T)] = np.inf
 
     mag = {}
-    for idx, filt in enumerate(filts):
+    for idx, filt in enumerate(filters):
         nu_of_filt = nu_host[idx]
-        ext_per_filt = ext[idx]
-        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F = (
-            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-            * exp
-            / (1 - exp)
-            * Rs
-            * Rs
-            / D
-            / D
-        )
-        F *= ext_per_filt
+        F = bb_flux_from_inv_temp(nu_of_filt, one_over_T, Rs)
         F *= 1 + z
-        mAB = np.ones(len(F))
-        mAB *= np.inf
-        mAB[F > 0] = -2.5 * np.log10(F[F > 0]) - 48.6
-        mag[filt] = mAB
-
-        # make sure there are at least two valid data point for interpolation
-        if len(np.where(np.isfinite(mAB))[0]) < 2:
-            mag[filt] = np.ones(t_day.shape) * np.nan
+        mag[filt] = flux_to_ABmag(F)
 
     return t_day, lbol, mag
 
+# def inv_temp_from_rad_bb_and_lum(lbol, r_bb, time):
+#     inv_t_obs = (4 *sigSB* np.pi * r_bb* r_bb/lbol)**0.25
+#     inv_t_obs = autocomplete_data(time, time, inv_t_obs)
 
-def metzger_lc(t_day, param_dict, filters=None):
+
+def metzger_lc(t_day, param_dict, nu_obs, filters):
 
     # convert time from day to second
-    day = 86400.0  # in seconds
-    t = t_day * day
+    t = t_day * seconds_a_day
+    nu_host = nu_obs * (1 + z)
+    t /= 1 + z
     tprec = len(t)
 
     if len(np.where(t == 0)[0]) > 0:
         raise ValueError("For Me2017, start later than t=0")
-
-    # define constants
-    c = astropy.constants.c.cgs.value
-    h = astropy.constants.h.cgs.value
-    kb = astropy.constants.k_B.cgs.value
-    Msun = astropy.constants.M_sun.cgs.value
-    sigSB = astropy.constants.sigma_sb.cgs.value
-    arad = 4 * sigSB / c
-    Mpc = astropy.constants.pc.cgs.value * 1e6
-
     # fetch parameters
-    M0 = 10 ** param_dict["log10_mej"] * Msun  # total ejecta mass
-    v0 = 10 ** param_dict["log10_vej"] * c  # minimum escape velocity
+    M0 = 10 ** param_dict["log10_mej"] * msun_cgs  # total ejecta mass
+    v0 = 10 ** param_dict["log10_vej"] * c_cgs  # minimum escape velocity
     beta = param_dict["beta"]
     kappa_r = 10 ** param_dict["log10_kappa_r"]
-    z = param_dict["z"]
-    Ebv = param_dict["Ebv"]
-    D = 1e-5 * Mpc  # 10pc
+    z = param_dict["redshift"]
 
     # define additional parameters
     E0 = 0.5 * M0 * v0 * v0  # initial thermal energy of bulk
-    Mn = 1e-8 * Msun  # mass cut for free neutrons
+    Mn = 1e-8 * msun_cgs  # mass cut for free neutrons
     Ye = 0.1  # electron fraction
     Xn0max = 1 - 2 * Ye  # initial neutron mass fraction in outermost layers
 
     # define mass / velocity array of the outer ejecta, comprised half of the mass
     mmin = np.log(1e-8)
-    mmax = np.log(M0 / Msun)
+    mmax = np.log(M0 / msun_cgs)
     mprec = 300
     m = np.arange(mprec) * (mmax - mmin) / (mprec - 1) + mmin
     m = np.exp(m)
 
-    vm = v0 * np.power(m * Msun / M0, -1.0 / beta)
-    vm[vm > c] = c
+    vm = v0 * np.power(m * msun_cgs / M0, -1.0 / beta)
+    vm[vm > c_cgs] = c_cgs
 
-    # define thermalization efficiency rom Barnes+16
-    ca3 = 1.3
-    cb3 = 0.2
-    cd3 = 1.1
-
-    ca2 = 8.2
-    cb2 = 1.2
-    cd2 = 1.52
-
-    ca = 0.56
-    cb = 0.17
-    cd = 0.74
-    eth = np.exp(-ca * t_day) + np.log(1.0 + 2 * cb * (t_day ** (cd))) / (
-        2 * cb * t_day ** (cd)
-    )
-    eth *= 0.36
-    eth2 = np.exp(-ca2 * t_day) + np.log(1.0 + 2 * cb2 * (t_day ** (cd2))) / (
-        2 * cb2 * t_day ** (cd2)
-    )
-    eth2 *= 0.36
-    eth3 = np.exp(-ca3 * t_day) + np.log(1.0 + 2 * cb3 * (t_day ** (cd3))) / (
-        2 * cb3 * t_day ** (cd3)
-    )
-    eth3 *= 0.36
+    # define thermalization efficiency from Barnes+16, eq. 34
+    def thermalization_efficiency(time, ca, cb, cd):
+        timescale_factor = 2*cb * time**cd
+        eff_therm = np.exp(-ca*time) + np.log(1.0 + timescale_factor) / timescale_factor
+        return 0.36 * eff_therm
+    
+    eth = thermalization_efficiency(t_day, ca=0.56, cb=0.17, cd=0.74)
+    # eth2= thermalization_efficiency(t_day, ca= 8.2, cb= 1.2, cd=1.52)
+    # eth3= thermalization_efficiency(t_day, ca= 1.3, cb= 0.2, cd= 1.1)
 
     # define radioactive heating rates
-    Xn0 = Xn0max * 2 * np.arctan(Mn / m / Msun) / np.pi  # neutron mass fraction
+    Xn0 = Xn0max * 2 * np.arctan(Mn / m / msun_cgs) / np.pi  # neutron mass fraction
     Xr = 1.0 - Xn0  # r-process fraction
-
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nu_obs = scipy.constants.c / lambdas
-    nu_host = nu_obs * (1 + z)
-    t /= 1 + z
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
 
     # define arrays in mass layer and time
     Xn = np.zeros((mprec, tprec))
@@ -941,13 +830,13 @@ def metzger_lc(t_day, param_dict, filters=None):
     etharray = np.tile(eth, (mprec, 1))
     Xn = Xn0array * np.exp(-tarray / 900.0)
     edotn = 3.2e14 * Xn
-    edotr = (
-        4.0e18
-        * Xrarray
-        * (0.5 - (1.0 / np.pi) * np.arctan((tarray - t0) / sig)) ** (1.3)
-        * etharray
-    )
-    edotr = 2.1e10 * etharray * ((tarray / day) ** (-1.3))
+    # edotr = (
+    #     4.0e18
+    #     * Xrarray
+    #     * (0.5 - (1.0 / np.pi) * np.arctan((tarray - t0) / sig)) ** (1.3)
+    #     * etharray
+    # )
+    edotr = 2.1e10 * etharray * ((tarray / seconds_a_day) ** (-1.3))
     edot = edotn + edotr
     kappan = 0.4 * (1.0 - Xn - Xrarray)
     kappar = kappa_r * Xrarray
@@ -1004,8 +893,8 @@ def metzger_lc(t_day, param_dict, filters=None):
             kappaoz = kappa_r * (temp[j] / 4000.0) ** (5.5)
         kappaoz = kappa_r
         LPdV = E[j] * v[j] / R[j]
-        tdiff0 = 3 * kappaoz * M0 / (4 * np.pi * c * v[j] * t[j])
-        tlc0 = R[j] / c
+        tdiff0 = 3 * kappaoz * M0 / (4 * np.pi * c_cgs * v[j] * t[j])
+        tlc0 = R[j] / c_cgs
         tdiff0 = tdiff0 + tlc0
         Lrad[j] = E[j] / tdiff0
         Ek[j + 1] = Ek[j] + LPdV * dt[j]
@@ -1015,7 +904,7 @@ def metzger_lc(t_day, param_dict, filters=None):
         taues[j + 1] = M0 * 0.4 / (4 * R[j + 1] ** 2)
 
         templayer = (
-            3 * ene[:-1, j] * dm * Msun / (arad * 4 * np.pi * (t[j] * vm[:-1]) ** 3)
+            3 * ene[:-1, j] * dm * msun_cgs / (arad * 4 * np.pi * (t[j] * vm[:-1]) ** 3)
         )
 
         if np.isnan(templayer).any():
@@ -1031,23 +920,19 @@ def metzger_lc(t_day, param_dict, filters=None):
         ] / 4000.0 ** (5.5)
         kappa_correction[:] = 1
 
-        tdiff[:-1, j] = (
-            0.08
-            * kappa[:-1, j]
-            * m[:-1]
-            * Msun
-            * 3
-            * kappa_correction
-            / (vm[:-1] * c * t[j] * beta)
+        tdiff[:-1, j] = (0.08 * kappa[:-1, j]
+            * m[:-1] * msun_cgs
+            * 3 * kappa_correction
+            / (vm[:-1] * c_cgs * t[j] * beta)
         )
         tau[:-1, j] = (
-            m[:-1] * Msun * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
+            m[:-1] * msun_cgs * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
         )
-        lum[:-1, j] = ene[:-1, j] / (tdiff[:-1, j] + t[j] * (vm[:-1] / c))
-        ene[:-1, j + 1] = (edot[:-1, j] - (ene[:-1, j] / t[j]) - lum[:-1, j]) * dt[
-            j
-        ] + ene[:-1, j]
-        lum[:-1, j] = lum[:-1, j] * dm * Msun
+        lum[:-1, j] = ene[:-1, j] / (tdiff[:-1, j] + t[j] * (vm[:-1] / c_cgs))
+        ene[:-1, j + 1] = ene[:-1, j] + dt[j]*(
+            edot[:-1, j] - (ene[:-1, j] / t[j]) - lum[:-1, j]
+            ) 
+        lum[:-1, j] = lum[:-1, j] * dm * msun_cgs
 
         tau[mprec - 1, j] = tau[mprec - 2, j]
         # photosphere
@@ -1065,222 +950,100 @@ def metzger_lc(t_day, param_dict, filters=None):
     lbol = Ltotm * 1e40
 
     Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto**2 * sigSB)) ** (0.25)
+    Tobs = autocomplete_data(t_day, t_day, Tobs)
 
-    ii = np.where(~np.isnan(Tobs) & (Tobs > 0))[0]
-    f = interp.interp1d(t_day[ii], Tobs[ii], fill_value="extrapolate")
-    Tobs = f(t_day)
-
-    Tobs[Tobs == 0.0] = np.nan
+    Tobs[Tobs <= 0.0] = np.nan
     one_over_T = 1.0 / Tobs
     one_over_T[~np.isfinite(one_over_T)] = np.inf
 
     mag = {}
-    for idx, filt in enumerate(filts):
+    for idx, filt in enumerate(filters):
         nu_of_filt = nu_host[idx]
-        ext_per_filt = ext[idx]
-        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F = (
-            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-            * exp
-            / (1 - exp)
-            * Rphoto
-            * Rphoto
-            / D
-            / D
-        )
-        F *= ext_per_filt
+        F = bb_flux_from_inv_temp(nu_of_filt, one_over_T, Rphoto)
         F *= 1 + z
-        mAB = np.ones(len(F))
-        mAB *= np.inf
-        mAB[F > 0] = -2.5 * np.log10(F[F > 0]) - 48.6
-        mag[filt] = mAB
+        mag[filt] = flux_to_ABmag(F)
 
     return t_day, lbol, mag
 
 
-def blackbody_constant_temperature(t_day, param_dict, filters=None):
-    # prevent the output message flooded by these warning messages
-    old = np.seterr()
-    np.seterr(invalid="ignore")
-    np.seterr(divide="ignore")
-
-    # convert time from day to second
-    day = 86400.0  # in seconds
-    t = t_day * day
-
-    # define constants
-    c = astropy.constants.c.cgs.value
-    h = astropy.constants.h.cgs.value
-    kb = astropy.constants.k_B.cgs.value
-    sigSB = astropy.constants.sigma_sb.cgs.value
-    Mpc = astropy.constants.pc.cgs.value * 1e6
+def blackbody_constant_temperature(t_day, param_dict, nu_obs, filters=None):
 
     # fetch parameters
     bb_luminosity = param_dict[
         "bb_luminosity"
     ]  # blackboady's total luminosity in erg/s
     temperature = param_dict["temperature"]  # blackbody's temperature in K
-    z = param_dict["z"]
-    Ebv = param_dict["Ebv"]
-    D = 1e-5 * Mpc  # 10pc
+    z = param_dict["redshift"]
 
     # parameter conversion
     one_over_T = 1.0 / temperature
     bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
-    # get the default filters and wavelength
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
 
-    nu_obs = scipy.constants.c / lambdas
+    # convert time from day to second
+    t = t_day * seconds_a_day
     nu_host = nu_obs * (1 + z)
     t /= 1 + z
 
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
-
     mag = {}
-    for idx, filt in enumerate(filts):
+    for idx, filt in enumerate(filters):
         nu_of_filt = nu_host[idx]
-        ext_per_filt = ext[idx]
-        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F_bb = (
-            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-            * exp
-            / (1 - exp)
-            * bb_radius
-            * bb_radius
-            / D
-            / D
-        )
+        F = bb_flux_from_inv_temp(nu_of_filt, one_over_T, bb_radius)
+        F *= 1 + z
+        mag[filt] = flux_to_ABmag(F)
 
-        F_bb *= ext_per_filt
-        F_bb *= 1 + z
-        mAB = np.ones(len(t_day))
-        mAB *= -2.5 * np.log10(F_bb) - 48.6
-        mag[filt] = mAB
+    lbol = np.full_like(t_day, dummy_lum)  # some dummy value
 
-    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
-
-    np.seterr(**old)
 
     return t_day, lbol, mag
 
 
-def synchrotron_powerlaw(t_day, param_dict, filters=None):
-    # prevent the output message flooded by these warning messages
-    old = np.seterr()
-    np.seterr(invalid="ignore")
-    np.seterr(divide="ignore")
-
+def synchrotron_powerlaw(t_day, param_dict, nu_obs, filters):
     beta = param_dict["beta_freq"]  # frequency index
     alpha = param_dict["alpha_time"]  # time index
     F_ref = param_dict["F_ref"]  # in mJy for t=1day and nu=1Hz
-    Ebv = param_dict["Ebv"]
-
-    # get the default filters and wavelength
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nu_obs = scipy.constants.c / lambdas
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
 
     mag = {}
-    for idx, filt in enumerate(filts):
-        nu_of_filt = nu_obs[idx]
-        ext_per_filt = ext[idx]
-        F_pl = F_ref * np.power(nu_of_filt, -beta) * np.power(t_day, -alpha)
-        F_pl *= ext_per_filt
-        mAB = np.ones(len(t_day))
-        mAB *= -2.5 * np.log10(F_pl) + 16.4  # convert flux in mJy to AB magnitude
-        mag[filt] = mAB
+    for idx, filt in enumerate(filters):
+        F_pl = F_ref * np.power(nu_obs[idx], -beta) * np.power(t_day, -alpha)
+        mag[filt] = flux_to_ABmag(F_pl, unit='mJy')
 
-    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
-
-    np.seterr(**old)
-
+    lbol = np.full_like(t_day, dummy_lum)  # some dummy value
     return t_day, lbol, mag
 
 
-def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict, filters=None):
-
-    # prevent the output message flooded by these warning messages
-    old = np.seterr()
-    np.seterr(invalid="ignore")
-    np.seterr(divide="ignore")
-
-    # convert time from day to second
-    day = 86400.0  # in seconds
-    t = t_day * day
-
-    # define constants
-    c = astropy.constants.c.cgs.value
-    h = astropy.constants.h.cgs.value
-    kb = astropy.constants.k_B.cgs.value
-    sigSB = astropy.constants.sigma_sb.cgs.value
-    Mpc = astropy.constants.pc.cgs.value * 1e6
-
+def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict, nu_obs, filters):
     # fetch parameters
     bb_luminosity = param_dict["bb_luminosity"]  # blackboady's total luminosity
     temperature = param_dict["temperature"]  # for the blackbody radiation
     beta = param_dict["beta"]  # for the power-law
     powerlaw_mag = param_dict["powerlaw_mag"]
     powerlaw_filt_ref = "g"
-    z = param_dict["z"]
-    Ebv = param_dict["Ebv"]
-    D = 1e-5 * Mpc  # 10pc
+    z = param_dict["redshift"]
 
     # parameter conversion
     one_over_T = 1.0 / temperature
     bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
-    # get the default filters and wavelength
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
+
     # calculate the powerlaw prefactor (with the reference filter)
-    nu_ref = scipy.constants.c / lambdas[filts == powerlaw_filt_ref]
+    nu_ref = nu_obs[filters.index(powerlaw_filt_ref)]
     powerlaw_prefactor = np.power(nu_ref, beta) * np.power(
         10, -0.4 * (powerlaw_mag + 48.6)
     )
 
-    nu_obs = scipy.constants.c / lambdas
+    # convert time from day to second
+    t = t_day * seconds_a_day
     nu_host = nu_obs * (1 + z)
     t /= 1 + z
 
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
-
     mag = {}
-    for idx, filt in enumerate(filts):
+    for idx, filt in enumerate(filters):
         nu_of_filt = nu_host[idx]
-        ext_per_filt = ext[idx]
-        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F_bb = (
-            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-            * exp
-            / (1 - exp)
-            * bb_radius
-            * bb_radius
-            / D
-            / D
-        )
-        F_pl = powerlaw_prefactor * np.power(nu_of_filt, -beta)
+        F = bb_flux_from_inv_temp(nu_of_filt, one_over_T, bb_radius)
+        F+= powerlaw_prefactor * np.power(nu_of_filt, -beta)
+        F*= 1 + z
+        mag[filt] = flux_to_ABmag(F)
 
-        F = F_bb + F_pl  # adding the two contributions
-
-        F *= ext_per_filt
-        F *= 1 + z
-        mAB = np.ones(len(t_day))
-        mAB *= -2.5 * np.log10(F) - 48.6
-        mag[filt] = mAB
-
-    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
-
-    np.seterr(**old)
-
+    lbol = np.full_like(t_day, dummy_lum)  # some dummy value
     return t_day, lbol, mag
 
 
@@ -1305,13 +1068,6 @@ def estimate_mag_err(uncer_params, df):
 
     return df
 
-
-def check_default_attr(args, attr, default=False):
-
-    if hasattr(args, attr):
-        return getattr(args, attr)
-    else:
-        return default
 
 
 class NumpyEncoder(json.JSONEncoder):

@@ -1,12 +1,12 @@
 from __future__ import division
 
-import inspect
 import numpy as np
 from bilby.core.likelihood import Likelihood
 
 from ..gw.gw_likelihood import GravitationalWaveTransientLikelihood, setup_gw_kwargs
 from ..eos.eos_likelihood import setup_eos_kwargs, EquationofStateLikelihood
-from ..em.em_likelihood import EMTransientLikelihood, setup_em_kwargs, setup_grb_kwargs
+from ..em.em_likelihood import EMTransientLikelihood, setup_em_kwargs
+
 
 class MultiMessengerLikelihood(Likelihood):
     """A multi-messenger likelihood object
@@ -24,12 +24,11 @@ class MultiMessengerLikelihood(Likelihood):
     
 
     """
-    def __init__(self, priors, messenger_likelihoods, param_conv_func, **kwargs):
+    def __init__(self, priors, messenger_likelihoods,  **kwargs):
+        super(MultiMessengerLikelihood, self).__init__(parameters={})
         self.reprs=[lhood.__repr__() for lhood in messenger_likelihoods]
         self.sub_likelihoods=messenger_likelihoods
         self.priors = priors
-        self.parameter_conversion=param_conv_func
-        super(MultiMessengerLikelihood, self).__init__(parameters={})
         self.__sync_parameters()
 
     def __repr__(self):
@@ -42,13 +41,17 @@ class MultiMessengerLikelihood(Likelihood):
         for lhood in self.sub_likelihoods:
             lhood.parameters= self.parameters
 
+
     def log_likelihood(self):
         if not self.priors.evaluate_constraints(self.parameters):
             return np.nan_to_num(-np.inf)
-        
+        self.sub_log_likelihood()
+
+    def sub_log_likelihood(self):
         logL=0
         for lhood in self.sub_likelihoods:
-            logL+= lhood.log_likelihood()
+            lhood.parameters = self.parameters
+            logL+= lhood.sub_log_likelihood()
         if not np.isfinite(logL):
             return np.nan_to_num(-np.inf)
         else:
@@ -61,7 +64,7 @@ class MultiMessengerLikelihood(Likelihood):
         return noise_logL
     
 
-def setup_nmma_likelihood(data_dump, priors, args,messengers, param_conv_func, logger, **kwargs
+def setup_nmma_likelihood(data_dump, priors, args,messengers, logger, param_conv_func= None, **kwargs
     #messengers, interferometers, waveform_generator, light_curve_data, priors, args
     ):
     """Takes the kwargs and sets up and returns
@@ -93,20 +96,26 @@ def setup_nmma_likelihood(data_dump, priors, args,messengers, param_conv_func, l
 
     if "eos" in messengers:
         logger.info("Sampling over EOS generated on the fly")
-        eos_kwargs = setup_eos_kwargs(priors, data_dump, args, logger, **kwargs)
+        eos_kwargs = setup_eos_kwargs(priors, data_dump, 
+                                      args, logger, **kwargs)
         messenger_lhoods.append(EquationofStateLikelihood(priors,  **eos_kwargs))
         likelihood_kwargs.update(eos_kwargs)
+
     if "gw" in messengers:
-        gw_kwargs = setup_gw_kwargs(priors, data_dump, args, logger, **kwargs)
+        gw_kwargs = setup_gw_kwargs(data_dump, 
+                                    args, logger, **kwargs)
         messenger_lhoods.append(GravitationalWaveTransientLikelihood(priors, param_conv_func, **gw_kwargs))
         likelihood_kwargs.update(gw_kwargs)
 
     if "em" in messengers:
-        em_kwargs= setup_em_kwargs(param_conv_func, data_dump, args, logger, **kwargs)
+        # if "grb" in messengers:
+        #     ###modifies the em parameters, does not (as of 06/24) have its own likelihood
+        #     em_kwargs= setup_grb_kwargs(param_conv_func, data_dump,
+        #                                 args, logger, **kwargs)
+        # else:
+        em_kwargs= setup_em_kwargs(param_conv_func, data_dump,
+                                        args, logger, **kwargs)
 
-        ###modifies the em parameters, does not (as of 06/24) have its own likelihood
-        if "grb" in messengers:
-            em_kwargs= setup_grb_kwargs(em_kwargs,args.grb_resolution, param_conv_func)
         
         messenger_lhoods.append(
             EMTransientLikelihood(priors, **em_kwargs))
@@ -119,7 +128,7 @@ def setup_nmma_likelihood(data_dump, priors, args,messengers, param_conv_func, l
         f"Initialise {Likelihood} with kwargs: \n{likelihood_kwargs}"
     )
     
-    return MultiMessengerLikelihood(priors, messenger_lhoods, param_conv_func,**likelihood_kwargs)
+    return MultiMessengerLikelihood(priors, messenger_lhoods,**likelihood_kwargs)
 
 
 def reorder_loglikelihoods(unsorted_loglikelihoods, unsorted_samples, sorted_samples):

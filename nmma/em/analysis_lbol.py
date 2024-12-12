@@ -10,7 +10,6 @@ import bilby
 import bilby.core
 import matplotlib
 import numpy as np
-from scipy.interpolate import interp1d
 import pandas as pd
 from astropy import time
 from bilby.core.likelihood import ZeroLikelihood

@@ -26,9 +26,11 @@ from .parser import (
     create_nmma_generation_parser,
     parse_generation_args,
 )
-from .parser.generation_parser import remove_argument_from_parser
+
 from ..em.io import loadEvent
 from ..em.injection import create_light_curve_data
+from ..em.em_likelihood import setup_lightcurve_model
+from ..eos.eos_gen import compose_eos_constraints
 
 from .. import __version__
 
@@ -73,7 +75,7 @@ def get_version_info():
         nmma_version=__version__,
     )
 
-def remove_expandable_args(parser, category, inp):
+def remove_expandable_args(parser, required_arg_groups):
     # for cat in msg_list:
     #     if messenger not in inputs.messengers:
     #         #  identify argument_group corresponding to non-sampled msg.
@@ -81,7 +83,28 @@ def remove_expandable_args(parser, category, inp):
     #             if f'with_{messenger}' in [act.dest for act in ag._group_actions]:
     #                 parser._action_groups.remove(ag)
     for ag in parser._action_groups:
-        if 
+        if ag.title not in required_arg_groups:
+            parser._action_groups.remove(ag)
+        
+    return parser
+
+def determine_required_args(analysis_categories):
+    required_args=[
+        'positional arguments', 'options', 'Dynesty Settings','GW input arguments', 'Misc. Settings',  'Data generation arguments', 'Injection arguments', 'Job submission arguments', 'Likelihood arguments', 'Output arguments', 'Prior arguments',  'Sampler arguments','Slurm Settings']
+    if "gw" in analysis_categories:
+        required_args.extend(
+            ['Calibration arguments','Waveform arguments', 
+             'Detector arguments', 'Post processing arguments'])
+    if 'em' in analysis_categories:
+        required_args.append('EM analysis input arguments')
+    if 'eos' in analysis_categories:
+        required_args.append('EOS analysis input arguments')
+    if 'Hubble' in analysis_categories:
+        required_args.append('Hubble input arguments')
+    if 'tabulated_eos' in analysis_categories:
+        required_args.append('Tabulated EOS input arguments')
+    return required_args
+    
 
 def write_complete_config_file(parser, args, inputs):
     """Wrapper function that uses bilby_pipe's complete config writer.
@@ -101,16 +124,11 @@ def write_complete_config_file(parser, args, inputs):
 
     ##eliminate args from config we do not use
     #   iterate through possible messengers
-    msg_list =['em','eos', 'grb','gw']
-    ana_mod_list = ['Hubble', 'tabulated_eos']
+    check_messengers= inputs.messengers + inputs.analysis_modifiers
 
-
-
-    for analysis_modifier in ana_mod_list:
-        if analysis_modifier in inputs.analysis_modifiers: 
-            for ag in parser._action_groups:
-                if f'with_{messenger}' in [act.dest for act in ag._group_actions]:
-                    parser._action_groups.remove(ag)
+    # clean parser to only use setups that we apply
+    required_arg_groups= determine_required_args(check_messengers)
+    parser= remove_expandable_args(parser, required_arg_groups)
 
     try:
         bilby_pipe.main.write_complete_config_file(parser, args, inputs)
@@ -127,68 +145,87 @@ def create_generation_logger(outdir, label):
     bilby_pipe.data_generation.logger = logger
     return logger
 
-def read_constraint_from_args(args, constraint_kind):
-    ##preferred: Have the dict with the subconstraints already set up
-    prep_dict= getattr(args, constraint_kind, None) 
-    if prep_dict is not None:
-        return bilby_pipe.utils.convert_string_to_dict(prep_dict)
-    
-    ###otherwise try to construct it:
-        ### read in provided attributes 
-    prel_dict= {key.removeprefix(constraint_kind+'_'): ##cut identifier
-                bilby_pipe.utils.convert_string_to_list(getattr(args, key)) ## read in list or float
-                for key in dir(args)            ## search args for attrs 
-                if key.startswith(constraint_kind+'_')} ## related with kind
-    new_constraints = prel_dict.pop('name', None)
-    if new_constraints is not None: ## there needs to be a unique label
-        ext_dict={} 
-        ### iterate through constrs.
-        for i, name in enumerate(new_constraints): 
-            ext_dict[name] ={k:v[i] for k,v in prel_dict.items()} 
-        return ext_dict
-
-def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
-    if args.eos_constraint_dict:
-        try:
-            with open(args.eos_constraint_dict, 'r') as f:
-                constraint_dict = json.load(f) 
-        except:
-            constraint_dict = {}
-
-        for constraint_kind in constraint_kinds:
-            new_dict= read_constraint_from_args(args,constraint_kind)
-            try:
-                constraint_dict[constraint_kind].update(new_dict)
-            except KeyError:
-                constraint_dict[constraint_kind] = new_dict
-            except AttributeError:
-                constraint_dict[constraint_kind] = new_dict
-
-    with open(args.eos_constraint_dict, "w") as f:
-        json.dump(constraint_dict, f, indent=4)
-    return constraint_dict
-
-class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
+class NMMADataGenerationInput(bilby_pipe.input.Input):
     ###FIXME get rid of compulsory GW structure
     def __init__(self, args, unknown_args):
+        
         super().__init__(args, unknown_args)
+        # Generic setup, ripped from bilby pipe
+        # Admin arguments
+        self.injection_parameters=None
+        self.ini = args.ini
+        self.transfer_files = args.transfer_files
+
+        # Run index arguments
+        self.idx = args.idx
+        self.generation_seed = args.generation_seed
+        self.trigger_time = args.trigger_time
+
+        # Naming arguments
+        self.outdir = args.outdir
+        self.label = args.label
+
+        # Prior arguments
+        self.reference_frame = args.reference_frame
+        self.time_reference = args.time_reference
+        self.phase_marginalization = args.phase_marginalization
+        self.prior_file = args.prior_file
+        self.prior_dict = args.prior_dict
+        self.deltaT = args.deltaT
+        self.default_prior = args.default_prior
+        # Marginalization
+        self.distance_marginalization = args.distance_marginalization
+        self.distance_marginalization_lookup_table = (
+            args.distance_marginalization_lookup_table
+        )
+        self.phase_marginalization = args.phase_marginalization
+        self.time_marginalization = args.time_marginalization
+        self.calibration_marginalization = args.calibration_marginalization
+        self.calibration_lookup_table = args.calibration_lookup_table
+        self.number_of_response_curves = args.number_of_response_curves
+        self.jitter_time = args.jitter_time
+
+        # Plotting
+        self.plot_data = args.plot_data
+        self.plot_spectrogram = args.plot_spectrogram
+        self.plot_injection = args.plot_injection
+
+
+        
         self.args = args
         self.sampler = "dynesty"
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
 
-        ### identify messengers and modifiers, to be extended
+
+        # This is done before instantiating the likelihood so that it is the full prior
+        self._priors=self._get_priors()
+        self.priors.to_json(outdir=self.data_directory, label=self.label)
+        self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
+
+
+        self.create_data(args, unknown_args)
+
+        self.meta_data = dict(
+                config_file=self.ini,
+                data_dump_file=self.data_dump_file,
+                **get_version_info(),
+                command_line_args=args.__dict__,
+                unknown_command_line_args=unknown_args,
+                injection_parameters= self.injection_parameters,
+        )
+
+        ### identify messengers, to be extended
         messengers=[]
-        if args.with_eos_parameters:
+        if args.with_eos:
             messengers.append("eos")
         if args.with_em:
-            messengers.append('em')
+            messengers.append("em")
         if args.with_grb:
             messengers.append("grb")
         if args.with_gw:
-            #### resetting likelihood type is an unpleasant bilby_pipe remnant
-            self.gw_likelihood_type = self.likelihood_type
             messengers.append("gw")
+
         self.messengers = messengers
 
         analysis_modifiers= []
@@ -197,8 +234,10 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         if args.with_tabulated_eos:
             analysis_modifiers.append('tabulated_eos')
         self.analysis_modifiers= analysis_modifiers
+        
 
-        self.setup_inputs()
+
+        self.save_data_dump()
 
     @property
     def sampling_seed(self):
@@ -210,6 +249,7 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
             sampling_seed = np.random.randint(1, 1e6)
         self._sampling_seed = sampling_seed
         np.random.seed(sampling_seed)
+    
 
     def save_data_dump(self):
         data_dump= dict(
@@ -222,21 +262,14 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
                 injection_parameters=self.injection_parameters,
         )
         if "em" in self.messengers:
-            if self.injection_parameters:
-                light_curve_data = create_light_curve_data(
-                    self.injection_parameters, self.args
-                )
-            else:
-                light_curve_data = loadEvent(self.args.light_curve_data)
-
             data_dump |=  dict(
-                light_curve_data=light_curve_data
+                light_curve_data=self.light_curve_data
             )
 
         if "gw" in self.messengers:
             data_dump |= dict(
-                waveform_generator=self.waveform_generator,
-                ifo_list=self.interferometers,
+                waveform_generator=self.gw_inputs.waveform_generator,
+                ifo_list=self.gw_inputs.interferometers,
             )
         if "eos" in self.messengers:
             data_dump |= dict(
@@ -245,32 +278,46 @@ class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
         with open(self.data_dump_file, "wb+") as file:
             pickle.dump(data_dump, file)
 
-    def setup_inputs(self):
-        if "gw" in self.messengers:
-            if self.gw_likelihood_type == "ROQGravitationalWaveTransient":
-                self.save_roq_weights()
-            self.interferometers.plot_data(outdir=self.data_directory, label=self.label)
+    def create_data(self, args, unknown_args):
+        self.data_set = False
+        self.injection = args.injection
+        self.injection_numbers = args.injection_numbers
+        self.injection_file = args.injection_file
+        self.injection_dict = args.injection_dict
+        if self.injection:
+            self.injection_parameters = self.injection_df.iloc[self.idx].to_dict()
+        else: 
+            self.injection_parameters=None
 
-        # This is done before instantiating the likelihood so that it is the full prior
-        self.priors.to_json(outdir=self.data_directory, label=self.label)
-        self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
 
-        if "eos" in self.messengers:
+        if args.with_eos:
             self.eos_constraint_dict = compose_eos_constraints(self.args)
 
-        # We build the likelihood here to ensure the distance marginalization exist
-        # before sampling
-        self.likelihood
+        if args.with_em:
+            if self.injection_parameters:
+                self.light_curve_data = create_light_curve_data(
+                    self.injection_parameters, self.args
+                )
+            else:
+                self.light_curve_data = loadEvent(self.args.light_curve_data)
+            
+            filters=args.filters
+            if not filters:
+                filters = list(self.light_curve_data.keys())
+            setup_lightcurve_model(args, sample_times=np.arange(0, 14., 0.1), param_conv_func=None, filters=filters)
 
-        self.meta_data.update(
-            dict(
-                config_file=self.ini,
-                data_dump_file=self.data_dump_file,
-                **get_version_info(),
-            )
-        )
+        if args.with_gw:
+            self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, unknown_args)
+            #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
+            self.gw_likelihood_type = self.gw_inputs.likelihood_type
+            self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)
 
-        self.save_data_dump()
+            # We build the likelihood here to ensure the 
+            # distance marginalization exist before sampling
+            self.gw_inputs.likelihood
+
+            if self.gw_likelihood_type == "ROQGravitationalWaveTransient":
+                self.gw_inputs.save_roq_weights()
 
 
 def generate_runner(parser=None, **kwargs):
@@ -351,4 +398,113 @@ def nmma_generation():
         subprocess.run([f"bash {bash_file}"], shell=True)
     else:
         logger.info(f"Setup complete, now run:\n $ bash {bash_file}")
+
+
+
+
+#########legacy, just for checks
+
+# class NMMADataGenerationInput(bilby_pipe.data_generation.DataGenerationInput):
+#     ###FIXME get rid of compulsory GW structure
+#     def __init__(self, args, unknown_args):
+#         super().__init__(args, unknown_args)
+#         self.args = args
+#         self.sampler = "dynesty"
+#         self.sampling_seed = args.sampling_seed
+#         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
+
+#         ### identify messengers and modifiers, to be extended
+#         messengers=[]
+#         if args.with_eos_parameters:
+#             messengers.append("eos")
+#         if args.with_em:
+#             messengers.append('em')
+#         if args.with_grb:
+#             messengers.append("grb")
+#         if args.with_gw:
+#             #### resetting likelihood type is an unpleasant bilby_pipe remnant
+#             self.gw_likelihood_type = self.likelihood_type
+#             messengers.append("gw")
+#         self.messengers = messengers
+
+#         analysis_modifiers= []
+#         if args.with_Hubble:
+#             analysis_modifiers.append("Hubble")
+#         if args.with_tabulated_eos:
+#             analysis_modifiers.append('tabulated_eos')
+#         self.analysis_modifiers= analysis_modifiers
+
+#         self.setup_inputs()
+
+#     @property
+#     def sampling_seed(self):
+#         return self._sampling_seed
+
+#     @sampling_seed.setter
+#     def sampling_seed(self, sampling_seed):
+#         if sampling_seed is None:
+#             sampling_seed = np.random.randint(1, 1e6)
+#         self._sampling_seed = sampling_seed
+#         np.random.seed(sampling_seed)
+
+#     def save_data_dump(self):
+#         data_dump= dict(
+#                 prior_file=self.prior_file,
+#                 args=self.args,
+#                 messengers = self.messengers,
+#                 analysis_modifiers= self.analysis_modifiers,
+#                 data_dump_file=self.data_dump_file,
+#                 meta_data=self.meta_data,
+#                 injection_parameters=self.injection_parameters,
+#         )
+#         if "em" in self.messengers:
+#             if self.injection_parameters:
+#                 light_curve_data = create_light_curve_data(
+#                     self.injection_parameters, self.args
+#                 )
+#             else:
+#                 light_curve_data = loadEvent(self.args.light_curve_data)
+
+#             data_dump |=  dict(
+#                 light_curve_data=light_curve_data
+#             )
+
+#         if "gw" in self.messengers:
+#             data_dump |= dict(
+#                 waveform_generator=self.waveform_generator,
+#                 ifo_list=self.interferometers,
+#             )
+#         if "eos" in self.messengers:
+#             data_dump |= dict(
+#                 eos_constraint_dict=self.eos_constraint_dict
+#             )
+#         with open(self.data_dump_file, "wb+") as file:
+#             pickle.dump(data_dump, file)
+
+#     def setup_inputs(self):
+#         if "gw" in self.messengers:
+#             if self.gw_likelihood_type == "ROQGravitationalWaveTransient":
+#                 self.save_roq_weights()
+#             self.interferometers.plot_data(outdir=self.data_directory, label=self.label)
+
+#         # This is done before instantiating the likelihood so that it is the full prior
+#         self.priors.to_json(outdir=self.data_directory, label=self.label)
+#         self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
+
+#         if "eos" in self.messengers:
+#             self.eos_constraint_dict = compose_eos_constraints(self.args)
+
+#         # We build the likelihood here to ensure the distance marginalization exist
+#         # before sampling
+#         self.likelihood
+
+#         self.meta_data.update(
+#             dict(
+#                 config_file=self.ini,
+#                 data_dump_file=self.data_dump_file,
+#                 **get_version_info(),
+#             )
+#         )
+
+#         self.save_data_dump()
 

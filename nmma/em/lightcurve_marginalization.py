@@ -1,4 +1,3 @@
-import argparse
 import glob
 import os
 
@@ -20,16 +19,15 @@ from nmma.em.model import (
     SupernovaGRBLightCurveModel,
     SVDLightCurveModel,
 )
-from nmma.joint.conversion import EOS2Parameters, MultimessengerConversion
 
-from ..utils.models import refresh_models_list
+from nmma.joint.conversion import (MultimessengerConversion, EOS2Parameters, mass_ratio_to_eta,
+                                   chirp_mass_and_eta_to_component_masses)
+
+from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict
+from .em_parsing import lc_marginalisation_parser, parsing_and_logging
+from .utils import setup_sample_times
 
 np.random.seed(0)
-cosmo = LambdaCDM(H0=70, Om0=0.3, Ode0=0.7)
-
-
-def q2eta(q):
-    return q / (1 + q) ** 2
 
 
 def ms2mc(m1, m2):
@@ -40,153 +38,12 @@ def ms2mc(m1, m2):
     return (mchirp, eta, q)
 
 
-def mc2ms(mc, eta):
-    """
-    Utility function for converting mchirp,eta to component masses. The
-    masses are defined so that m1>m2. The rvalue is a tuple (m1,m2).
-    """
-    root = np.sqrt(0.25 - eta)
-    fraction = (0.5 + root) / (0.5 - root)
-    invfraction = 1 / fraction
 
-    m2 = mc * np.power((1 + fraction), 0.2) / np.power(fraction, 0.6)
-
-    m1 = mc * np.power(1 + invfraction, 0.2) / np.power(invfraction, 0.6)
-    return (m1, m2)
-
-
-def main():
-
-    parser = argparse.ArgumentParser(
-        description="Summary analysis for nmma injection file"
-    )
-    parser.add_argument(
-        "--model", type=str, required=True, help="Name of the kilonova model to be used"
-    )
-    parser.add_argument(
-        "--template-file", type=str, help="The template file to be used"
-    )
-    parser.add_argument("--hdf5-file", type=str, help="The hdf5 file to be used")
-    parser.add_argument("--coinc-file", type=str, help="The coinc xml file to be used")
-    parser.add_argument("-g", "--gps", type=int, default=1187008882)
-    parser.add_argument(
-        "-s",
-        "--skymap",
-        type=str,
-    )
-    parser.add_argument(
-        "--eos-dir",
-        type=str,
-        required=True,
-        help="EOS file directory in (radius [km], mass [solar mass], lambda)",
-    )
-    parser.add_argument("-e", "--gw170817-eos", type=str)
-    parser.add_argument("-o", "--outdir", type=str, default="outdir")
-    parser.add_argument("-n", "--Nmarg", type=int, default=100)
-    parser.add_argument("--label", type=str, required=True, help="Label for the run")
-    parser.add_argument(
-        "--svd-path",
-        type=str,
-        help="Path to the SVD directory with {model}.joblib",
-    )
-    parser.add_argument(
-        "--tmin",
-        type=float,
-        default=0.0,
-        help="Days to be started analysing from the trigger time (default: 0)",
-    )
-    parser.add_argument(
-        "--tmax",
-        type=float,
-        default=14.0,
-        help="Days to be stoped analysing from the trigger time (default: 14)",
-    )
-    parser.add_argument(
-        "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
-    )
-    parser.add_argument(
-        "--svd-mag-ncoeff",
-        type=int,
-        default=10,
-        help="Number of eigenvalues to be taken for mag evaluation (default: 10)",
-    )
-    parser.add_argument(
-        "--svd-lbol-ncoeff",
-        type=int,
-        default=10,
-        help="Number of eigenvalues to be taken for lbol evaluation (default: 10)",
-    )
-    parser.add_argument(
-        "--filters",
-        type=str,
-        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
-        default="u,g,r,i,z,y,J,H,K",
-    )
-    parser.add_argument(
-        "--gptype", type=str, help="SVD interpolation scheme.", default="sklearn"
-    )
-    parser.add_argument(
-        "--generation-seed",
-        metavar="seed",
-        type=int,
-        default=42,
-        help="Injection generation seed (default: 42)",
-    )
-    parser.add_argument(
-        "--joint-light-curve",
-        help="Flag for using both kilonova and GRB afterglow light curve",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--with-grb-injection",
-        help="If the injection has grb included",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--plot", action="store_true", default=False, help="add best fit plot"
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="print out log likelihoods",
-    )
-    parser.add_argument(
-        "--injection-detection-limit",
-        metavar="mAB",
-        type=str,
-        default=None,
-        help="The highest mAB to be presented in the injection data set, any mAB higher than this will become a non-detection limit. Should be comma delimited list same size as injection set.",
-    )
-
-    parser.add_argument(
-        "--absolute", action="store_true", default=False, help="Absolute Magnitude"
-    )
-
-    parser.add_argument(
-        "--refresh-models-list",
-        type=bool,
-        default=False,
-        help="Refresh the list of models available on Gitlab",
-    )
-
-    args = parser.parse_args()
-
-    refresh = False
-    try:
-        refresh = args.refresh_model_list
-    except AttributeError:
-        pass
-    if refresh:
-        refresh_models_list(
-            models_home=args.svd_path if args.svd_path not in [None, ""] else None
-        )
-
-    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
-    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+def main(args=None):
+    args = parsing_and_logging(lc_marginalisation_parser, args)
 
     # initialize light curve model
-    sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    sample_times = setup_sample_times(args)
 
     if args.joint_light_curve:
 
@@ -235,7 +92,7 @@ def main():
                 lbol_ncoeff=args.svd_lbol_ncoeff,
             )
             light_curve_model = SVDLightCurveModel(  # noqa: F841
-                **light_curve_kwargs, gptype=args.gptype
+                **light_curve_kwargs, interpolation_type=args.interpolation_type
             )
 
     args.kilonova_tmin = args.tmin
@@ -248,24 +105,7 @@ def main():
     args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
     args.kilonova_error = 0
 
-    filenames = sorted(glob.glob(os.path.join(args.eos_dir, "*.dat")))
-    global Neos
-    Neos = len(filenames)
-    EOS_GW170817 = np.loadtxt(args.gw170817_eos)
-
-    global EOS_data
-    EOS_data, weights = {}, []
-    for EOSIdx in range(0, Neos):
-        data = np.loadtxt(
-            "{0}/{1}.dat".format(args.eos_dir, EOSIdx + 1), usecols=[0, 1, 2]
-        )
-        EOS_data[EOSIdx] = {}
-        EOS_data[EOSIdx]["R"] = np.array(data[:, 0])
-        EOS_data[EOSIdx]["M"] = np.array(data[:, 1])
-        EOS_data[EOSIdx]["Lambda"] = np.array(data[:, 2])
-        EOS_data[EOSIdx]["weight"] = EOS_GW170817[EOSIdx]
-
-        weights.append(EOS_data[EOSIdx]["weight"])
+    EOS_data, weights, Neos = load_tabulated_macro_eos_set_to_dict(args.eos_dir, args.eos_weights)
 
     if args.template_file is not None:
         try:
@@ -292,9 +132,9 @@ def main():
         posterior = f["lalinference"]["lalinference_mcmc"]["posterior_samples"][()]
 
         data_out = Table(posterior)
-        data_out["eta"] = q2eta(data_out["q"])
+        data_out["eta"] = mass_ratio_to_eta(data_out["q"])
         data_out["mchirp"] = data_out["mc"]
-        data_out["m1"], data_out["m2"] = mc2ms(data_out["mchirp"], data_out["eta"])
+        data_out["m1"], data_out["m2"] = chirp_mass_and_eta_to_component_masses(data_out["mchirp"], data_out["eta"])
         data_out["weight"] = 1.0 / len(data_out["m1"])
 
         data_out["chi_eff"] = (
@@ -302,6 +142,7 @@ def main():
         ) / (data_out["m1"] + data_out["m2"])
 
         args.gps = np.median(data_out["t0"])
+
     elif args.coinc_file is not None:
         data_out = Table.read(
             args.coinc_file, format="ligolw", tablename="sngl_inspiral"
@@ -494,80 +335,15 @@ def main():
         plt.savefig(plotName, bbox_inches="tight")
         plt.close()
 
-        plotName = os.path.join(args.outdir, "lc.pdf")
-        fig = plt.figure(figsize=(16, 18))
-        filts = args.filters.split(",")
-        ncols = 1
-        nrows = int(np.ceil(len(filts) / ncols))
-        gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
-
-        for ii, filt in enumerate(filts):
-            loc_x, loc_y = np.divmod(ii, nrows)
-            loc_x, loc_y = int(loc_x), int(loc_y)
-            ax = fig.add_subplot(gs[loc_y, loc_x])
-
-            data_out = []
-            for jj, key in enumerate(list(mag_ds.keys())):
-                data_out.append(mag_ds[key][:, ii + 1])
-            data_out = np.vstack(data_out)
-
-            bins = np.linspace(-20, 25, 101)
-
-            def return_hist(x):
-                hist, bin_edges = np.histogram(x, bins=bins)
-                return hist
-
-            hist = np.apply_along_axis(lambda x: return_hist(x), -1, data_out.T)
-            bins = (bins[1:] + bins[:-1]) / 2.0
-
-            X, Y = np.meshgrid(sample_times, bins)
-            hist = hist.astype(np.float64)
-            hist[hist == 0.0] = np.nan
-
-            ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="viridis", alpha=0.7)
-
-            # plot 10th, 50th, 90th percentiles
-            ax.plot(
-                sample_times,
-                np.nanpercentile(data_out, 50, axis=0),
-                c="k",
-                linestyle="--",
-            )
-            ax.plot(sample_times, np.nanpercentile(data_out, 90, axis=0), "k--")
-            ax.plot(sample_times, np.nanpercentile(data_out, 10, axis=0), "k--")
-
-            ax.set_xlim([0, 14])
-            ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
-
-            if ii == len(filts) - 1:
-                ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
-            else:
-                plt.setp(ax.get_xticklabels(), visible=False)
-
-            if args.absolute:
-                ax.set_ylim([-12, -18])
-                ax.set_yticks([-18, -16, -14, -12])
-            else:
-                ax.set_ylim([24, 15])
-                ax.set_yticks([24, 21, 18, 15])
-
-            ax.tick_params(axis="x", labelsize=30)
-            ax.tick_params(axis="y", labelsize=30)
-            ax.grid(which="both", alpha=0.5)
-
-        fig.text(0.45, 0.05, "Time [days]", fontsize=30)
-        fig.text(
-            0.01,
-            0.5,
-            "Absolute Magnitude",
-            va="center",
-            rotation="vertical",
-            fontsize=30,
-        )
-
-        plt.tight_layout()
-        plt.savefig(plotName, bbox_inches="tight")
-        plt.close()
+        from .plotting_utils import lc_plot
+        filters = args.filters.split(",")
+        plotpath= os.path.join(args.outdir, "lc.pdf")
+        plot_dict = {filt: np.vstack([lc_data[:, i+1] for lc_data in mag_ds.values()]) for i, filt in enumerate(filters)}
+        if args.absolute:
+            ylim = [-12, -18]
+        else:
+            ylim = [24, 15]
+        lc_plot(filters, plot_dict, sample_times, plotpath= plotpath, ylim = ylim, n_yticks=4, ylabel_kwargs = dict(fontsize=30, rotation=0, labelpad=14))
 
 
 if __name__ == "__main__":

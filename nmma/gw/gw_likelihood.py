@@ -1,18 +1,29 @@
 from __future__ import division
 import inspect
 import numpy as np
-
-from ..joint.conversion import MultimessengerConversion
-    
-
-from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient
-from bilby.core.likelihood import Likelihood
+from bilby_pipe.utils import convert_string_to_dict
+from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
+from ..joint.base import NMMABaseLikelihood
 
 def setup_gw_kwargs(data_dump, args, logger, **kwargs):
+    """
+    Setup the kwargs for the gravitational-wave likelihood.
+    We read some required args for the chosen gw-likelihood in this process.
+    For multibanding, this includes:
+        reference_chirp_mass: float, optional          
+            A reference chirp mass for determining the frequency banding. This is set to prior minimum of chirp mass if not specified. Hence a CBCPriorDict object needs to be passed to priors when this parameter is not specified.
+    For relative-binning, this includes:
+        fiducial_parameters: dictionary
+            fiducial parameters for relative binning reference waveform
+        update_fiducial_parameters: bool
+            if True, tries to optimize fiducial parameters with the maximum likelihood. Defaults to False
+        epsilon: float
+            sets the precision of the binning for relative binning
+    """
     signature = inspect.signature(GravitationalWaveTransientLikelihood) 
     default_gw_kwargs= {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
 
-    gw_kwargs= default_gw_kwargs.update(dict(
+    gw_kwargs = default_gw_kwargs | dict(
             gw_likelihood_type=args.likelihood_type,
             interferometers=data_dump["ifo_list"],
             waveform_generator=data_dump["waveform_generator"],
@@ -22,7 +33,7 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
             time_marginalization=args.time_marginalization,
             reference_frame=args.reference_frame,
             time_reference=args.time_reference
-        ))
+        )
     if hasattr(args, 'jitter_time'):
         gw_kwargs.update(jitter_time=args.jitter_time)
     if args.likelihood_type == 'ROQGravitationalWaveTransient':
@@ -30,6 +41,16 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
         gw_kwargs.pop("jitter_time", None)
         args.weight_file = data_dump["meta_data"].get("weight_file", None)
         gw_kwargs.update(roq_likelihood_kwargs(args, logger))
+
+    elif args.likelihood_type == 'RelativeBinningGravitationalWaveTransient':
+        fiducial_parameters = convert_string_to_dict(args.fiducial_parameters)
+        gw_kwargs.update(
+            fiducial_parameters=fiducial_parameters, epsilon=args.epsilon,  update_fiducial_parameters=args.update_fiducial_parameters
+        )
+    elif args.likelihood_type == 'MBGravitationalWaveTransient':
+        gw_kwargs.pop("time_marginalization", None)
+        gw_kwargs.pop("jitter_time", None)
+        gw_kwargs.update(reference_chirp_mass=args.reference_chirp_mass)
 
     gw_kwargs.update(**kwargs)
     return gw_kwargs
@@ -74,7 +95,7 @@ def roq_likelihood_kwargs(args, logger):
         kwargs["quadratic_matrix"] = args.roq_quadratic_matrix
     return kwargs
 
-class GravitationalWaveTransientLikelihood(Likelihood):
+class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
     """ A GravitationalWaveTransient likelihood object
 
     This likelihood uses the usual gravitational-wave transient
@@ -92,8 +113,7 @@ class GravitationalWaveTransientLikelihood(Likelihood):
         An object which computes the frequency-domain strain of the signal, 
         given some set of parameters
     gw_likelihood_type: str
-        The gravitational-wave likelihood to be taken is
-        "GravitationalWaveTransient" or "ROQGravitationalWaveTransient"
+        The gravitational-wave likelihood to be taken
     roq_params: str, array_like
         Parameters describing the domain of validity of the ROQ basis.
     roq_params_check: bool
@@ -143,18 +163,17 @@ class GravitationalWaveTransientLikelihood(Likelihood):
         Name of the reference for the sampled time parameter.
         - "geocent"/"geocenter": sample in the time at the Earth's center,
           this is the default
-        - e.g., "H1": sample in the time of arrival at H1
+        - e.g., "H1": sample in the time of arrival at H1    
+    kwargs:
+        Additional keyword arguments passed to the likelihood class. These might be required by the chosen gw_likelihood_type!
 
     """
 
-    def __init__(self,priors, param_conv_func, 
-                 interferometers,  waveform_generator,
-                 gw_likelihood_type, 
-                 time_marginalization=False, distance_marginalization=False,
-                 phase_marginalization=False, distance_marginalization_lookup_table=None,
-                 jitter_time=True, reference_frame="sky", time_reference="geocenter", **kwargs):
+    def __init__(self,priors, param_conv_func, interferometers,  
+                 waveform_generator, gw_likelihood_type, time_marginalization=False, distance_marginalization=False, phase_marginalization=False, distance_marginalization_lookup_table=None, jitter_time=True, reference_frame="sky", time_reference="geocenter", **kwargs):
 
-
+        if param_conv_func is None:
+            param_conv_func = self.identity_conversion
         waveform_generator.parameter_conversion = param_conv_func
         waveform_generator.start_time = interferometers[0].time_array[0]
 
@@ -177,34 +196,20 @@ class GravitationalWaveTransientLikelihood(Likelihood):
 
         elif gw_likelihood_type == 'ROQGravitationalWaveTransient':
             GWLikelihood = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
+
+        elif gw_likelihood_type == 'RelativeBinningGravitationalWaveTransient':
+            GWLikelihood = RelativeBinningGravitationalWaveTransient(**gw_likelihood_kwargs)
+            
+        elif gw_likelihood_type == 'MBGravitationalWaveTransient':
+            GWLikelihood = MBGravitationalWaveTransient(**gw_likelihood_kwargs)
         else:
             raise ValueError("Unknown GW Likelihood class {}")
 
-        super(GravitationalWaveTransientLikelihood, self).__init__(parameters={})
-        self.parameter_conversion = param_conv_func
-        self.GWLikelihood = GWLikelihood
-        self.priors = priors
+        super().__init__(sub_model=GWLikelihood, priors=priors, param_conv_func=param_conv_func)
         self.time_marginalization = time_marginalization
         self.phase_marginalization = phase_marginalization
         self.distance_marginalization = distance_marginalization
-        self.__sync_parameters()
 
-    def __repr__(self):
-        return self.__class__.__name__ + ' with ' + self.GWLikelihood.__repr__()
-
-    def __sync_parameters(self):
-        self.GWLikelihood.parameters = self.parameters
-
-    def log_likelihood(self):
-
-        if not self.priors.evaluate_constraints(self.parameters):
-            return np.nan_to_num(-np.inf)
-
-        logL_GW = self.GWLikelihood.log_likelihood()
-        if not np.isfinite(logL_GW):
-            return np.nan_to_num(-np.inf)
-
-        return logL_GW
 
     def noise_log_likelihood(self):
-        return self.GWLikelihood.noise_log_likelihood()
+        return self.sub_model.noise_log_likelihood()

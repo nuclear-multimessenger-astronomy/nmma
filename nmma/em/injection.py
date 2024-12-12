@@ -6,7 +6,7 @@ from importlib import resources
 from scipy.interpolate import interp1d
 
 from .model import SVDLightCurveModel, KilonovaGRBLightCurveModel
-from .utils import estimate_mag_err, check_default_attr
+from .utils import estimate_mag_err
 
 
 def create_light_curve_data(
@@ -17,12 +17,12 @@ def create_light_curve_data(
     keep_infinite_data=False,
 ):
 
-    train_stats = check_default_attr(args, "train_stats")
-    ztf_sampling = check_default_attr(args, "ztf_sampling")
-    ztf_uncertainties = check_default_attr(args, "ztf_uncertainties")
-    ztf_ToO = check_default_attr(args, "ztf_ToO")
-    rubin_ToO = check_default_attr(args, "rubin_ToO")
-    photometry_augmentation = check_default_attr(
+    train_stats = getattr(args, "train_stats", False)
+    ztf_sampling = getattr(args, "ztf_sampling", False)
+    ztf_uncertainties = getattr(args, "ztf_uncertainties", False)
+    ztf_ToO = getattr(args, "ztf_ToO", False)
+    rubin_ToO = getattr(args, "rubin_ToO", False)
+    photometry_augmentation = getattr(
         args, "photometry_augmentation", default=None
     )
 
@@ -117,7 +117,7 @@ def create_light_curve_data(
 
         else:
             light_curve_model = SVDLightCurveModel(
-                sample_times=sample_times, gptype=args.gptype, **kilonova_kwargs
+                sample_times=sample_times, interpolation_type=args.interpolation_type, **kilonova_kwargs
             )
 
     lbol, mag = light_curve_model.generate_lightcurve(
