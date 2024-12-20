@@ -29,29 +29,11 @@ import matplotlib.patches as mpatches
 
 import lal
 
-from nmma.joint.conversion import MultimessengerConversion, EOS2Parameters
+from nmma.joint.conversion import (MultimessengerConversion, EOS2Parameters, mass_ratio_to_eta,
+                                   chirp_mass_and_eta_to_component_masses)
 
 np.random.seed(0)
 cosmo = LambdaCDM(H0=70, Om0=0.3, Ode0=0.7)
-
-
-def q2eta(q):
-    return q / (1 + q) ** 2
-
-
-def mc2ms(mc, eta):
-    """
-    Utility function for converting mchirp,eta to component masses. The
-    masses are defined so that m1>m2. The rvalue is a tuple (m1,m2).
-    """
-    root = np.sqrt(0.25 - eta)
-    fraction = (0.5 + root) / (0.5 - root)
-    invfraction = 1 / fraction
-
-    m2 = mc * np.power((1 + fraction), 0.2) / np.power(fraction, 0.6)
-
-    m1 = mc * np.power(1 + invfraction, 0.2) / np.power(invfraction, 0.6)
-    return (m1, m2)
 
 
 def ms2mc(m1, m2):
@@ -154,7 +136,7 @@ def prior_EOS_BNS(cube, ndim, nparams):
     cube[2] = cube[2] * 2 * 1e-2 - 1e-2
     cube[3] = cube[3] * 3 - 3
 
-
+def loglike_EOS
 def loglike_EOS_BNS(cube, ndim, nparams):
 
     q = cube[0]
@@ -163,8 +145,8 @@ def loglike_EOS_BNS(cube, ndim, nparams):
     zeta = 10 ** cube[3]
 
     params = copy.deepcopy(default_parameters)
-    eta = q2eta(q)
-    (m1, m2) = mc2ms(params["chirp_mass"], eta)
+    eta = mass_ratio_to_eta(q)
+    (m1, m2) = chirp_mass_and_eta_to_component_masses(params["chirp_mass"], eta)
 
     params = {
         **params,
@@ -200,8 +182,8 @@ def loglike_EOS_NSBH(cube, ndim, nparams):
     zeta = 10 ** cube[3]
 
     params = copy.deepcopy(default_parameters)
-    eta = q2eta(q)
-    (m1, m2) = mc2ms(params["chirp_mass"], eta)
+    eta = mass_ratio_to_eta(q)
+    (m1, m2) = chirp_mass_and_eta_to_component_masses(params["chirp_mass"], eta)
 
     params = {
         **params,
@@ -378,9 +360,7 @@ def main():
         EOS_data[EOSIdx] = {}
         EOS_data[EOSIdx]["R"] = np.array(data[:, 0])
         EOS_data[EOSIdx]["M"] = np.array(data[:, 1])
-        EOS_data[EOSIdx]["R14"] = interp.interp1d(
-            EOS_data[EOSIdx]["M"], EOS_data[EOSIdx]["R"]
-        )(1.4)
+        EOS_data[EOSIdx]["R14"] = np.interp(1.4, EOS_data[EOSIdx]["M"], EOS_data[EOSIdx]["R"])
         EOS_data[EOSIdx]["weight"] = EOS_GW170817[EOSIdx]
 
         R14.append(EOS_data[EOSIdx]["R14"])
@@ -559,8 +539,8 @@ def main():
                     eos = np.floor(eos)
 
                     params = copy.deepcopy(default_parameters)
-                    eta = q2eta(q)
-                    (m1, m2) = mc2ms(params["chirp_mass"], eta)
+                    eta = mass_ratio_to_eta(q)
+                    (m1, m2) = chirp_mass_and_eta_to_component_masses(params["chirp_mass"], eta)
 
                     if args.binary_type == "BNS":
                         params = {

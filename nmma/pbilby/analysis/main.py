@@ -11,7 +11,6 @@ import bilby
 import numpy as np
 import pandas as pd
 from bilby.core.utils import logger
-from bilby.gw import conversion
 from nestcheck import data_processing
 from pandas import DataFrame
 
@@ -24,11 +23,9 @@ from parallel_bilby.analysis.read_write import (
     write_current_state,
     write_sample_dump,
 )
-from parallel_bilby.analysis.sample_space import fill_sample
 
 from ..parser import (
     create_nmma_analysis_parser,
-    create_nmma_gw_analysis_parser,
     parse_analysis_args
     )
 from .analysis_run import AnalysisRun
@@ -36,7 +33,6 @@ from .analysis_run import AnalysisRun
 
 def analysis_runner(
     data_dump,
-    inference_favour,
     outdir=None,
     label=None,
     dynesty_sample="acceptance-walk",
@@ -88,7 +84,6 @@ def analysis_runner(
     # Initialise a run
     run = AnalysisRun(
         data_dump=data_dump,
-        inference_favour=inference_favour,
         outdir=outdir,
         label=label,
         dynesty_sample=dynesty_sample,
@@ -273,27 +268,16 @@ def analysis_runner(
                     rejection_sample_posterior=rejection_sample_posterior
                 )
 
-                posterior = conversion.fill_from_fixed_priors(
-                    result.posterior, run.priors
-                )
 
                 logger.info(
                     "Generating posterior from marginalized parameters for"
-                    f" nsamples={len(posterior)}, POOL={pool.size}"
+                    f" nsamples={len(result.posterior)}, POOL={pool.size}"
                 )
                 #fill_args = [
                 #    (ii, row, run.likelihood) for ii, row in posterior.iterrows()
                 #]
                 #samples = pool.map(fill_sample, fill_args)
-                posterior, _ = run.likelihood.parameter_conversion(
-                    posterior,
-                )
-
-                result.posterior = conversion._generate_all_cbc_parameters(
-                    posterior,
-                    run.likelihood.GWLikelihood.waveform_generator.waveform_arguments,
-                    conversion.convert_to_lal_binary_neutron_star_parameters,
-                )
+                result.posterior, _ = run.parameter_conversion.convert_to_multimessenger_parameters(result.posterior)
 
                 logger.debug(
                     "Updating prior to the actual prior (undoing marginalization)"
@@ -306,7 +290,7 @@ def analysis_runner(
                         run.priors[name] = run.likelihood.priors[name]
                 result.priors = run.priors
 
-                result.posterior = result.posterior.applymap(
+                result.posterior = result.posterior.map(
                     lambda x: x[0] if isinstance(x, list) else x
                 )
                 result.posterior = result.posterior.select_dtypes([np.number])
@@ -329,7 +313,7 @@ def analysis_runner(
         return exit_reason
 
 
-def main_nmma():
+def nmma_analysis():
     """
     nmma_analysis entrypoint.
 
@@ -343,21 +327,4 @@ def main_nmma():
     input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
 
     # Run the analysis
-    analysis_runner(**vars(input_args), inference_favour='nmma')
-
-
-def main_nmma_gw():
-    """
-    nmma_analysis entrypoint.
-
-    This function is a wrapper around analysis_runner(),
-    giving it a command line interface.
-    """
-    cli_args = get_cli_args()
-
-    # Parse command line arguments
-    analysis_parser = create_nmma_gw_analysis_parser(sampler="dynesty")
-    input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
-
-    # Run the analysis
-    analysis_runner(**vars(input_args), inference_favour='nmma_gw')
+    analysis_runner(**vars(input_args))

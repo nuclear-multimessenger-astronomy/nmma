@@ -1,4 +1,3 @@
-import argparse
 import json
 import os
 from pathlib import Path
@@ -10,424 +9,20 @@ import bilby
 import bilby.core
 import matplotlib
 import numpy as np
-from scipy.interpolate import interp1d
 import pandas as pd
 from astropy import time
 from bilby.core.likelihood import ZeroLikelihood
 import matplotlib.pyplot as plt
 
-from ..utils.models import refresh_models_list
 from .injection import create_light_curve_data
-from .likelihood import OpticalLightCurve
+from .em_likelihood import OpticalLightCurve
 from .model import create_light_curve_model_from_args, model_parameters_dict
 from .prior import create_prior_from_args
-from .utils import getFilteredMag, dataProcess
+from .utils import getFilteredMag, dataProcess, setup_sample_times
 from .io import loadEvent
-
+from .em_parsing import parsing_and_logging, em_analysis_parser
 matplotlib.use("agg")
 
-
-def get_parser(**kwargs):
-    add_help = kwargs.get("add_help", True)
-
-    parser = argparse.ArgumentParser(
-        description="Inference on kilonova ejecta parameters.",
-        add_help=add_help,
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Name of the configuration file containing parameter values.",
-    )
-    parser.add_argument(
-        "--model", type=str, help="Name of the kilonova model to be used"
-    )
-    parser.add_argument(
-        "--interpolation-type",
-        type=str,
-        help="SVD interpolation scheme.",
-        default="sklearn_gp",
-    )
-    parser.add_argument(
-        "--svd-path",
-        type=str,
-        help="Path to the SVD directory with {model}.joblib",
-        default="svdmodels",
-    )
-    parser.add_argument(
-        "--outdir",
-        type=str,
-        help="Path to the output directory",
-        default="outdir",
-    )
-    parser.add_argument(
-        "--label", type=str, help="Label for the run", default="injection"
-    )
-    parser.add_argument(
-        "--trigger-time",
-        type=float,
-        help="Trigger time in modified julian day, not required if injection set is provided",
-    )
-    parser.add_argument(
-        "--data",
-        type=str,
-        help="Path to the data file in [time(isot) filter magnitude error] format",
-    )
-    parser.add_argument("--prior", type=str, help="Path to the prior file")
-    parser.add_argument(
-        "--tmin",
-        type=float,
-        default=0.05,
-        help="Days to start analysing from the trigger time (default: 0.05)",
-    )
-    parser.add_argument(
-        "--tmax",
-        type=float,
-        default=14.0,
-        help="Days to stop analysing from the trigger time (default: 14)",
-    )
-    parser.add_argument(
-        "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
-    )
-    parser.add_argument(
-        "--log-space-time",
-        action="store_true",
-        default=False,
-        help="Create the sample_times to be uniform in log-space",
-    )
-    parser.add_argument(
-        "--n-tstep",
-        type=int,
-        default=50,
-        help="Number of time steps (used with --log-space-time, default: 50)",
-    )
-    parser.add_argument(
-        "--photometric-error-budget",
-        type=float,
-        default=0.1,
-        help="Photometric error (mag) (default: 0.1)",
-    )
-    parser.add_argument(
-        "--svd-mag-ncoeff",
-        type=int,
-        default=10,
-        help="Number of eigenvalues to be taken for mag evaluation (default: 10)",
-    )
-    parser.add_argument(
-        "--svd-lbol-ncoeff",
-        type=int,
-        default=10,
-        help="Number of eigenvalues to be taken for lbol evaluation (default: 10)",
-    )
-    parser.add_argument(
-        "--filters",
-        type=str,
-        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
-    )
-    parser.add_argument(
-        "--use-Ebv",
-        action="store_true",
-        default=False,
-        help="If using the Ebv extinction during the inference",
-    )
-    parser.add_argument(
-        "--Ebv-max",
-        type=float,
-        default=0.5724,
-        help="Maximum allowed value for Ebv (default:0.5724)",
-    )
-    parser.add_argument(
-        "--grb-resolution",
-        type=float,
-        default=5,
-        help="The upper bound on the ratio between thetaWing and thetaCore (default: 5)",
-    )
-    parser.add_argument(
-        "--jet-type",
-        type=int,
-        default=0,
-        help="Jet type to used used for GRB afterglow light curve (default: 0)",
-    )
-    parser.add_argument(
-        "--error-budget",
-        type=str,
-        default="1.0",
-        help="Additional systematic error (mag) to be introduced (default: 1)",
-    )
-    parser.add_argument(
-        "--sampler",
-        type=str,
-        default="pymultinest",
-        help="Sampler to be used (default: pymultinest)",
-    )
-    parser.add_argument(
-        "--soft-init",
-        action="store_true",
-        default=False,
-        help="To start the sampler softly (without any checking, default: False)",
-    )
-    parser.add_argument(
-        "--sampler-kwargs",
-        default="{}",
-        type=str,
-        help="Additional kwargs (e.g. {'evidence_tolerance':0.5}) for bilby.run_sampler, put a double quotation marks around the dictionary",
-    )
-    parser.add_argument(
-        "--cpus",
-        type=int,
-        default=1,
-        help="Number of cores to be used, only needed for dynesty (default: 1)",
-    )
-    parser.add_argument(
-        "--nlive", type=int, default=2048, help="Number of live points (default: 2048)"
-    )
-    parser.add_argument(
-        "--reactive-sampling",
-        action="store_true",
-        default=False,
-        help="To use reactive sampling in ultranest (default: False)",
-    )
-    parser.add_argument(
-        "--seed",
-        metavar="seed",
-        type=int,
-        default=42,
-        help="Sampling seed (default: 42)",
-    )
-    parser.add_argument(
-        "--injection", metavar="PATH", type=str, help="Path to the injection json file"
-    )
-    parser.add_argument(
-        "--injection-num",
-        metavar="eventnum",
-        type=int,
-        help="The injection number to be taken from the injection set",
-    )
-    parser.add_argument(
-        "--injection-detection-limit",
-        metavar="mAB",
-        type=str,
-        help="The highest mAB to be presented in the injection data set, any mAB higher than this will become a non-detection limit. Should be comma delimited list same size as injection set.",
-    )
-    parser.add_argument(
-        "--injection-outfile",
-        metavar="PATH",
-        type=str,
-        help="Path to the output injection lightcurve",
-    )
-    parser.add_argument(
-        "--injection-model",
-        type=str,
-        help="Name of the kilonova model to be used for injection (default: the same as model used for recovery)",
-    )
-    parser.add_argument(
-        "--remove-nondetections",
-        action="store_true",
-        default=False,
-        help="remove non-detections from fitting analysis",
-    )
-    parser.add_argument(
-        "--detection-limit",
-        metavar="DICT",
-        type=str,
-        default=None,
-        help="Dictionary for detection limit per filter, e.g., {'r':22, 'g':23}, put a double quotation marks around the dictionary",
-    )
-    parser.add_argument(
-        "--with-grb-injection",
-        help="If the injection has grb included",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--prompt-collapse",
-        help="If the injection simulates prompt collapse and therefore only dynamical",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--ztf-sampling", help="Use realistic ZTF sampling", action="store_true"
-    )
-    parser.add_argument(
-        "--ztf-uncertainties",
-        help="Use realistic ZTF uncertainties",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--ztf-ToO",
-        help="Adds realistic ToO observations during the first one or two days. Sampling depends on exposure time specified. Valid values are 180 (<1000sq deg) or 300 (>1000sq deg). Won't work w/o --ztf-sampling",
-        type=str,
-        choices=["180", "300"],
-    )
-    parser.add_argument(
-        "--train-stats",
-        help="Creates a file too.csv to derive statistics",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--rubin-ToO",
-        help="Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--rubin-ToO-type",
-        help="Type of ToO observation. Won't work w/o --rubin-ToO",
-        type=str,
-        choices=["platinum","gold","gold_z","silver","silver_z"],
-    )
-    parser.add_argument(
-        "--xlim",
-        type=str,
-        default="0,14",
-        help="Start and end time for light curve plot (default: 0-14)",
-    )
-    parser.add_argument(
-        "--ylim",
-        type=str,
-        default="22,16",
-        help="Upper and lower magnitude limit for light curve plot (default: 22-16)",
-    )
-    parser.add_argument(
-        "--generation-seed",
-        metavar="seed",
-        type=int,
-        default=42,
-        help="Injection generation seed (default: 42)",
-    )
-    parser.add_argument(
-        "--plot", action="store_true", default=False, help="add best fit plot"
-    )
-    parser.add_argument(
-        "--bilby-zero-likelihood-mode",
-        action="store_true",
-        default=False,
-        help="enable prior run",
-    )
-    parser.add_argument(
-        "--photometry-augmentation",
-        help="Augment photometry to improve parameter recovery",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--photometry-augmentation-seed",
-        metavar="seed",
-        type=int,
-        default=0,
-        help="Optimal generation seed (default: 0)",
-    )
-    parser.add_argument(
-        "--photometry-augmentation-N-points",
-        help="Number of augmented points to include",
-        type=int,
-        default=10,
-    )
-    parser.add_argument(
-        "--photometry-augmentation-filters",
-        type=str,
-        help="A comma seperated list of filters to use for augmentation (e.g. g,r,i). If none is provided, will use all the filters available",
-    )
-    parser.add_argument(
-        "--photometry-augmentation-times",
-        type=str,
-        help="A comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax",
-    )
-
-    parser.add_argument(
-        "--conditional-gaussian-prior-thetaObs",
-        action="store_true",
-        default=False,
-        help="The prior on the inclination is against to a gaussian prior centered at zero with sigma = thetaCore / N_sigma",
-    )
-
-    parser.add_argument(
-        "--conditional-gaussian-prior-N-sigma",
-        default=1,
-        type=float,
-        help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True",
-    )
-
-    parser.add_argument(
-        "--sample-over-Hubble",
-        action="store_true",
-        default=False,
-        help="To sample over Hubble constant and redshift",
-    )
-
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="print out log likelihoods",
-    )
-
-    parser.add_argument(
-        "--refresh-models-list",
-        type=bool,
-        default=False,
-        help="Refresh the list of models available on Gitlab",
-    )
-    parser.add_argument(
-        "--local-only",
-        action="store_true",
-        default=False,
-        help="only look for local svdmodels (ignore Gitlab)",
-    )
-    parser.add_argument(
-        "--ignore-timeshift",
-        help="If you want to ignore the timeshift parameter in an injection file.",
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "--bestfit",
-        help="Save the best fit parameters and magnitudes to JSON",
-        action="store_true",
-        default=False,
-    )
-
-    parser.add_argument(
-        "--fits-file",
-        help="Fits file output from Bayestar, to be used for constructing dL-iota prior"
-    )
-    parser.add_argument(
-        "--cosiota-node-num",
-        help="Number of cos-iota nodes used in the Bayestar fits (default: 10)",
-        default=10,
-    )
-
-    parser.add_argument(
-        "--skip-sampling",
-        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.",
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "--ra",
-        type=float,
-        help="Right ascension of the sky location; to be used together with fits file"
-    )
-    parser.add_argument(
-        "--dec",
-        type=float,
-        help="Declination of the sky location; to be used together with fits file"
-    )
-    parser.add_argument(
-        "--dL",
-        type=float,
-        help="Distance of the location; to be used together with fits file"
-    )
-    parser.add_argument(
-        "--fetch-Ebv-from-dustmap",
-        help="Fetching Ebv from dustmap, to be used as fixed-value prior",
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "--systematics-file",
-        metavar="PATH",
-        help="Path to systematics configuration file",
-        default=None,
-    )
-
-    return parser
 
 
 def analysis(args):
@@ -439,18 +34,25 @@ def analysis(args):
             )
             exit()
 
-    refresh = False
-    try:
-        refresh = args.refresh_models_list
-    except AttributeError:
-        pass
-    if refresh:
-        refresh_models_list(
-            models_home=args.svd_path if args.svd_path not in [None, ""] else None
-        )
 
-    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
-    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+    if args.filters:
+        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+        if len(filters) == 0:
+            raise ValueError("Need at least one valid filter.")
+    elif args.rubin_ToO_type == 'platinum':
+        filters = ["ps1__g","ps1__r","ps1__i","ps1__z","ps1__y"]
+    elif args.rubin_ToO_type == 'gold':
+        filters = ["ps1__g","ps1__r","ps1__i"]
+    elif args.rubin_ToO_type == 'gold_z':
+        filters = ["ps1__g","ps1__r","ps1__z"]
+    elif args.rubin_ToO_type == 'silver':
+        filters = ["ps1__g""ps1__i"]
+    elif args.rubin_ToO_type == 'silver_z':
+        filters = ["ps1__g","ps1__z"]
+    else:
+        filters = None
+
 
     if args.filters:
         filters = args.filters.replace(" ", "")  # remove all whitespace
@@ -605,6 +207,11 @@ def analysis(args):
                     i+=1
 
         if args.injection_outfile is not None:
+            if args.outfile_type == "csv":
+                ext = "dat"
+            else:
+                ext = "json"
+            injection_outfile = os.path.join(args.outdir, f"{injection_outfile}.{ext}")
             if filters is not None:
                 if args.detection_limit is None:
                     detection_limit = {x: np.inf for x in filters}
@@ -663,7 +270,10 @@ def analysis(args):
             lc = pd.DataFrame(data=data_out, columns=columns)
             lc.sort_values("jd", inplace=True)
             lc = lc.reset_index(drop=True)
-            lc.to_csv(args.injection_outfile)
+            if args.outfile_type == "csv":
+                lc.to_csv(injection_outfile)
+            else:
+                lc.to_json(injection_outfile)
 
     else:
         # load the kilonova afterglow data
@@ -923,7 +533,6 @@ def analysis(args):
             # make best-fit lc interpolation
             sample_times = mag["bestfit_sample_times"]
             mag_used = mag[filt]
-            interp = interp1d(sample_times, mag_used)
             # fetch data
             samples = copy.deepcopy(processed_data[filt])
             t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
@@ -948,7 +557,7 @@ def analysis(args):
                     sigma_y[finite_idx],
                 )
                 print("the time passes into the interp is: ", t_det)
-                num = (y_det - interp(t_det)) ** 2
+                num = (y_det - np.interp(t_det,sample_times, mag_used)) ** 2
                 den = sigma_y_det**2 + err**2
                 chi2_per_filt = np.sum(num / den)
                 # store the data
@@ -1207,32 +816,9 @@ def nnanalysis(args):
         filters = filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
 
-    refresh = False
-    try:
-        refresh = args.refresh_models_list
-    except AttributeError:
-        pass
-    if refresh:
-        refresh_models_list(
-            models_home=args.svd_path if args.svd_path not in [None, ""] else None
-        )
+    
 
-    # set up outdir
-    bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
-    bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
-
-    print('Setting up logger and storage directory')
-
-    if args.log_space_time:
-        if args.n_tstep:
-            n_step = args.n_tstep
-        else:
-            n_step = int((args.tmax - args.tmin) / args.dt)
-        sample_times = np.logspace(
-            np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
-        )
-    else:
-        sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    sample_times = setup_sample_times(args)
 
     # create the kilonova data if an injection set is given
     if args.injection:
@@ -1542,21 +1128,18 @@ def nnanalysis(args):
         print('saved posterior plot')
 
 def main(args=None):
-    if args is None:
-        parser = get_parser()
-        args = parser.parse_args()
-        if args.config is not None:
-            yaml_dict = yaml.safe_load(Path(args.config).read_text())
-            for analysis_set in yaml_dict.keys():
-                params = yaml_dict[analysis_set]
-                for key, value in params.items():
-                    key = key.replace("-", "_")
-                    if key not in args:
-                        print(f"{key} not a known argument... please remove")
-                        exit()
-                    setattr(args, key, value)
+    args = parsing_and_logging(em_analysis_parser, args)
+    if args.config is not None:
+        yaml_dict = yaml.safe_load(Path(args.config).read_text())
+        for analysis_set in yaml_dict.keys():
+            params = yaml_dict[analysis_set]
+            for key, value in params.items():
+                key = key.replace("-", "_")
+                if key not in args:
+                    print(f"{key} not a known argument... please remove")
+                    exit()
+                setattr(args, key, value)
     if args.sampler == "neuralnet":
         nnanalysis(args)
     else:
         analysis(args)
-    

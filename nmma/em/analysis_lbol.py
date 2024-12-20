@@ -10,12 +10,11 @@ import bilby
 import bilby.core
 import matplotlib
 import numpy as np
-from scipy.interpolate import interp1d
 import pandas as pd
 from astropy import time
 from bilby.core.likelihood import ZeroLikelihood
 
-from .likelihood import BolometricLightCurve
+from .em_likelihood import BolometricLightCurve
 from .model_lbol import SimpleBolometricLightCurveModel
 from .prior import create_prior_from_args
 
