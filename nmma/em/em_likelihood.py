@@ -5,7 +5,7 @@ from scipy.stats import norm, truncnorm
 
 from ..joint.base import NMMABaseLikelihood
 from .model import *
-from . import utils
+from . import utils, systematics
 
 
 
@@ -115,7 +115,7 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         Time of the kilonova trigger in Modified Julian Day
     error_budget: float (default:1)
         Additionally introduced statistical error on the light curve data,
-        so as to keep the systematic error in control
+        so as to keep the systematic error under control. This will only be used if the parameters-dict does not containt a 'sys_err' sampling parameter.
     tmin: float (default:0)
         Days from trigger_time to be started analysing
     tmax: float (default:14)
@@ -129,9 +129,10 @@ class EMTransientLikelihood(NMMABaseLikelihood):
 
     """
 
-    def __init__(self, priors, 
+    def __init__(self, 
         light_curve_model,
         light_curve_data,
+        priors = None,
         filters=None,
         detection_limit=np.inf,
         em_transient_trigger_time=0.,
@@ -149,7 +150,7 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         else:
             model_type=BolometricTransient
         sub_model = model_type(
-                light_curve_model, sample_times, light_curve_data, filters, em_transient_trigger_time, error_budget, detection_limit, verbose)
+                light_curve_model, sample_times, priors, light_curve_data, filters, em_transient_trigger_time, error_budget, detection_limit, verbose)
 
 
         # self.light_curve_model = light_curve_model
@@ -240,38 +241,100 @@ class OpticalTransient(BaseEMTransient):
         trigger_time,
         error_budget=1.0,
         detection_limit=np.inf,
-        verbose = False
+        verbose = False,
+        systematics_file=None,
     ):  
         super().__init__(light_curve_model, sample_times, verbose)
         self.filters = filters
-        if isinstance(error_budget, (int, float, complex)) and not isinstance(
-            error_budget, bool
-        ):
-            self.error_budget = dict(zip(filters, [error_budget] * len(filters)))
-        elif isinstance(error_budget, dict):
-            for filt in self.filters:
-                if filt not in error_budget:
-                    raise ValueError(f"filter {filt} missing from error_budget")
-            self.error_budget = error_budget
 
-        processedData = utils.dataProcess(
+        ##setup light curve data
+        self.light_curve_data = utils.dataProcess(
             light_curve_data, self.filters, trigger_time, sample_times[0], sample_times[-1])
-        self.light_curve_data = processedData
 
+        # setup detection limit
         self.detection_limit = {}
         if isinstance(detection_limit, (int, float)):
-            for filt in self.filters:
-                self.detection_limit[filt] = detection_limit
-        else:
-            for filt in self.filters:
-                if filt in detection_limit:
-                    self.detection_limit[filt] = detection_limit[filt]
-                else:
-                    self.detection_limit[filt] = np.inf
+            self.detection_limit = {filt: detection_limit for filt in self.filters}
+        elif isinstance(detection_limit, dict):
+            self.detection_limit = {filt: detection_limit.get(filt, np.inf) for filt in self.filters}
 
-    def __repr__(self):
-        return f"{self.__class__.__name__ } in \n\tfilters={self.filters}"
+
+        #determine_systematic_error_handling
+        ## case 1: use systematics_file
+        if systematics_file:
+            yaml_dict = systematics.load_yaml(systematics_file)
+            systematics.validate_only_one_true(yaml_dict)
+            time_dep_sys_dict = yaml_dict["config"]["withTime"]
+            # case 1a: time-dependent systematics
+            if time_dep_sys_dict['value']:
+
+                #get the time nodes and the filters
+                self.systematics_time_nodes = np.round(
+                    np.linspace(self.sample_times[0], self.sample_times[-1], time_dep_sys_dict["time_nodes"]),
+                    2)
+                yaml_filters = list(time_dep_sys_dict["filters"])
+                systematics.validate_filters(yaml_filters)
+
+                #iterate over the filters and assign them to a systematics filter group
+                systematics_filters = {}
+                for filter_group in yaml_filters:
+                    #this should only be the case if no filters are specified
+                    if filter_group is None:
+                        systematics_filters = {filt: 'all' for filt in self.filters}
+                        break
+                    elif isinstance(filter_group, list):
+                        for filt in filter_group:
+                            systematics_filters[filt] = "___".join(filter_group)
+                    else:
+                        #this should mean that the filter_group is in fact a single filter
+                        systematics_filters[filter_group] = filter_group
+                ## By this procedure, every filter should immediately be assigned to a systematics filter-group that we can use to calculate the systematics error       
+                self.systematics_filters = systematics_filters  
+
+                self.compute_em_err = self.em_err_from_systematics_sampling
+
+            # case 1b: no time-dependency 
+            else:
+                # sample with time-independent error, that is case 2
+                ## FIXME would it not be more naturally to still have a filter dependent error, even if it does not vary in time?
+                self.compute_em_err = self.em_err_from_parameters
+                
+        
+        # case 2: sample over general limit
+        elif 'em_syserr' in self.parameters.keys():
+            self.compute_em_err = self.em_err_from_parameters
+        
+        #case 3: preset general limit
+        else:
+            #3a: shared value for all filters
+            if isinstance(error_budget, (int, float, complex)) and not isinstance(
+                error_budget, bool
+            ):
+                self.error_budget = {filt:error_budget for filt in self.filters}
+
+            #3b: specific values in each filter
+            elif isinstance(error_budget, dict):
+                for filt in self.filters:
+                    if filt not in error_budget:
+                        raise ValueError(f"filter {filt} missing from error_budget")
+                self.error_budget = error_budget
+            self.compute_em_err = self.em_err_from_budget
+
+
+
+    def em_err_from_parameters(self, *_):
+        return self.parameters['em_syserr']
     
+    def em_err_from_budget(self, filt, _):
+        return self.error_budget[filt]
+    
+    def em_err_from_systematics_sampling(self, filt, data_time):
+        systematics_filt = self.systematics_filters[filt]
+        sampled_filter_systematics = [self.parameters[f"sys_err_{systematics_filt}{i}"] for i in range(len(self.systematics_time_nodes))]
+        return utils.autocomplete_data(data_time, self.systematics_time_nodes, sampled_filter_systematics)
+
+
+             ##FIXME Check if this is the right way to handle the error budget
     def update_lightcurve_reference(self, _, model_mags):
         lc_data ={}
         t0 = self.parameters["timeshift"]
@@ -295,20 +358,18 @@ class OpticalTransient(BaseEMTransient):
         return lc_data
 
     def band_log_likelihood(self, lc_data):
-        em_err_param = self.parameters.get('em_syserr', None)
         minus_chisquare_total = 0.0
         gaussprob_total = 0.0
         for filt in self.filters:
-            if not em_err_param:
-                em_err_param= self.error_budget[filt]
             # decompose the data
             data_time, data_mag, data_sigma  = self.light_curve_data[filt].T
-            data_sigma = np.sqrt(data_sigma**2 + em_err_param**2)
+            systematic_em_err = self.get_em_err(filt, data_time)
+            data_sigma = np.sqrt(data_sigma**2 + systematic_em_err**2)
             model_time, model_mags = lc_data[filt]
             # evaluate the light curve magnitude at the data points
             est_mag = utils.autocomplete_data(data_time, model_time, model_mags)
             minus_chisquare, gaussprob = chisquare_gaussianlog_from_lc_data( 
-                est_mag, data_mag , data_sigma,  em_err_param, 
+                est_mag, data_mag , data_sigma,  systematic_em_err, 
                 lim=self.detection_limit[filt]
             )
             if isinstance(minus_chisquare, bool):
@@ -448,10 +509,16 @@ class OpticalLightCurve(EMTransientLikelihood):
         verbose=False,
     ):
         super().__init__(
-                light_curve_model, light_curve_data, trigger_time, filters, 
-                detection_limit, error_budget, tmin, tmax, verbose
+                light_curve_model=light_curve_model,
+                light_curve_data = light_curve_data,
+                trigger_time = trigger_time,
+                filters= filters,
+                detection_limit = detection_limit,
+                error_budget = error_budget,
+                tmin = tmin,
+                tmax = tmax, 
+                verbose = verbose
                 )
-
 class BolometricLightCurve(EMTransientLikelihood):
     """Legacy class for bolometric likelihood objects
 
@@ -489,11 +556,11 @@ class BolometricLightCurve(EMTransientLikelihood):
         verbose=False
     ):
         super().__init__(
-                light_curve_model,
-                light_curve_data,
-                detection_limit,
-                error_budget,
-                tmin,
-                tmax, 
-                verbose
+                light_curve_model=light_curve_model,
+                light_curve_data = light_curve_data,
+                detection_limit = detection_limit,
+                error_budget = error_budget,
+                tmin = tmin,
+                tmax = tmax, 
+                verbose = verbose
                 )

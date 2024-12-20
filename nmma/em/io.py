@@ -3,9 +3,16 @@ from astropy.time import Time
 import h5py
 import numpy as np
 import pandas as pd
-from scipy.interpolate import interpolate as interp
+import json
 import scipy.signal
 from sncosmo.bandpasses import _BANDPASSES
+
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 
 def loadEvent(filename):
@@ -160,14 +167,9 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
                 idx = np.where(group[magerror_key] != 99.0)[0]
                 if len(idx) < 2:
                     continue
-                lc = interp.interp1d(
+                data[name][filt] = np.interp(tt,
                     group["jd"].iloc[idx] - jd_min,
-                    group[mag_key].iloc[idx],
-                    fill_value=np.nan,
-                    bounds_error=False,
-                    assume_sorted=True,
-                )
-                data[name][filt] = lc(tt)
+                    group[mag_key].iloc[idx],left=np.nan, right=np.nan )
         
         # Bulla datatype
         elif datatype == "bulla":
@@ -282,3 +284,12 @@ def read_lightcurve_file(filename: str) -> dict:
     df.rename(columns={"t[days]": "t"}, inplace=True)
 
     return df.to_dict(orient="series")
+
+def return_from_json(json_file):
+    with open(json_file, "r") as f:
+        data = json.load(f)
+    return data
+
+def write_to_json(injection_outfile, data, filters, sample_times):
+    with open(injection_outfile, "w") as f:
+        json.dump(data, f, cls=NumpyEncoder, indent=4)

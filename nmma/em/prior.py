@@ -1,9 +1,32 @@
 import bilby
 import bilby.core
 from bilby.core.prior import Prior
+from bilby.core.prior import PriorDict as _PriorDict
 from bilby.core.prior.interpolated import Interped
 from bilby.core.prior.conditional import ConditionalTruncatedGaussian
 
+from . import systematics
+
+
+def from_list(self, systematics):
+    """
+    Similar to `from_file` but instead of file buffer, takes a list of Prior strings
+    See `from_file` for more details
+    """
+
+    comments = ["#", "\n"]
+    prior = dict()
+    for line in systematics:
+        if line[0] in comments:
+            continue
+        line.replace(" ", "")
+        elements = line.split("=")
+        key = elements[0].replace(" ", "")
+        val = "=".join(elements[1:]).strip()
+        prior[key] = val
+    self.from_dictionary(prior)
+
+setattr(_PriorDict, "from_list", from_list)
 
 class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
     """
@@ -28,7 +51,7 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
         boundary=None,
     ):
 
-        super(ConditionalTruncatedGaussian, self).__init__(
+        super().__init__(
             mu=0,
             sigma=1,
             minimum=minimum,
@@ -76,7 +99,13 @@ def inclination_prior_from_fits(priors, args):
 
     # check if the sky location is input
     # if not, the maximum posterior point is taken
-    if 'ra' in priors and 'dec' in priors:
+    if ('ra' in priors and 'dec' in priors) or (args.ra and args.dec):
+        if args.ra and args.dec:
+            print("Using command line input for sky location, ignoring the prior file input")
+            ra = args.ra
+            dec = args.dec
+        else:
+            print("Using prior file input for sky location")
         ra = np.rad2deg(priors['ra'].peak)
         dec = np.rad2deg(priors['dec'].peak)
         print(f"Using the input sky location ra={ra}, dec={dec}")
@@ -127,7 +156,12 @@ def inclination_prior_from_fits(priors, args):
     # now have the joint distribution evaluated
     u = np.linspace(-1, 1, 1000)  # this is cosiota
     # fetch the fixed distance
-    dL = priors['luminosity_distance'].peak
+    if args.dL:
+        print("Using command line input for distance, ignoring the prior file input")
+        dL = args.dL
+    else:
+        print("Using prior file input for distance")
+        dL = priors['luminosity_distance'].peak
     prob_u = prob_density(u) * dist_norm(u) * np.square(dL) * norm(dist_mu(u), dist_sigma(u)).pdf(dL)
 
     iota = np.arccos(u)

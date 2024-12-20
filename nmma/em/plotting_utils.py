@@ -16,16 +16,22 @@ params = {
 
 
 matplotlib.rcParams.update(params)
+def check_limit(lim):
+    if isinstance(lim, str):
+        lim = [float(val) for val in lim.split(",")]
+    assert len(lim) == 2, f"{lim} is no valid plot-limit." 
+    return lim
 
-def  lc_plot(filters, data_dict, sample_times, plotpath, percentiles = (10, 50, 90), 
-             xlim = [0,14], ylim = [-12, -18], n_yticks =8,colorbar= False,
-             ylabel_kwargs = dict(fontsize=30, rotation=90, labelpad=8),  **fig_kwargs):
-    
+def basic_photo_lc_plot(
+        plot_fc, filters, save_path, fontsize=30, figsize=(15, 18), colorbar=False, xlim = [0,14], ylim = [-12, -18], n_yticks = 4, ylabel_kwargs = dict(fontsize=30, rotation=90, labelpad=8),**kwargs):
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=figsize)
     ncols = 1
-    nrows = len(filters)
+    nrows = int(np.ceil(len(filters) / ncols))
     gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
+
+    xlim = check_limit(xlim)
+    ylim = check_limit(ylim)
 
     axs = []
     for ii, filt in enumerate(filters):
@@ -33,11 +39,56 @@ def  lc_plot(filters, data_dict, sample_times, plotpath, percentiles = (10, 50, 
         loc_x, loc_y = int(loc_x), int(loc_y)
         ax = fig.add_subplot(gs[loc_y, loc_x])
 
+        ax, cb = plot_fc(ax, filt, ii)
+
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        if ii == len(filters) - 1:
+            ax.set_xticks([np.ceil(x) for x in np.linspace(xlim[0], xlim[1], 8)])
+        else:
+            plt.setp(ax.get_xticklabels(), visible=False)
+
+        ax.set_yticks([np.ceil(x) for x in np.linspace(ylim[0], ylim[1], n_yticks)])
+        
+        ax.set_ylabel(filt, **ylabel_kwargs)
+
+        ax.tick_params(axis="x", labelsize=fontsize)
+        ax.tick_params(axis="y", labelsize=fontsize)
+        ax.grid(which="both", alpha=0.5)
+        axs.append(ax)
+
+    if colorbar:
+        fig.colorbar(cb, ax=axs, location="right", shrink=0.6)
+
+    fig.text(0.45, 0.05, "Time [days]", fontsize=fontsize)
+    ylabel = "Absolute Magnitude"
+
+    fig.text(0.01, 0.5, ylabel, fontsize=fontsize,
+        va="center", rotation="vertical")
+    
+    plt.tight_layout()
+    plt.savefig(save_path, bbox_inches="tight")
+    plt.close()
+
+
+def lc_comparison_plot(mag_dict, training_data, filters, sample_times, save_path,  **kwargs):
+    def lc_plot_fc(ax, filt, ii):
+        ax.plot(sample_times, training_data[:, ii], "k--", label="grid")
+        ax.plot(sample_times, mag_dict[filt], "b-", label="interpolated")
+        if ii == 0:
+            ax.legend(fontsize=kwargs.get("fontsize", 30)//2)
+        return ax, None
+    
+    basic_photo_lc_plot(lc_plot_fc, filters, save_path=save_path,  **kwargs)
+
+
+def lc_plot_with_histogram(filters, data_dict, sample_times, save_path, percentiles = (10, 50, 90) , **kwargs):
+    def lc_hist_fc(ax, filt, ii):
         plot_data = data_dict[filt]
 
         bins = np.linspace(-20, 30, 100)
         def return_hist(x):
-            hist, bin_edges = np.histogram(x, bins=bins)
+            hist, _ = np.histogram(x, bins=bins)
             return hist
 
         hist = np.apply_along_axis(lambda x: return_hist(x), -1, plot_data.T)
@@ -48,47 +99,44 @@ def  lc_plot(filters, data_dict, sample_times, plotpath, percentiles = (10, 50, 
         hist[hist == 0.0] = np.nan
 
         cb = ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="cividis", alpha=0.7)
-
         # plot 10th, 50th, 90th percentiles
         for pct in percentiles:
             ax.plot(sample_times, np.nanpercentile(plot_data, pct, axis=0), "k--")
-        xlim = check_limit(xlim)
-        ax.set_xlim(xlim)
-        ylim = check_limit(ylim)
-        ax.set_ylim(ylim)
 
-        ax.set_ylabel(filt, ylabel_kwargs)
+        return ax, cb
+    basic_photo_lc_plot(lc_hist_fc, filters, save_path, **kwargs)
 
-        if ii == len(filters) - 1:
-            ax.set_xticks([np.ceil(x) for x in np.linspace(xlim[0], xlim[1], 8)])
-        else:
-            plt.setp(ax.get_xticklabels(), visible=False)
 
-        ax.set_yticks([np.ceil(x) for x in np.linspace(ylim[0], ylim[1], n_yticks)])
-        ax.tick_params(axis="x", labelsize=35)
-        ax.tick_params(axis="y", labelsize=35)
-        ax.grid(which="both", alpha=0.5)
+def spec_subplot(
+        fig, ax, X, Y, Z, data_label, vmin =-10, vmax =-2, fontsize=30, cbar_label="log10(Flux)"
+        ):
+    pcm = ax.pcolormesh(X, Y, Z, vmin=vmin, vmax=vmax)
+    ax.set_title(data_label, fontsize=fontsize)
+    ax.set_xlabel("Time [days]", fontsize=fontsize)
+    ax.set_ylabel("Wavelength [AA]", fontsize=fontsize)
+    ax.tick_params(axis="x", labelsize=fontsize)
+    ax.tick_params(axis="y", labelsize=fontsize)
+    ax.grid(which="both", alpha=0.5)
+    cbar = fig.colorbar(pcm, ax=ax)
+    cbar.set_label(cbar_label, fontsize=fontsize)
+    cbar.ax.tick_params(labelsize=fontsize)
+    return fig, ax
 
-        axs.append(ax)
+def basic_spec_plot(
+        mesh_X, mesh_Y, spec_func, plot_entries, save_path, figsize=(32, 14)):
+    
+    XX, YY = np.meshgrid(mesh_X, mesh_Y)
+    fig = plt.figure(figsize=figsize)
+    ncols = len(plot_entries)
+    nrows = 1
+    gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
+    for ii, (label, plot_data) in enumerate(plot_entries.items()):
+        loc_x, loc_y = np.divmod(ii, nrows)
+        loc_x, loc_y = int(loc_x), int(loc_y)
+        ax = fig.add_subplot(gs[loc_x,loc_y])
+        fig, ax = spec_func(fig, ax, XX, YY, plot_data, label)
 
-    if colorbar:
-        fig.colorbar(cb, ax=axs, location="right", shrink=0.6)
-    fig.text(0.42, 0.05, r"Time [days]", fontsize=36)
-    fig.text(
-        0.01,
-        0.5,
-        r"Absolute Magnitude",
-        va="center",
-        rotation="vertical",
-        fontsize=36,
-    )
 
     plt.tight_layout()
-    plt.savefig(plotpath, bbox_inches="tight")
+    plt.savefig(save_path, bbox_inches="tight")
     plt.close()
-
-def check_limit(lim):
-    if isinstance(lim, str):
-        lim = [float(val) for val in lim.split(",")]
-    assert len(lim) == 2, f"{lim} is no valid plot-limit." 
-    return lim

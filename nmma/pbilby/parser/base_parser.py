@@ -94,7 +94,7 @@ def _add_em_settings_to_parser(parser):
         type=float, default=14.0, help="Days to be stoped analysing from the trigger time (default: 14)", )
     em_input_parser.add( "--em-transient-tstep", 
         type=float, default=0.1, help="Time step (in days) for light curve initial evaluation (default: 0.1)", )
-    em_input_parser.add("--em-transient-error", type=float, 
+    em_input_parser.add("--em-transient-error", "--kilonova-error", type=float, 
         default=1.0, help="Additional statistical error (mag) to be introduced (default: 1)", )
     return parser
 
@@ -108,12 +108,12 @@ def _add_kn_settings_to_parser(parser):
     em_input_parser.add("--kilonova-model-svd", type=str, 
         help="Path to the kilonova model's SVD data" )
     em_input_parser.add(
-        "--kilonova-injection-model",
+        "em-injection-model", "--kilonova-injection-model",
         type=str,
         help="Name of the kilonova model to be used for injection",
     )
     em_input_parser.add(
-        "--kilonova-injection-svd",
+        "--injection-svd-path", "--kilonova-injection-svd",
         type=str,
         help="Path to the kilonova model's SVD data for injection",
     )

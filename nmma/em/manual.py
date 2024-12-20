@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 
 import bilby
@@ -10,7 +9,6 @@ import pandas as pd
 from astropy import time
 
 from ..utils.models import refresh_models_list
-from .injection import create_light_curve_data
 from .model import (
     GenericCombineLightCurveModel,
     GRBLightCurveModel,
@@ -19,8 +17,9 @@ from .model import (
     SupernovaLightCurveModel,
     SVDLightCurveModel,
 )
-from .utils import getFilteredMag, loadEvent
-
+from .utils import getFilteredMag, setup_sample_times, transform_to_app_mag_dict
+from .io import loadEvent
+import nmma.em.analysis as em_ana 
 matplotlib.use("agg")
 
 
@@ -315,8 +314,9 @@ def main(args=None):
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
+    filters = em_ana.set_filters(args)
     # initialize light curve model
-    sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    sample_times = setup_sample_times(args)
 
     models = []
     # check if there are more than one model
@@ -329,33 +329,25 @@ def main(args=None):
     for model_name in model_names:
         if model_name == "TrPi2018":
             lc_model = GRBLightCurveModel(
-                sample_times=sample_times,
                 resolution=args.grb_resolution,
                 jetType=args.jet_type,
             )
 
         elif model_name == "nugent-hyper":
-            lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model="nugent-hyper"
-            )
+            lc_model = SupernovaLightCurveModel(model="nugent-hyper")
 
         elif model_name == "salt2":
-            lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times, model="salt2"
-            )
+            lc_model = SupernovaLightCurveModel(model="salt2")
 
         elif model_name == "Piro2021":
-            lc_model = ShockCoolingLightCurveModel(sample_times=sample_times)
+            lc_model = ShockCoolingLightCurveModel()
 
         elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
-            lc_model = SimpleKilonovaLightCurveModel(
-                sample_times=sample_times, model=model_name
-            )
+            lc_model = SimpleKilonovaLightCurveModel(model=model_name)
 
         else:
             lc_kwargs = dict(
                 model=model_name,
-                sample_times=sample_times,
                 svd_path=args.svd_path,
                 mag_ncoeff=args.svd_mag_ncoeff,
                 lbol_ncoeff=args.svd_lbol_ncoeff,
@@ -366,186 +358,26 @@ def main(args=None):
         models.append(lc_model)
 
         if len(models) > 1:
-            light_curve_model = GenericCombineLightCurveModel(models, sample_times)
+            light_curve_model = GenericCombineLightCurveModel(models)
         else:
             light_curve_model = models[0]
 
     # create the kilonova data if an injection set is given
     if args.injection:
-        with open(args.injection, "r") as f:
-            injection_dict = json.load(
-                f, object_hook=bilby.core.utils.decode_bilby_json
-            )
-        injection_df = injection_dict["injections"]
-        injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+        data, _ = em_ana.make_injection(args, sample_times, injection_model=light_curve_model)
 
-        if "geocent_time" in injection_parameters:
-            tc_gps = time.Time(injection_parameters["geocent_time"], format="gps")
-        elif "geocent_time_x" in injection_parameters:
-            tc_gps = time.Time(injection_parameters["geocent_time_x"], format="gps")
-        else:
-            print("Need either geocent_time or geocent_time_x")
-            exit(1)
-        trigger_time = tc_gps.mjd
-
-        injection_parameters["kilonova_trigger_time"] = trigger_time
-        if args.prompt_collapse:
-            injection_parameters["log10_mej_wind"] = -3.0
-
-        # sanity check for eject masses
-        if "log10_mej_dyn" in injection_parameters and not np.isfinite(
-            injection_parameters["log10_mej_dyn"]
-        ):
-            injection_parameters["log10_mej_dyn"] = -3.0
-        if "log10_mej_wind" in injection_parameters and not np.isfinite(
-            injection_parameters["log10_mej_wind"]
-        ):
-            injection_parameters["log10_mej_wind"] = -3.0
-
-        args.kilonova_tmin = args.tmin
-        args.kilonova_tmax = args.tmax
-        args.kilonova_tstep = args.dt
-        args.kilonova_error = args.photometric_error_budget
-
-        args.kilonova_injection_model = args.model
-        args.kilonova_injection_svd = args.svd_path
-        args.injection_svd_mag_ncoeff = args.svd_mag_ncoeff
-        args.injection_svd_lbol_ncoeff = args.svd_lbol_ncoeff
-
-        data = create_light_curve_data(
-            injection_parameters, args, light_curve_model=light_curve_model
-        )
         print("Injection generated")
 
         if args.injection_outfile is not None:
-            if args.injection_detection_limit is None:
-                detection_limit = {x: np.inf for x in args.filters.split(",")}
-            else:
-                detection_limit = {
-                    x: float(y)
-                    for x, y in zip(
-                        args.filters.split(","),
-                        args.injection_detection_limit.split(","),
-                    )
-                }
-            data_out = np.empty((0, 6))
-            for filt in data.keys():
-                if args.filters:
-                    if args.photometry_augmentation_filters:
-                        filts = list(
-                            set(
-                                args.filters.split(",")
-                                + args.photometry_augmentation_filters.split(",")
-                            )
-                        )
-                    else:
-                        filts = args.filters.split(",")
-                    if filt not in filts:
-                        continue
-                for row in data[filt]:
-                    mjd, mag, mag_unc = row
-                    if not np.isfinite(mag_unc):
-                        data_out = np.append(
-                            data_out,
-                            np.array([[mjd, 99.0, 99.0, filt, mag, 0.0]]),
-                            axis=0,
-                        )
-                    else:
-                        if filt in detection_limit:
-                            data_out = np.append(
-                                data_out,
-                                np.array(
-                                    [
-                                        [
-                                            mjd,
-                                            mag,
-                                            mag_unc,
-                                            filt,
-                                            detection_limit[filt],
-                                            0.0,
-                                        ]
-                                    ]
-                                ),
-                                axis=0,
-                            )
-                        else:
-                            data_out = np.append(
-                                data_out,
-                                np.array([[mjd, mag, mag_unc, filt, np.inf, 0.0]]),
-                                axis=0,
-                            )
-
-            columns = ["jd", "mag", "mag_unc", "filter", "limmag", "programid"]
-            lc = pd.DataFrame(data=data_out, columns=columns)
-            lc.sort_values("jd", inplace=True)
-            lc = lc.reset_index(drop=True)
-            lc.to_csv(args.injection_outfile)
-
+            em_ana.store_injections(args, data=data)
     else:
         # load the kilonova afterglow data
         data = loadEvent(args.data)
 
         trigger_time = args.trigger_time
 
-    if args.remove_nondetections:
-        filters_to_check = list(data.keys())
-        for filt in filters_to_check:
-            idx = np.where(np.isfinite(data[filt][:, 2]))[0]
-            data[filt] = data[filt][idx, :]
-            if len(idx) == 0:
-                del data[filt]
-
-    # check for detections
-    detection = False
-    notallnan = False
-    for filt in data.keys():
-        idx = np.where(np.isfinite(data[filt][:, 2]))[0]
-        if len(idx) > 0:
-            detection = True
-        idx = np.where(np.isfinite(data[filt][:, 1]))[0]
-        if len(idx) > 0:
-            notallnan = True
-        if detection and notallnan:
-            break
-    if (not detection) or (not notallnan):
-        raise ValueError("Need at least one detection to do fitting.")
-
-    error_budget = [float(x) for x in args.error_budget.split(",")]
-    if args.filters:
-        if args.photometry_augmentation_filters:
-            filters = list(
-                set(
-                    args.filters.split(",")
-                    + args.photometry_augmentation_filters.split(",")
-                )
-            )
-        else:
-            filters = args.filters.split(",")
-
-        values_to_indices = {v: i for i, v in enumerate(filters)}
-        filters_to_analyze = sorted(
-            list(set(filters).intersection(set(list(data.keys())))),
-            key=lambda v: values_to_indices[v],
-        )
-
-        if len(error_budget) == 1:
-            error_budget = dict(
-                zip(filters_to_analyze, error_budget * len(filters_to_analyze))
-            )
-        elif len(args.filters.split(",")) == len(error_budget):
-            error_budget = dict(zip(args.filters.split(","), error_budget))
-        else:
-            raise ValueError("error_budget must be the same length as filters")
-
-    else:
-        filters_to_analyze = list(data.keys())
-        error_budget = dict(
-            zip(filters_to_analyze, error_budget * len(filters_to_analyze))
-        )
-
-    print("Running with filters {0}".format(filters_to_analyze))
-    # setup the parameter dictionary
-
+    data = em_ana.check_detections(data, args.remove_nondetections)
+    filters_to_analyze, error_budget = em_ana.set_error_budget_and_filters(args, data)
     ##########################
     # Fetch parameters
     ##########################
@@ -565,11 +397,7 @@ def main(args=None):
         mags = []
         for params in parameters:
             _, mag = light_curve_model.generate_lightcurve(sample_times, params)
-            for filt in mag.keys():
-                if params["luminosity_distance"] > 0:
-                    mag[filt] += 5.0 * np.log10(
-                        params["luminosity_distance"] * 1e6 / 10.0
-                    )
+            mag = transform_to_app_mag_dict(mag, params)
             mag["bestfit_sample_times"] = sample_times
             if "timeshift" in params:
                 mag["bestfit_sample_times"] = (
@@ -581,13 +409,10 @@ def main(args=None):
                     sample_times, params, return_all=True
                 )
 
-                for ii in range(len(mag_all)):
-                    for filt in mag_all[ii].keys():
-                        if params["luminosity_distance"] > 0:
-                            mag_all[ii][filt] += 5.0 * np.log10(
-                                params["luminosity_distance"] * 1e6 / 10.0
-                            )
-                model_colors = cm.Spectral(np.linspace(0, 1, len(models)))[::-1]
+                
+                for i, mag_dict in enumerate(mag_all):
+                    mag_all[i] = transform_to_app_mag_dict(mag_dict, params)
+                    model_colors = cm.Spectral(np.linspace(0, 1, len(models)))[::-1]
             mags.append(mag)
 
         filters_plot = []

@@ -14,3 +14,6 @@ svdmodels/
 ##custom files
 stable_eos_241205.txt
 nmma/eos/data
+
+##to be deprecated
+nmma/eos/manual.py

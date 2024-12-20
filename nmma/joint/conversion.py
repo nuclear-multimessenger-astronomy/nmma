@@ -19,7 +19,7 @@ from bilby.gw.conversion import (
 
 from ..eos.eos_processing import setup_eos_generator
 
-
+########################## distance conversions ####################################
 def luminosity_distance_to_redshift(distance, cosmology = default_cosmology):
 
     if isinstance(distance, pd.Series):
@@ -80,26 +80,13 @@ def observation_angle_conversion(parameters):
         parameters["KNtheta"] = parameters.get("inclination_EM", 0.0) * 180.0 / np.pi
     return parameters
 
+
+############################## mass conversions ####################################
 def mass_ratio_to_eta(q):
     return q / (1 + q) ** 2
 
 
-def mc2ms(mc, eta):
-    """
-    Utility function for converting mchirp,eta to component masses. The
-    masses are defined so that m1>m2. The rvalue is a tuple (m1,m2).
-    """
-    root = np.sqrt(0.25 - eta)
-    fraction = (0.5 + root) / (0.5 - root)
-    invfraction = 1 / fraction
-
-    m2 = mc * np.power((1 + fraction), 0.2) / np.power(fraction, 0.6)
-
-    m1 = mc * np.power(1 + invfraction, 0.2) / np.power(invfraction, 0.6)
-    return (m1, m2)
-
-
-def ms2mc(m1, m2):
+def component_masses_to_mass_quantities(m1, m2):
     eta = m1 * m2 / ((m1 + m2) * (m1 + m2))
     mchirp = ((m1 * m2) ** (3.0 / 5.0)) * ((m1 + m2) ** (-1.0 / 5.0))
     q = m2 / m1
@@ -107,6 +94,10 @@ def ms2mc(m1, m2):
     return (mchirp, eta, q)
 
 def chirp_mass_and_eta_to_component_masses(mc, eta):
+    """
+    Utility function for converting mchirp,eta to component masses. The
+    masses are defined so that m1>m2. The rvalue is a tuple (m1,m2).
+    """
     M = mc / np.power(eta, 3. / 5.)
     q = (1 - np.sqrt(1. - 4. * eta) - 2 * eta) / (2. * eta)
 
@@ -126,6 +117,9 @@ def tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(lambda1, l
 
     return lambdaT, dlambdaT
 
+
+
+############################## EOS-related conversions ####################################
 def lambda_to_compactness(lambda_i):
     "Function to link tidal deformability to compactness based on quasi-universal relation"
     loglam= np.log(lambda_i)
@@ -523,7 +517,7 @@ class BNSEjectaFitting(object):
 
 
 class MultimessengerConversion(object):
-    def __init__(self, args, messengers, ana_modifiers, fixed_prior={}):
+    def __init__(self, args, messengers, ana_modifiers =[], fixed_prior={}):
         self.messengers     = messengers
         self.modifiers      = ana_modifiers
         self.args           = args

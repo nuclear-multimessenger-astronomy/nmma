@@ -9,6 +9,7 @@ import scipy.constants
 from sncosmo.models import _SOURCES
 
 from . import utils
+from . import lightcurve_generation as lc_gen
 
 from ..joint.conversion import observation_angle_conversion, get_redshift, Hubble_constant_to_distance, default_cosmology
 from ..utils.models import get_models_home, get_model
@@ -19,11 +20,16 @@ ln10 = np.log(10)
 # As different KN models have very different parameters,
 # we need a dict to keep track for them. Remember, the order matters
 
-model_parameters_dict = {
+model_parameters_dict = { 
+    ## bolometric models
+    "Arnett": ["tau_m", "log10_mni"],
+    "Arnett_modified": ["tau_m", "log10_mni", "t_0"],
+    ## kilonova models
     "Bu2019nsbh": ["log10_mej_dyn", "log10_mej_wind", "KNtheta"],
     "Bu2019lm": ["log10_mej_dyn", "log10_mej_wind", "KNphi", "KNtheta"],
     "Bu2019lm_sparse": ["log10_mej_dyn", "log10_mej_wind"],
     "Ka2017": ["log10_mej", "log10_vej", "log10_Xlan"],
+    ## GRB models
     "TrPi2018": [
         "inclination_EM",
         "log10_E0",
@@ -40,6 +46,7 @@ model_parameters_dict = {
         "xi_N",
         "d_L",
     ],
+    ## Shock cooling models
     "Piro2021": ["log10_Menv", "log10_Renv", "log10_Ee"],
     "Me2017": ["log10_mej", "log10_vej", "beta", "log10_kappa_r"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
@@ -238,6 +245,35 @@ class LightCurveModelContainer(object):
         return {self.model: citation_dict[self.model]}
     
 
+class SimpleBolometricLightCurveModel(LightCurveModelContainer):
+    def __init__(self,  parameter_conversion=None, model="Arnett"):
+        """A light curve model object
+
+        An object to evaluted the kilonova Arnett light curve across filters
+
+        Parameters
+        ----------
+        model: string
+            Name of the model. Can be either "Arnett" (default) or "Arnett_modified"
+
+        Returns
+        -------
+        LightCurveModel: `nmma.em.model.SimpleBolometricLightCurveModel`
+            A light curve model object to evaluate the light curve
+            given a set of parameters
+        """
+        super().__init__(model, parameter_conversion)
+        if model == "Arnett":
+            self.lc_func = lc_gen.arnett_lc
+        elif model == "Arnett_modified":
+            self.lc_func = lc_gen.arnett_modified_lc
+
+    def generate_lightcurve(self, sample_times, parameters):
+        new_parameters = self.em_parameter_setup(parameters)
+        lbol = self.lc_func(sample_times, new_parameters)
+        return lbol, {}
+
+
 class SVDLightCurveModel(LightCurveModelContainer):
     """A light curve model object
 
@@ -289,14 +325,18 @@ class SVDLightCurveModel(LightCurveModelContainer):
 
         # Some models have underscores. Keep those, but drop '_tf' if it exists
         model_name_components = model.split("_")
+        self.model_specifier = ""
         if "tf" in model_name_components:
             model_name_components.remove("tf")
+            self.model_specifier = "_tf"
+
         core_model_name = "_".join(model_name_components)
 
-        modelfile = os.path.join(self.svd_path, f"{core_model_name}.joblib")
+        modelfile   = os.path.join(self.svd_path, f"{core_model_name}.joblib")
+        outdir      = os.path.join(self.svd_path, f"{model}{self.model_specifier}")
         if not local_only:
-            self.get_model_data(filters)
             ##FIXME Does this make sense for api_gp, too?
+            self.get_model_data(filters)
         try:
             self.svd_mag_model = joblib.load(modelfile)
             self.svd_lbol_model= None
@@ -310,8 +350,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
 
 
         if self.interpolation_type == "sklearn_gp":
-            outdir = os.path.join(self.svd_path, f"{model}")
-            self.load_filt_model(outdir,joblib.load )
+            self.load_filt_model(outdir,joblib.load, fn_ext='joblib', target_name='gps')
 
         elif self.interpolation_type == "api_gp":
             from .training import load_api_gp_model
@@ -323,7 +362,6 @@ class SVDLightCurveModel(LightCurveModelContainer):
             import tensorflow as tf
             tf.get_logger().setLevel("ERROR")
             from tensorflow.keras.models import load_model
-            outdir = os.path.join(self.svd_path, f"{model}_tf")
             self.load_filt_model(outdir, load_model, fn_ext= 'h5', target_name='model')
 
         else:
@@ -331,9 +369,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
         
 
     def get_model_data(self, filters):
-        _, model_filters = get_model(
-            self.svd_path, f"{self.model}", filters=filters
-        )
+        _, model_filters = get_model(self.svd_path, f"{self.model}{self.model_specifier}", filters=filters)
         if filters is None and model_filters is not None:
             self.filters = model_filters
         
@@ -352,12 +388,13 @@ class SVDLightCurveModel(LightCurveModelContainer):
     def __repr__(self):
         return super().__repr__() + f"(model={self.model}, svd_path={self.svd_path})"
 
-    def generate_lightcurve(self, sample_times, parameters):
+    def generate_lightcurve(self, sample_times, parameters, filters = None):
         param_dict = self.em_parameter_setup(parameters)
         z= param_dict['redshift']
         parameters_list = [param_dict[key] for key in self.model_parameters]
-
-        _, lbol, mag = utils.calc_lc(
+        if filters is None:
+            filters = self.filters
+        lbol, mag = lc_gen.calc_lc(
             sample_times / (1.0 + z),
             parameters_list,
             svd_mag_model=self.svd_mag_model,
@@ -365,7 +402,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
             mag_ncoeff=self.mag_ncoeff,
             lbol_ncoeff=self.lbol_ncoeff,
             interpolation_type=self.interpolation_type,
-            filters=self.filters,
+            filters=filters,
         )
         lbol *= 1.0 + z
 
@@ -376,6 +413,10 @@ class SVDLightCurveModel(LightCurveModelContainer):
             mag[filt] += ext_mags[i]
 
         return lbol, mag
+    
+    def generate_spectra(self, sample_times, wavelengths, parameters):
+        _, spec = self.generate_lightcurve(sample_times, parameters, filters=wavelengths)
+        return spec
 
 
 class GRBLightCurveModel(LightCurveModelContainer):
@@ -449,7 +490,7 @@ class GRBLightCurveModel(LightCurveModelContainer):
             return np.zeros(len(sample_times)), {}
         
         filts, nu_0s, ext_mag = self.get_extinction_mags(new_parameters['redshift'], new_parameters.get("Ebv", 0.0), self.filters)
-        _, lbol, mag = utils.grb_lc(
+        lbol, mag = lc_gen.grb_lc(
             sample_times, grb_param_dict, filters=filts, obs_frequencies= nu_0s
         )
         mag = self.apply_extinction_correction(mag, ext_mag, filts )
@@ -489,7 +530,7 @@ class HostGalaxyLightCurveModel(LightCurveModelContainer):
 
     def generate_lightcurve(self, sample_times, parameters):
         new_parameters = self.em_parameter_setup(parameters)
-        lbol, mag = utils.host_lc(sample_times, new_parameters, self.filters, self.host_mag)
+        lbol, mag = lc_gen.host_lc(sample_times, new_parameters, self.filters, self.host_mag)
 
         return lbol, mag
 
@@ -526,7 +567,7 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         
         stretch = em_param_dict.get("supernova_mag_stretch", 1)
 
-        tt, lbol, mag = utils.sn_lc(
+        lbol, mag = lc_gen.sn_lc(
             sample_times / stretch,
             em_param_dict,
             cosmology=default_cosmology,
@@ -567,7 +608,7 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
         lc_param_dict = self.em_parameter_setup(parameters)
         filts, nus, ext_mag = self.get_extinction_mags(lc_param_dict['redshift'], lc_param_dict.get("Ebv", 0.0), self.filters)
 
-        _, lbol, mag = utils.sc_lc(sample_times, lc_param_dict, nus, filters=filts)
+        lbol, mag = lc_gen.sc_lc(sample_times, lc_param_dict, nus, filters=filts)
 
         mag = self.apply_extinction_correction(mag, ext_mag, filts)
         return lbol, mag
@@ -594,10 +635,10 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         """
         super().__init__(model, parameter_conversion, filters)
         lc_dict={
-            "Me2017"        : utils.metzger_lc,
-            "PL_BB_fixedT"  :  utils.powerlaw_blackbody_constant_temperature_lc,
-            "blackbody_fixedT": utils.blackbody_constant_temperature,
-            "synchrotron_powerlaw": utils.synchrotron_powerlaw
+            "Me2017"        : lc_gen.metzger_lc,
+            "PL_BB_fixedT"  :  lc_gen.powerlaw_blackbody_constant_temperature_lc,
+            "blackbody_fixedT": lc_gen.blackbody_constant_temperature,
+            "synchrotron_powerlaw": lc_gen.synchrotron_powerlaw
         }
         self.lc_func = lc_dict[model]
 
@@ -610,7 +651,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         old = np.seterr()
         np.seterr(invalid="ignore")
         np.seterr(divide="ignore")
-        _, lbol, mag = self.lc_func(sample_times, param_dict, nu_obs, self.filters)
+        lbol, mag = self.lc_func(sample_times, param_dict, nu_obs, self.filters)
         np.seterr(**old)
         if self.model == "synchrotron_powerlaw":
             # remove the distance modulus for the synchrotron powerlaw
@@ -755,7 +796,6 @@ class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
 def create_light_curve_model_from_args(
     model_name_arg,
     args,
-    sample_times,
     filters=None,
     sample_over_Hubble=False
 ):
@@ -779,7 +819,6 @@ def create_light_curve_model_from_args(
     for model_name in model_names:
         if model_name == "TrPi2018":
             lc_model = GRBLightCurveModel(
-                sample_times=sample_times,
                 resolution=args.grb_resolution,
                 jetType=args.jet_type,
                 parameter_conversion=parameter_conversion,
@@ -788,7 +827,6 @@ def create_light_curve_model_from_args(
 
         elif model_name in sncosmo_names:
             lc_model = SupernovaLightCurveModel(
-                sample_times=sample_times,
                 model=model_name,
                 parameter_conversion=parameter_conversion,
                 filters=filters,
@@ -796,14 +834,12 @@ def create_light_curve_model_from_args(
 
         elif model_name == "Piro2021":
             lc_model = ShockCoolingLightCurveModel(
-                sample_times=sample_times,
                 parameter_conversion=parameter_conversion,
                 filters=filters,
             )
 
         elif model_name == "Me2017" or model_name == "PL_BB_fixedT":
             lc_model = SimpleKilonovaLightCurveModel(
-                sample_times=sample_times,
                 model=model_name,
                 parameter_conversion=parameter_conversion,
                 filters=filters,
@@ -811,7 +847,6 @@ def create_light_curve_model_from_args(
 
         elif model_name == "Sr2023":
             lc_model = HostGalaxyLightCurveModel(
-                sample_times=sample_times,
                 parameter_conversion=parameter_conversion,
                 filters=filters,
             )
@@ -820,7 +855,6 @@ def create_light_curve_model_from_args(
             local_only = getattr(args, 'local_only', False)
             lc_kwargs = dict(
                 model=model_name,
-                sample_times=sample_times,
                 svd_path=args.svd_path,
                 mag_ncoeff=args.svd_mag_ncoeff,
                 lbol_ncoeff=args.svd_lbol_ncoeff,
@@ -834,7 +868,7 @@ def create_light_curve_model_from_args(
         models.append(lc_model)
 
     if len(models) > 1:
-        light_curve_model = CombinedLightCurveModelContainer(sample_times, models)
+        light_curve_model = CombinedLightCurveModelContainer(models)
     else:
         light_curve_model = models[0]
 
