@@ -1,4 +1,12 @@
 import os
+from .em_parsing import slurm_parser
+import json
+
+import numpy as np
+
+import bilby
+
+import os
 import argparse
 import json
 import pandas as pd
@@ -8,27 +16,7 @@ from bilby_pipe.create_injections import InjectionCreator
 
 
 def main():
-
-    parser = argparse.ArgumentParser(description="Slurm files from nmma injection file")
-    parser.add_argument(
-        "--prior-file",
-        type=str,
-        required=True,
-        help="The prior file from which to generate injections",
-    )
-    parser.add_argument(
-        "--injection-file",
-        type=str,
-        required=True,
-        help="The bilby injection json file to be used",
-    )
-    parser.add_argument(
-        "--analysis-file",
-        type=str,
-        required=True,
-        help="The analysis bash script to be replicated",
-    )
-    parser.add_argument("-o", "--outdir", type=str, default="outdir")
+    parser = slurm_parser
     args = parser.parse_args()
 
     # load the injection json file
@@ -88,6 +76,41 @@ def main():
         fid = open(analysis_file, "w")
         fid.write(analysis)
         fid.close()
+
+
+
+
+def lc_creation():
+    parser = slurm_parser()
+    args = parser.parse_args()
+
+    with open(args.injection, "r") as f:
+        injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
+
+    logdir = os.path.join(args.outdir, "logs")
+    if not os.path.isdir(logdir):
+        os.makedirs(logdir)
+
+    number_jobs = int(
+        np.ceil(len(injection_dict["injections"]) / args.lightcurves_per_job)
+    )
+
+    for ii in range(number_jobs):
+        with open(args.analysis_file, "r") as file:
+            analysis = file.read()
+
+        injection_min, injection_max = ii * number_jobs, (ii + 1) * number_jobs
+
+        analysis = analysis.replace(
+            "INJRANGE", "%d,%d" % (injection_min, injection_max)
+        )
+        analysis_file = os.path.join(args.outdir, "inference_%d.sh" % ii)
+
+        fid = open(analysis_file, "w")
+        fid.write(analysis)
+        fid.close()
+
+    fid.close()
 
 
 if __name__ == "__main__":

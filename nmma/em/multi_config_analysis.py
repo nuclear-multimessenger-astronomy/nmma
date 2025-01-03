@@ -1,10 +1,9 @@
 import yaml
 import subprocess
-from .analysis import get_parser
+from .em_parsing import em_analysis_parser
 from pathlib import Path
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-import sys
 import os
 
 
@@ -56,7 +55,7 @@ def main(args=None):
     parser = get_parser_here()
     args, _ = parser.parse_known_args(namespace=args)
 
-    _parser = get_parser()
+    _parser = em_analysis_parser()
     main_args = _parser.parse_args([])
 
     yaml_dict = yaml.safe_load(os.path.expandvars(Path(args.config).read_text()))

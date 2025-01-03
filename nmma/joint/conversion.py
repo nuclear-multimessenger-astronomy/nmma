@@ -19,7 +19,7 @@ from bilby.gw.conversion import (
 
 from ..eos.eos_processing import setup_eos_generator
 
-
+########################## distance conversions ####################################
 def luminosity_distance_to_redshift(distance, cosmology = default_cosmology):
 
     if isinstance(distance, pd.Series):
@@ -40,7 +40,8 @@ def get_redshift(parameters):
     elif "luminosity_distance" in parameters:
             return luminosity_distance_to_redshift(parameters["luminosity_distance"])
     else:
-        return np.zeros_like(parameters.values()[0])
+        ## zeros like the first input of parameters, independent of size and keys
+        return np.zeros_like(next(iter(parameters.values()))) 
 
 def Hubble_constant_to_distance(parameters, added_keys, cosmology= default_cosmology):
     # Hubble constant is supposed to be km/s/Mpc
@@ -80,26 +81,13 @@ def observation_angle_conversion(parameters):
         parameters["KNtheta"] = parameters.get("inclination_EM", 0.0) * 180.0 / np.pi
     return parameters
 
+
+############################## mass conversions ####################################
 def mass_ratio_to_eta(q):
     return q / (1 + q) ** 2
 
 
-def mc2ms(mc, eta):
-    """
-    Utility function for converting mchirp,eta to component masses. The
-    masses are defined so that m1>m2. The rvalue is a tuple (m1,m2).
-    """
-    root = np.sqrt(0.25 - eta)
-    fraction = (0.5 + root) / (0.5 - root)
-    invfraction = 1 / fraction
-
-    m2 = mc * np.power((1 + fraction), 0.2) / np.power(fraction, 0.6)
-
-    m1 = mc * np.power(1 + invfraction, 0.2) / np.power(invfraction, 0.6)
-    return (m1, m2)
-
-
-def ms2mc(m1, m2):
+def component_masses_to_mass_quantities(m1, m2):
     eta = m1 * m2 / ((m1 + m2) * (m1 + m2))
     mchirp = ((m1 * m2) ** (3.0 / 5.0)) * ((m1 + m2) ** (-1.0 / 5.0))
     q = m2 / m1
@@ -107,6 +95,10 @@ def ms2mc(m1, m2):
     return (mchirp, eta, q)
 
 def chirp_mass_and_eta_to_component_masses(mc, eta):
+    """
+    Utility function for converting mchirp,eta to component masses. The
+    masses are defined so that m1>m2. The rvalue is a tuple (m1,m2).
+    """
     M = mc / np.power(eta, 3. / 5.)
     q = (1 - np.sqrt(1. - 4. * eta) - 2 * eta) / (2. * eta)
 
@@ -126,27 +118,29 @@ def tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(lambda1, l
 
     return lambdaT, dlambdaT
 
+
+
+############################## EOS-related conversions ####################################
 def lambda_to_compactness(lambda_i):
     "Function to link tidal deformability to compactness based on quasi-universal relation"
     loglam= np.log(lambda_i)
     return 0.371 - 0.0391 * loglam + 0.001056 * loglam * loglam
 
 def mass_and_compactness_to_radius(mass, comp):
-    return mass / comp * lal.MRSUN_SI / 1e3
+    ### returns 0 if compactness is greater than 0.5, i.e. black hole
+    return np.where(comp<0.5, mass / comp * lal.MRSUN_SI / 1e3, 0.0)
 
 def radii_from_qur(converted_parameters, added_keys):
-    
     mass_1_source = converted_parameters["mass_1_source"]
     mass_2_source = converted_parameters["mass_2_source"]    
     lambda_1 = converted_parameters["lambda_1"]
     lambda_2 = converted_parameters["lambda_2"]
 
-    compactness_1, compactness_2=  lambda_to_compactness([lambda_1,lambda_2])
-
-    converted_parameters["radius_1"] = mass_and_compactness_to_radius(
-        mass_1_source, compactness_1)
-    converted_parameters["radius_2"] = mass_and_compactness_to_radius(
-        mass_2_source, compactness_2)
+    compactness_1 = lambda_to_compactness(lambda_1)
+    converted_parameters["radius_1"] = mass_and_compactness_to_radius( mass_1_source, compactness_1)
+    
+    compactness_2=  lambda_to_compactness(lambda_2)
+    converted_parameters["radius_2"] = mass_and_compactness_to_radius(mass_2_source, compactness_2)
 
     chirp_mass_source = component_masses_to_chirp_mass(mass_1_source, mass_2_source)
     lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(
@@ -227,15 +221,15 @@ class BBHEjectaFitting(object):
 
     def ejecta_parameter_conversion(self, converted_parameters, added_keys):
         added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind"]
-        converted_parameters['log10mej_dyn'] = np.ones_like(converted_parameters['mass_1_source'])*(-np.inf)
-        converted_parameters['log10mej_wind'] =np.ones_like(converted_parameters['mass_1_source'])*(-np.inf)
+        converted_parameters['log10mej_dyn'] = np.full_like(converted_parameters['mass_1_source'], -np.inf)
+        converted_parameters['log10mej_wind'] =np.full_like(converted_parameters['mass_1_source'], -np.inf)
 
         return converted_parameters, added_keys
     
 
 class NSBHEjectaFitting(object):
     def __init__(self):
-        pass
+        self.mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind"]
 
     def chibh2risco(self, chi_bh):
 
@@ -328,19 +322,14 @@ class NSBHEjectaFitting(object):
 
         mass_1_source = converted_parameters["mass_1_source"]
         mass_2_source = converted_parameters["mass_2_source"]
-        total_mass_source = mass_1_source + mass_1_source
 
         radius_2 = converted_parameters["radius_2"]
         compactness_2 = mass_2_source * lal.MRSUN_SI / (radius_2 * 1e3)
 
         if "cos_tilt_1" not in converted_parameters:
             converted_parameters["cos_tilt_1"] = np.cos(converted_parameters["tilt_1"])
-        if "cos_tilt_2" not in converted_parameters:
-            converted_parameters["cos_tilt_2"] = np.cos(converted_parameters["tilt_2"])
 
         chi_1 = converted_parameters["a_1"] * converted_parameters["cos_tilt_1"]
-        chi_2 = converted_parameters["a_2"] * converted_parameters["cos_tilt_2"]
-        chi_eff = (mass_1_source * chi_1 + mass_2_source * chi_2) / total_mass_source
 
         mdyn_fit = self.dynamic_mass_fitting(
             mass_1_source, mass_2_source, compactness_2, chi_1
@@ -350,28 +339,18 @@ class NSBHEjectaFitting(object):
         )
         mdisk_fit = remnant_disk_fit - mdyn_fit
 
+        ### compute ejecta parameters if there si a disk
+        converted_parameters["log10_mej_wind"] =  np.where(mdisk_fit>0.,
+            np.log10(mdisk_fit) + np.log10(converted_parameters["ratio_zeta"]), -np.inf
+        )
+
         log_mdyn_fit = np.log(mdyn_fit)
         log_alpha = converted_parameters["log10_alpha"] * np.log(10.0)
         log_mej_dyn = np.logaddexp(log_mdyn_fit, log_alpha)
-        log10_mej_dyn = log_mej_dyn / np.log(10.0)
+        converted_parameters["log10_mej_dyn"]  = np.where(mdisk_fit>0,
+            log_mej_dyn / np.log(10.0), -np.inf
+        )
 
-        converted_parameters["log10_mej_dyn"] = log10_mej_dyn
-        converted_parameters["log10_mej_wind"] = np.log10(
-            converted_parameters["ratio_zeta"]
-        ) + np.log10(mdisk_fit)
-
-        if isinstance(compactness_2, (list, tuple, pd.core.series.Series, np.ndarray)):
-            BH_index = np.where(compactness_2 == 0.5)[0]
-            negative_mdisk_index = np.where(~np.isfinite(log_mej_dyn))[0]
-            invalid_index = list(set(BH_index) | set(negative_mdisk_index))
-
-            converted_parameters["log10_mej_dyn"][invalid_index] = -np.inf
-            converted_parameters["log10_mej_wind"][invalid_index] = -np.inf
-
-        else:
-            if compactness_2 == 0.5 or (not np.isfinite(log_mej_dyn)):
-                converted_parameters["log10_mej_dyn"] = -np.inf
-                converted_parameters["log10_mej_wind"] = -np.inf
 
         added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind"]
 
@@ -380,7 +359,7 @@ class NSBHEjectaFitting(object):
 
 class BNSEjectaFitting(object):
     def __init__(self):
-        pass
+        self.mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
     def log10_disk_mass_fitting(
         self,
@@ -499,94 +478,45 @@ class BNSEjectaFitting(object):
 
         mej_dyn = mdyn_fit + converted_parameters["alpha"]
         log10_mej_dyn = np.log10(mej_dyn)
-
-        converted_parameters["log10_mej_dyn"] = log10_mej_dyn
         log10_mej_wind = np.log10(converted_parameters["ratio_zeta"]) + log10_mdisk_fit
-        converted_parameters["log10_mej_wind"] = log10_mej_wind
         # total eject mass
         total_ejeta_mass = 10**log10_mej_dyn + 10**log10_mej_wind
-        log10_mej = np.log10(total_ejeta_mass)
-        converted_parameters["log10_mej"] = log10_mej
         # GRB afterglow energy
         log10_E0_MSUN = (
             np.log10(converted_parameters["ratio_epsilon"])
             + np.log10(1.0 - converted_parameters["ratio_zeta"])
             + log10_mdisk_fit
         )
-        log10_E0_erg = log10_E0_MSUN + np.log10(
+
+        converted_parameters["log10_mej_dyn"] = log10_mej_dyn
+        converted_parameters["log10_mej_wind"] = log10_mej_wind
+        converted_parameters["log10_mej"] = np.log10(total_ejeta_mass)
+        converted_parameters["log10_E0"] = log10_E0_MSUN + np.log10(
             lal.MSUN_SI * scipy.constants.c * scipy.constants.c * 1e7
-        )
-        converted_parameters["log10_E0"] = log10_E0_erg
+        ) 
 
         if (
             isinstance(compactness_1, (list, tuple, pd.core.series.Series, np.ndarray))
             and len(compactness_1) > 1
         ):
-
-            mdyn_nan_index = np.where((~np.isfinite(log10_mej_dyn)))[0]
-            if not isinstance(converted_parameters, pd.DataFrame):
-                converted_parameters["log10_mej_dyn"][mdyn_nan_index] = -np.inf
-            else:
-                converted_parameters.loc[mdyn_nan_index, "log10_mej_dyn"] = -np.inf
-
-            mwind_nan_index = np.where((~np.isfinite(log10_mej_wind)))[0]
-            if not isinstance(converted_parameters, pd.DataFrame):
-                converted_parameters["log10_mej_wind"][mwind_nan_index] = -np.inf
-            else:
-                converted_parameters.loc[mwind_nan_index, "log10_mej_wind"] = -np.inf
-
-            mej_tot_nan_index = np.where((~np.isfinite(log10_mej)))[0]
-            if not isinstance(converted_parameters, pd.DataFrame):
-                converted_parameters["log10_mej"][mej_tot_nan_index] = -np.inf
-            else:
-                converted_parameters.loc[mej_tot_nan_index, "log10_mej"] = -np.inf
-
-            E0_nan_index = np.where((~np.isfinite(log10_E0_erg)))[0]
-            if not isinstance(converted_parameters, pd.DataFrame):
-                converted_parameters["log10_E0"][E0_nan_index] = -np.inf
-            else:
-                converted_parameters.loc[E0_nan_index, "log10_E0"] = -np.inf
-
-            BH_index = np.where((compactness_1 == 0.5) + (compactness_2 == 0.5))[0]
-            if not isinstance(converted_parameters, pd.DataFrame):
-                converted_parameters["log10_mej_dyn"][BH_index] = -np.inf
-                converted_parameters["log10_mej_wind"][BH_index] = -np.inf
-                converted_parameters["log10_mej"][BH_index] = -np.inf
-                converted_parameters["log10_E0"][BH_index] = -np.inf
-            else:
-                converted_parameters.loc[BH_index, "log10_mej_dyn"] = -np.inf
-                converted_parameters.loc[BH_index, "log10_mej_wind"] = -np.inf
-                converted_parameters.loc[BH_index, "log10_mej"] = -np.inf
-                converted_parameters.loc[BH_index, "log10_E0"] = -np.inf
+            for key in self.mass_fitting_keys:
+                nan_index = np.where((~np.isfinite(converted_parameters[key])))[0]
+                try:
+                    converted_parameters[key][nan_index] = -np.inf
+                except:
+                    ## this should only be the case for parameter conversion of a result object, using a pandas df.
+                    converted_parameters.loc[nan_index, key] = -np.inf
 
         else:
-            if not np.isfinite(log10_mej_dyn):
-                converted_parameters["log10_mej_dyn"] = -np.inf
+            for key in self.mass_fitting_keys:
+                ##correct for NaNs
+                if not np.isfinite(converted_parameters[key] ):
+                    converted_parameters[key] = -np.inf
+                    
+                else:
+                    converted_parameters[key] = float(converted_parameters[key])
 
-            if not np.isfinite(log10_mej_wind):
-                converted_parameters["log10_mej_wind"] = -np.inf
 
-            if not np.isfinite(log10_mej):
-                converted_parameters["log10_mej"] = -np.inf
-
-            if not np.isfinite(log10_E0_erg):
-                converted_parameters["log10_E0"] = -np.inf
-
-            if compactness_1 == 0.5 or compactness_2 == 0.5:
-                converted_parameters["log10_mej_dyn"] = -np.inf
-                converted_parameters["log10_mej_wind"] = -np.inf
-                converted_parameters["log10_mej"] = -np.inf
-                converted_parameters["log10_E0"] = -np.inf
-
-            log10_mej_dyn = converted_parameters["log10_mej_dyn"]
-            log10_mej_wind = converted_parameters["log10_mej_wind"]
-            log10_mej = converted_parameters["log10_mej"]
-            log10_E0 = converted_parameters["log10_E0"]
-
-            converted_parameters["log10_mej_dyn"] = float(log10_mej_dyn)
-            converted_parameters["log10_mej_wind"] = float(log10_mej_wind)
-            converted_parameters["log10_mej"] = float(log10_mej)
-            converted_parameters["log10_E0"] = float(log10_E0)
 
         added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
@@ -596,7 +526,7 @@ class BNSEjectaFitting(object):
 
 
 class MultimessengerConversion(object):
-    def __init__(self, args, messengers, ana_modifiers, fixed_prior={}):
+    def __init__(self, args, messengers, ana_modifiers =[], fixed_prior={}):
         self.messengers     = messengers
         self.modifiers      = ana_modifiers
         self.args           = args

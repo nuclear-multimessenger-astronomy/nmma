@@ -13,7 +13,7 @@ from nmma.em.model import (
     SVDLightCurveModel,
 )
 
-from ..em import create_lightcurves
+from ..em import lightcurve_handling as lch
 from ..em.io import read_lightcurve_file
 from ..em.lightcurve_handling import validate_lightcurve
 from ..joint import create_injection
@@ -150,11 +150,11 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             outfile_type="csv",
             xlim="0,14",
             ylim="22,16",
-            photometric_error_budget=0.0,
+            em_transient_error=0.0,
             increment_seeds=False,
         )
 
-        create_lightcurves.main(args)
+        lch.lcs_from_injection_parameters(args)
 
         command_line_lightcurve_file = os.path.join(
             output_directory, f"{command_line_lightcurve_label}.dat"

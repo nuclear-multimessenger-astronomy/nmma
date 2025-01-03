@@ -34,7 +34,7 @@ def args():
         tmax=10.0,
         dt=0.5,
         log_space_time=False,
-        photometric_error_budget=0.1,
+        em_transient_error=0.1,
         soft_init=False,
         bestfit=True,
         svd_mag_ncoeff=10,

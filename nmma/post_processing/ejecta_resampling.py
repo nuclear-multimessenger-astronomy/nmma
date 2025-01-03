@@ -227,7 +227,7 @@ class TotalEjectaMassInference(EjectaResampler):
         super().__init__(GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, combine_ejecta_mass=True, **kwargs)
 
 
-class EjectaMassInference(Solver):
+class EjectaMassInference(EjectaResampler):
     def __init__(self, GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, **kwargs):
         super().__init__(GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, combine_ejecta_mass=False, **kwargs)
 

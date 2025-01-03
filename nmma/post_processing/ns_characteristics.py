@@ -2,14 +2,11 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 import scipy.interpolate
-import arviz
-import bilby
-from tqdm import tqdm
 import seaborn
 
 import matplotlib
 import matplotlib.pyplot as plt
-from .event_resampling import (reweight_to_flat_mass_prior, find_spread_from_resampling,
+from .event_resampling import (reweight_to_flat_mass_prior, 
                                estimate_observable_trend)
 from .parser import R14_parser
 from ..eos.eos_processing import load_macro_characteristics_from_tabulated_eos_set

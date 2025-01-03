@@ -51,7 +51,7 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
         boundary=None,
     ):
 
-        super(ConditionalTruncatedGaussian, self).__init__(
+        super().__init__(
             mu=0,
             sigma=1,
             minimum=minimum,
@@ -106,8 +106,8 @@ def inclination_prior_from_fits(priors, args):
             dec = args.dec
         else:
             print("Using prior file input for sky location")
-            ra = np.rad2deg(priors['ra'].peak)
-            dec = np.rad2deg(priors['dec'].peak)
+        ra = np.rad2deg(priors['ra'].peak)
+        dec = np.rad2deg(priors['dec'].peak)
         print(f"Using the input sky location ra={ra}, dec={dec}")
         # convert them back to theta and phi
         phi = np.deg2rad(ra)
