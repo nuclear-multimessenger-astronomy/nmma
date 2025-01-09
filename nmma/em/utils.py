@@ -4,16 +4,12 @@ import os
 import pandas as pd
 import scipy.interpolate as interp
 import scipy.signal
-import scipy.constants
 import scipy.stats
 
 import sncosmo
 from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
 
 import dust_extinction.shapes as dustShp
-
-import astropy.units
-import astropy.constants
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -24,6 +20,9 @@ import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
 
+import astropy.units
+### some frequently used constants:
+from nmma.joint.constants import c_cgs, c_SI, eV_per_h_SI
 
 
 
@@ -130,6 +129,20 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
     return ext
 
+def get_extinction_mags(redshift, Ebv, filts= None, out= 'nus'):
+    default_filts, lambdas = get_default_filts_lambdas(filters=filts)
+    nu_0s = c_SI / lambdas
+
+    if Ebv != 0.0:
+        ext = extinctionFactorP92SMC(nu_0s, Ebv, redshift)
+        ext_mag = -2.5 * np.log10(ext)
+    else:
+        ext_mag = np.zeros(len(nu_0s))
+    if out == 'lambdas':
+        return default_filts, lambdas, ext_mag
+    else:
+        return default_filts, nu_0s, ext_mag
+
 def get_all_bandpass_metadata():
     """
     Retrieves and combines the metadata for all registered bandpasses and interpolators.
@@ -173,7 +186,7 @@ def getFilteredMag(mag, filt):
         "swope2__H",
     ]
     sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
-    sncosmo_maps = {
+    sncosmo_maps  = {
         name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts
     }
     sncosmo_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
@@ -325,10 +338,8 @@ def get_default_filts_lambdas(filters=None):
         [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
     )
     lambdas_bessel = 1e-10 * np.array([3605.07, 4413.08, 5512.12, 6585.91, 8059.88])
-    lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (
-        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
-    )
+    lambdas_radio = c_SI / np.array([1.25e9, 3e9, 5.5e9, 6e9])
+    lambdas_Xray  = c_SI /(np.array([1e3, 5e3]) * eV_per_h_SI)
 
     lambdas = np.concatenate(
         [lambdas_sloan, lambdas_bessel, lambdas_radio, lambdas_Xray]
@@ -361,31 +372,17 @@ def get_default_filts_lambdas(filters=None):
 
         for filt in filters:
             if filt.startswith("radio") and filt not in filts:
-                # for additional radio filters that not in the list
-                # calculate the lambdas based on the filter name
-                # split the filter name
-                freq_string = filt.replace("radio-", "")
-                freq_unit = freq_string[-3:]
-                freq_val = float(freq_string.replace(freq_unit, ""))
-                # make use of the astropy.units to be more flexible
-                freq = astropy.units.Quantity(freq_val, unit=freq_unit)
-                freq = freq.to("Hz").value
+                # for additional radio filters that are not in the list
+                freq = extract_unit(filt, "radio", "Hz")
                 # adding to the list
                 filts_slice.append(filt)
-                lambdas_slice.append(scipy.constants.c / freq)
+                lambdas_slice.append(c_SI / freq)
             elif filt.startswith("X-ray-") and filt not in filts:
                 # for additional X-ray filters that not in the list
-                # calculate the lambdas based on the filter name
-                # split the filter name
-                energy_string = filt.replace("X-ray-", "")
-                energy_unit = energy_string[-3:]
-                energy_val = float(energy_string.replace(energy_unit, ""))
-                # make use of the astropy.units to be more flexible
-                energy = astropy.units.Quantity(energy_val, unit=energy_unit)
-                freq = energy.to("eV").value * scipy.constants.eV / scipy.constants.h
+                freq = extract_unit(filt, "X-ray", "eV") * eV_per_h_SI
                 # adding to the list
                 filts_slice.append(filt)
-                lambdas_slice.append(scipy.constants.c / freq)
+                lambdas_slice.append(c_SI / freq)
             else:
                 try:
                     ii = filts.index(filt)
@@ -400,6 +397,16 @@ def get_default_filts_lambdas(filters=None):
         lambdas = np.array(lambdas_slice)
 
     return filts, lambdas
+
+def extract_unit(filter_string, indicator, target_unit):
+    # calculate the lambdas based on the filter name
+    # split the filter name
+    filter_string = filter_string.replace(f"{indicator}-", "")
+    filt_unit = filter_string[-3:]
+    filt_val = float(filter_string.replace(filt_unit, ""))
+    # make use of the astropy.units to be more flexible
+    quantity = astropy.units.Quantity(filt_val, unit=filt_unit)
+    return quantity.to(target_unit).value
 
 
 def flux_to_ABmag(flux, unit='cgs', residual_mag = None):
@@ -418,7 +425,7 @@ def flux_to_ABmag(flux, unit='cgs', residual_mag = None):
         return np.full_like(flux, np.nan)
     mAB = np.full_like(flux, np.inf)
 
-    mAB[suff_flux] = -2.5 * np.log10(flux [suff_flux]) + residual_magnitude
+    mAB[suff_flux] = -2.5 * np.log10(flux[suff_flux]) + residual_magnitude
     return mAB
 
 def estimate_mag_err(uncer_params, df):

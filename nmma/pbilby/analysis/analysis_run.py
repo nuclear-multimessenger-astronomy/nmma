@@ -3,15 +3,6 @@ import os
 from glob import glob
 import pickle
 
-import bilby
-import dynesty
-import numpy as np
-import logging
-import os
-from glob import glob
-import pickle
-
-import bilby
 import dynesty
 import numpy as np
 import pandas as pd
@@ -85,8 +76,8 @@ def compose_priors(prior_file, args, ana_modifiers, logger):
         priors["EOS"] = eos_prior
 
 
-    # add the ratio_epsilon in case it is not present for no-grb case
-    if not args.with_grb and "ratio_epsilon" not in priors:
+    # add the ratio_epsilon in case it is not present (for no-grb case)
+    if "ratio_epsilon" not in priors:
         priors["ratio_epsilon"] = DeltaFunction(0.01, name="ratio_epsilon")
 
     
@@ -142,8 +133,7 @@ class AnalysisRun(object):
         enlarge=1.5,
         sampling_seed=0,
         proposals=None,
-        bilby_zero_likelihood_mode=False,
-        **kwargs
+        bilby_zero_likelihood_mode=False
     ):
         ## Set some basic attributes
         self.maxmcmc = maxmcmc
@@ -209,7 +199,7 @@ class AnalysisRun(object):
         logger.setLevel(logging.WARNING)
         
         self.likelihood= setup_nmma_likelihood(data_dump,
-            priors, self.args, self.messengers,  logger, **kwargs
+            priors, self.args, self.messengers,  logger
             )
         
         logger.setLevel(logging.INFO)

@@ -9,7 +9,6 @@ import time
 
 import bilby
 import numpy as np
-import pandas as pd
 from bilby.core.utils import logger
 from nestcheck import data_processing
 from pandas import DataFrame

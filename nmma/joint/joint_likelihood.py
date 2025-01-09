@@ -4,7 +4,7 @@ import numpy as np
 from bilby.core.likelihood import Likelihood
 
 from ..gw.gw_likelihood import GravitationalWaveTransientLikelihood, setup_gw_kwargs
-from ..eos.eos_likelihood import setup_eos_kwargs, EquationofStateLikelihood
+from ..eos.eos_likelihood import EquationofStateLikelihood, setup_eos_kwargs
 from ..em.em_likelihood import EMTransientLikelihood, setup_em_kwargs
 
 
@@ -64,8 +64,7 @@ class MultiMessengerLikelihood(Likelihood):
         return noise_logL
     
 
-def setup_nmma_likelihood(data_dump, priors, args,messengers, logger, param_conv_func= None, **kwargs
-    #messengers, interferometers, waveform_generator, light_curve_data, priors, args
+def setup_nmma_likelihood(data_dump, priors, args,messengers, logger, param_conv_func= None
     ):
     """Takes the kwargs and sets up and returns
     MultiMessengerLikelihood.
@@ -96,32 +95,21 @@ def setup_nmma_likelihood(data_dump, priors, args,messengers, logger, param_conv
 
     if "eos" in messengers:
         logger.info("Sampling over EOS generated on the fly")
-        eos_kwargs = setup_eos_kwargs(priors, data_dump, 
-                                      args, logger, **kwargs)
+        eos_kwargs = setup_eos_kwargs(data_dump, args, logger)
         messenger_lhoods.append(EquationofStateLikelihood(priors,  **eos_kwargs))
         likelihood_kwargs.update(eos_kwargs)
 
     if "gw" in messengers:
-        gw_kwargs = setup_gw_kwargs(data_dump, 
-                                    args, logger, **kwargs)
+        gw_kwargs = setup_gw_kwargs(data_dump, args, logger)
         messenger_lhoods.append(GravitationalWaveTransientLikelihood(priors, param_conv_func, **gw_kwargs))
         likelihood_kwargs.update(gw_kwargs)
 
     if "em" in messengers:
-        # if "grb" in messengers:
-        #     ###modifies the em parameters, does not (as of 06/24) have its own likelihood
-        #     em_kwargs= setup_grb_kwargs(param_conv_func, data_dump,
-        #                                 args, logger, **kwargs)
-        # else:
-        em_kwargs= setup_em_kwargs(param_conv_func, data_dump,
-                                        args, logger, **kwargs)
-
-        
-        messenger_lhoods.append(
-            EMTransientLikelihood(priors, **em_kwargs))
+        em_kwargs= setup_em_kwargs(priors, data_dump, args, logger)
+        messenger_lhoods.append(EMTransientLikelihood(**em_kwargs))
         likelihood_kwargs.update(em_kwargs)
     
-    # if "spec" in messengers:
+    # if "spec" in messengers:  # FUTURE
     #     spec_kwargs = setup_spectroscopy_kwargs(data_dump, args, ...)
     #     messenger_lhoods.append(SpectroscopicLikelihood(priors, **spec_kwargs))
     logger.info(

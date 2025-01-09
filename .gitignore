@@ -10,6 +10,9 @@ nmma.egg-info/
 
 # models
 svdmodels/
+benchmark_output/
+svdtraingmodel/
+outdir/
 
 ##custom files
 stable_eos_241205.txt

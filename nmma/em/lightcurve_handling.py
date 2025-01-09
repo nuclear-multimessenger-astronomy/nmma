@@ -82,7 +82,6 @@ def write_lightcurve_file(lc_outfile, data, filters, sample_times):
         fid.write("\n")
     fid.close()
 
-
 def get_all_gw_quantities(data_out):
     try:
         data_out["mchirp"], data_out["eta"], data_out["q"] = component_masses_to_mass_quantities(
@@ -183,23 +182,23 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
 
             light_curve_model = KilonovaGRBLightCurveModel(
                 kilonova_kwargs=kilonova_kwargs,
-                GRB_resolution=args.grb_resolution,
-                jetType=args.jet_type,
+                grb_resolution=args.grb_resolution,
+                jet_type=args.jet_type,
             )
 
         else:
 
             light_curve_model = SupernovaGRBLightCurveModel(
-                GRB_resolution=args.grb_resolution,
+                grb_resolution=args.grb_resolution,
                 SNmodel=args.model,
-                jetType=args.jet_type,
+                jet_type=args.jet_type,
             )
 
     else:
         if args.model == "TrPi2018":
             light_curve_model = GRBLightCurveModel(
                 resolution=args.grb_resolution,
-                jetType=args.jet_type,
+                jet_type=args.jet_type,
             )
 
         else:
@@ -319,7 +318,7 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         complete_parameters = read_trigger_time(complete_parameters, args)
         sample_times = setup_sample_times(args)
         data = create_light_curve_data(
-            complete_parameters, args,light_curve_model,  sample_times, doAbsolute=args.absolute
+            complete_parameters, args, light_curve_model,  sample_times, doAbsolute=args.absolute
         )
 
         filters = args.filters.split(",")
@@ -371,7 +370,7 @@ def lcs_from_injection_parameters(args=None):
         filters = args.filters.split(",")
     else:
         filters = None
-    _, _, light_curve_model = create_light_curve_model_from_args(args.model, args, filters=filters)
+    light_curve_model = create_light_curve_model_from_args(args.model, args, filters)
 
     # read injection file
     with open(args.injection, "r") as f:
@@ -421,9 +420,9 @@ def lcs_from_injection_parameters(args=None):
         data = create_light_curve_data(
             injection_parameters,
             args,
-            doAbsolute=args.absolute,
             light_curve_model=light_curve_model,
             sample_times=sample_times,
+            doAbsolute=args.absolute,
             keep_infinite_data=True,
         )
         print("Injection generated")

@@ -2,9 +2,16 @@ import os
 import copy
 import glob
 import numpy as np
+import pytest
+import shutil
 
 from ..em import training, model_parameters, io, svdmodel_benchmark
-
+@pytest.fixture(autouse=True)
+def cleanup_outdir():
+    ModelPath = "svdtrainingmodel"
+    yield
+    if os.path.exists(ModelPath):
+        shutil.rmtree(ModelPath)
 
 def test_training():
 

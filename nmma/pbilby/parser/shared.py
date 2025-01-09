@@ -40,7 +40,7 @@ def _create_base_nmma_parser(sampler="dynesty"):
         base_parser = _add_dynesty_settings_to_parser(base_parser)
     base_parser = _add_em_settings_to_parser(base_parser)
     base_parser = _add_grb_settings_to_parser(base_parser)
-    base_parser = _add_kn_settings_to_parser(base_parser)
+    base_parser = _add_injection_settings_to_parser(base_parser)
     base_parser = _add_eos_settings_to_parser(base_parser)
     base_parser = _add_gw_settings_to_parser(base_parser)
     base_parser = _add_tabulated_eos_settings_to_parser(base_parser)
@@ -67,24 +67,23 @@ def _add_em_settings_to_parser(parser):
     
     ## emulator args
     em_input_parser.add(
-        "--transient-emulator-type", type=str,
+        "--em-transient-interpolation-type","--kilonova-interpolation-type", type=str,
         help="Interpolation method to be used for EM transient model (sklearn_gp or tensorflow)",
     )
-    em_input_parser.add( "--lc-model-svd-path", type=str, 
+    em_input_parser.add( "--svd-path", "--kilonova-model-svd", type=str, 
         help="Path to the lightcurve model's SVD data" )
     em_input_parser.add("--svd-mag-ncoeff", type=int, default=10,
         help="Number of eigenvalues to be taken for mag evaluation (default: 10)" )
     em_input_parser.add( "--svd-lbol-ncoeff", type=int, default=10,
         help="Number of eigenvalues to be taken for lbol evaluation (default: 10)", )
-    em_input_parser.add(
-        "--local-model-only",
-        action=StoreBoolean,
-        help="use local svd models only",
-    )
+    em_input_parser.add("--local-only","--local-model-only", action=StoreBoolean, help="use local svd models only")
 
     ## lightcurve args
     em_input_parser.add("--em-transient-class", type=str, default='svd',
         help="Name of the kilonova model to be used" )
+    em_input_parser.add( "--em-transient-model", "--kilonova-model",
+        type=str, help="Name of the specfic model to be used" )
+    
     em_input_parser.add(
         "--em-transient-trigger-time","--kilonova-trigger-time",
         type=float, help="Time for the EM-transient trigger (in MJD)")
@@ -98,38 +97,33 @@ def _add_em_settings_to_parser(parser):
         default=1.0, help="Additional statistical error (mag) to be introduced (default: 1)", )
     return parser
 
-def _add_kn_settings_to_parser(parser):
+def _add_injection_settings_to_parser(parser):
     # general args
-    em_input_parser = parser.add_argument_group(
-        title="kilonova analysis input arguments", description="Specific kilonova analysis inputs")
-    
-    em_input_parser.add( "--em-transient-model","--kilonova-model", 
-        type=str, help="Name of the kilonova model to be used" )
-    em_input_parser.add("--kilonova-model-svd", type=str, 
-        help="Path to the kilonova model's SVD data" )
-    em_input_parser.add(
+    injection_parser = parser.add_argument_group(
+        title="injection arguments", description="Specific kilonova analysis inputs")
+    injection_parser.add(
         "em-injection-model", "--kilonova-injection-model",
         type=str,
         help="Name of the kilonova model to be used for injection",
     )
-    em_input_parser.add(
+    injection_parser.add(
         "--injection-svd-path", "--kilonova-injection-svd",
         type=str,
         help="Path to the kilonova model's SVD data for injection",
     )
-    em_input_parser.add(
+    injection_parser.add(
         "--injection-svd-mag-ncoeff",
         type=int,
         default=10,
         help="Number of eigenvalues to be taken for mag evaluation (default: 10)",
     )
-    em_input_parser.add(
+    injection_parser.add(
         "--injection-svd-lbol-ncoeff",
         type=int,
         default=10,
         help="Number of eigenvalues to be taken for lbol evaluation (default: 10)",
     )
-    em_input_parser.add(
+    injection_parser.add(
         "--injection-detection-limit",
         type=float,
         default=28,
@@ -142,9 +136,7 @@ def _add_grb_settings_to_parser(parser):
     grb_input_parser = parser.add_argument_group(
         title="GRB analysis input arguments", description="Specify GRB analysis inputs"
     )
-    grb_input_parser.add( "--with-grb", action=StoreBoolean,
-        help="Flag for including GRB afterglow in analysis", )
-    grb_input_parser.add( "--grb-jettype", type=int, default=0,
+    grb_input_parser.add( "--jet-type", type=int, default=0,
         help="GRB jet type (default: 0 (Gaussian))",)
     grb_input_parser.add("--grb-resolution", type=float, default=5,
         help="The upper bound on the ratio between thetaWing and thetaCore (default: 5)", )

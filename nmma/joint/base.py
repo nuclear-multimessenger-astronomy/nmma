@@ -1,4 +1,4 @@
-
+import inspect
 import numpy as np
 from bilby.core.likelihood import Likelihood
 
@@ -61,3 +61,19 @@ class NMMABaseLikelihood(Likelihood):
     def noise_log_likelihood(self):
         return 0.
         # return self.sub_model.noise_log_likelihood()
+
+
+def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes = []):
+    prefixes.append('')
+    signature = inspect.signature(_callable) 
+    #step 1: get all default kwargs from the signature
+    default_kwargs= {key: val.default for key, val in signature.parameters.items() if val.default is not inspect.Parameter.empty}
+
+    #step 2: get all available kwargs from the namespace
+    for key in signature.parameters.keys():
+        ## this checks if further parameters from args-Namespace are only used as shorthands in the class definition (e.g. tmin, tmax)
+        for prefix in prefixes:
+            if hasattr(namespace, prefix+key):
+                default_kwargs[key] = getattr(namespace, prefix+key)
+                break
+    return default_kwargs

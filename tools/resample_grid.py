@@ -4,6 +4,7 @@ import pathlib
 import h5py
 import numpy as np
 import os
+import shutil
 
 BASE_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
@@ -94,6 +95,14 @@ class Grid:
             for key in keys:
                 original_obj = self.file[key]
                 new_file.copy(original_obj, key)
+    
+    def remove(self):
+        # Clean up directories starting with base_dirname
+        for item in os.listdir():
+            if item.startswith(self.base_dirname) and os.path.isdir(item):
+                shutil.rmtree(item)
+                # shutil.rmtree(item_path)
+
 
 
 def get_parser():
@@ -137,6 +146,11 @@ def get_parser():
         help="If set, shuffle file keys before downsampling/fragmenting",
     )
     parser.add_argument(
+        "--remove",
+        action="store_true",
+        help="If set, delete all recently created directories in the end",
+    )
+    parser.add_argument(
         "--random-seed",
         type=int,
         default=21,
@@ -160,7 +174,7 @@ def main(args=None):
         gridpath=args.gridpath,
         random_seed=args.random_seed,
         base_dirname=args.base_dirname,
-        base_filename=args.base_filename,
+        base_filename=args.base_filename
     )
 
     if args.do_downsample:
@@ -168,3 +182,5 @@ def main(args=None):
 
     if args.do_fragment:
         grid.fragment(factor=args.factor, shuffle=args.shuffle)
+    if args.remove:
+        grid.remove()

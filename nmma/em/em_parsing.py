@@ -1,7 +1,7 @@
 import argparse
 from ..utils.models import refresh_models_list
 from bilby.core import utils
-from ..pbilby.parser.base_parser import StoreBoolean
+from ..pbilby.parser.shared import StoreBoolean
 
     
 def parsing_and_logging(parser_func, args= None):

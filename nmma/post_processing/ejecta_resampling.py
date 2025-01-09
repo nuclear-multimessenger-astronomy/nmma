@@ -1,22 +1,21 @@
 import numpy as np
 import pandas as pd
 import os
-import glob
-from subprocess import check_output
 
 import scipy.stats
 import scipy.special
 import scipy.interpolate
-import lal
 from bilby.gw.prior import PriorDict
 from bilby.core.prior import Uniform
 
-from .parser import resampling_parser, condor_parser
+from .parser import resampling_parser
 from ..joint.conversion import (
     BNSEjectaFitting, NSBHEjectaFitting, BBHEjectaFitting,
     luminosity_distance_to_redshift, chirp_mass_and_eta_to_component_masses,
     tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities
         )
+from ..joint.constants import geom_msun_km
+
 from pymultinest.solve import Solver
 
 
@@ -71,7 +70,7 @@ def corner_plot(posterior_samples, solution, outdir, withNSBH):
         limits = ((np.amin(mc), np.amax(mc)), (np.amin(q), 3), (np.amin(alpha), np.amax(alpha)), (np.amin(zeta), np.amax(zeta)))
         plt.figure(1)
         corner.corner(plotSamples.T, labels=labels, range=limits, **kwargs)
-        plt.savefig('{0}/corner.pdf'.format(outdir), bbox_inches='tight')
+        plt.savefig(f'{outdir}/corner.pdf', bbox_inches='tight')
         
 
     else: #BNS resampling result corner plot
@@ -98,7 +97,7 @@ def corner_plot(posterior_samples, solution, outdir, withNSBH):
         limits = ((np.amin(mc), np.amax(mc)), (np.amin(q), 3), (np.amin(lambdaT), np.amax(lambdaT)), (np.amin(alpha), np.amax(alpha)), (np.amin(zeta), np.amax(zeta)), (np.amin(MTOV), 2.7))
         plt.figure(1)
         corner.corner(plotSamples.T, labels=labels, range=limits, **kwargs)
-        plt.savefig('{0}/corner.pdf'.format(outdir), bbox_inches='tight')
+        plt.savefig(f'{outdir}/corner.pdf', bbox_inches='tight')
         print("The 90% upper bound for lambdaT is {0}".format(np.quantile(lambdaT, 0.9)))
 
 class EjectaResampler(Solver):
@@ -180,14 +179,14 @@ class EjectaResampler(Solver):
         mass_ratio = m2 / m1
 
         r1, r2, R16 = np.interp((m1, m2, 1.6), self.EOS_masses_dict[EOS], self.EOS_radius_dict[EOS], right = 0)
-        R16 *= 1e3 / lal.MRSUN_SI ###needed in geo units for BNSEjectaFitting
+        R16 /= geom_msun_km ###needed in geo units for BNSEjectaFitting
         try:
-            C2 = m2 / (r2 * 1e3 / lal.MRSUN_SI)   ### disfavour EOS if secondary cannot be supported as NS
+            C2 = m2 / r2 * geom_msun_km   ### disfavour EOS if secondary cannot be supported as NS
         except ZeroDivisionError:
             return np.nan_to_num(-np.inf)
         if not self.withNSBH:
             try:
-                C1 = m1 / (r1 * 1e3 / lal.MRSUN_SI)   ### disfavour EOS if primary cannot be supported as NS
+                C1 = m1 / r1 * geom_msun_km   ### disfavour EOS if primary cannot be supported as NS
             except ZeroDivisionError:
                 return np.nan_to_num(-np.inf)
         MTOV = self.EOS_masses_dict[EOS][-1]
@@ -293,103 +292,9 @@ def main_resampling():
         posterior_samples["chi_2"] = samples[6]
 
     posterior_samples = pd.DataFrame.from_dict(posterior_samples)
-    posterior_samples.to_csv("{0}/posterior_samples.dat".format(args.outdir), sep=" ", index=False)
+    posterior_samples.to_csv(f"{args.outdir}/posterior_samples.dat", sep=" ", index=False)
 
     corner_plot(posterior_samples, solution, args.outdir, args.withNSBH)
-
-
-def condor_resampling():
-    parser = condor_parser()
-    args = parser.parse_args
-
-    gwsamples = glob.glob(os.path.join(args.GWsamples, "*.dat"))
-
-    if args.detections_file is not None:
-        events = np.loadtxt(args.detections_file, usecols=[0]).astype(int)
-    else:
-        events = np.arange(len(gwsamples))
-
-    logdir = os.path.join(args.outdir, "logs")
-    if not os.path.isdir(logdir):
-        os.makedirs(logdir)
-
-    gwem_resampling = (
-        check_output(["which", "gwem_resampling"]).decode().replace("\n", "")
-    )
-
-    job_number = 0
-
-    fid = open(args.condor_dag_file, "w")
-    fid1 = open(args.bash_file, "w")
-    for ii in events:
-
-        gwsamples = os.path.join(
-            args.GWsamples, "inj_PhD_posterior_samples_%d.dat" % ii
-        )
-        if not os.path.isfile(gwsamples):
-            print(f"missing {gwsamples}... continuing")
-            continue
-
-        emsamples = os.path.join(
-            args.EMsamples, "%d/injection_Bu2019lm_posterior_samples.dat" % ii
-        )
-        if not os.path.isfile(emsamples):
-            print(f"missing {emsamples}... continuing")
-            continue
-
-        outdir = os.path.join(args.outdir, "%d" % ii)
-
-        fid.write("JOB %d %s\n" % (job_number, args.condor_sub_file))
-        fid.write("RETRY %d 3\n" % (job_number))
-        fid.write(
-            'VARS %d jobNumber="%d" outdir="%s" GWsamples="%s" EMsamples="%s"\n'
-            % (job_number, job_number, outdir, gwsamples, emsamples)
-        )
-        fid.write("\n\n")
-        job_number = job_number + 1
-
-        fid1.write(
-            "%s --outdir %s --EMsamples %s --GWsamples %s --EOS %s --nlive 8192 --GWprior %s --EMprior %s --total-ejecta-mass --Neos %d --total-ejecta-mass %s\n"
-            % (
-                gwem_resampling,
-                outdir,
-                emsamples,
-                gwsamples,
-                args.EOSpath,
-                args.GWprior,
-                args.EMprior,
-                args.Neos,
-                args.total_ejecta_mass
-            )
-        )
-    fid.close()
-    fid1.close()
-
-    fid = open(args.condor_sub_file, "w")
-    fid.write("executable = %s\n" % gwem_resampling)
-    fid.write(f"output = {logdir}/out.$(jobNumber)\n")
-    fid.write(f"error = {logdir}/err.$(jobNumber)\n")
-    if args.total_ejecta_mass:
-        fid.write(
-            "arguments = --outdir $(outdir) --EMsamples $(EMsamples) --GWsamples $(GWsamples) --EOS %s --nlive 8192 --GWprior %s --EMprior %s --total-ejecta-mass --Neos %d\n"
-            % (args.EOSpath, args.GWprior, args.EMprior, args.Neos)
-        )
-    else:
-        fid.write(
-            "arguments = --outdir $(outdir) --EMsamples $(EMsamples) --GWsamples $(GWsamples) --EOS %s --nlive 8192 --GWprior %s --EMprior %s --Neos %d\n"
-            % (args.EOSpath, args.GWprior, args.EMprior, args.Neos)
-        )
-    fid.write('requirements = OpSys == "LINUX"\n')
-    fid.write("request_memory = 8192\n")
-    fid.write("request_disk = 500 MB\n")
-    fid.write("request_cpus = 1\n")
-    fid.write("accounting_group = ligo.dev.o2.burst.allsky.stamp\n")
-    fid.write("notification = nevers\n")
-    fid.write("getenv = true\n")
-    fid.write("log = /local/%s/gwem_resampling.log\n" % os.environ["USER"])
-    fid.write("+MaxHours = 24\n")
-    fid.write("universe = vanilla\n")
-    fid.write("queue 1\n")
 
 
 if __name__ == "__main__":

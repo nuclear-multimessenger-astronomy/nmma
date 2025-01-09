@@ -7,6 +7,29 @@ import numpy as np
 from .utils import autocomplete_data
 from ..utils.models import get_models_home, get_model
 
+try:
+    import tensorflow as tf
+    from tensorflow.keras import Sequential
+    from tensorflow.keras.layers import Dense, Dropout
+    from tensorflow.keras.models import load_model as load_tf_model
+except ImportError:
+    print("Install tensorflow if you want to use it...")
+
+try:
+    from sklearn.gaussian_process import GaussianProcessRegressor
+    from sklearn.gaussian_process.kernels import RationalQuadratic
+
+    #NOTE this is used by the tensorflow model!
+    from sklearn.model_selection import train_test_split 
+except ImportError:
+    print("Install scikit-learn if you want to use it...")
+
+try:
+    from gp_api.gaussian_process import GaussianProcess
+    from gp_api.kernels import CompactKernel
+except ImportError:
+    print("Install gaussian-process-api if you want to use it...")
+
 
 class SVDTrainingModel(object):
     """A light curve training model object
@@ -20,28 +43,41 @@ class SVDTrainingModel(object):
         Name of the model
     data: dict
         Data containing filter data with filters as columns
+    parameters: list
+        List of model parameters
     sample_times: np.array
-        An arry of time for the light curve to be evaluted on
+        An array of time for the light curve to be evaluated on
     filters: list
         List of filters to train
-    svd_path: str
+    svd_path: str, optional
         Path to the svd directory
-    n_coeff: int
-        number of eigenvalues to be taken for SVD evaluation
-    n_epochs: int
-        number of epochs for tensorflow training
-    interpolation_type: str
-        type of interpolation
-    data_type: str
+    n_coeff: int, optional
+        Number of eigenvalues to be taken for SVD evaluation
+    n_epochs: int, optional
+        Number of epochs for tensorflow training
+    interpolation_type: str, optional
+        Type of interpolation, must be one of sklearn_gp, api_gp or tensorflow
+    data_type: str, optional
         Data type for interpolation [photometry or spectroscopy]
-    plot: boolean
+    data_time_unit: str, optional
+        Unit of time for the data [days, hours, minutes, or seconds]
+    plot: bool, optional
         Whether to show plots or not
-    plotdir: str
+    plotdir: str, optional
         Directory for plotting
-    start_training: bool
-        Indicate whether we want to start training a model directly after initialization. Defaults to True.
+    ncpus: int, optional
+        Number of CPUs to use for training
+    univariate_spline: bool, optional
+        Whether to use univariate spline for interpolation
+    univariate_spline_s: int, optional
+        Smoothing factor for univariate spline
+    random_seed: int, optional
+        Random seed for reproducibility
+    start_training: bool, optional
+        Indicate whether we want to start training a model directly after initialization
+    continue_training: bool, optional
+        Indicate whether we want to continue training an existing model
     """
-
     def __init__(
         self,
         model,
@@ -64,64 +100,59 @@ class SVDTrainingModel(object):
         start_training=True,
         continue_training=False,
     ):
+        ##collect all arguments to pass on
+        setup_kwargs = locals()
+        setup_kwargs.pop("self")
+        ## set interpolation_type here, pass everything else
+        self.interpolation_type = setup_kwargs.pop("interpolation_type")
 
-        if interpolation_type not in ["sklearn_gp", "tensorflow", "api_gp"]:
+        if (interpolation_type != "tensorflow") and continue_training:
+            print(
+                "--continue-training only supported with --interpolation-type \
+                 tensorflow, this will have no effect"
+            )
+
+        if self.interpolation_type == "tensorflow":
+            self.backend = TensorflowTrainingModel(**setup_kwargs)
+        elif self.interpolation_type == "sklearn_gp":
+            self.backend = SklearnGPTrainingModel(**setup_kwargs)
+        elif self.interpolation_type == "api_gp":
+            self.backend = GPAPITrainingModel(**setup_kwargs)
+        else:
             raise ValueError(
                 "interpolation_type must be sklearn_gp, api_gp or tensorflow"
             )
 
-        if (interpolation_type != "tensorflow") and continue_training:
-            raise ValueError(
-                "--continue-training only supported with --interpolation-type tensorflow"
-            )
+    # called when an attribute is not found:
+    def __getattr__(self, name):
+        # assume it is implemented by self.instance
+        return self.backend.__getattribute__(name)
+
+        
+class BaseTrainingModel(object):
+    def __init__(
+        self,
+        model,
+        data,
+        parameters,
+        sample_times,
+        filters,
+        svd_path=None,
+        n_coeff=10,
+        n_epochs=15,
+        data_type="photometry",
+        data_time_unit="days",
+        plot=False,
+        plotdir=os.path.join(os.getcwd(), "plot"),
+        ncpus=1,
+        univariate_spline=False,
+        univariate_spline_s=2,
+        random_seed=42,
+        start_training=True,
+        continue_training=False,
+    ):
 
         self.model = model
-        self.interpolation_type = interpolation_type
-
-        if self.interpolation_type == "sklearn_gp":
-            try:
-                from sklearn.gaussian_process import GaussianProcessRegressor
-                from sklearn.gaussian_process.kernels import RationalQuadratic
-                self.gp_regressor = GaussianProcessRegressor
-                self.rational_quadratic = RationalQuadratic
-            except ImportError:
-                print("Install scikit-learn if you want to use it...")
-                return
-            self.training_func = self.train_sklearn_gp_model
-            self.model_specifier = ""
-            self.file_ending = 'joblib'
-            self.load_func = joblib.load
-            self.load_routine = self.load_routine_gp
-            self.save_routine = self.save_routine_gp
-
-        elif self.interpolation_type == "api_gp":
-            try:
-                from gp_api.gaussian_process import GaussianProcess
-                from gp_api.kernels import CompactKernel
-                self.gp_fit = GaussianProcess.fit
-                self.kernel_fit = CompactKernel.fit
-            except ImportError:
-                print("Install gaussian-process-api if you want to use it...")
-                return
-            self.training_func = self.train_api_gp_model
-            self.model_specifier = "_api"
-            # self.file_ending = None
-            self.load_func = joblib.load
-            self.load_routine = self.load_routine_api
-
-        elif self.interpolation_type == "tensorflow":
-            try:
-                from tensorflow.keras.models import load_model as load_tf_model
-                self.load_func = load_tf_model
-                self.load_routine = self.load_routine_tf
-                self.save_routine = self.save_routine_tf
-            except ImportError:
-                print("Install tensorflow if you want to use it...")
-                return
-            self.training_func = self.train_tensorflow_model
-            self.model_specifier = "_tf"
-            self.file_ending = 'h5'
-
         self.svd_path = get_models_home(svd_path)
         self.modelfile = os.path.join(self.svd_path, f"{self.model}.joblib")
         self.outdir = os.path.join(self.svd_path, f"{self.model}{self.model_specifier}")
@@ -148,10 +179,6 @@ class SVDTrainingModel(object):
         if self.ncpus > 1:
             print(f"Running with {self.ncpus} CPUs")
 
-        if self.plot:
-            if not os.path.isdir(self.plotdir):
-                os.mkdir(self.plotdir)
-
         self.interpolate_data(data_time_unit=data_time_unit)
 
         self.model_exists = self.check_model()
@@ -175,35 +202,7 @@ class SVDTrainingModel(object):
             self.train_model()
             self.save_model()
 
-        self.load_model(self.modelfile)
-
-    def load_routine_tf(self, filt):
-        outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
-        self.svd_model[filt]["model"] = self.load_func(outfile, compile=False)
-        self.svd_model[filt]["model"].compile(optimizer="adam", loss="mse")
-
-    def save_routine_tf(self, filt, outfile):
-        self.svd_model[filt]["model"].save(outfile)
-        del self.svd_model[filt]["model"]
-
-
-    def load_routine_gp(self, filt):
-        outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
-        if not os.path.isfile(outfile):
-            return
-        self.svd_model[filt]["gps"] = self.load_func(outfile)
-    
-    def save_routine_gp(self, filt, outfile):
-        joblib.dump(self.svd_model[filt]["gps"], outfile, compress=9)
-        del self.svd_model[filt]["gps"]
-
-    def load_routine_api(self, filt):
-        for i, sub_model in enumerate(self.svd_model[filt]["gps"]):
-            self.svd_model[filt]["gps"][i] = load_api_gp_model(sub_model)
-    
-    def save_routine_api(self):
-            get_model(self.svd_path, f"{self.model}_api", self.svd_model.keys())
-
+        self.load_model()
 
 
     def interpolate_data(self, data_time_unit="days"):
@@ -295,9 +294,7 @@ class SVDTrainingModel(object):
             # Perform the SVD decomposition
             UA, sA, VA = np.linalg.svd(data_array_postprocess, full_matrices=True)
             VA = VA.T
-
             n, n = UA.shape
-            m, m = VA.shape
 
             cAmat = np.zeros((self.n_coeff, n))
             cAvar = np.zeros((self.n_coeff, n))
@@ -333,11 +330,139 @@ class SVDTrainingModel(object):
             cAmat = self.svd_model[filt]["cAmat"]
 
             self.training_func(param_array_postprocess, cAmat, filt)
-            
 
-    def train_sklearn_gp_model(self, param_array_postprocess, cAmat, filt):
+    def check_model(self):
+        if not os.path.isfile(self.modelfile):
+            return False
+        try:
+            for filt in self.filters:
+                outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
+                if not os.path.isfile(outfile):
+                    return False
+            ## we do not do this for api_gp-model and will fail as it has no file_ending
+        except AttributeError:
+            pass
+
+        return True
+
+    def save_model(self):
+        if not os.path.isdir(self.outdir):
+            os.makedirs(self.outdir)
+
+        for filt in self.filters:
+            outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
+            self.save_routine(filt, outfile)
+
+        joblib.dump(self.svd_model, self.modelfile, compress=9)
+
+    def load_model(self):
+        get_model(self.svd_path, f"{self.model}{self.model_specifier}", self.filters)
+        self.svd_model = joblib.load(self.modelfile)
+
+        for filt in self.svd_model.keys():
+            self.load_routine(filt)
+
+class TensorflowTrainingModel(BaseTrainingModel):
+    def __init__(self, **kwargs):
+
+        self.model_specifier = "_tf"
+        self.file_ending = 'h5'
+        if kwargs['plot'] and not os.path.isdir(kwargs['plotdir']):
+            os.mkdir(kwargs['plotdir'])
+        super().__init__(**kwargs)
+
+    def load_routine(self, filt):
+        outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
+        self.svd_model[filt]["model"] = load_tf_model(outfile, compile=False)
+        self.svd_model[filt]["model"].compile(optimizer="adam", loss="mse")
+
+    def save_routine(self, filt, outfile):
+        self.svd_model[filt]["model"].save(outfile)
+        del self.svd_model[filt]["model"]
+
+    def training_func(self, param_array_postprocess, cAmat, filt, dropout_rate=0.6):
+        """
+        Train a tensorflow model to emulate the KN model.
+        """
+        train_X, val_X, train_y, val_y = train_test_split(
+            param_array_postprocess,
+            cAmat.T,
+            shuffle=True,
+            test_size=0.1,
+            random_state=self.random_seed,
+        )
+
+        tf.keras.utils.set_random_seed(self.random_seed)
+
+        if self.model_exists and self.continue_training:
+            model = self.svd_model[filt]["model"]
+        else:
+            model = Sequential()
+            # One/few layers of wide NN approximate GP
+            model.add(
+                Dense(
+                    2048,
+                    activation="relu",
+                    kernel_initializer="he_normal",
+                    input_shape=(train_X.shape[1],),
+                )
+            )
+            model.add(Dropout(dropout_rate))
+            model.add(Dense(self.n_coeff))
+
+            # compile the model
+            model.compile(optimizer="adam", loss="mse")
+
+        # fit the model
+        training_history = model.fit(
+            train_X,
+            train_y,
+            epochs=self.n_epochs,
+            batch_size=32,
+            validation_data=(val_X, val_y),
+            verbose=True,
+        )
+
+        if self.plot:
+            loss = training_history.history["loss"]
+            val_loss = training_history.history["val_loss"]
+            plt.figure()
+            plt.plot(loss, label="training loss")
+            plt.plot(val_loss, label="validation loss")
+            plt.legend()
+            plt.xlabel("epoch number")
+            plt.ylabel("number of losses")
+            plt.savefig(
+                os.path.join(self.plotdir, f"train_history_loss_{filt}.pdf")
+            )
+            plt.close()
+
+        # evaluate the model
+        error = model.evaluate(param_array_postprocess, cAmat.T, verbose=0)
+        print(f"{filt} MSE:", error)
+
+        self.svd_model[filt]["model"] = model
+
+class SklearnGPTrainingModel(BaseTrainingModel):
+    def __init__(self, **kwargs):
+        
+        self.model_specifier = ""
+        self.file_ending = 'joblib'
+        super().__init__(**kwargs)
+
+    def load_routine(self, filt):
+        outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
+        if not os.path.isfile(outfile):
+            return
+        self.svd_model[filt]["gps"] = joblib.load(outfile)
+    
+    def save_routine(self, filt, outfile):
+        joblib.dump(self.svd_model[filt]["gps"], outfile, compress=9)
+        del self.svd_model[filt]["gps"]
+
+    def training_func(self, param_array_postprocess, cAmat, filt):
         # Set of Gaussian Process
-        kernel = 1.0 * self.rational_quadratic(
+        kernel = 1.0 * RationalQuadratic(
             length_scale=1.0,
             alpha=0.1,
             length_scale_bounds=(1e-10, 1e10),
@@ -347,7 +472,7 @@ class SVDTrainingModel(object):
         print("Calculating the coefficents")
 
         def gp_func(cAmat_i):
-            gp = self.gp_regressor(kernel=kernel, n_restarts_optimizer=0)
+            gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=0)
             gp.fit(param_array_postprocess, cAmat_i)
             return gp
 
@@ -363,18 +488,31 @@ class SVDTrainingModel(object):
 
         self.svd_model[filt]["gps"] = gps
 
-    def train_api_gp_model(self, param_array_postprocess, cAmat, filt):
+class GPAPITrainingModel(BaseTrainingModel):
+    def __init__(self, **kwargs):
+        self.model_specifier = "_api"
+        super().__init__(**kwargs)
+
+    def load_routine(self, filt):
+        for i, sub_model in enumerate(self.svd_model[filt]["gps"]):
+            self.svd_model[filt]["gps"][i] = load_api_gp_model(sub_model)
+    
+    def save_model(self):
+        get_model(self.svd_path, f"{self.model}_api", self.svd_model.keys())
+        joblib.dump(self.svd_model, self.modelfile, compress=9)
+
+    def training_func(self, param_array_postprocess, cAmat, filt):
         nd = 1
         # Construct hyperparamters
         coeffs = [0.5] * nd
 
         # Create the compact kernel
-        kernel = self.kernel_fit(param_array_postprocess, method="simple", 
+        kernel = CompactKernel.fit(param_array_postprocess, method="simple", 
                                  coeffs=coeffs, sparse=True)
         gps = []
         for i in range(self.n_coeff):
             # Fit the training data
-            gp = self.gp_fit(
+            gp = GaussianProcess.fit(
                 param_array_postprocess, cAmat[i, :], kernel=kernel, train_err=None
             )
 
@@ -412,122 +550,6 @@ class SVDTrainingModel(object):
 
         self.svd_model[filt]["gps"] = gps
 
-    def train_tensorflow_model(self, dropout_rate=0.6):
-        """
-        Train a tensorflow model to emulate the KN model.
-        """
-        try:
-            import tensorflow as tf
-
-            tf.get_logger().setLevel("ERROR")
-            from sklearn.model_selection import train_test_split
-            from tensorflow.keras import Sequential
-            from tensorflow.keras.layers import Dense, Dropout
-        except ImportError:
-            print("Install tensorflow if you want to use it...")
-            return
-
-        # Loop through filters
-        for filt in self.filters:
-            print("Computing NN for filter %s..." % filt)
-
-            param_array_postprocess = self.svd_model[filt]["param_array_postprocess"]
-            cAmat = self.svd_model[filt]["cAmat"]
-
-            train_X, val_X, train_y, val_y = train_test_split(
-                param_array_postprocess,
-                cAmat.T,
-                shuffle=True,
-                test_size=0.1,
-                random_state=self.random_seed,
-            )
-
-            tf.keras.utils.set_random_seed(self.random_seed)
-
-            if self.model_exists and self.continue_training:
-                model = self.svd_model[filt]["model"]
-            else:
-                model = Sequential()
-                # One/few layers of wide NN approximate GP
-                model.add(
-                    Dense(
-                        2048,
-                        activation="relu",
-                        kernel_initializer="he_normal",
-                        input_shape=(train_X.shape[1],),
-                    )
-                )
-                model.add(Dropout(dropout_rate))
-                model.add(Dense(self.n_coeff))
-
-                # compile the model
-                model.compile(optimizer="adam", loss="mse")
-
-            # fit the model
-            training_history = model.fit(
-                train_X,
-                train_y,
-                epochs=self.n_epochs,
-                batch_size=32,
-                validation_data=(val_X, val_y),
-                verbose=True,
-            )
-
-            if self.plot:
-                loss = training_history.history["loss"]
-                val_loss = training_history.history["val_loss"]
-                plt.figure()
-                plt.plot(loss, label="training loss")
-                plt.plot(val_loss, label="validation loss")
-                plt.legend()
-                plt.xlabel("epoch number")
-                plt.ylabel("number of losses")
-                plt.savefig(
-                    os.path.join(self.plotdir, f"train_history_loss_{filt}.pdf")
-                )
-                plt.close()
-
-            # evaluate the model
-            error = model.evaluate(param_array_postprocess, cAmat.T, verbose=0)
-            print(f"{filt} MSE:", error)
-
-            self.svd_model[filt]["model"] = model
-
-    def check_model(self):
-        if not os.path.isfile(self.modelfile):
-            return False
-        try:
-            for filt in self.filters:
-                outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
-                if not os.path.isfile(outfile):
-                    return False
-            ## we do not do this for api_gp-model and will fail as it has no file_ending
-        except AttributeError:
-            pass
-
-        return True
-
-    def save_model(self):
-        try:
-            if not os.path.isdir(self.outdir):
-                os.makedirs(self.outdir)
-
-            for filt in self.filters:
-                outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
-                self.save_routine(filt, outfile)
-
-            ## we do not do this for api_gp-model
-        except AttributeError:
-            self.save_routine_api()
-
-        joblib.dump(self.svd_model, self.modelfile, compress=9)
-
-    def load_model(self):
-        get_model(self.svd_path, f"{self.model}{self.model_specifier}", self.filters)
-        self.svd_model = joblib.load(self.modelfile)
-
-        for filt in self.svd_model.keys():
-            self.load_routine(filt)
 
 def min_max_scaling(data):
     """

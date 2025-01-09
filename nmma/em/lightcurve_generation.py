@@ -6,10 +6,8 @@ import pandas as pd
 from importlib import resources
 
 from scipy.integrate import quad
-from  astropy import constants as const
 import sncosmo
 
-from .model import SVDLightCurveModel, KilonovaGRBLightCurveModel
 from .utils import estimate_mag_err, autocomplete_data, flux_to_ABmag, setup_sample_times, transform_to_app_mag_dict
 from nmma.em.training import SVDTrainingModel
 
@@ -34,17 +32,8 @@ except ImportError:
 
 
 ### some frequently used constants:
-
-# convert time from day to second
-seconds_a_day = 86400.0  # in seconds
-msun_cgs = const.M_sun.cgs.value
-c_cgs = const.c.cgs.value
-h = const.h.cgs.value
-kb = const.k_B.cgs.value
-sigSB = const.sigma_sb.cgs.value
-arad = 4 * sigSB / c_cgs
-Mpc = const.pc.cgs.value * 1e6
-D = 10 * const.pc.cgs.value  # ref distance for absolute magnitude
+from nmma.joint.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D 
+seconds_a_day = 86400.0  
 abs_mag_dist_factor = D**2
 dummy_lum = 1 # 1e43   ### dummy value returned for conformity that should never be used further
 
@@ -389,6 +378,12 @@ def sc_lc(t_day, param_dict,nus, filters):
 
 ## metzger model for kilonovae
 def metzger_lc(t_day, param_dict, nu_obs, filters):
+    # fetch parameters
+    M0 = 10 ** param_dict["log10_mej"] * msun_cgs  # total ejecta mass
+    v0 = 10 ** param_dict["log10_vej"] * c_cgs  # minimum escape velocity
+    beta = param_dict["beta"]
+    kappa_r = 10 ** param_dict["log10_kappa_r"]
+    z = param_dict["redshift"]
 
     # convert time from day to second
     t = t_day * seconds_a_day
@@ -398,12 +393,6 @@ def metzger_lc(t_day, param_dict, nu_obs, filters):
 
     if len(np.where(t == 0)[0]) > 0:
         raise ValueError("For Me2017, start later than t=0")
-    # fetch parameters
-    M0 = 10 ** param_dict["log10_mej"] * msun_cgs  # total ejecta mass
-    v0 = 10 ** param_dict["log10_vej"] * c_cgs  # minimum escape velocity
-    beta = param_dict["beta"]
-    kappa_r = 10 ** param_dict["log10_kappa_r"]
-    z = param_dict["redshift"]
 
     # define additional parameters
     E0 = 0.5 * M0 * v0 * v0  # initial thermal energy of bulk
@@ -676,19 +665,13 @@ def fill_lightcurve_data(times, data_per_filt):
 def create_light_curve_data(
     injection_parameters,
     args,
-    light_curve_model=None,
+    light_curve_model,
     sample_times=None,
     doAbsolute=False,
     keep_infinite_data=False,
 ):
 
-    kilonova_kwargs = dict(
-        model=getattr(args, 'em_injection_model', args.model),
-        svd_path=getattr(args, 'injection_svd_path', args.svd_path),
-        mag_ncoeff = getattr(args, 'injection_svd_mag_ncoeff', args.svd_mag_ncoeff),   
-        lbol_ncoeff = getattr(args, 'injection_svd_lbol_ncoeff', args.svd_lbol_ncoeff),
-    )
-
+   
     if args.filters:
         filters = args.filters.split(",")
         bands = {i + 1: b for i, b in enumerate(filters)}
@@ -754,20 +737,6 @@ def create_light_curve_data(
     seed = args.generation_seed
 
     np.random.seed(seed)
-
-    #create light_curve_model
-    if light_curve_model is None:
-        if args.with_grb_injection:
-            light_curve_model = KilonovaGRBLightCurveModel(
-                kilonova_kwargs=kilonova_kwargs,
-                GRB_resolution=np.inf,
-            )
-
-        else:
-            light_curve_model = SVDLightCurveModel(
-                interpolation_type=args.interpolation_type, 
-                **kilonova_kwargs
-            )
 
     # create lightcurve_data
     if sample_times is None:

@@ -157,7 +157,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         lch.lcs_from_injection_parameters(args)
 
         command_line_lightcurve_file = os.path.join(
-            output_directory, f"{command_line_lightcurve_label}.dat"
+            output_directory, f"{command_line_lightcurve_label}_0.dat"
         )
         assert os.path.exists(
             command_line_lightcurve_file
@@ -210,7 +210,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         lightcurve_parameters = get_parameters_from_injection_file(injection_file)
         time_series = np.arange(0.01, 20.0 + 0.5, 0.5)
         lightcurve_model = model_lightcurve_function(
-            sample_times=time_series,
             model=model_name,
             filters=["sdssu"],
         )

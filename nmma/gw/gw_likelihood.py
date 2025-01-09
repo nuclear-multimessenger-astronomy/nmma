@@ -1,9 +1,8 @@
 from __future__ import division
-import inspect
 import numpy as np
 from bilby_pipe.utils import convert_string_to_dict
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
-from ..joint.base import NMMABaseLikelihood
+from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
 
 def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     """
@@ -20,22 +19,13 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
         epsilon: float
             sets the precision of the binning for relative binning
     """
-    signature = inspect.signature(GravitationalWaveTransientLikelihood) 
-    default_gw_kwargs= {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
+    default_gw_kwargs = initialisation_args_from_signature_and_namespace(
+        GravitationalWaveTransientLikelihood, args, prefixes=['gw_'])
 
     gw_kwargs = default_gw_kwargs | dict(
-            gw_likelihood_type=args.likelihood_type,
             interferometers=data_dump["ifo_list"],
             waveform_generator=data_dump["waveform_generator"],
-            phase_marginalization=args.phase_marginalization,
-            distance_marginalization=args.distance_marginalization,
-            distance_marginalization_lookup_table=args.distance_marginalization_lookup_table,
-            time_marginalization=args.time_marginalization,
-            reference_frame=args.reference_frame,
-            time_reference=args.time_reference
         )
-    if hasattr(args, 'jitter_time'):
-        gw_kwargs.update(jitter_time=args.jitter_time)
     if args.likelihood_type == 'ROQGravitationalWaveTransient':
         gw_kwargs.pop("time_marginalization", None)
         gw_kwargs.pop("jitter_time", None)
@@ -45,7 +35,8 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     elif args.likelihood_type == 'RelativeBinningGravitationalWaveTransient':
         fiducial_parameters = convert_string_to_dict(args.fiducial_parameters)
         gw_kwargs.update(
-            fiducial_parameters=fiducial_parameters, epsilon=args.epsilon,  update_fiducial_parameters=args.update_fiducial_parameters
+            fiducial_parameters=fiducial_parameters, epsilon=args.epsilon,
+            update_fiducial_parameters=args.update_fiducial_parameters
         )
     elif args.likelihood_type == 'MBGravitationalWaveTransient':
         gw_kwargs.pop("time_marginalization", None)
@@ -114,18 +105,6 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
         given some set of parameters
     gw_likelihood_type: str
         The gravitational-wave likelihood to be taken
-    roq_params: str, array_like
-        Parameters describing the domain of validity of the ROQ basis.
-    roq_params_check: bool
-        If true, run tests using the roq_params to check the prior and data are
-        valid for the ROQ
-    roq_scale_factor: float
-        The ROQ scale factor used.
-    distance_marginalization: bool, optional
-        If true, marginalize over distance in the likelihood.
-        This uses a look up table calculated at run time.
-        The distance prior is set to be a delta function at the minimum
-        distance allowed in the prior being marginalised over.
     time_marginalization: bool, optional
         If true, marginalize over time in the likelihood.
         This uses a FFT to calculate the likelihood over a regularly spaced
@@ -135,6 +114,11 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
         If using time marginalisation and jitter_time is True a "jitter"
         parameter is added to the prior which modifies the position of the
         grid of times.
+    distance_marginalization: bool, optional
+        If true, marginalize over distance in the likelihood.
+        This uses a look up table calculated at run time.
+        The distance prior is set to be a delta function at the minimum
+        distance allowed in the prior being marginalised over.
     phase_marginalization: bool, optional
         If true, marginalize over phase in the likelihood.
         This is done analytically using a Bessel function.
@@ -151,7 +135,7 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
         Whether to introduce a `time_jitter` parameter. This avoids either
         missing the likelihood peak, or introducing biases in the
         reconstructed time posterior due to an insufficient sampling frequency.
-        Default is False, however using this parameter is strongly encouraged.
+        Using this parameter is strongly encouraged.
     reference_frame: (str, bilby.gw.detector.InterferometerList, list), optional
         Definition of the reference frame for the sky location.
         - "sky": sample in RA/dec, this is the default
@@ -188,13 +172,22 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
             time_marginalization=time_marginalization,
             reference_frame=reference_frame,
             time_reference=time_reference,
-            jitter_time=jitter_time
+            jitter_time=jitter_time,
+            **kwargs
         )
 
         if gw_likelihood_type == 'GravitationalWaveTransient':
             GWLikelihood = GravitationalWaveTransient(**gw_likelihood_kwargs)
 
         elif gw_likelihood_type == 'ROQGravitationalWaveTransient':
+            """Additional params:
+            roq_params: str, array_like
+                Parameters describing the domain of validity of the ROQ basis.
+            roq_params_check: bool
+                If true, run tests using the roq_params to check the prior and data are
+                valid for the ROQ
+            roq_scale_factor: float
+                The ROQ scale factor used."""
             GWLikelihood = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         elif gw_likelihood_type == 'RelativeBinningGravitationalWaveTransient':

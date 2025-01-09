@@ -12,17 +12,16 @@ import numpy as np
 import pandas as pd
 from bilby.core.likelihood import ZeroLikelihood
 
-import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from nmma.em import lightcurve_handling as lch
 from .lightcurve_generation import create_light_curve_data, create_detection_limit
 from .em_likelihood import EMTransientLikelihood
-from .model import create_light_curve_model_from_args, model_parameters_dict, SimpleBolometricLightCurveModel
+from nmma.em import model  
 from .prior import create_prior_from_args
 from .utils import getFilteredMag, dataProcess, setup_sample_times, transform_to_app_mag_dict
 from .io import loadEvent
+from .plotting_utils import basic_em_analysis_plot, bolometric_lc_plot
 from .em_parsing import parsing_and_logging, em_analysis_parser, bolometric_parser
 matplotlib.use("agg")
 
@@ -182,9 +181,8 @@ def make_injection(args, sample_times, filters = None, fixed_timestep=False, inj
         if injection_model is None:
             injection_model = args.model
 
-        _, _, injection_model = create_light_curve_model_from_args(
-            injection_model, args, filters=filters,
-            sample_over_Hubble=args.sample_over_Hubble,
+        injection_model = model.create_light_curve_model_from_args(
+            injection_model, args, filters=filters, 
         )
     data = create_light_curve_data(
         injection_parameters, args, 
@@ -209,72 +207,35 @@ def inspect_detection_limit(args, data, filters):
         else:
             detection_limit = literal_eval(args.detection_limit)
 
-        #print("the detection limits for this run are: ", detection_limit)
-
         for filt in filters:
-            i=0
-            for row in data[filt]:
-                #print('the old data is {data}'.format(data=data[filt]))
+            for i, row in enumerate(data[filt]):
                 mjd, mag, mag_unc = row
-                #print("the data for {f} is: ".format(f=filt), row)
                 if mag > detection_limit[filt]:
                     data[filt][i,:] = [mjd, detection_limit[filt], -np.inf]
-                
-                #print("the new data is: ", data[filt])
-                i+=1
     return data
 
 def store_injections(args, filters, data):
-    if filters is not None:
-        detection_limit =create_detection_limit(args, filters)
+    if filters:
+        detection_limit = create_detection_limit(args, filters)
+        ref_filts = set(filters + (args.photometry_augmentation_filters or "").split(","))
     else:
         detection_limit = {}
-    data_out = np.empty((0, 6))
-    for filt in data.keys():
-        if filters:
-            if args.photometry_augmentation_filters:
-                filts = list(
-                    set(
-                        filters
-                        + args.photometry_augmentation_filters.split(",")
-                    )
-                )
-            else:
-                filts = filters
-            if filt not in filts:
+        ref_filts = []
+
+    data_out = []
+
+    for filt, rows in data.items():
+        if filters and filt not in ref_filts:
                 continue
-        for row in data[filt]:
-            mjd, mag, mag_unc = row
+
+        for mjd, mag, mag_unc in rows:
             if not np.isfinite(mag_unc):
-                data_out = np.append(
-                    data_out,
-                    np.array([[mjd, 99.0, 99.0, filt, mag, 0.0]]),
-                    axis=0,
-                )
+                data_out.append([mjd, 99.0, 99.0, filt, mag, 0.0])
             else:
-                if filt in detection_limit:
-                    data_out = np.append(
-                        data_out,
-                        np.array(
-                            [
-                                [
-                                    mjd,
-                                    mag,
-                                    mag_unc,
-                                    filt,
-                                    detection_limit[filt],
-                                    0.0,
-                                ]
-                            ]
-                        ),
-                        axis=0,
-                    )
-                else:
-                    data_out = np.append(
-                        data_out,
-                        np.array([[mjd, mag, mag_unc, filt, np.inf, 0.0]]),
-                        axis=0,
-                    )
+                limmag = detection_limit.get(filt, np.inf)
+                data_out.append([mjd, mag, mag_unc, filt, limmag, 0.0])
+
+    data_out = np.array(data_out)
 
     columns = ["jd", "mag", "mag_unc", "filter", "limmag", "programid"]
     lc = pd.DataFrame(data=data_out, columns=columns)
@@ -362,7 +323,7 @@ def bolometric_analysis(args):
 
     error_budget = args.error_budget
 
-    light_curve_model = SimpleBolometricLightCurveModel(model=args.model)
+    light_curve_model = model.SimpleBolometricLightCurveModel(model=args.model)
 
     # setup the prior
     priors = create_prior_from_args(args.model.split(','), args)
@@ -387,47 +348,13 @@ def bolometric_analysis(args):
     if args.bestfit or args.plot:
         lbol, lbol_dict, bestfit_params  = fetch_bestfit(args, light_curve_model, sample_times)
         lbol_dict["lbol"] = lbol
-        
-        ###################### plot best fit light curve ######################
-        matplotlib.rcParams.update(
-            {'font.size': 12,
-             'text.usetex': True,
-             'font.family': 'Times New Roman'}
-        )
 
-        plt.figure(1)
-        plotName = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
-        color = "coral"
-
-        t = data["phase"].to_numpy()
+        data_times = data["phase"].to_numpy()
         y = data["Lbb"].to_numpy()
         sigma_y = data["Lbb_unc"].to_numpy()
-
-        idx = np.where(~np.isnan(y))[0]
-        t, y, sigma_y = t[idx], y[idx], sigma_y[idx]
-
-        idx = np.where(np.isfinite(sigma_y))[0]
-        plt.errorbar(
-            t[idx], y[idx], sigma_y[idx], fmt="o", color="k", markersize=12,
+        bolometric_lc_plot(data_times, y, sigma_y, lbol_dict, 
+            save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
         )
-
-        idx = np.where(~np.isfinite(sigma_y))[0]
-        plt.errorbar(
-            t[idx], y[idx], sigma_y[idx], fmt="v", color="k", markersize=12
-        )
-
-        plt.plot(lbol_dict['bestfit_sample_times'], lbol_dict['lbol'],
-                 color=color,
-                 linewidth=3,
-                 linestyle="--",
-                 )
-
-        plt.ylabel("L [erg / s]")
-        plt.xlabel("Time [days]")
-        plt.tight_layout()
-        plt.savefig(plotName)
-        plt.close()
-
     return
 
 def analysis(args):
@@ -475,13 +402,14 @@ def analysis(args):
 
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze, error_budget = set_error_budget_and_filters(args, data)
-    model_names, models, light_curve_model = create_light_curve_model_from_args(
-        args.model,
-        args,
-        filters=filters_to_analyze,
-        sample_over_Hubble=args.sample_over_Hubble,
+    light_curve_model = model.create_light_curve_model_from_args(
+        args.model, args, filters=filters_to_analyze,
     )
-
+    try:
+        model_names = [light_curve_model.model]
+    except AttributeError:
+        model_names = [sub_model.model for sub_model in light_curve_model.models]
+    
     # setup the prior
     priors = create_prior_from_args(model_names, args)
    
@@ -528,7 +456,7 @@ def analysis(args):
                     "log10_mej_wind",
                 ]
             else:
-                injlist = ["luminosity_distance"] + model_parameters_dict[model_name]
+                injlist = ["luminosity_distance"] + model.model_parameters_dict[model_name]
 
             injlist_all = list(set(injlist_all + injlist))
 
@@ -617,17 +545,7 @@ def analysis(args):
 
     if args.plot:
 
-
-        if len(models) > 1:
-            _, mag_all = light_curve_model.generate_lightcurve(
-                sample_times, bestfit_params, return_all=True
-            )
-            for i, mag_dict in enumerate(mag_all):
-                mag_all[i] = transform_to_app_mag_dict(mag_dict, bestfit_params)
-
-            model_colors = cm.Spectral(np.linspace(0, 1, len(models)))[::-1]
-
-        filters_plot = []
+        filters_to_plot = []
         for filt in filters_to_analyze:
             if filt not in data:
                 continue
@@ -637,158 +555,33 @@ def analysis(args):
             t, y, sigma_y = t[idx], y[idx], sigma_y[idx]
             if len(t) == 0:
                 continue
-            filters_plot.append(filt)
+            filters_to_plot.append(filt)
+        mags_to_plot = [getFilteredMag(best_mags, filt) for filt in filters_to_plot]
 
-        colors = cm.Spectral(np.linspace(0, 1, len(filters_plot)))[::-1]
-
-        plotName = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
-
-        # set up the geometry for the all-in-one figure
-        wspace = 0.6  # All in inches.
-        hspace = 0.3
-        lspace = 1.0
-        bspace = 0.7
-        trspace = 0.2
-        hpanel = 2.25
-        wpanel = 3.
-
-        ncol = 2
-        nrow = int(np.ceil(len(filters_plot) / ncol))
-        fig, axes = plt.subplots(nrow, ncol)
-
-        figsize = (1.5 * (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace),
-                   1.5 * (bspace + hpanel * nrow + hspace * (nrow - 1) + trspace))
-        # Create the figure and axes.
-        fig, axes = plt.subplots(nrow, ncol, figsize=figsize, squeeze=False)
-        fig.subplots_adjust(left=lspace / figsize[0],
-                            bottom=bspace / figsize[1],
-                            right=1. - trspace / figsize[0],
-                            top=1. - trspace / figsize[1],
-                            wspace=wspace / wpanel,
-                            hspace=hspace / hpanel)
-
-        if len(filters_plot) % 2:
-            axes[-1, -1].axis('off')
-
-        cnt = 0
-        for filt, color in zip(filters_plot, colors):
-            cnt = cnt + 1
-
-            # summary plot
-            row = (cnt - 1) // ncol
-            col = (cnt - 1) % ncol
-            ax_sum = axes[row, col]
-            # adding the ax for the Delta
-            divider = make_axes_locatable(ax_sum)
-            ax_delta = divider.append_axes('bottom',
-                                           size='30%',
-                                           sharex=ax_sum)
-
-            # configuring ax_sum
-            ax_sum.set_ylabel("AB magnitude", rotation=90)
-            ax_delta.set_ylabel(r"$\Delta (\sigma)$")
-            if cnt == len(filters_plot) or cnt == len(filters_plot) - 1:
-                ax_delta.set_xlabel("Time [days]")
-            else:
-                ax_delta.set_xticklabels([])
-
-            # plotting the best-fit lc and the data in ax1
-            samples = data[filt]
-            t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
-            t -= trigger_time + timeshift
-            idx = np.where(~np.isnan(y))[0]
-            t, y, sigma_y = t[idx], y[idx], sigma_y[idx]
-
-            idx = np.where(np.isfinite(sigma_y))[0]
-            det_idx = idx
-            ax_sum.errorbar(
-                t[idx],
-                y[idx],
-                sigma_y[idx],
-                fmt="o",
-                color=color,
+        if isinstance(light_curve_model, model.CombinedLightCurveModelContainer):
+            sub_models = light_curve_model.models
+            model_colors = cm.Spectral(np.linspace(0, 1, len(sub_models)))[::-1]
+            _, mag_all = light_curve_model.generate_lightcurve(
+                sample_times, bestfit_params, return_all=True
             )
+            sub_model_plot_props = {}
+            for i, sub_model in enumerate(sub_models):
+                sub_mags = transform_to_app_mag_dict(mag_all[i], bestfit_params)
+                sub_model_plot_props[sub_model.model] ={
+                    'color': model_colors[i], 
+                    'plot_mags' : [getFilteredMag(sub_mags, filt) for filt in filters_to_plot]
+                }
+        else: sub_model_plot_props = None
 
-            idx = np.where(~np.isfinite(sigma_y))[0]
-            ax_sum.errorbar(
-                t[idx],
-                y[idx],
-                sigma_y[idx],
-                fmt="v",
-                color=color,
-            )
-  
-            mag_plot = getFilteredMag(best_mags, filt)
-
-            # calculating the chi2
-            mag_per_data = np.interp(
-                t[det_idx],
-                best_mags["bestfit_sample_times"],
-                mag_plot)
-            diff_per_data = mag_per_data - y[det_idx]
-            sigma_per_data = np.sqrt((sigma_y[det_idx]**2 + error_budget[filt]**2))
-            chi2_per_data = diff_per_data**2
-            chi2_per_data /= sigma_per_data**2
-            chi2_total = np.sum(chi2_per_data)
-            N_data = len(det_idx)
-
-            # plot the mismatch between the model and the data
-            ax_delta.scatter(t[det_idx], diff_per_data / sigma_per_data, color=color)
-            ax_delta.axhline(0, linestyle='--', color='k')
-
-            ax_sum.plot(
-                best_mags["bestfit_sample_times"],
-                mag_plot,
-                color='coral',
-                linewidth=3,
-                linestyle="--",
-            )
-
-            if len(models) > 1:
-                ax_sum.fill_between(
-                    best_mags["bestfit_sample_times"],
-                    mag_plot + error_budget[filt],
-                    mag_plot - error_budget[filt],
-                    facecolor='coral',
-                    alpha=0.2,
-                    label="combined",
-                )
-            else:
-                ax_sum.fill_between(
-                    best_mags["bestfit_sample_times"],
-                    mag_plot + error_budget[filt],
-                    mag_plot - error_budget[filt],
-                    facecolor='coral',
-                    alpha=0.2,
-                )
-
-            if len(models) > 1:
-                for ii in range(len(mag_all)):
-                    mag_plot = getFilteredMag(mag_all[ii], filt)
-                    ax_sum.plot(
-                        best_mags["bestfit_sample_times"],
-                        mag_plot,
-                        color='coral',
-                        linewidth=3,
-                        linestyle="--",
-                    )
-                    ax_sum.fill_between(
-                        best_mags["bestfit_sample_times"],
-                        mag_plot + error_budget[filt],
-                        mag_plot - error_budget[filt],
-                        facecolor=model_colors[ii],
-                        alpha=0.2,
-                        label=models[ii].model,
-                    )
-
-            ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
-
-            ax_sum.set_xlim([float(x) for x in args.xlim.split(",")])
-            ax_sum.set_ylim([float(x) for x in args.ylim.split(",")])
-            ax_delta.set_xlim([float(x) for x in args.xlim.split(",")])
-
-        plt.savefig(plotName, bbox_inches='tight')
-        plt.close()
+        basic_em_analysis_plot(
+            data, error_budget,
+            filters_to_plot, mags_to_plot,
+            sub_model_plot_props,
+            sample_times = best_mags["bestfit_sample_times"],
+            delta_t= timeshift + trigger_time, 
+            xlim = args.xlim, ylim = args.ylim, 
+            save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
+        )
 
 def nnanalysis(args):
 
@@ -869,13 +662,14 @@ def nnanalysis(args):
 
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze, error_budget = set_error_budget_and_filters(args, data)
-    model_names, models, light_curve_model = create_light_curve_model_from_args(
-        args.model,
-        args,
-        filters=filters_to_analyze,
-        sample_over_Hubble=args.sample_over_Hubble,
+    light_curve_model = model.create_light_curve_model_from_args(
+        args.model, args, filters=filters_to_analyze,
     )
-
+    try:
+        model_names = [light_curve_model.model]
+    except AttributeError:
+        model_names = [sub_model.model for sub_model in light_curve_model.models]
+    
     # setup the prior
     priors = create_prior_from_args(model_names, args)
     

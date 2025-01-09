@@ -1,4 +1,5 @@
 import argparse
+from nmma.pbilby.parser.shared import StoreBoolean
 
 def joint_postprocess_parser(parser):
 
@@ -57,16 +58,28 @@ def resampling_parser():
     parser.add_argument("--nlive", type=int, required=False, default=1024, help="live number")
     parser.add_argument("--GWprior", type=str, required=True, help="Prior file used for the GW analysis")
     parser.add_argument("--EMprior",type=str,required=True,help="Prior file used for the EM eos analysis")
-    parser.add_argument("--total-ejecta-mass",action="store_true",
+    parser.add_argument("--total-ejecta-mass",action=StoreBoolean,
             help="To run with total ejecta mass, if not activated, the two ejecta are consider seperately")
-    parser.add_argument("--withNSBH", action="store_true", 
+    parser.add_argument("--withNSBH", action=StoreBoolean, 
             help="Compute GW-EM-resampling for NSBH source, else: for BNS source.")
     return parser
 
-def condor_parser():
-    parser = resampling_parser()
-    parser.add_argument("-d", "--detections-file", type=str)
-    parser.add_argument("--condor-dag-file",type=str, required=True, help="The condor dag file to be created")
-    parser.add_argument("--condor-sub-file",type=str, required=True, help="The condor sub file to be created")
-    parser.add_argument("--bash-file", type=str, required=True, help="The bash file to be created")
+def maximum_mass_parser():
+    parser = argparse.ArgumentParser(
+        description="Inference on the maximum mass constraint of the EOS when a joint posterior for binary components, ejecta and EOS is provided."
+    )
+    parser.add_argument("--outdir", metavar="PATH", type=str, required=True)
+    parser.add_argument("--joint-posterior", type=str,  required=True,
+        help="Posterior file with chirp mass, eta_star, EOSID, log10_mdisk, log10_mej_dyn as columns.")
+    parser.add_argument("--prior", metavar="PATH", type=str, required=True,
+        help="Prior specification for chirp mass, eta_star, log10_mdisk, log10_mej_dyn. If use_M_kepler is True, prior file must also contain ratio_R and delta.",
+    )
+    parser.add_argument("--eos-path-macro", metavar="PATH", type=str, required=True,
+        help="EOS folder with EOS files in [R, M, Lambda, p_central] format.")
+    parser.add_argument("--eos-path-micro", metavar="PATH", type=str, required=True,
+        help="EOS folder with EOS files in [n, energy density, pressure, speed of sound squared] format.")
+    parser.add_argument( "--use-M-Kepler",  action=StoreBoolean,
+        help="If set, it is assumed that the BNS remnant collapsed to a black hole above the Kepler limit.")
+    parser.add_argument("--nlive", type=int,  default=1024)
+    
     return parser

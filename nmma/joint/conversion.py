@@ -2,13 +2,10 @@ from __future__ import division
 
 import numpy as np
 import pandas as pd
-import scipy.interpolate
-import scipy.constants
 from astropy import units
 from astropy import cosmology as cosmo
 
-default_cosmology = cosmo.Planck18
-import lal
+from nmma.joint.constants import geom_msun_km, msun_to_ergs, default_cosmology
 
 from bilby.gw.conversion import (
     component_masses_to_chirp_mass,
@@ -128,7 +125,7 @@ def lambda_to_compactness(lambda_i):
 
 def mass_and_compactness_to_radius(mass, comp):
     ### returns 0 if compactness is greater than 0.5, i.e. black hole
-    return np.where(comp<0.5, mass / comp * lal.MRSUN_SI / 1e3, 0.0)
+    return np.where(comp<0.5, mass / comp * geom_msun_km, 0.0)
 
 def radii_from_qur(converted_parameters, added_keys):
     mass_1_source = converted_parameters["mass_1_source"]
@@ -150,7 +147,7 @@ def radii_from_qur(converted_parameters, added_keys):
     converted_parameters["R_16"] = (
         chirp_mass_source
         * np.power(lambda_tilde / 0.0042, 1.0 / 6.0)
-        * lal.MRSUN_SI / 1e3
+        * geom_msun_km
     )
 
     added_keys += ["radius_1", "radius_2", "R_16"]
@@ -324,7 +321,7 @@ class NSBHEjectaFitting(object):
         mass_2_source = converted_parameters["mass_2_source"]
 
         radius_2 = converted_parameters["radius_2"]
-        compactness_2 = mass_2_source * lal.MRSUN_SI / (radius_2 * 1e3)
+        compactness_2 = mass_2_source * geom_msun_km / radius_2
 
         if "cos_tilt_1" not in converted_parameters:
             converted_parameters["cos_tilt_1"] = np.cos(converted_parameters["tilt_1"])
@@ -462,8 +459,8 @@ class BNSEjectaFitting(object):
         radius_1 = converted_parameters["radius_1"]
         radius_2 = converted_parameters["radius_2"]
 
-        compactness_1 = mass_1_source * lal.MRSUN_SI / (radius_1 * 1e3)
-        compactness_2 = mass_2_source * lal.MRSUN_SI / (radius_2 * 1e3)
+        compactness_1 = mass_1_source * geom_msun_km / radius_1
+        compactness_2 = mass_2_source * geom_msun_km / radius_2
 
         mdyn_fit = self.dynamic_mass_fitting_KrFo(
             mass_1_source, mass_2_source, compactness_1, compactness_2
@@ -473,7 +470,7 @@ class BNSEjectaFitting(object):
             total_mass,
             mass_ratio,
             converted_parameters["TOV_mass"],
-            converted_parameters["R_16"] * 1e3 / lal.MRSUN_SI,
+            converted_parameters["R_16"] / geom_msun_km,
         )
 
         mej_dyn = mdyn_fit + converted_parameters["alpha"]
@@ -491,9 +488,8 @@ class BNSEjectaFitting(object):
         converted_parameters["log10_mej_dyn"] = log10_mej_dyn
         converted_parameters["log10_mej_wind"] = log10_mej_wind
         converted_parameters["log10_mej"] = np.log10(total_ejeta_mass)
-        converted_parameters["log10_E0"] = log10_E0_MSUN + np.log10(
-            lal.MSUN_SI * scipy.constants.c * scipy.constants.c * 1e7
-        ) 
+        converted_parameters["log10_E0"] =  log10_E0_MSUN + np.log10(msun_to_ergs) 
+ 
 
         if (
             isinstance(compactness_1, (list, tuple, pd.core.series.Series, np.ndarray))
@@ -538,25 +534,27 @@ class MultimessengerConversion(object):
         self.macro_eos_conversion = self.setup_eos_converter(args)
         
     def setup_eos_converter(self, args):
-        # Case 1: no eos sampling, use quasi-universal relations instead
-        if not args.with_eos:
-            return radii_from_qur 
-        
-        # Case 2: precomputed eos data is loaded to ram
-        if args.eos_to_ram:
-            EOSdata = [None]*args.Neos
-            for j in range(args.Neos):
-                EOSdata[j] = np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T
-            self.EOSdata=np.array(EOSdata)
-            return self.eos_from_ram
-        
-        # Case 3: eos is generated from emulator on the fly
-        elif hasattr(args, 'tov_emulator'):
+        # Case 1: eos is generated from emulator on the fly
+        if 'eos' in self.messengers:
             self.tov_emulator = setup_eos_generator(args)
             return self.eos_from_emulator
-        # Case 4: eos is loaded directly from file
+        
+        elif 'eos' in self.modifiers:
+            # Case 2a: precomputed eos data is loaded to ram
+            if args.eos_to_ram:
+                EOSdata = [None]*args.Neos
+                for j in range(args.Neos):
+                    EOSdata[j] = np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T
+                self.EOSdata=np.array(EOSdata)
+                return self.eos_from_ram
+        
+            # Case 2b: eos is loaded directly from file
+            else:
+                return self.eos_direct_load
+        
+        # Case 3: no eos sampling, use quasi-universal relations instead
         else:
-            return self.eos_direct_load
+            return radii_from_qur 
         
 
     def eos_direct_load(self, converted_parameters, added_keys):

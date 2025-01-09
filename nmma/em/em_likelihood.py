@@ -1,101 +1,41 @@
 from __future__ import division
-import inspect
 import numpy as np
 from scipy.stats import norm, truncnorm
 
-from ..joint.base import NMMABaseLikelihood
-from .model import *
-from . import utils, systematics
+from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
+from . import model, utils, systematics
 
 
 
-def setup_em_kwargs(param_conv_func, data_dump, args, logger, **kwargs):
-    # get lc_data and filters
+def setup_em_kwargs(priors, data_dump, args,  logger=None):
+    #Prerequisites
+    ## get lc_data and filters
     light_curve_data= data_dump["light_curve_data"]
     filters=args.filters
     if not filters:
         filters = list(light_curve_data.keys())
 
-    # identify what kind of transient we are dealing with
-    em_transient_class= get_em_transient_class(args.em_transient_class)
-
-    # setup the light curve model for this transient class and filters
-    light_curve_model = setup_lightcurve_model(em_transient_class, args, filters, param_conv_func)
-
+    ## identify what kind of transient we are dealing with
+    lc_model_class= model.lc_model_class_from_str(args.em_transient_class)
+    ## setup the light curve model for this transient class and filters
+    light_curve_model = model.create_light_curve_model_from_args(lc_model_class, args, filters)
 
 
-    # inspect the signature of the EM-likelihood class
-    em_transient_signature = inspect.signature(EMTransientLikelihood) 
-    ## this provides all arguments that the likelihood takes from args or from the default value
-    em_kwargs = {key : getattr(args, key, val.default) for key, val in em_transient_signature.parameters.items() } 
 
+    em_kwargs = initialisation_args_from_signature_and_namespace(
+        EMTransientLikelihood, args, ['em_transient_', 'kilonova_']
+        )
 
-    
+    # add kwargs manually
     em_likelihood_kwargs = dict(
-        light_curve_model=light_curve_model,
-        filters=filters,light_curve_data=light_curve_data,
-        trigger_time=args.em_transient_trigger_time,
+        light_curve_model=light_curve_model,light_curve_data=light_curve_data,
+        priors = priors, filters=filters,
         error_budget=args.em_transient_error,
     )
     return em_kwargs | em_likelihood_kwargs
 
-def get_em_transient_class(class_name = 'svd'):
-    transient_class_map = {
-        "svd": SVDLightCurveModel,
-        "grb": GRBLightCurveModel,
-        "host_galaxy": HostGalaxyLightCurveModel,
-        "supernova": SupernovaLightCurveModel,
-        "shock": ShockCoolingLightCurveModel,
-        "simple_kilonova": SimpleKilonovaLightCurveModel,
-        "combined": CombinedLightCurveModelContainer,
-        "kilonova_grb": KilonovaGRBLightCurveModel,
-        "supernova_grb": SupernovaGRBLightCurveModel,
-        "supernova_shock": SupernovaShockCoolingLightCurveModel,
-    }
-    ##FIXME get more robust handling of aliases and typos
-    try:
-        return transient_class_map[class_name.lower()]
-    except KeyError(f"EM transient class must be one of {transient_class_map.keys()}, but was {class_name}"):
-        exit()
 
-def setup_lightcurve_model(em_transient_class, args, filters, param_conv_func = None):
-
-    ## parse args into light curve model
-    # FIXME: this routine needs an update!
-    # create_light_curve_model_from_args()
-
-    signature = inspect.signature(em_transient_class) 
-    default_transient_kwargs= {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
-    # case1: individual transient classes
-    if isinstance(em_transient_class, LightCurveModelContainer):
-        
-        light_curve_model_kwargs = dict(
-        # model=args.kilonova_model,
-        # svd_path=args.lc_model_svd_path,
-        # parameter_conversion=param_conv_func,
-        # mag_ncoeff=args.svd_mag_ncoeff,
-        # lbol_ncoeff=args.svd_lbol_ncoeff,
-        # interpolation_type=args.transient_emulator_type,
-        # filters=filters,
-        # local_only=args.local_model_only,
-        )
-        light_curve_model = SVDLightCurveModel(**light_curve_model_kwargs)
-        ##case 1.5: manually combine GRB and nuclear transient 
-        ## FIXME this is a bit of an ugly hack, should be handled more elegantly
-        if args.with_grb:
-            grb_model = GRBLightCurveModel(
-                    filters = filters,
-                    resolution=args.grb_resolution, 
-                    parameter_conversion=param_conv_func
-                    ) 
-            light_curve_model = CombinedLightCurveModelContainer([light_curve_model, grb_model])
-
-    if isinstance(em_transient_class, CombinedLightCurveModelContainer):
-        pass
-
-
-    return light_curve_model
-
+   
 
 
 class EMTransientLikelihood(NMMABaseLikelihood):
@@ -480,7 +420,7 @@ class OpticalLightCurve(EMTransientLikelihood):
 
     Parameters
     ----------
-    light_curve_model: `nmma.em.SVDLightCurveModel`
+    light_curve_model: `nmma.em.LightCurveModelContainer`
         And object which computes the light curve of a kilonova signal,
         given a set of parameters
     filters: list, str

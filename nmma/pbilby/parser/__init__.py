@@ -1,8 +1,8 @@
-from .analysis_parser import (
+from .analysis import (
     create_nmma_analysis_parser,
     parse_analysis_args
     )
-from .generation_parser import (
+from .generation import (
     create_nmma_generation_parser,
     parse_generation_args
     )

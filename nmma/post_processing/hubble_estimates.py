@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 import scipy.stats
-import scipy.constants
 import bilby
 from tqdm import tqdm
 import json
+from nmma.joint.constants import c_kms
 from .parser import Hubble_parser
 from .event_resampling import reweight_to_flat_mass_prior, find_spread_from_resampling
 
@@ -96,7 +96,7 @@ def load_in_posteriors(injection_df, event_to_loop, args):
 
         # Have the true redshift centered be the center of the posterior
         distance_injected = injection_df.luminosity_distance[i]
-        z_true = H0_true * distance_injected * (1e3 / scipy.constants.c)  # the factor 100 is to convert speed of light to km s^-1
+        z_true = H0_true * distance_injected / c_kms
 
         if args.p_value_threshold:
             # check if the GW posterior is good
@@ -110,8 +110,7 @@ def load_in_posteriors(injection_df, event_to_loop, args):
 
         # generate redshift samples and Hubble samples
         redshift_samples = np.random.normal(float(z_true), 1e-3, size=len(distanceEM))
-        velocity_samples = redshift_samples * scipy.constants.c / 1e3  # velocity in km s^-1
-        H0_samples_EM = velocity_samples / distanceEM  # Hubble samples in km s^-1 Mpc^-1
+        H0_samples_EM = redshift_samples * c_kms / distanceEM  # Hubble samples in km s^-1 Mpc^-1
 
         # generate the posterior on H0 with a gaussian_kde with weighting back to the uniform in volume
         # the reason for reweighting back to uniform in volume (p(d) ~ d^2) is because the selection effect
@@ -120,8 +119,7 @@ def load_in_posteriors(injection_df, event_to_loop, args):
         probs_EM[i] = scipy.stats.gaussian_kde(H0_samples_EM, weights=distanceEM * distanceEM)
         # now do it for GW
         redshift_samples = np.random.normal(float(z_true), 1e-3, size=len(distanceGW))
-        velocity_samples = redshift_samples * scipy.constants.c / 1e3
-        H0_samples_GW = velocity_samples / distanceGW
+        H0_samples_GW = redshift_samples * c_kms / distanceGW
         probs_GW[i] = scipy.stats.gaussian_kde(H0_samples_GW)
 
     return probs_EM, probs_GW

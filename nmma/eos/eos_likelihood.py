@@ -1,19 +1,17 @@
 from __future__ import division
 from glob import glob
-import inspect
-from ..joint.base import NMMABaseLikelihood
+from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
 import numpy as np
 from scipy.special import logsumexp
 from scipy.stats import norm, gaussian_kde
 
 
-def setup_eos_kwargs(priors, data_dump, args, logger, **kwargs):
-    signature = inspect.signature(EquationofStateLikelihood) 
-    default_eos_kwargs= {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
-    
-    eos_kwargs = default_eos_kwargs | dict(
+def setup_eos_kwargs(data_dump, args, logger):
+    # default_eos_kwargs = initialisation_args_from_signature_and_namespace(EquationofStateLikelihood, args)
+    # eos_kwargs = default_eos_kwargs | dict(
+    eos_kwargs = dict(
         constraint_dict=data_dump['eos_constraint_dict'],
-        crust_path=args.eos_crust_file
+        # crust_path=args.eos_crust_file
     )
     return eos_kwargs
 
@@ -56,6 +54,7 @@ def setup_joint_eos_constraint(constraint_dict):
 class EquationofStateLikelihood(NMMABaseLikelihood):
     def __init__(self, priors, constraint_dict, **kwargs):
         sub_model =setup_joint_eos_constraint(constraint_dict)
+        # to be extended for more complex likelihood expressions
         super().__init__(sub_model=sub_model, priors=priors, **kwargs)
       
 
