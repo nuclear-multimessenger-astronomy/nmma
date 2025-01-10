@@ -13,10 +13,11 @@ from nmma.em.model import (
     SVDLightCurveModel,
 )
 
-from ..em import create_lightcurves
+from ..em import lightcurve_handling as lch
 from ..em.io import read_lightcurve_file
-from ..em.validate_lightcurve import validate_lightcurve
-from ..eos import create_injection
+from ..em.lightcurve_handling import validate_lightcurve
+from ..joint import create_injection
+from ..joint.conversion import distance_modulus_nmma
 
 
 def lightcurveInjectionTest(model_name, model_lightcurve_function):
@@ -39,7 +40,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
     test_directory = os.path.join(dataDir, model_name)
     priorDir=os.path.join(workingDir, '../../priors/')
     svdmodels=os.path.join(workingDir, '../../svdmodels/')
-    
     if os.path.isdir(test_directory):
         shutil.rmtree(test_directory)
     os.makedirs(test_directory, exist_ok=True)
@@ -83,8 +83,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             generation_seed=42,
             grb_resolution=5,
             eos_file="example_files/eos/ALF2.dat",
-            binary_type="BNS",
-            eject=False,
+            eject=True,
             detections_file=None,
             indices_file=None,
             original_parameters=True,
@@ -150,14 +149,14 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             outfile_type="csv",
             xlim="0,14",
             ylim="22,16",
-            photometric_error_budget=0.0,
+            em_transient_error=0.0,
             increment_seeds=False,
         )
 
-        create_lightcurves.main(args)
+        lch.lcs_from_injection_parameters(args)
 
         command_line_lightcurve_file = os.path.join(
-            output_directory, f"{command_line_lightcurve_label}.dat"
+            output_directory, f"{command_line_lightcurve_label}_0.dat"
         )
         assert os.path.exists(
             command_line_lightcurve_file
@@ -210,7 +209,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         lightcurve_parameters = get_parameters_from_injection_file(injection_file)
         time_series = np.arange(0.01, 20.0 + 0.5, 0.5)
         lightcurve_model = model_lightcurve_function(
-            sample_times=time_series,
             model=model_name,
             filters=["sdssu"],
         )
@@ -218,15 +216,9 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             sample_times=time_series, parameters=lightcurve_parameters
         )[1]
         # need to adjust magnitudes to be absolute
-        absolute_magnitude_conversion = (
-            lambda magnitude, distance: magnitude + 5 * np.log10(distance * 1e6 / 10.0)
-        )
-        luminosity_distance = lightcurve_parameters["luminosity_distance"]
-        adjusted_lightcurve_from_function = {}
-        for key, magnitude in lightcurve_from_function.items():
-            adjusted_lightcurve_from_function[key] = absolute_magnitude_conversion(
-                magnitude, luminosity_distance
-            )
+        distance_modulus = distance_modulus_nmma(lightcurve_parameters["luminosity_distance"])
+        adjusted_lightcurve_from_function = {key: mag +distance_modulus 
+                        for key, mag in lightcurve_from_function.items()}
         adjusted_lightcurve_from_function["t"] = time_series
 
         return adjusted_lightcurve_from_function
@@ -272,7 +264,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         """
         shutil.rmtree(test_directory)
         assert not os.path.exists(test_directory), "test directory has not been deleted"
-
     injection_file = create_injection_from_command_line(model_name)
     command_line_lightcurve_dictionary = create_lightcurve_from_command_line(
         model_name, injection_file

@@ -174,10 +174,8 @@ def create_benchmark(
         raise ValueError("Need at least one valid filter.")
 
     # create the SVDlight curve model
-    sample_times = np.arange(tmin, tmax + dt, dt)
     light_curve_model = SVDLightCurveModel(
         model,
-        sample_times,
         svd_path=svd_path,
         mag_ncoeff=svd_ncoeff,
         interpolation_type=interpolation_type,

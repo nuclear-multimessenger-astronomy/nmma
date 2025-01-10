@@ -1,4 +1,3 @@
-import argparse
 import copy
 import glob
 import inspect
@@ -6,12 +5,13 @@ import os
 
 import numpy as np
 
-from ..utils.models import refresh_models_list
 from . import model_parameters
 from .model import SVDLightCurveModel
 from .training import SVDTrainingModel
-from .utils import interpolate_nans
+from .utils import interpolate_nans, setup_sample_times
 from .io import read_photometry_files, read_spectroscopy_files
+from .em_parsing import parsing_and_logging, svd_training_parser
+from .plotting_utils import lc_comparison_plot, basic_spec_plot, spec_subplot
 
 
 def axial_symmetry(training_data):
@@ -34,163 +34,10 @@ def axial_symmetry(training_data):
 
 def main():
 
-    parser = argparse.ArgumentParser(
-        description="Inference on kilonova ejecta parameters."
-    )
-    parser.add_argument(
-        "--model", type=str, required=True, help="Name of the SVD model to create"
-    )
-    parser.add_argument(
-        "--svd-path",
-        type=str,
-        help="Path to the SVD directory with {model}.joblib",
-    )
-    parser.add_argument(
-        "--data-path",
-        type=str,
-        help="Path to the directory of light curve files",
-    )
-    parser.add_argument(
-        "--data-file-type",
-        type=str,
-        help="Type of light curve files [bulla, standard, ztf, hdf5]",
-        default="bulla",
-    )
-    parser.add_argument(
-        "--interpolation-type",
-        type=str,
-        required=True,
-        help="Type of interpolation to perform",
-    )
-    parser.add_argument(
-        "--data-type",
-        type=str,
-        default="photometry",
-        help="Data type for interpolation [photometry or spectroscopy]",
-    )
-    parser.add_argument(
-        "--data-time-unit",
-        type=str,
-        default="days",
-        help="Time unit of input data (days, hours, minutes, or seconds)",
-    )
-    parser.add_argument(
-        "--tmin",
-        type=float,
-        default=0.0,
-        help="Days to be started analysing from the trigger time (default: 0)",
-    )
-    parser.add_argument(
-        "--tmax",
-        type=float,
-        default=14.0,
-        help="Days to be stoped analysing from the trigger time (default: 14)",
-    )
-    parser.add_argument(
-        "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
-    )
-    parser.add_argument(
-        "--lmin",
-        type=float,
-        default=0.0,
-        help="Minimum wavelength to analyze (default: 3000)",
-    )
-    parser.add_argument(
-        "--lmax",
-        type=float,
-        default=10000.0,
-        help="Maximum wavelength to analyze (default: 10000)",
-    )
-    parser.add_argument(
-        "--svd-ncoeff",
-        type=int,
-        default=10,
-        help="Number of eigenvalues to be taken for SVD evaluation (default: 10)",
-    )
-    parser.add_argument(
-        "--tensorflow-nepochs",
-        type=int,
-        default=15,
-        help="Number of epochs for tensorflow training (default: 15)",
-    )
-    parser.add_argument(
-        "--filters",
-        type=str,
-        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
-    )
-    parser.add_argument(
-        "--outdir", type=str, default="output", help="Path to the output directory"
-    )
-    parser.add_argument(
-        "--axial-symmetry",
-        action="store_true",
-        default=False,
-        help="add training samples based on the fact that there is axial symmetry",
-    )
-    parser.add_argument(
-        "--ncpus",
-        default=1,
-        type=int,
-        help="number of cpus to be used, only support for sklearn_gp",
-    )
-    parser.add_argument(
-        "--use-UnivariateSpline",
-        action="store_true",
-        default=False,
-        help="using UnivariateSpline to mitigate the numerical noise in the grid",
-    )
-    parser.add_argument(
-        "--UnivariateSpline-s",
-        default=2,
-        help="s-value to be used for UnivariateSpline",
-    )
-    parser.add_argument(
-        "--plot", action="store_true", default=False, help="enable plotting"
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="print out log likelihoods",
-    )
-    parser.add_argument(
-        "--ignore-bolometric",
-        action="store_true",
-        default=False,
-        help="ignore bolometric light curve files (ending in _Lbol.file_extension)",
-    )
-    parser.add_argument(
-        "--refresh-models-list",
-        type=bool,
-        default=False,
-        help="Refresh the list of models available on Gitlab",
-    )
-    parser.add_argument(
-        "--random-seed",
-        type=int,
-        default=42,
-        help="random seed to set during training",
-    )
-    parser.add_argument(
-        "--continue-training",
-        action="store_true",
-        default=False,
-        help="Continue training an existing model",
-    )
-    args = parser.parse_args()
-
-    refresh = False
-    try:
-        refresh = args.refresh_model_list
-    except AttributeError:
-        pass
-    if refresh:
-        refresh_models_list(
-            models_home=args.svd_path if args.svd_path not in [None, ""] else None
-        )
+    args = parsing_and_logging(svd_training_parser)
 
     # initialize light curve model
-    sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
+    sample_times = setup_sample_times(args)
 
     MODEL_FUNCTIONS = {
         k: v for k, v in model_parameters.__dict__.items() if inspect.isfunction(v)
@@ -248,7 +95,7 @@ def main():
         sample_times,
         filts,
         n_coeff=args.svd_ncoeff,
-        n_epochs=args.tensorflow_nepochs,
+        n_epochs=args.nepochs,
         svd_path=args.svd_path,
         interpolation_type=args.interpolation_type,
         data_type=args.data_type,
@@ -264,7 +111,6 @@ def main():
 
     light_curve_model = SVDLightCurveModel(
         args.model,
-        sample_times,
         svd_path=args.svd_path,
         mag_ncoeff=args.svd_ncoeff,
         interpolation_type=args.interpolation_type,
@@ -280,133 +126,40 @@ def main():
         parameters = training_model.model_parameters
         data = {param: training[param] for param in parameters}
         data["redshift"] = 0
-        if args.data_type == "photometry":
-            lbol, mag = light_curve_model.generate_lightcurve(sample_times, data)
-        elif args.data_type == "spectroscopy":
-            spec = light_curve_model.generate_spectra(
-                sample_times, training_model.filters, data
-            )
-
-        import matplotlib.pyplot as plt
-
         plotName = os.path.join(
             args.outdir, "injection_" + args.model + "_lightcurves.png"
         )
-
         if args.data_type == "photometry":
-
-            fig = plt.figure(figsize=(16, 18))
-            ncols = 1
-            nrows = int(np.ceil(len(filts) / ncols))
-            gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
-
-            for ii, filt in enumerate(filts):
-                loc_x, loc_y = np.divmod(ii, nrows)
-                loc_x, loc_y = int(loc_x), int(loc_y)
-                ax = fig.add_subplot(gs[loc_y, loc_x])
-
-                plt.plot(sample_times, training["data"][:, ii], "k--", label="grid")
-                plt.plot(sample_times, mag[filt], "b-", label="interpolated")
-
-                ax.set_xlim([0, 14])
-                if args.model == "CV":
-                    ax.set_ylim([28, 12])
-                else:
-                    ax.set_ylim([-12, -18])
-                ax.set_ylabel(filt, fontsize=30, rotation=0, labelpad=14)
-
-                if ii == 0:
-                    ax.legend(fontsize=16)
-
-                if ii == len(filts) - 1:
-                    ax.set_xticks([0, 2, 4, 6, 8, 10, 12, 14])
-                else:
-                    plt.setp(ax.get_xticklabels(), visible=False)
-
-                if args.data_type == "photometry":
-                    if args.model == "CV":
-                        ax.set_yticks([28, 25, 22, 19, 16])
-                    else:
-                        ax.set_yticks([-18, -16, -14, -12])
-
-                ax.tick_params(axis="x", labelsize=30)
-                ax.tick_params(axis="y", labelsize=30)
-                ax.grid(which="both", alpha=0.5)
-
-            fig.text(0.45, 0.05, "Time [days]", fontsize=30)
-            ylabel = "Absolute Magnitude"
-
-            fig.text(
-                0.01,
-                0.5,
-                ylabel,
-                va="center",
-                rotation="vertical",
-                fontsize=30,
-            )
+            lbol, mag = light_curve_model.generate_lightcurve(sample_times, data)
+            lc_comparison_plot(mag_dict=mag, training_data=training["data"], filters= filts, sample_times=sample_times, save_path=plotName, ylabel_kwargs=dict( fontsize=30, rotation=0, labelpad=14))
 
         elif args.data_type == "spectroscopy":
+            spec = light_curve_model.generate_spectra(
+                sample_times, training_model.filters, data)
+            
+            training_data =np.log10(training["data"])
+            interpolated_data = np.log10(np.array([spec[key] for key in filts]))
+            residual = interpolated_data - training_data
+            norm_residual = np.log10(np.abs(residual/training_data))
+            plot_entries = {"Original": training_data.T, 
+                             "Interpolated": interpolated_data,
+                            "(Original - Interpolated) / Interpolated": norm_residual.T}
+            def spec_plot_func(fig, ax, XX, YY, plot_data, label):
+                if label == "(Original - Interpolated) / Interpolated":
+                    vmin = -3
+                    vmax = 0
+                    cbar_label = "Relative Difference"
+                else:
+                    vmin = -10
+                    vmax = -2
+                    cbar_label = "log10(Flux)"
+                fig, ax = spec_subplot(fig, ax, XX, YY, plot_data, label, vmin=vmin, vmax=vmax, cbar_label=cbar_label)
+                return fig, ax
+            basic_spec_plot(
+                mesh_X=sample_times,
+                mesh_Y=filts,
+                spec_func = spec_plot_func,
+                plot_entries=plot_entries,
+                save_path=plotName,
+                figsize=(32, 14))
 
-            fig = plt.figure(figsize=(32, 14))
-            ncols = 3
-            nrows = 1
-            vmin = -10
-            vmax = -2
-            gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
-
-            XX, YY = np.meshgrid(sample_times, filts)
-            ZZ = np.log10(training["data"].T)
-
-            ax = fig.add_subplot(gs[0, 0])
-            plt.pcolor(XX, YY, ZZ, vmin=vmin, vmax=vmax)
-            ax.set_xlabel("Time [days]", fontsize=30)
-            ax.set_ylabel("Wavelength [AA]", fontsize=30)
-            ax.set_title("Original", fontsize=30)
-            ax.tick_params(axis="x", labelsize=30)
-            ax.tick_params(axis="y", labelsize=30)
-            ax.grid(which="both", alpha=0.5)
-            cbar = plt.colorbar()
-            cbar.set_label("log10(Flux)", fontsize=30)
-            cbar.ax.tick_params(labelsize=30)
-
-            spec_plot = np.array([spec[key] for key in filts]).T
-            ZZ = np.log10(spec_plot.T)
-
-            ax = fig.add_subplot(gs[0, 1])
-            plt.pcolor(XX, YY, ZZ, vmin=vmin, vmax=vmax)
-            ax.set_xlabel("Time [days]", fontsize=30)
-            ax.set_ylabel("Wavelength [AA]", fontsize=30)
-            ax.set_title("Interpolated", fontsize=30)
-            ax.tick_params(axis="x", labelsize=30)
-            ax.tick_params(axis="y", labelsize=30)
-            ax.grid(which="both", alpha=0.5)
-            cbar = plt.colorbar()
-            cbar.set_label("log10(Flux)", fontsize=30)
-            cbar.ax.tick_params(labelsize=30)
-
-            ZZ = np.log10(
-                np.abs(
-                    (
-                        (np.log10(spec_plot) - np.log10(training["data"]))
-                        / np.log10(training["data"])
-                    )
-                )
-            ).T
-
-            vmin = -3
-            vmax = 0
-            ax = fig.add_subplot(gs[0, 2])
-            plt.pcolor(XX, YY, ZZ, vmin=vmin, vmax=vmax)
-            ax.set_xlabel("Time [days]", fontsize=30)
-            ax.set_ylabel("Wavelength [AA]", fontsize=30)
-            ax.set_title("(Original - Interpolated) / Interpolated", fontsize=30)
-            ax.tick_params(axis="x", labelsize=30)
-            ax.tick_params(axis="y", labelsize=30)
-            ax.grid(which="both", alpha=0.5)
-            cbar = plt.colorbar()
-            cbar.set_label("Relative Difference", fontsize=30)
-            cbar.ax.tick_params(labelsize=30)
-
-        plt.tight_layout()
-        plt.savefig(plotName, bbox_inches="tight")
-        plt.close()

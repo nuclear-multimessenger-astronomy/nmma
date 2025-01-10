@@ -1,11 +1,116 @@
 import numpy as np
-from scipy.interpolate import CubicSpline, interp1d
+from scipy.interpolate import CubicSpline, UnivariateSpline, interp1d
 from scipy.integrate import solve_ivp, cumulative_trapezoid
 from scipy.optimize import minimize_scalar
 from .tov import TOVSolver
 import lal
+import json
+from bilby_pipe.utils import convert_string_to_dict, convert_string_to_list
 
 
+def read_constraint_from_args(args, constraint_kind):
+    ##preferred: Have the dict with the subconstraints already set up
+    prep_dict= getattr(args, constraint_kind, None) 
+    if prep_dict is not None:
+        return convert_string_to_dict(prep_dict)
+    
+    ###otherwise try to construct it:
+        ### read in provided attributes 
+    prel_dict= {key.removeprefix(constraint_kind+'_'): ##cut identifier
+                convert_string_to_list(getattr(args, key)) ## read in list or float
+                for key in dir(args)            ## search args for attrs 
+                if key.startswith(constraint_kind+'_')} ## related with kind
+    new_constraints = prel_dict.pop('name', None)
+    if new_constraints is not None: ## there needs to be a unique label
+        ext_dict={} 
+        ### iterate through constrs.
+        for i, name in enumerate(new_constraints): 
+            ext_dict[name] ={k:v[i] for k,v in prel_dict.items()} 
+        return ext_dict
+
+def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
+    if args.eos_constraint_dict:
+        try:
+            with open(args.eos_constraint_dict, 'r') as f:
+                constraint_dict = json.load(f) 
+        except:
+            constraint_dict = {}
+
+        for constraint_kind in constraint_kinds:
+            new_dict= read_constraint_from_args(args,constraint_kind)
+            if new_dict is None:
+                continue
+            try:
+                constraint_dict[constraint_kind].update(new_dict)
+            except KeyError:
+                constraint_dict[constraint_kind] = new_dict
+            except AttributeError:
+                constraint_dict[constraint_kind] = new_dict
+
+    with open(args.eos_constraint_dict, "w") as f:
+        json.dump(constraint_dict, f, indent=4)
+    return constraint_dict
+
+### Test routine for EOS generation, to be replaced
+def eos_from_nep (S0_val, L_val, nsat_val = 0.16, 
+	Esat_val = -16.0, Ksat_val = 220.0, Qsat_val = 0.0, Zsat_val = 0.0,
+	Ksym_val = -100.0, Qsym_val = 0.0, Zsym_val = 0.0,
+	crust_path="data/BPS_crust_eos.dat"):
+	
+	# Load crust EOS
+	# will load an array with n, p, eps
+	crust_EOS = np.loadtxt(crust_path)
+
+	# Define general parameters
+	m_neutron = 939.565 #in MeV
+	xval      = 0.02    #change this later!!!
+
+	# Define remaining empirical parameters
+	# Symmetric matter:
+	nsat = nsat_val
+	Esat = Esat_val
+	Ksat = Ksat_val
+	Qsat = Qsat_val
+	Zsat = Zsat_val
+
+	#Symmetry energy:
+	Ssym = S0_val
+	Lsym = L_val 
+	Ksym = Ksym_val
+	Qsym = Qsym_val
+	Zsym = Zsym_val
+
+	# Energy/Particle for symmetric nuclear matter
+	def EA_SNM (n):
+		xexp = (n-nsat)/(3.*nsat)
+		return(Esat + Ksat * xexp**2/2. + Qsat * xexp**3/6. + Zsat * xexp**4/24.)
+
+	# Symmetry energy
+	def EA_sym (n):
+		xexp = (n-nsat)/(3.*nsat)
+		return(Ssym + Lsym * xexp + Ksym * xexp**2/2. + Qsym * xexp**3/6. + Zsym * xexp**4/24.)
+
+	# Symmetry energy
+	def EA_beta (n, x):
+		return(EA_SNM (n) + EA_sym (n) * (1-2.*x))
+
+	# Generate outer-core EOS
+	# will make an array with n, p, eps
+	n_values       = np.arange(0.1, 1.6, 0.002)
+	EOS_array      = np.zeros((len(n_values), 3))
+	EOS_array[:,0] = n_values # n
+	EOS_array[:,2] = n_values*(m_neutron + EA_beta (n_values, xval)) # eps
+
+	# function E/A(n)
+	EA_beta_inter        = UnivariateSpline(n_values, EA_beta (n_values, xval), k=3)
+	EA_beta_inter_derive = EA_beta_inter.derivative()
+	EOS_array[:,1]       = n_values**2 * EA_beta_inter_derive(n_values)
+
+	return (np.concatenate((crust_EOS,EOS_array)))
+
+
+
+######### legacy routine that should no longer be applied
 class EOS_with_CSE(object):
     """
     Create and eos object with an array of (n, p, e) as the

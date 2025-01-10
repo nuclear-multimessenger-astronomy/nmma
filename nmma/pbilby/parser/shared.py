@@ -6,6 +6,7 @@ from numpy import inf
 
 logger = bilby.core.utils.logger
 
+
 from ... import __version__  # noqa: E402
 
 
@@ -29,186 +30,296 @@ class StoreBoolean(argparse.Action):
 
 def _create_base_nmma_parser(sampler="dynesty"):
     base_parser = argparse.ArgumentParser("base", add_help=False)
-    base_parser.add(
+    base_parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
     )
+
     if sampler in ["all", "dynesty"]:
         base_parser = _add_dynesty_settings_to_parser(base_parser)
     base_parser = _add_em_settings_to_parser(base_parser)
+    base_parser = _add_grb_settings_to_parser(base_parser)
+    base_parser = _add_injection_settings_to_parser(base_parser)
     base_parser = _add_eos_settings_to_parser(base_parser)
+    base_parser = _add_gw_settings_to_parser(base_parser)
+    base_parser = _add_tabulated_eos_settings_to_parser(base_parser)
     base_parser = _add_Hubble_settings_to_parser(base_parser)
     base_parser = _add_misc_settings_to_parser(base_parser)
     return base_parser
-
-
-def _create_base_nmma_gw_parser(sampler="dynesty"):
-    base_parser = argparse.ArgumentParser("base", add_help=False)
-    base_parser.add(
-        "--version",
-        action="version",
-        version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
-    )
-    if sampler in ["all", "dynesty"]:
-        base_parser = _add_dynesty_settings_to_parser(base_parser)
-    base_parser = _add_eos_settings_to_parser(base_parser)
-    base_parser = _add_Hubble_settings_to_parser(base_parser)
-    base_parser = _add_misc_settings_to_parser(base_parser)
-    return base_parser
-
 
 def _add_em_settings_to_parser(parser):
+    # general args
     em_input_parser = parser.add_argument_group(
         title="EM analysis input arguments", description="Specify EM analysis inputs"
+    )
+    em_input_parser.add(
+        "--with-em", action=StoreBoolean, default = False,
+        help="Flag for including general EM features in analysis",
     )
     em_input_parser.add(
         "--light-curve-data", type=str, help="Path to the observed light curve data"
     )
     em_input_parser.add(
-        "--with-grb",
-        action="store_true",
-        help="Flag for including GRB afterglow in analysis",
-    )
-    em_input_parser.add(
-        "--grb-jettype",
-        type=int,
-        default=0,
-        help="GRB jet type (default: 0 (Gaussian))",
-    )
-    em_input_parser.add(
-        "--grb-resolution",
-        type=float,
-        default=5,
-        help="The upper bound on the ratio between thetaWing and thetaCore (default: 5)",
-    )
-    em_input_parser.add(
-        "--kilonova-model", type=str, help="Name of the kilonova model to be used"
-    )
-    em_input_parser.add(
-        "--kilonova-model-svd", type=str, help="Path to the kilonova model's SVD data"
-    )
-    em_input_parser.add(
-        "--kilonova-interpolation-type",
-        type=str,
-        help="Interpolation method to be used for KN model (sklearn_gp or tensorflow)",
-    )
-    em_input_parser.add(
-        "--svd-mag-ncoeff",
-        type=int,
-        default=10,
-        help="Number of eigenvalues to be taken for mag evaluation (default: 10)",
-    )
-    em_input_parser.add(
-        "--svd-lbol-ncoeff",
-        type=int,
-        default=10,
-        help="Number of eigenvalues to be taken for lbol evaluation (default: 10)",
-    )
-    em_input_parser.add(
-        "--filters",
-        type=str,
-        default=None,
+        "--filters", type=str,  default=None,
         help="A comma seperated list of filters to use (e.g. g,r,i)."
-        "If none is provided, will use all the filters available",
-    )
+        "If none is provided, will use all the filters available", )
+    
+    ## emulator args
     em_input_parser.add(
-        "--with-grb-injection",
-        action="store_true",
-        help="Flag for including GRB afterglow in injection",
+        "--em-transient-interpolation-type","--kilonova-interpolation-type", type=str,
+        help="Interpolation method to be used for EM transient model (sklearn_gp or tensorflow)",
     )
+    em_input_parser.add( "--svd-path", "--kilonova-model-svd", type=str, 
+        help="Path to the lightcurve model's SVD data" )
+    em_input_parser.add("--svd-mag-ncoeff", type=int, default=10,
+        help="Number of eigenvalues to be taken for mag evaluation (default: 10)" )
+    em_input_parser.add( "--svd-lbol-ncoeff", type=int, default=10,
+        help="Number of eigenvalues to be taken for lbol evaluation (default: 10)", )
+    em_input_parser.add("--local-only","--local-model-only", action=StoreBoolean, help="use local svd models only")
+
+    ## lightcurve args
+    em_input_parser.add("--em-transient-class", type=str, default='svd',
+        help="Name of the kilonova model to be used" )
+    em_input_parser.add( "--em-transient-model", "--kilonova-model",
+        type=str, help="Name of the specfic model to be used" )
+    
     em_input_parser.add(
-        "--kilonova-injection-model",
+        "--em-transient-trigger-time","--kilonova-trigger-time",
+        type=float, help="Time for the EM-transient trigger (in MJD)")
+    em_input_parser.add( "--em-transient-tmin","--kilonova-tmin", 
+        type=float, default=0.0, help="Days to be started analysing from the trigger time (default: 0)", )
+    em_input_parser.add( "--em-transient-tmax","--kilonova-tmax",
+        type=float, default=14.0, help="Days to be stoped analysing from the trigger time (default: 14)", )
+    em_input_parser.add( "--em-transient-tstep", 
+        type=float, default=0.1, help="Time step (in days) for light curve initial evaluation (default: 0.1)", )
+    em_input_parser.add("--em-transient-error", "--kilonova-error", type=float, 
+        default=1.0, help="Additional statistical error (mag) to be introduced (default: 1)", )
+    return parser
+
+def _add_injection_settings_to_parser(parser):
+    # general args
+    injection_parser = parser.add_argument_group(
+        title="injection arguments", description="Specific kilonova analysis inputs")
+    injection_parser.add(
+        "em-injection-model", "--kilonova-injection-model",
         type=str,
         help="Name of the kilonova model to be used for injection",
     )
-    em_input_parser.add(
-        "--kilonova-injection-svd",
+    injection_parser.add(
+        "--injection-svd-path", "--kilonova-injection-svd",
         type=str,
         help="Path to the kilonova model's SVD data for injection",
     )
-    em_input_parser.add(
+    injection_parser.add(
         "--injection-svd-mag-ncoeff",
         type=int,
         default=10,
         help="Number of eigenvalues to be taken for mag evaluation (default: 10)",
     )
-    em_input_parser.add(
+    injection_parser.add(
         "--injection-svd-lbol-ncoeff",
         type=int,
         default=10,
         help="Number of eigenvalues to be taken for lbol evaluation (default: 10)",
     )
-    em_input_parser.add(
+    injection_parser.add(
         "--injection-detection-limit",
         type=float,
         default=28,
         help="Above which the injection light curve is expected to be not detectable (default: 28)",
     )
-    em_input_parser.add(
-        "--kilonova-trigger-time",
-        type=float,
-        help="Time for the kilonova trigger (in MJD)",
+
+    return parser
+    
+def _add_grb_settings_to_parser(parser):
+    grb_input_parser = parser.add_argument_group(
+        title="GRB analysis input arguments", description="Specify GRB analysis inputs"
     )
-    em_input_parser.add(
-        "--kilonova-tmin",
-        type=float,
-        default=0.0,
-        help="Days to be started analysing from the trigger time (default: 0)",
-    )
-    em_input_parser.add(
-        "--kilonova-tmax",
-        type=float,
-        default=14.0,
-        help="Days to be stoped analysing from the trigger time (default: 14)",
-    )
-    em_input_parser.add(
-        "--kilonova-tstep",
-        type=float,
-        default=0.1,
-        help="Time step (in days) for light curve initial evalution (default: 0.1)",
-    )
-    em_input_parser.add(
-        "--kilonova-error",
-        type=float,
-        default=1.0,
-        help="Additionaly statistical error (mag) to be introdouced (default: 1)",
-    )
-    em_input_parser.add(
-        "--local-model-only",
-        action="store_true",
-        help="use local svd models only",
+    grb_input_parser.add( "--jet-type", type=int, default=0,
+        help="GRB jet type (default: 0 (Gaussian))",)
+    grb_input_parser.add("--grb-resolution", type=float, default=5,
+        help="The upper bound on the ratio between thetaWing and thetaCore (default: 5)", )
+    grb_input_parser.add( "--with-grb-injection", action=StoreBoolean,
+        help="Flag for including GRB afterglow in injection",
     )
 
     return parser
 
+def _add_tabulated_eos_settings_to_parser(parser):
+    tab_eos_input_parser = parser.add_argument_group(
+        title="Tabulated EOS input arguments", description="Specify tabulated EOS inputs"
+    )
+
+    tab_eos_input_parser.add(
+        "--with-tabulated-eos",
+        action=StoreBoolean,
+        default=False,
+        help="Flag for sampling over tabulated EOS (default:False)",
+    )
+
+    tab_eos_input_parser.add(
+        "--eos-to-ram",
+        action=StoreBoolean,
+        default=False,
+        help="Depending on cluster architecture, it can be faster to load all EOS files directly to RAM"
+    )
+    tab_eos_input_parser.add(
+        "--eos-data", 
+        help="Path to the EOS directory"
+    )
+    tab_eos_input_parser.add(
+        "--Neos", type=int, 
+        help="Number of EOSs to be used"
+    )
+    tab_eos_input_parser.add(
+        "--eos-weight", help="Path to the precalculated EOS weighting",
+    )
+    return parser
 
 def _add_eos_settings_to_parser(parser):
+    
     eos_input_parser = parser.add_argument_group(
         title="EOS input arguments", description="Specify EOS inputs"
     )
-    eos_input_parser.add("--binary-type", type=str, help="The binary is BNS or NSBH")
+
     eos_input_parser.add(
         "--with-eos",
-        action="store_true",
+        action=StoreBoolean,
         default=False,
-        help="Flag for sampling over EOS (default:False)",
-    )
-    eos_input_parser.add(
-        "--eos-data", type=str, required=False, help="Path to the EOS directory"
-    )
-    eos_input_parser.add(
-        "--Neos", type=int, required=False, help="Number of EOSs to be used"
-    )
-    eos_input_parser.add(
-        "--eos-weight",
-        type=str,
-        required=False,
-        help="Path to the precalculated EOS weighting",
+        help="Flag for sampling over nuclear empirical parameters from which we generate an EOS (default:False)"
     )
 
+    eos_input_parser.add(
+        "--eos-crust-file", help="Path to data file for eos crust, to be used if --eos-from-neps is set to True"
+    )
+
+    eos_input_parser.add('--tov-emulator', type=str, help='Path to the TOV emulator')
+
+    eos_input_parser.add('--emulator-backend', type=str, default= 'tensorflow',
+         help='The backend to use for the TOV emulator. Should be one of "tensorflow", "jax", or "pytorch"')
+
+    eos_input_parser.add('--micro-eos-model', type=str, default= 'nep-5',      
+        help='The micro EOS model to use. ') ## FIXME: add model_selection
+    
+        ### args to set up eos likelihood evaluation based on constraints
+    eos_input_parser.add(
+        "--eos-constraint-dict", 
+        help="path to .json-file from which eos-constraints are read and/or to which they should be stored. Can be appended with additional constraints."
+    )
+
+    ### setup LowerMTOVConstraint
+    eos_input_parser.add(
+        "--lower-mtov",
+        type=bilby_pipe.utils.nonestr,
+        help= "dict with additional lower mtov limits to consider, using style: {'name':{'mass':mass_val,'error':gaussian_error_val [, 'arxiv':'arxiv_id']},...}"
+    )
+    eos_input_parser.add(
+        "--lower-mtov-name",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of identifiers for further lower-mtov-values to consider"
+    )
+    eos_input_parser.add(
+        "--lower-mtov-mass",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of additional lower mtov limits to consider"
+    )
+    eos_input_parser.add(
+        "--lower-mtov-error",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of additional mtov limit errors to consider"
+    )
+    eos_input_parser.add(
+        "--lower-mtov-arxiv",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of arxiv-ids for additional lower mtov limits to consider"
+    )
+    
+    ### setup UpperMTOVConstraint
+    eos_input_parser.add(
+        "--upper-mtov",
+        type=bilby_pipe.utils.nonestr,
+        help= "dict with additional upper mtov limits to consider, using style: {'name':{'mass':mass_val,'error':gaussian_error_val [, 'arxiv':'arxiv_id']},...}"
+    )
+    eos_input_parser.add(
+        "--upper-mtov-name",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of identifiers for further upper-mtov-values to consider"
+    )
+    eos_input_parser.add(
+        "--upper-mtov-mass",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of additional upper mtov limits to consider"
+    )
+    eos_input_parser.add(
+        "--upper-mtov-error",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of additional mtov limit errors to consider"
+    )
+    eos_input_parser.add(
+        "--upper-mtov-arxiv",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of arxiv-ids for additional upper mtov limits to consider"
+    )
+
+    ### setup MassRadiusConstraint
+    eos_input_parser.add(
+        "--mass-radius",
+        type=bilby_pipe.utils.nonestr,
+        help= "dict with additional mass-radius constraints to consider, using style: {'name':{'file_path':path_to_R_M_posterior,[, 'arxiv':'arxiv_id']},...}"
+    )
+    eos_input_parser.add(
+        "--mass-radius-name",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of identifiers for further mass-radius-posteriors to consider"
+    )
+    eos_input_parser.add(
+        "--MR-posterior-file-path",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of files with additional radius-mass posteriors to consider"
+    )
+    eos_input_parser.add(
+        "--mass-radius-arxiv",
+        type=bilby_pipe.utils.nonestr,
+        action = 'append',
+        help= "list of arxiv-ids for additional R-M posteriors to consider"
+    )
+    
     return parser
 
+def _add_gw_settings_to_parser(parser):
+    gw_input_parser = parser.add_argument_group(
+        title="GW input arguments", description="Specify GW inputs"
+    )
+    gw_input_parser.add(
+        "--with-gw",
+        action=StoreBoolean,
+        default=False,
+        help="Flag for sampling over GW parameters (default:True)",
+    )
+
+    ## Multibanding kwargs
+    gw_input_parser.add("--reference-chirp-mass", type=float, 
+        help="The reference chirp mass for multibanding gw likelihood.")
+
+    ## Relative Binning kwargs
+    gw_input_parser.add("--fiducial-parameters", 
+        type=bilby_pipe.utils.nonestr, default=None, help="A dict of fiducial parameters, to be read by the GW-likelihood")
+    gw_input_parser.add("--update-fiducial-parameters", 
+        type=StoreBoolean, default=False, help="Flag to update the fiducial parameters from maximum likelihood")
+    gw_input_parser.add("--epsilon", type=float, 
+        help ="Tunable parameter which limits the differential phase change in each bin when setting up the bin range. See https://arxiv.org/abs/1806.08792")
+    return parser
 
 def _add_Hubble_settings_to_parser(parser):
     H0_input_parser = parser.add_argument_group(
@@ -216,7 +327,7 @@ def _add_Hubble_settings_to_parser(parser):
     )
     H0_input_parser.add(
         "--with-Hubble",
-        action="store_true",
+        action=StoreBoolean,
         default=False,
         help="Flag for sampling over Hubble constants (default:False)",
     )
@@ -225,7 +336,6 @@ def _add_Hubble_settings_to_parser(parser):
     )
 
     return parser
-
 
 def _add_dynesty_settings_to_parser(parser):
     dynesty_group = parser.add_argument_group(title="Dynesty Settings")
@@ -339,7 +449,7 @@ def _add_dynesty_settings_to_parser(parser):
     dynesty_group.add_argument(
         "--nestcheck",
         default=False,
-        action="store_true",
+        action=StoreBoolean,
         help=(
             "Save a 'nestcheck' pickle in the outdir (default=False). "
             "This pickle stores a `nestcheck.data_processing.process_dynesty_run` "
@@ -401,7 +511,7 @@ def _add_slurm_settings_to_parser(parser):
 def _add_misc_settings_to_parser(parser):
     misc_group = parser.add_argument_group(title="Misc. Settings")
     misc_group.add_argument(
-        "--bilby-zero-likelihood-mode", default=False, action="store_true"
+        "--bilby-zero-likelihood-mode", default=False, action=StoreBoolean
     )
     misc_group.add_argument(
         "--sampling-seed",
@@ -410,17 +520,17 @@ def _add_misc_settings_to_parser(parser):
         help="Random seed for sampling, parallel runs will be incremented",
     )
     misc_group.add_argument(
-        "-c", "--clean", action="store_true", help="Run clean: ignore any resume files"
+        "-c", "--clean", action=StoreBoolean, help="Run clean: ignore any resume files"
     )
     misc_group.add_argument(
         "--no-plot",
-        action="store_true",
+        action=StoreBoolean,
         help="If true, don't generate check-point plots",
     )
     misc_group.add_argument(
         "--do-not-save-bounds-in-resume",
         default=True,
-        action="store_true",
+        action=StoreBoolean,
         help=(
             "If true, do not store bounds in the resume file. This can make "
             "resume files large (~GB)"
@@ -434,7 +544,7 @@ def _add_misc_settings_to_parser(parser):
     )
     misc_group.add_argument(
         "--rotate-checkpoints",
-        action="store_true",
+        action=StoreBoolean,
         help="If true, backup checkpoint before overwriting (ending in '.bk').",
     )
     return parser
