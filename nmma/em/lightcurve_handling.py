@@ -187,10 +187,12 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
             )
 
         else:
-
+            supernova_kwargs = dict(
+                model = args.model
+            )
             light_curve_model = SupernovaGRBLightCurveModel(
+                supernova_kwargs = supernova_kwargs,
                 grb_resolution=args.grb_resolution,
-                SNmodel=args.model,
                 jet_type=args.jet_type,
             )
 

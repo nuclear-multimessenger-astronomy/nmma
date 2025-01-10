@@ -17,6 +17,12 @@ from bilby.gw.conversion import (
 from ..eos.eos_processing import setup_eos_generator
 
 ########################## distance conversions ####################################
+def distance_modulus_nmma(d_lum = 1e-5):
+        # mag_app = mag_abs + 5* log10(dist/10pc) | NMMA-dist is in Mpc
+        #         = mag_abs + 5 * (log10(Mpc/10pc)+ log10(params["luminosity_distance"]))  
+        # therefore: distance_modulus = mag_app - mag_abs =
+        return  5.0 * (5+ np.log10(d_lum))
+
 def luminosity_distance_to_redshift(distance, cosmology = default_cosmology):
 
     if isinstance(distance, pd.Series):
@@ -29,7 +35,7 @@ def luminosity_distance_to_redshift(distance, cosmology = default_cosmology):
         distance_grid = cosmology.luminosity_distance(zgrid).value
         return np.interp(distance, distance_grid, zgrid).value
     else:
-        return cosmo.z_at_value(cosmology.luminosity_distance, distance *units.Mpc)
+        return cosmo.z_at_value(cosmology.luminosity_distance, distance *units.Mpc).value
         
 def get_redshift(parameters):
     if "redshift" in parameters:
@@ -43,11 +49,12 @@ def get_redshift(parameters):
 def Hubble_constant_to_distance(parameters, added_keys, cosmology= default_cosmology):
     # Hubble constant is supposed to be km/s/Mpc
     alt_cosmo = cosmology.clone(H0= parameters["Hubble_constant"] )
-    if "redshift" in parameters.keys():
-        ### get distance in Mpc
+    try:
+        ### get distance in Mpc, assuming redshift is available
         parameters["luminosity_distance"] = alt_cosmo.luminosity_distance(parameters["redshift"])
         added_keys = added_keys + ["luminosity_distance"]
-    elif "luminosity_distance" in parameters.keys():
+    except KeyError:
+        # if redshift is not available as a Key, "luminosity_distance" should be
         parameters["redshift"] = luminosity_distance_to_redshift(
                                 parameters["luminosity_distance"], cosmology=alt_cosmo)
         added_keys = added_keys + ["redshift"]
@@ -154,45 +161,48 @@ def radii_from_qur(converted_parameters, added_keys):
     return converted_parameters, added_keys
 
 def macro_props_from_eos(eos_data, converted_parameters, added_keys):
-    ### assuming TOV mass and radius are the last entries of the respective arrays
-    TOV_radius_list = []
-    TOV_mass_list = []
-    lambda_1_list = []
-    lambda_2_list = []
-    radius_1_list = []
-    radius_2_list = []
-    R_14_list = []
-    R_16_list = []
+    eos_keys = ["TOV_radius", "TOV_mass", "lambda_1", "lambda_2",
+                "radius_1", "radius_2", "R_14", "R_16"]
+    added_keys += eos_keys
+    
     m1_source = np.atleast_1d(converted_parameters["mass_1_source"])
     m2_source = np.atleast_1d(converted_parameters["mass_2_source"])
-    for i, eos_vals in enumerate(eos_data):
-        (TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1,
-            radius_2, R_14, R_16
-        ) = EOS2Parameters(*eos_vals, m1_source[i],  m2_source[i] )
-            
-        TOV_radius_list.append(TOV_radius)
-        TOV_mass_list.append(TOV_mass)
-        lambda_1_list.append(lambda_1)
-        lambda_2_list.append(lambda_2)
-        radius_1_list.append(radius_1)
-        radius_2_list.append(radius_2)
-        R_14_list.append(R_14)
-        R_16_list.append(R_16)
-    
-    keys_lists = zip([
-        "TOV_radius", "TOV_mass", "lambda_1", "lambda_2",
-        "radius_1", "radius_2", "R_14", "R_16"],
-        [TOV_radius_list, TOV_mass_list, lambda_1_list,
-         lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list])
-    if len(TOV_radius_list) == 1:
-        for key, _list in keys_lists:
-            converted_parameters[key] = float(_list[0])
+    if len(eos_data)==1:
+        for key, val_array in zip(eos_keys, 
+        EOS2Parameters(*eos_data[0],m1_source, m2_source)
+        ):
+            converted_parameters[key] = val_array
     else:
-        for key, _list in keys_lists:
+        ### assuming TOV mass and radius are the last entries of the respective arrays
+        TOV_mass_list = []
+        TOV_radius_list = []
+        lambda_1_list = []
+        lambda_2_list = []
+        radius_1_list = []
+        radius_2_list = []
+        R_14_list = []
+        R_16_list = []
+        for i, eos_vals in enumerate(eos_data):
+            
+            (TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1,
+                radius_2, R_14, R_16
+            ) = EOS2Parameters(*eos_vals, m1_source[i],  m2_source[i] )
+                
+            TOV_radius_list.append(TOV_radius)
+            TOV_mass_list.append(TOV_mass)
+            lambda_1_list.append(lambda_1)
+            lambda_2_list.append(lambda_2)
+            radius_1_list.append(radius_1)
+            radius_2_list.append(radius_2)
+            R_14_list.append(R_14)
+            R_16_list.append(R_16)
+    
+        for key, _list in zip(eos_keys, [
+            TOV_radius_list, TOV_mass_list, lambda_1_list,
+            lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list
+        ]):
             converted_parameters[key] = np.array(_list)
 
-    added_keys +=["lambda_1", "lambda_2", "TOV_mass", "TOV_radius",
-                "radius_1", "radius_2", "R_14", "R_16"]
     return converted_parameters, added_keys
 
 
@@ -203,13 +213,24 @@ def EOS2Parameters(radius_val, mass_val, Lambda_val, m1_source, m2_source
     TOV_radius = radius_val[np.argmax(mass_val)]
 
     (lambda_1, lambda_2) = np.interp(x=[m1_source, m2_source],
-                                   xp= mass_val, fp=Lambda_val, left=0, right=0)
-    (radius_1, radius_2, 
-     R_14, R_16) = np.interp(
-                            x=[m1_source, m2_source, 1.4, 1.6],
-                            xp=mass_val, fp= radius_val, left =0, right=0)
+            xp= mass_val, fp=Lambda_val, left=0, right=0)
+    try:
+        (radius_1, radius_2, R_14, R_16) = np.interp(
+                x=[m1_source, m2_source, 1.4, 1.6],
+                xp=mass_val, fp= radius_val, left =0, right=0)
 
-    return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
+        return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
+    ## radius interpolation will raise an error if dealing with multiple sources at once
+    # In that case we return all values as corresponding arrays
+    except ValueError:
+        (radius_1, radius_2) = np.interp(
+                x=[m1_source, m2_source],
+                xp=mass_val, fp= radius_val, left =0, right=0)
+        (R_14, R_16) = np.interp(x=[1.4, 1.6],
+                xp=mass_val, fp= radius_val, left =0, right=0)
+        ref = np.ones_like(radius_1)
+
+        return ref*TOV_mass, ref*TOV_radius, lambda_1, lambda_2, radius_1, radius_2, ref*R_14, ref*R_16
 
 
 class BBHEjectaFitting(object):
@@ -558,8 +579,12 @@ class MultimessengerConversion(object):
         
 
     def eos_direct_load(self, converted_parameters, added_keys):
-        EOSID = np.array(converted_parameters["EOS"]).astype(int)
-        eos_data =np.array([np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID])
+        try:
+            EOSID = np.array(converted_parameters["EOS"]).astype(int)
+            eos_data =np.array([np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID])
+        except:
+            #In case we only use one eos, e.g. for injection
+            eos_data = np.array([np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T])
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
 
     def eos_from_ram(self, converted_parameters, added_keys):
@@ -607,13 +632,8 @@ class MultimessengerConversion(object):
             )
 
             theta_jn = converted_parameters["theta_jn"]
-            converted_parameters["KNtheta"] = (
-                180 / np.pi * np.minimum(theta_jn, np.pi - theta_jn)
-            )
-            converted_parameters["inclination_EM"] = (
-                converted_parameters["KNtheta"] * np.pi / 180.0
-            )
-
+            converted_parameters["inclination_EM"] = np.minimum(theta_jn, np.pi - theta_jn)
+            converted_parameters["KNtheta"] = 180.0 / np.pi * converted_parameters["inclination_EM"]
             added_keys = added_keys + ["KNtheta", "inclination_EM"]
     
         added_keys = [
@@ -640,7 +660,7 @@ class MultimessengerConversion(object):
                         ### then do NSBH ejecta
                          self.NSBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
                          ### otherwise assume BBH (i.e., no ejecta)
-                         self.BBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
+                          self.BBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
                         )
                 )
     

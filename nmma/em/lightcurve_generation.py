@@ -386,12 +386,11 @@ def metzger_lc(t_day, param_dict, nu_obs, filters):
     z = param_dict["redshift"]
 
     # convert time from day to second
-    t = t_day * seconds_a_day
+    t = t_day * seconds_a_day / (1 + z)
     nu_host = nu_obs * (1 + z)
-    t /= 1 + z
     tprec = len(t)
 
-    if len(np.where(t == 0)[0]) > 0:
+    if np.any(t == 0):
         raise ValueError("For Me2017, start later than t=0")
 
     # define additional parameters
@@ -399,14 +398,9 @@ def metzger_lc(t_day, param_dict, nu_obs, filters):
     Mn = 1e-8 * msun_cgs  # mass cut for free neutrons
     Ye = 0.1  # electron fraction
     Xn0max = 1 - 2 * Ye  # initial neutron mass fraction in outermost layers
-
-    # define mass / velocity array of the outer ejecta, comprised half of the mass
-    mmin = np.log(1e-8)
-    mmax = np.log(M0 / msun_cgs)
     mprec = 300
-    m = np.arange(mprec) * (mmax - mmin) / (mprec - 1) + mmin
-    m = np.exp(m)
-
+    # define mass / velocity array of the outer ejecta, comprised half of the mass
+    m = np.geomspace(1e-8, M0 / msun_cgs, mprec)
     vm = v0 * np.power(m * msun_cgs / M0, -1.0 / beta)
     vm[vm > c_cgs] = c_cgs
 
@@ -425,22 +419,11 @@ def metzger_lc(t_day, param_dict, nu_obs, filters):
     Xr = 1.0 - Xn0  # r-process fraction
 
     # define arrays in mass layer and time
-    Xn = np.zeros((mprec, tprec))
-    edotn = np.zeros((mprec, tprec))
-    edotr = np.zeros((mprec, tprec))
-    edot = np.zeros((mprec, tprec))
-    kappa = np.zeros((mprec, tprec))
-    kappan = np.zeros((mprec, tprec))
-    kappar = np.zeros((mprec, tprec))
-
-    # define specific heating rates and opacity of each mass layer
-    t0 = 1.3
-    sig = 0.11
-
     tarray = np.tile(t, (mprec, 1))
     Xn0array = np.tile(Xn0, (tprec, 1)).T
     Xrarray = np.tile(Xr, (tprec, 1)).T
     etharray = np.tile(eth, (mprec, 1))
+
     Xn = Xn0array * np.exp(-tarray / 900.0)
     edotn = 3.2e14 * Xn
     edotr = 2.1e10 * etharray * ((tarray / seconds_a_day) ** (-1.3))
@@ -448,6 +431,10 @@ def metzger_lc(t_day, param_dict, nu_obs, filters):
     kappan = 0.4 * (1.0 - Xn - Xrarray)
     kappar = kappa_r * Xrarray
     kappa = kappan + kappar
+
+    # define specific heating rates and opacity of each mass layer
+    t0 = 1.3
+    sig = 0.11
 
     # define total r-process heating of inner layer
     Lr = M0 * 4e18 * (0.5 - (1.0 / np.pi) * np.arctan((t - t0) / sig)) ** (1.3) * eth

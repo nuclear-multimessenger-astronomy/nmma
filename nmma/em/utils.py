@@ -21,6 +21,7 @@ warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
 
 import astropy.units
+from nmma.joint.conversion import distance_modulus_nmma
 ### some frequently used constants:
 from nmma.joint.constants import c_cgs, c_SI, eV_per_h_SI
 
@@ -57,18 +58,20 @@ DEFAULT_FILTERS = [
     "ultrasat",
 ]
 
-def setup_sample_times(args):
-    n_step = int((args.tmax - args.tmin) / args.dt) +1
+def setup_sample_times(args, timeshift=0.):
+    tmin = args.tmin + timeshift
+    tmax = args.tmax + timeshift
+    n_step = int((tmax - tmin) / args.dt) +1
     if getattr(args, 'log_space_time', False):
-        return np.geomspace(args.tmin, args.tmax, n_step)
+        return np.geomspace(tmin, tmax, n_step)
     else:
-        return np.linspace(args.tmin, args.tmax, n_step)
+        return np.linspace(tmin, tmax, n_step)
 
 def transform_to_app_mag_dict(mag_dict, params):
-    if params["luminosity_distance"] > 0:
-        for k in mag_dict.keys():
-            mag_dict[k] += 5.0 * np.log10(
-            params["luminosity_distance"] * 1e6 / 10.0)
+    d_lum = params.get("luminosity_distance", 1e-5) ## assume 10 pc =1e-5 Mpc for abs_mag
+    distance_modulus = distance_modulus_nmma(d_lum)
+    for k in mag_dict.keys():
+        mag_dict[k] += distance_modulus
     return mag_dict
 
 
@@ -220,25 +223,15 @@ def getFilteredMag(mag, filt):
         raise ValueError(f"Unknown filter: {filt}")
 
 
-def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
-    processedData = copy.deepcopy(raw_data)
-    for filt in filters:
-        if filt not in processedData:
-            continue
-        time = processedData[filt][:, 0]
-        mag = processedData[filt][:, 1]
-        dmag = processedData[filt][:, 2]
-        # shift the time by the triggerTime
-        time -= triggerTime
-
-        # filter the out of range data
-        idx = np.where((time > tmin) * (time < tmax))[0]
-
-        data = np.vstack((time[idx], mag[idx], dmag[idx])).T
-        processedData[filt] = data
+def process_data(raw_data, trigger_time, tmin, tmax):
+    unprocessed_data = copy.deepcopy(raw_data)
+    processedData = {}
+    for filt, data in unprocessed_data.items():
+        time, mag, dmag = data[:, 0] - trigger_time, data[:, 1], data[:, 2]
+        idx = (time > tmin) & (time < tmax)
+        processedData[filt] = np.vstack((time[idx], mag[idx], dmag[idx])).T
 
     return processedData
-
 
 def interpolate_nans(data_dict: dict) -> dict:
     """
@@ -296,7 +289,7 @@ def autocomplete_data(interp_points, ref_points, ref_data, extrapolate='linear',
 
         if extrapolate=='linear':
             interp_data = np.interp(interp_points, fin_ref, fin_data)
-            x0, x1, xm, xn = fin_ref[[0,1,-2,-1]]
+            x0, x1, xm, xn = fin_ref[ [0,1,-2,-1]]
             y0, y1, ym, yn = fin_data[[0,1,-2,-1]]
             lower_extrap_args= np.argwhere(interp_points<x0)
             interp_data[lower_extrap_args] = y0 + (y1-y0)/(x1-x0)*(interp_points[lower_extrap_args]-x0)
@@ -417,6 +410,7 @@ def flux_to_ABmag(flux, unit='cgs', residual_mag = None):
         residual_magnitude = 8.9
     elif unit == 'mJy':
         residual_magnitude = 16.4
+    ## explicit value takes preference over default units
     if residual_mag:
         residual_magnitude = residual_mag
 

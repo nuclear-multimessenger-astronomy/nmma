@@ -11,7 +11,7 @@ from . import lightcurve_generation as lc_gen
 
 from nmma.joint.base import initialisation_args_from_signature_and_namespace
 from nmma.joint.constants import default_cosmology
-from nmma.joint.conversion import observation_angle_conversion, get_redshift, Hubble_constant_to_distance
+from nmma.joint.conversion import observation_angle_conversion, get_redshift, Hubble_constant_to_distance, distance_modulus_nmma
 from nmma.utils.models import get_models_home, get_model
 
 ln10 = np.log(10)
@@ -690,13 +690,14 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         if self.model == "synchrotron_powerlaw":
             # remove the distance modulus for the synchrotron powerlaw
             # as the reference flux is defined at the observer
-            dist_mod = 5.0 * np.log10(param_dict["luminosity_distance"] * 1e6 / 10)
+            dist_mod = distance_modulus_nmma(param_dict["luminosity_distance"])
             for filt in mag.keys():
                 mag[filt] -= dist_mod
         mag = self.apply_extinction_correction(mag, ext_mags, filts)
 
         return lbol, mag
-    
+
+
 class CombinedLightCurveModelContainer(object):
     """
     An object to evaluate the combined light curve from a set of parameters
@@ -824,8 +825,8 @@ class KilonovaGRBLightCurveModel(CombinedLightCurveModelContainer):
 class SupernovaGRBLightCurveModel(CombinedLightCurveModelContainer):
     def __init__(
         self,
+        supernova_kwargs,
         parameter_conversion=None,
-        SNmodel="nugent-hyper",
         grb_resolution=12,
         jet_type=0,
     ):
@@ -834,10 +835,9 @@ class SupernovaGRBLightCurveModel(CombinedLightCurveModelContainer):
             resolution=grb_resolution,
             jet_type=jet_type,
         )
-        sn_model = SupernovaLightCurveModel( parameter_conversion, model=SNmodel
+        sn_model = SupernovaLightCurveModel( parameter_conversion = parameter_conversion, **supernova_kwargs
         )
         super().__init__([grb_model, sn_model])
-
 
 class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
     def __init__(self, parameter_conversion=None, filters=None):
@@ -883,13 +883,14 @@ def get_lc_model_from_modelname(model_name):
         # FIXME This is an unclean default, should be more explicit!
         return SVDLightCurveModel
 
-def single_model_from_args(model_class, model_name, args, filters):
-    if getattr(args, 'sample_over_Hubble', False) or getattr(args, 'with_Hubble', False):
-        parameter_conversion = Hubble_constant_to_distance
+def single_model_from_args(model_class, model_name, args, 
+                           filters, prefixes = ['grb_', 'em_transient_']):
+    if getattr(args, 'sample_over_Hubble', False):
+        parameter_conversion = Hubble_constant_to_distance 
     else:
         parameter_conversion = None
     default_model_args = initialisation_args_from_signature_and_namespace(
-        model_class, args, prefixes= ['grb_', 'em_transient_']
+        model_class, args, prefixes= prefixes
     )
     model_args = default_model_args | dict(
         model = model_name,  filters =filters,
@@ -914,9 +915,11 @@ def create_light_curve_model_from_args(
         model_names = args.em_injection_model.split(",")
         if len(model_names)==1:
             #NOTE default to GRB if only one model_name is given
-            model_names.append('TrPi2018')
-        models_list = models_list_from_names(model_names, args, filters)
-        return em_transient(models_list)
+            prim_model = get_lc_model_from_modelname(args.em_transient_model)
+            models_list = [single_model_from_args(prim_model, args.em_transient_model, args, filters), single_model_from_args(GRBLightCurveModel,'TrPi2018', args, filters, prefixes=["grb_"] ) ]
+        else:
+            models_list = models_list_from_names(model_names, args, filters)
+        return CombinedLightCurveModelContainer(models_list)
         
 
     # case 3: we have the model_names and need to find the classes first
@@ -939,7 +942,6 @@ def create_injection_model(args):
         mag_ncoeff = getattr(args, 'injection_svd_mag_ncoeff', args.svd_mag_ncoeff),   
         lbol_ncoeff = getattr(args, 'injection_svd_lbol_ncoeff', args.svd_lbol_ncoeff),
     )
-    #create light_curve_model
     if args.with_grb_injection:
         return KilonovaGRBLightCurveModel(
             kilonova_kwargs=kilonova_kwargs,

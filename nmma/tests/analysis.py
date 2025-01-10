@@ -93,7 +93,6 @@ def args():
 
 
 def test_analysis_systematics_with_time(args):
-
     args.systematics_file = f"{DATA_DIR}/systematics_with_time.yaml"
     analysis.main(args)
 

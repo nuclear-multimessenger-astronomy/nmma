@@ -4,7 +4,7 @@ import pandas as pd
 
 import numpy as np
 
-import lalsimulation as lalsim
+from  lalsimulation import SimInspiralTransformPrecessingWvf2PE as lalsim_conversion
 from gwpy.table import Table
 
 try:
@@ -12,16 +12,9 @@ try:
 except ImportError:
     raise ImportError("You do not have ligo.lw installed: $ pip install python-ligo-lw")
 
-from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
-
 from bilby_pipe.create_injections import InjectionCreator
 
-from .conversion import (
-    source_frame_masses,
-    EOS2Parameters,
-    NSBHEjectaFitting,
-    BNSEjectaFitting,
-)
+from .conversion import  MultimessengerConversion
 
 
 def file_to_dataframe(
@@ -53,87 +46,31 @@ def file_to_dataframe(
         "phi_jl": [],
     }
     for row in table:
+        coa_phase = row.get("coa_phase", 0)
+        if aligned_spin:
+            spin_args = [0.0, 0.0, row["spin1z"], 0.0, 0.0, row["spin2z"]]  
+        else:
+            spin_args = [row["spin1x"], row["spin1y"], row["spin1z"], row["spin2x"], row["spin2y"], row["spin2z"]]
+        precession_args = [row["inclination"], *spin_args,
+            row["mass1"], row["mass2"], reference_frequency, coa_phase]
+        conversion_args = [float(arg) for arg in precession_args]
+        conversion_keys = ["theta_jn","phi_jl", "tilt_1" ,"tilt_2", "phi_12", "a_1","a_2"]
+        
+        for key, val in zip(conversion_keys, lalsim_conversion(*conversion_args) ):
+            injection_values[key].append(val)
+ 
         injection_values["simulation_id"].append(int(row["simulation_id"]))
-        injection_values["mass_1"].append(max(float(row["mass1"]), float(row["mass2"])))
-        injection_values["mass_2"].append(min(float(row["mass1"]), float(row["mass2"])))
         injection_values["luminosity_distance"].append(float(row["distance"]))
-
-        if "polarization" in row.colnames:
-            injection_values["psi"].append(float(row["polarization"]))
-        else:
-            injection_values["psi"].append(0.0)
-
-        if "coa_phase" in row.colnames:
-            coa_phase = float(row["coa_phase"])
-            injection_values["phase"].append(float(row["coa_phase"]))
-        else:
-            coa_phase = 0.0
-            injection_values["phase"].append(0.0)
-
-        if "geocent_end_time" in row.colnames:
-            if "geocent_end_time_ns" in row.colnames:
-                injection_values["geocent_time"].append(float(row["geocent_end_time"]) + float(row["geocent_end_time_ns"]) * (10 ** -9))
-            else:
-                injection_values["geocent_time"].append(float(row["geocent_end_time"]))
-        else:
-            injection_values["geocent_time"].append(trigger_time)
-
+        injection_values["psi"].append(float(row.get("polarization", 0)))
         injection_values["ra"].append(float(row["longitude"]))
         injection_values["dec"].append(float(row["latitude"]))
 
-        if aligned_spin:
-
-            args_list = [
-                float(arg)
-                for arg in [
-                    row["inclination"],
-                    0.0,
-                    0.0,
-                    row["spin1z"],
-                    0.0,
-                    0.0,
-                    row["spin2z"],
-                    row["mass1"],
-                    row["mass2"],
-                    reference_frequency,
-                    coa_phase,
-                ]
-            ]
-
-        else:
-
-            args_list = [
-                float(arg)
-                for arg in [
-                    row["inclination"],
-                    row["spin1x"],
-                    row["spin1y"],
-                    row["spin1z"],
-                    row["spin2x"],
-                    row["spin2y"],
-                    row["spin2z"],
-                    row["mass1"],
-                    row["mass2"],
-                    reference_frequency,
-                    row["coa_phase"],
-                ]
-            ]
-        (
-            theta_jn,
-            phi_jl,
-            tilt_1,
-            tilt_2,
-            phi_12,
-            a_1,
-            a_2,
-        ) = lalsim.SimInspiralTransformPrecessingWvf2PE(*args_list)
-        injection_values["theta_jn"].append(theta_jn)
-        injection_values["phi_jl"].append(phi_jl)
-        injection_values["tilt_1"].append(tilt_1)
-        injection_values["tilt_2"].append(tilt_2)
-        injection_values["phi_12"].append(phi_12)
-        injection_values["a_1"].append(a_1)
-        injection_values["a_2"].append(a_2)
+        injection_values["mass_1"].append(max(float(row["mass1"]), float(row["mass2"])))
+        injection_values["mass_2"].append(min(float(row["mass1"]), float(row["mass2"])))
+        injection_values["phase"].append(float(coa_phase))
+        geocent_time = float(row.get("geocent_end_time", trigger_time))
+        geocent_time_ns = float(row.get("geocent_end_time_ns", 0)) * 1e-9
+        injection_values["geocent_time"].append(geocent_time + geocent_time_ns)
 
     injection_values = pd.DataFrame.from_dict(injection_values)
     return injection_values
@@ -255,9 +192,6 @@ def get_parser():
         help="EOS file in (radius [km], mass [solar mass], lambda)",
     )
     parser.add_argument(
-        "--binary-type", type=str, required=False, help="Either BNS or NSBH"
-    )
-    parser.add_argument(
         "--eject",
         action="store_true",
         help="Whether to create injection files with eject properties",
@@ -285,10 +219,6 @@ def main(args=None):
         parser = get_parser()
         args = parser.parse_args()
 
-    if not args.original_parameters:
-        # check the binary type
-        assert args.binary_type in ["BNS", "NSBH"], "Unknown binary type"
-
     seed = args.generation_seed
     np.random.seed(seed)
 
@@ -300,12 +230,6 @@ def main(args=None):
             or args.injection_file.endswith(".xml.gz")
             or args.injection_file.endswith(".dat")
         ), "Unknown injection file format"
-
-    if not args.original_parameters:
-        # load the EOS
-        radius_val, mass_val, Lambda_val = np.loadtxt(
-            args.eos_file, usecols=[0, 1, 2], unpack=True
-        )
 
     # load the injection json file
     if args.injection_file:
@@ -394,86 +318,40 @@ def main(args=None):
             dataframe, args.filename, args.extension
         )
         return
+    
+    # else:
+    args.eos_to_ram = False
+    messengers = ['gw']
+    if args.eject:
+        messengers.append('em')
+    param_conversion = MultimessengerConversion(args, messengers, ana_modifiers=['eos'])
 
     # convert to all necessary parameters
-    dataframe, _ = convert_to_lal_binary_black_hole_parameters(dataframe)
-    Ninj = len(dataframe)
+    dataframe, _ = param_conversion.convert_to_multimessenger_parameters(dataframe)
 
-    # estimate the lambdas and radii with an eos given
-    dataframe, _ = source_frame_masses(dataframe, [])
-    TOV_mass = []
-    TOV_radius = []
-    lambda_1 = []
-    lambda_2 = []
-    radius_1 = []
-    radius_2 = []
-
-    for injIdx in range(0, Ninj):
-        mMax, rMax, lam1, lam2, r1, r2, R_14, R_16 = EOS2Parameters(
-            mass_val,
-            radius_val,
-            Lambda_val,
-            dataframe["mass_1_source"][injIdx],
-            dataframe["mass_2_source"][injIdx],
-        )
-
-        TOV_mass.append(mMax)
-        TOV_radius.append(rMax)
-        lambda_1.append(lam1.item())
-        lambda_2.append(lam2.item())
-        radius_1.append(r1.item())
-        radius_2.append(r2.item())
-
-    dataframe["TOV_mass"] = np.array(TOV_mass)
-    dataframe["TOV_radius"] = np.array(TOV_radius)
-    dataframe["lambda_1"] = np.array(lambda_1)
-    dataframe["lambda_2"] = np.array(lambda_2)
-    dataframe["radius_1"] = np.array(radius_1)
-    dataframe["radius_2"] = np.array(radius_2)
-    dataframe["R_16"] = np.ones(len(dataframe)) * R_16
-    dataframe["R_14"] = np.ones(len(dataframe)) * R_14
-
+   
     if args.eject:
-        if args.binary_type == "BNS":
-            ejectaFitting = BNSEjectaFitting()
-
-        elif args.binary_type == "NSBH":
-            ejectaFitting = NSBHEjectaFitting()
-
-        else:
-            raise ValueError("Unknown binary type")
-
-        dataframe, _ = ejectaFitting.ejecta_parameter_conversion(dataframe, [])
-        theta_jn = dataframe["theta_jn"]
-        dataframe["inclination_EM"] = np.minimum(theta_jn, np.pi - theta_jn)
-        dataframe["KNtheta"] = 180.0 / np.pi * dataframe["inclination_EM"]
 
         log10_mej_dyn = dataframe["log10_mej_dyn"]
         log10_mej_wind = dataframe["log10_mej_wind"]
-
+        index_condition = np.isfinite(log10_mej_dyn) * np.isfinite(log10_mej_wind)
         if "thetaWing" in dataframe and "thetaCore" in dataframe:
             print("Checking GRB resolution")
             grb_res = dataframe["thetaWing"] / dataframe["thetaCore"]
-            index_taken = np.where(
-                np.isfinite(log10_mej_dyn)
-                * np.isfinite(log10_mej_wind)
-                * (grb_res < args.grb_resolution)
-            )[0]
-        else:
-            index_taken = np.where(
-                np.isfinite(log10_mej_dyn) * np.isfinite(log10_mej_wind)
-            )[0]
+            index_condition *= (grb_res < args.grb_resolution)
+        
+        index_taken = np.where(index_condition)[0]
 
         dataframe = dataframe.take(index_taken)
 
-        print("{0} injections left".format(len(index_taken)))
+        print(f"{len(index_taken)} injections left")
 
-    if args.indices_file:
-        if args.detections_file is not None:
-            idxs = dets[index_taken]
-        else:
-            idxs = index_taken
-        np.savetxt(args.indices_file, idxs, fmt="%d")
+        if args.indices_file:
+            if args.detections_file is not None:
+                idxs = dets[index_taken]
+            else:
+                idxs = index_taken
+            np.savetxt(args.indices_file, idxs, fmt="%d")
 
     # dump the whole thing back into a json injection file
     injection_creator.write_injection_dataframe(

@@ -17,6 +17,7 @@ from ..em import lightcurve_handling as lch
 from ..em.io import read_lightcurve_file
 from ..em.lightcurve_handling import validate_lightcurve
 from ..joint import create_injection
+from ..joint.conversion import distance_modulus_nmma
 
 
 def lightcurveInjectionTest(model_name, model_lightcurve_function):
@@ -39,7 +40,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
     test_directory = os.path.join(dataDir, model_name)
     priorDir=os.path.join(workingDir, '../../priors/')
     svdmodels=os.path.join(workingDir, '../../svdmodels/')
-    
     if os.path.isdir(test_directory):
         shutil.rmtree(test_directory)
     os.makedirs(test_directory, exist_ok=True)
@@ -83,8 +83,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             generation_seed=42,
             grb_resolution=5,
             eos_file="example_files/eos/ALF2.dat",
-            binary_type="BNS",
-            eject=False,
+            eject=True,
             detections_file=None,
             indices_file=None,
             original_parameters=True,
@@ -217,15 +216,9 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             sample_times=time_series, parameters=lightcurve_parameters
         )[1]
         # need to adjust magnitudes to be absolute
-        absolute_magnitude_conversion = (
-            lambda magnitude, distance: magnitude + 5 * np.log10(distance * 1e6 / 10.0)
-        )
-        luminosity_distance = lightcurve_parameters["luminosity_distance"]
-        adjusted_lightcurve_from_function = {}
-        for key, magnitude in lightcurve_from_function.items():
-            adjusted_lightcurve_from_function[key] = absolute_magnitude_conversion(
-                magnitude, luminosity_distance
-            )
+        distance_modulus = distance_modulus_nmma(lightcurve_parameters["luminosity_distance"])
+        adjusted_lightcurve_from_function = {key: mag +distance_modulus 
+                        for key, mag in lightcurve_from_function.items()}
         adjusted_lightcurve_from_function["t"] = time_series
 
         return adjusted_lightcurve_from_function
@@ -271,7 +264,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         """
         shutil.rmtree(test_directory)
         assert not os.path.exists(test_directory), "test directory has not been deleted"
-
     injection_file = create_injection_from_command_line(model_name)
     command_line_lightcurve_dictionary = create_lightcurve_from_command_line(
         model_name, injection_file

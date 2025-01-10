@@ -100,7 +100,14 @@ class SVDTrainingModel(object):
         start_training=True,
         continue_training=False,
     ):
-        ##collect all arguments to pass on
+        # NOTE: This class is implemented for backwards compatibility. 
+        # Directly initiating a TensorflowTrainingModel, SklearnGPTrainingModel, 
+        # GPAPITrainingModel should be preferred.
+        # Most of the previous attributes and methods are now implemented in BaseTrainingModel which again is subclassed subject to the interpolation_type. 
+        # The __init__ creates a corresponding instance as a backend-attribute and
+        # __getattr__ retrieves any properties or methods from them
+
+        ##collect all arguments of __init__ to pass on
         setup_kwargs = locals()
         setup_kwargs.pop("self")
         ## set interpolation_type here, pass everything else
@@ -111,7 +118,6 @@ class SVDTrainingModel(object):
                 "--continue-training only supported with --interpolation-type \
                  tensorflow, this will have no effect"
             )
-
         if self.interpolation_type == "tensorflow":
             self.backend = TensorflowTrainingModel(**setup_kwargs)
         elif self.interpolation_type == "sklearn_gp":
@@ -123,9 +129,9 @@ class SVDTrainingModel(object):
                 "interpolation_type must be sklearn_gp, api_gp or tensorflow"
             )
 
-    # called when an attribute is not found:
+    # called when an attribute is not found, so almost always:
     def __getattr__(self, name):
-        # assume it is implemented by self.instance
+        # We assume it is implemented in the backend
         return self.backend.__getattribute__(name)
 
         
@@ -361,7 +367,16 @@ class BaseTrainingModel(object):
 
         for filt in self.svd_model.keys():
             self.load_routine(filt)
+    
+    def load_routine(self, filt):
+        raise NotImplementedError("This method should be implemented by subclasses.")
 
+    def save_routine(self, filt, outfile):
+        raise NotImplementedError("This method should be implemented by subclasses.")
+
+    def training_func(self, param_array_postprocess, cAmat, filt):
+        raise NotImplementedError("This method should be implemented by subclasses.")
+    
 class TensorflowTrainingModel(BaseTrainingModel):
     def __init__(self, **kwargs):
 
@@ -556,8 +571,6 @@ def min_max_scaling(data):
     row_wise Min-max scaling of data to [0, 1] range, assuming a 2d array as input
     """
     data = np.array(data)
-
-        # normalize parameters
     param_mins, param_maxs = np.min(data, axis=0), np.max(data, axis=0)
     rescaled_data = (data - param_mins) / (param_maxs - param_mins)
     return (rescaled_data, param_mins, param_maxs)  

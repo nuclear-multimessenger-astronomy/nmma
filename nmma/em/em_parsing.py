@@ -61,8 +61,7 @@ def em_analysis_parser(**kwargs):
     
     ##FIXME use common string_to_dict function from bilby pipe
     parser.add_argument("--detection-limit", type=str, default=None,
-        help="Dictionary for detection limit per filter, e.g., {'r':22, 'g':23}, put a double quotation marks around the dictionary")
-    ## FIXME unnecessary argument?
+        help="Dictionary for detection limit per filter, e.g., {'r':22, 'g':23}, put a double quotation mark around the dictionary")
     parser.add_argument(
         "--prompt-collapse",
         help="If the injection simulates prompt collapse and therefore only dynamical",

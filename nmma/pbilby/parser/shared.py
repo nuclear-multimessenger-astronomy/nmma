@@ -319,11 +319,6 @@ def _add_gw_settings_to_parser(parser):
         type=StoreBoolean, default=False, help="Flag to update the fiducial parameters from maximum likelihood")
     gw_input_parser.add("--epsilon", type=float, 
         help ="Tunable parameter which limits the differential phase change in each bin when setting up the bin range. See https://arxiv.org/abs/1806.08792")
-
-                        
-
-    ## FIXME: this should be unnecessary with flexible conversion
-    gw_input_parser.add("--binary-type", type=str, help="The binary is BNS or NSBH")
     return parser
 
 def _add_Hubble_settings_to_parser(parser):
