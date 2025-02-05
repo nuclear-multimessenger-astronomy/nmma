@@ -415,8 +415,9 @@ class SVDTrainingModel(object):
 
             tf.get_logger().setLevel("ERROR")
             from sklearn.model_selection import train_test_split
-            from tensorflow.keras import Sequential
-            from tensorflow.keras.layers import Dense, Dropout
+            import keras
+            from keras import Sequential
+            from keras.layers import Dense, Dropout
         except ImportError:
             print("Install tensorflow if you want to use it...")
             return
@@ -436,7 +437,7 @@ class SVDTrainingModel(object):
                 random_state=self.random_seed,
             )
 
-            tf.keras.utils.set_random_seed(self.random_seed)
+            keras.utils.set_random_seed(self.random_seed)
 
             if self.model_exists and self.continue_training:
                 model = self.svd_model[filt]["model"]
@@ -561,7 +562,7 @@ class SVDTrainingModel(object):
 
         elif self.interpolation_type == "tensorflow":
             try:
-                from tensorflow.keras.models import load_model as load_tf_model
+                from keras.models import load_model as load_tf_model
             except ImportError:
                 print("Install tensorflow if you want to use it...")
                 return
