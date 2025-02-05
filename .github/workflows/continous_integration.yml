@@ -63,7 +63,7 @@ jobs:
       - name: Update Homebrew
         if: matrix.os == 'macos-latest'
         run: |
-          brew update --preinstall
+          brew update --auto-update
 
       - name: Configure Homebrew cache
         if: matrix.os == 'macos-latest'
