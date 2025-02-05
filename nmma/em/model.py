@@ -307,7 +307,7 @@ class SVDLightCurveModel(LightCurveMixin):
             import tensorflow as tf
 
             tf.get_logger().setLevel("ERROR")
-            from tensorflow.keras.models import load_model
+            from keras.models import load_model
 
             if not local_only:
                 _, model_filters = get_model(self.svd_path, f"{self.model}_tf", filters=filters)
