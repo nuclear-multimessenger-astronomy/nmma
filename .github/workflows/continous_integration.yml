@@ -36,38 +36,37 @@ jobs:
           use-mamba: true
           mamba-version: "*"
           activate-environment: nmma_env
+          channels: defaults
 
       - name: Restore SVD models from cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: svdmodels
           key: svdmodels-${{ hashFiles('**/LICENSE') }}
           restore-keys: svdmodels-
-          save-always: true
 
       - name: Get pip cache dir
         id: pip-cache
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          echo "::set-output name=dir::$(pip cache dir)"
+          echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
 
-      - name: pip cache
-        uses: actions/cache@v4
+      - name: Restore pip cache
+        uses: actions/cache/restore@v4
         with:
           path: ${{ steps.pip-cache.outputs.dir }}
           key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-2-
-          save-always: true
 
       - name: Update Homebrew
         if: matrix.os == 'macos-latest'
         run: |
           brew update --auto-update
 
-      - name: Configure Homebrew cache
+      - name: Restore Homebrew cache
         if: matrix.os == 'macos-latest'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/Library/Caches/Homebrew/openmpi--*
@@ -84,10 +83,8 @@ jobs:
             ~/Library/Caches/Homebrew/downloads/*--basictex-*
             ~/Library/Caches/Homebrew/cmake--*
             ~/Library/Caches/Homebrew/downloads/*--cmake-*
-
           key: brew-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: brew-
-          save-always: true
 
       - name: Install Homebrew dependencies
         if: matrix.os == 'macos-latest'
@@ -100,6 +97,7 @@ jobs:
           sudo tlmgr install dvipng
           sudo tlmgr install cm-super
           sudo tlmgr install type1cm
+
       - name: Install Linux Dependencies
         if: matrix.os == 'ubuntu-latest'
         uses: awalsh128/cache-apt-pkgs-action@latest
@@ -120,7 +118,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super python3-mpi4py
-          
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
@@ -152,3 +150,38 @@ jobs:
           coveralls --service=github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save SVD models cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: svdmodels
+          key: svdmodels-${{ hashFiles('**/LICENSE') }}
+
+      - name: Save pip cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+
+      - name: Save Homebrew cache
+        if: always() && matrix.os == 'macos-latest'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/openmpi--*
+            ~/Library/Caches/Homebrew/downloads/*--openmpi-*
+            ~/Library/Caches/Homebrew/hdf5--*
+            ~/Library/Caches/Homebrew/downloads/*--hdf5-*
+            ~/Library/Caches/Homebrew/gcc--*
+            ~/Library/Caches/Homebrew/downloads/*--gcc-*
+            ~/Library/Caches/Homebrew/openblas--*
+            ~/Library/Caches/Homebrew/downloads/*--openblas-*
+            ~/Library/Caches/Homebrew/lapack--*
+            ~/Library/Caches/Homebrew/downloads/*--lapack-*
+            ~/Library/Caches/Homebrew/basictex--*
+            ~/Library/Caches/Homebrew/downloads/*--basictex-*
+            ~/Library/Caches/Homebrew/cmake--*
+            ~/Library/Caches/Homebrew/downloads/*--cmake-*
+          key: brew-${{ hashFiles('**/pyproject.toml') }}
