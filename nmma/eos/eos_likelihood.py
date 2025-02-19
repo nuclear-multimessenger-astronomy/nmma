@@ -76,7 +76,7 @@ class JointEoSConstraint(object):
         for constraint in self.constraints:
             logl += constraint.log_likelihood(self.parameters)
 
-        return logl
+        return np.squeeze(logl)
     
 
     def log_micro(self):
