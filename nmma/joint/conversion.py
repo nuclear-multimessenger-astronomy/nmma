@@ -626,7 +626,6 @@ class MultimessengerConversion(object):
 
             
         if "em" in self.messengers:
-
             converted_parameters, added_keys = self.ejecta_parameter_conversion(
                 converted_parameters, added_keys
             )

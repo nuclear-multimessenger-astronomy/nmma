@@ -335,9 +335,9 @@ class SVDLightCurveModel(LightCurveModelContainer):
         try:
             self.svd_mag_model = joblib.load(modelfile)
             self.svd_lbol_model= None
-        except ValueError(
-                        f"Model file not found: {modelfile}\n If possible, try removing the --local-only flag and rerun."):
-            exit()
+        except ValueError:
+            raise ValueError("Model file not found: {modelfile}\n \
+                If possible, try removing the --local-only flag and rerun.")
 
 
         if self.filters is None:
@@ -862,8 +862,8 @@ def lc_model_class_from_str(class_name = 'svd'):
     ##FIXME get more robust handling of aliases and typos
     try:
         return transient_class_map[class_name.lower()]
-    except KeyError(f"EM transient class must be one of {transient_class_map.keys()}, but was {class_name}"):
-        exit()
+    except KeyError:
+        raise KeyError(f"EM transient class must be one of {transient_class_map.keys()}, but was {class_name}")
 
 def get_lc_model_from_modelname(model_name):
     #FIXME This is incomplete, but identical to handling in NMMA 0.2.2

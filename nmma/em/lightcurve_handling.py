@@ -43,8 +43,8 @@ def read_trigger_time(parameters, args=None):
         except KeyError:
             try:
                 tc_gps = time.Time(args.gps, format="gps")
-            except AttributeError("Need either geocent_time or geocent_time_x"):
-                exit(1)
+            except AttributeError:
+                raise AttributeError("Need either geocent_time or geocent_time_x")
     parameters["kilonova_trigger_time"] = tc_gps.mjd
     return parameters
 
@@ -408,8 +408,8 @@ def lcs_from_injection_parameters(args=None):
                 mag_ds[index] = reading_function(injection_outfile)
                 continue
 
-            except ValueError(f"The previous run generated light curves with unreadable content. Please remove all output files in .{ext} format then retry."):
-                exit()
+            except ValueError:
+                raise ValueError(f"The previous run generated light curves with unreadable content. Please remove all output files in .{ext} format then retry.")
 
         ## do injection!
         injection_parameters = row.to_dict()

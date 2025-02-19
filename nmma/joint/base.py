@@ -45,7 +45,8 @@ class NMMABaseLikelihood(Likelihood):
         try:
             if not self.priors.evaluate_constraints(self.parameters):
                 return np.nan_to_num(-np.inf)
-        except AttributeError('No priors found, could not evaluate constraints'):
+        except AttributeError:
+            print('No priors found, could not evaluate constraints')
             pass
         
         return self.sub_log_likelihood()
