@@ -9,7 +9,6 @@ from scipy.integrate import quad
 import sncosmo
 
 from .utils import estimate_mag_err, autocomplete_data, flux_to_ABmag, setup_sample_times, transform_to_app_mag_dict
-from nmma.em.training import SVDTrainingModel
 
 try:
     import afterglowpy
@@ -123,8 +122,8 @@ def arnett_modified_lc(t_day, param_dict):
 def calc_lc(
     tt: np.array,
     param_list: np.array,
-    svd_mag_model: SVDTrainingModel = None,
-    svd_lbol_model: SVDTrainingModel = None,
+    svd_mag_model= None,
+    svd_lbol_model = None,
     mag_ncoeff: int = None,
     lbol_ncoeff: int = None,
     interpolation_type: str = "sklearn_gp",
