@@ -175,26 +175,67 @@ class BaseEMTransient(object):
     def band_log_likelihood(self, lc_data):
         raise NotImplementedError("This method should be implemented in the subclass")
 
+    def truncated_gaussian(self, m_det, m_err, m_est, lim):
+        a, b = (-np.inf - m_est) / m_err, (lim - m_est) / m_err
+        return truncnorm.logpdf(m_det, a, b, loc=m_est, scale=m_err)
+
+
+    def chisquare_gaussianlog_from_lc_data(self, est_mag, data_mag, data_sigma, upperlim_sigma, lim=np.inf):
+
+        # seperate the data into bounds (inf err) and actual measurement
+        infIdx = np.where(~np.isfinite(data_sigma))[0]
+        finiteIdx = np.where(np.isfinite(data_sigma))[0]
+
+        # evaluate the chisquare
+        if len(finiteIdx) >= 1:
+            minus_chisquare = np.sum(
+                self.truncated_gaussian(data_mag[finiteIdx], data_sigma[finiteIdx],
+                                est_mag[finiteIdx], lim)
+                    )
+        else:
+            minus_chisquare = 0.0
+
+        if np.isnan(minus_chisquare):
+            sanity_check_passed = False 
+            return sanity_check_passed, -np.inf
+
+        # evaluate the data with infinite error
+        gausslogsf=np.zeros(2) ##hack if len(infIdx)==0
+        if len(infIdx) > 0:
+            gausslogsf = norm.logsf(
+                    data_mag[infIdx], est_mag[infIdx], upperlim_sigma
+                )
+        return minus_chisquare, np.sum(gausslogsf)
+
 class OpticalTransient(BaseEMTransient):
-    """A optical kilonova / GRB / kilonova-GRB afterglow likelihood object
-    see line 1221 gwemlightcurves/sampler/loglike.py
+    """An EM transient that can be evaluated across multiple filters
 
     Parameters
     ----------
+    light_curve_model: `nmma.em.LightCurveModelContainer`
+        An object which computes the light curve of a transient ignal,
+        given a set of parameters
+    sample_times: array-like
+        Array of times at which the light curve is sampled
+    light_curve_data: dict
+        Dictionary of light curve data returned from nmma.em.utils.loadEvent
     filters: list, str
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
-    light_curve_data: dict
-        Dictionary of light curve data returned from nmma.em.utils.loadEvent
     trigger_time: float
         Time of the kilonova trigger in Modified Julian Day
-    error_budget: float (default:1)
+    error_budget: float (default: 1.0)
         Additionally introduced statistical error on the light curve data,
         so as to keep the systematic error in control
-    tmin: float (default:0)
-        Days from trigger_time to be started analysing
-    tmax: float (default:14)
-        Days from trigger_time to be ended analysing
+    detection_limit: float or dict (default: np.inf)
+        Detection limit for the light curve data
+    verbose: bool (default: False)
+        If True, print additional information during computation
+    systematics_file: str, optional
+        Path to a YAML file containing systematic error information
+    priors: dict, optional
+        Dictionary of prior distributions for the model parameters
+
     """
 
     def __init__(
@@ -330,7 +371,7 @@ class OpticalTransient(BaseEMTransient):
             model_time, model_mags = lc_data[filt]
             # evaluate the light curve magnitude at the data points
             est_mag = utils.autocomplete_data(data_time, model_time, model_mags)
-            minus_chisquare, gaussprob = chisquare_gaussianlog_from_lc_data( 
+            minus_chisquare, gaussprob = self.chisquare_gaussianlog_from_lc_data( 
                 est_mag, data_mag , data_sigma,  systematic_em_err, 
                 lim=self.detection_limit[filt]
             )
@@ -401,45 +442,12 @@ class BolometricTransient(BaseEMTransient):
         
         data_sigma = np.sqrt(self.data_sigma**2 + em_err_param**2)
         est_lum = utils.autocomplete_data(self.data_time, *lc_data)
-        minus_chisquare, gaussprob = chisquare_gaussianlog_from_lc_data(
+        minus_chisquare, gaussprob = self.chisquare_gaussianlog_from_lc_data(
             est_lum, self.data_lum, data_sigma, em_err_param, lim=self.detection_limit)
         if isinstance(minus_chisquare, bool):
             return np.nan_to_num(-np.inf)
         else:
             return minus_chisquare + gaussprob
-
-
-def truncated_gaussian(m_det, m_err, m_est, lim):
-    a, b = (-np.inf - m_est) / m_err, (lim - m_est) / m_err
-    return truncnorm.logpdf(m_det, a, b, loc=m_est, scale=m_err)
-
-
-def chisquare_gaussianlog_from_lc_data(est_mag, data_mag, data_sigma, upperlim_sigma, lim=np.inf):
-
-    # seperate the data into bounds (inf err) and actual measurement
-    infIdx = np.where(~np.isfinite(data_sigma))[0]
-    finiteIdx = np.where(np.isfinite(data_sigma))[0]
-
-    # evaluate the chisquare
-    if len(finiteIdx) >= 1:
-        minus_chisquare = np.sum(
-            truncated_gaussian(data_mag[finiteIdx], data_sigma[finiteIdx],
-                               est_mag[finiteIdx], lim)
-                )
-    else:
-        minus_chisquare = 0.0
-
-    if np.isnan(minus_chisquare):
-        sanity_check_passed = False 
-        return sanity_check_passed, -np.inf
-
-    # evaluate the data with infinite error
-    gausslogsf=np.zeros(2) ##hack if len(infIdx)==0
-    if len(infIdx) > 0:
-        gausslogsf = norm.logsf(
-                data_mag[infIdx], est_mag[infIdx], upperlim_sigma
-            )
-    return minus_chisquare, np.sum(gausslogsf)
 
 
 class OpticalLightCurve(EMTransientLikelihood):
