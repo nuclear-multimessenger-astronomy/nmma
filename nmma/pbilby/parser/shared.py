@@ -102,7 +102,7 @@ def _add_injection_settings_to_parser(parser):
     injection_parser = parser.add_argument_group(
         title="injection arguments", description="Specific kilonova analysis inputs")
     injection_parser.add(
-        "em-injection-model", "--kilonova-injection-model",
+        "--em-injection-model", "--kilonova-injection-model",
         type=str,
         help="Name of the kilonova model to be used for injection",
     )
@@ -194,17 +194,14 @@ def _add_eos_settings_to_parser(parser):
         "--eos-crust-file", help="Path to data file for eos crust, to be used if --eos-from-neps is set to True"
     )
 
-    eos_input_parser.add('--tov-emulator', type=str, help='Path to the TOV emulator')
-
-    eos_input_parser.add('--emulator-backend', type=str, default= 'tensorflow',
-         help='The backend to use for the TOV emulator. Should be one of "tensorflow", "jax", or "pytorch"')
-
+    eos_input_parser.add('--emulator-metadata', type=str, 
+        help='dict or path to dict with metadata for the TOV emulator. Must include "emulator_path", can contain further metadata')
     eos_input_parser.add('--micro-eos-model', type=str, default= 'nep-5',      
         help='The micro EOS model to use. ') ## FIXME: add model_selection
     
         ### args to set up eos likelihood evaluation based on constraints
     eos_input_parser.add(
-        "--eos-constraint-dict", 
+        "--eos-constraint-dict", type = bilby_pipe.utils.nonestr,
         help="path to .json-file from which eos-constraints are read and/or to which they should be stored. Can be appended with additional constraints."
     )
 
@@ -304,21 +301,22 @@ def _add_gw_settings_to_parser(parser):
     gw_input_parser.add(
         "--with-gw",
         action=StoreBoolean,
-        default=False,
+        default=True,
         help="Flag for sampling over GW parameters (default:True)",
     )
 
     ## Multibanding kwargs
-    gw_input_parser.add("--reference-chirp-mass", type=float, 
+    gw_input_parser.add("--reference-chirp-mass", type=bilby_pipe.utils.nonefloat, 
         help="The reference chirp mass for multibanding gw likelihood.")
 
     ## Relative Binning kwargs
-    gw_input_parser.add("--fiducial-parameters", 
-        type=bilby_pipe.utils.nonestr, default=None, help="A dict of fiducial parameters, to be read by the GW-likelihood")
-    gw_input_parser.add("--update-fiducial-parameters", 
-        type=StoreBoolean, default=False, help="Flag to update the fiducial parameters from maximum likelihood")
-    gw_input_parser.add("--epsilon", type=float, 
-        help ="Tunable parameter which limits the differential phase change in each bin when setting up the bin range. See https://arxiv.org/abs/1806.08792")
+    #  This is already defined in bilby-pipe -->
+    # gw_input_parser.add("--fiducial-parameters", 
+    #     type=bilby_pipe.utils.nonestr, default=None, help="A dict of fiducial parameters, to be read by the GW-likelihood")
+    # gw_input_parser.add("--update-fiducial-parameters", 
+    #     type=StoreBoolean, default=False, help="Flag to update the fiducial parameters from maximum likelihood")
+    # gw_input_parser.add("--epsilon", type=float, 
+    #     help ="Tunable parameter which limits the differential phase change in each bin when setting up the bin range. See https://arxiv.org/abs/1806.08792")
     return parser
 
 def _add_Hubble_settings_to_parser(parser):
