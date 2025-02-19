@@ -27,7 +27,7 @@ from ..parser import (
     create_nmma_analysis_parser,
     parse_analysis_args
     )
-from .analysis_run import AnalysisRun
+from .analysis_run import MainRun, WorkerRun
 
 
 def analysis_runner(
@@ -79,25 +79,13 @@ def analysis_runner(
         MPI worker tasks always return -1
 
     """
-
-    # Initialise a run
-    run = AnalysisRun(
-        data_dump=data_dump,
-        outdir=outdir,
-        label=label,
-        dynesty_sample=dynesty_sample,
-        nlive=nlive,
-        dynesty_bound=dynesty_bound,
-        walks=walks,
-        maxmcmc=maxmcmc,
-        nact=nact,
-        naccept=naccept,
-        facc=facc,
-        min_eff=min_eff,
-        enlarge=enlarge,
-        sampling_seed=sampling_seed,
-        proposals=proposals,
-        bilby_zero_likelihood_mode=bilby_zero_likelihood_mode,
+    # Initialise a WorkerRun. this needs a global scope to allow 
+    # persistence of states beyond the pool's scope.
+    # Otherwise emulators retrace on each evaluation.
+    global worker_run
+    worker_run = WorkerRun(
+        data_dump,
+        bilby_zero_likelihood_mode= bilby_zero_likelihood_mode
     )
 
     t0 = datetime.datetime.now()
@@ -110,7 +98,29 @@ def analysis_runner(
     ) as pool:
         if pool.is_master():
             POOL_SIZE = pool.size
-
+            run = MainRun(
+                worker_run.sampling_keys,
+                pooled_log_likelihood, 
+                pooled_prior_transform,
+                pooled_initial_point_from_prior,
+                args=worker_run.args,
+                outdir=outdir,
+                label=label,
+                periodic=worker_run.periodic,
+                reflective=worker_run.reflective,
+                dynesty_sample=dynesty_sample,
+                nlive=nlive,
+                dynesty_bound=dynesty_bound,
+                walks=walks,
+                maxmcmc=maxmcmc,
+                nact=nact,
+                naccept=naccept,
+                facc=facc,
+                min_eff=min_eff,
+                enlarge=enlarge,
+                sampling_seed=sampling_seed,
+                proposals=proposals,
+            )
             logger.info(f"sampling_keys={run.sampling_keys}")
             if run.periodic:
                 logger.info(
@@ -121,8 +131,8 @@ def analysis_runner(
                     f"Reflective keys: {[run.sampling_keys[ii] for ii in run.reflective]}"
                 )
             logger.info("Using priors:")
-            for key in run.priors:
-                logger.info(f"{key}: {run.priors[key]}")
+            for key in worker_run.priors:
+                logger.info(f"{key}: {worker_run.priors[key]}")
 
             resume_file = f"{run.outdir}/{run.label}_checkpoint_resume.pickle"
             samples_file = f"{run.outdir}/{run.label}_samples.dat"
@@ -276,7 +286,7 @@ def analysis_runner(
                 #    (ii, row, run.likelihood) for ii, row in posterior.iterrows()
                 #]
                 #samples = pool.map(fill_sample, fill_args)
-                result.posterior, _ = run.parameter_conversion.convert_to_multimessenger_parameters(result.posterior)
+                result.posterior, _ = worker_run.parameter_conversion.convert_to_multimessenger_parameters(result.posterior)
 
                 logger.debug(
                     "Updating prior to the actual prior (undoing marginalization)"
@@ -285,9 +295,9 @@ def analysis_runner(
                     ["distance", "phase", "time"],
                     ["luminosity_distance", "phase", "geocent_time"],
                 ):
-                    if getattr(run.likelihood, f"{par}_marginalization", False):
-                        run.priors[name] = run.likelihood.priors[name]
-                result.priors = run.priors
+                    if getattr(worker_run.likelihood, f"{par}_marginalization", False):
+                        worker_run.priors[name] = worker_run.likelihood.priors[name]
+                result.priors = worker_run.priors
 
                 result.posterior = result.posterior.map(
                     lambda x: x[0] if isinstance(x, list) else x
@@ -311,6 +321,16 @@ def analysis_runner(
             exit_reason = -1
         return exit_reason
 
+
+# Worker functions. These are read in the global scope by each worker
+def pooled_initial_point_from_prior(args):
+    return worker_run.get_initial_point_from_prior(args)
+
+def pooled_log_likelihood(v_array):
+    return worker_run.log_likelihood_function(v_array)
+
+def pooled_prior_transform(u_array):
+    return worker_run.prior_transform_function(u_array)
 
 def nmma_analysis():
     """

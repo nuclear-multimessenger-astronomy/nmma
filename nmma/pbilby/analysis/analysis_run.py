@@ -23,104 +23,19 @@ from ...joint.joint_likelihood import setup_nmma_likelihood
 from ...joint.conversion import MultimessengerConversion
 
 
-def compose_priors(prior_file, args, ana_modifiers, logger):
-    """
-    Routine to create a bilby-Prior object from a prior-file and to modify it for NMMA
-
-    Parameters
-    ----------
-    prior_file: str
-        The path to the prior-file
-    args: Namespace
-        The parser arguments
-
-    Returns
-    -------
-    priors: bilby.gw.prior.PriorDict
-        a bilby-Prior object
-
-    """
-    priors = PriorDict.from_json(prior_file)
-    priors.convert_floats_to_delta_functions()
-
-    ###adjust hubble prior if applicable
-    if args.Hubble_weight:
-        logger.info("Sampling over Hubble constant with pre-calculated prior")
-        logger.info("Assuming the redshift prior is the Hubble flow")
-        logger.info("Overwriting any Hubble prior in the prior file")
-        try:
-            Hubble_prior_data = pd.read_csv(args.Hubble_weight, delimiter=" ", header=0)
-            xx = Hubble_prior_data.Hubble.to_numpy()
-            yy = Hubble_prior_data.prior_weight.to_numpy()
-        except:
-            xx, yy =  np.loadtxt(args.Hubble_weight).T
-
-        Hmin = xx[0]
-        Hmax = xx[-1]
-
-        priors["Hubble_constant"] = Interped(
-            xx, yy, minimum=Hmin, maximum=Hmax, name="Hubble_constant"
-        )
-
-    # construct the eos prior
-    if "tabulated_eos" in ana_modifiers:
-        
-        logger.info("Sampling over precomputed EOSs")
-        xx = np.arange(0, args.Neos + 1)
-        if args.eos_weight:
-            eos_weight = np.loadtxt(args.eos_weight)
-            yy = np.concatenate((eos_weight, [eos_weight[-1]]))
-        else: 
-            yy = np.ones_like(xx)/len(xx)
-        eos_prior = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
-        priors["EOS"] = eos_prior
-
-
-    # add the ratio_epsilon in case it is not present (for no-grb case)
-    if "ratio_epsilon" not in priors:
-        priors["ratio_epsilon"] = DeltaFunction(0.01, name="ratio_epsilon")
-
-    
-    sampling_keys = []
-    fixed_keys = []
-    for p in priors:
-        if isinstance(priors[p], Constraint):
-            continue
-        elif priors[p].is_fixed:
-            fixed_keys.append(p)
-        else:
-            sampling_keys.append(p)
-
-
-    periodic = []
-    reflective = []
-    for ii, key in enumerate(sampling_keys):
-        if priors[key].boundary == "periodic":
-            logger.debug(f"Setting periodic boundary for {key}")
-            periodic.append(ii)
-        elif priors[key].boundary == "reflective":
-            logger.debug(f"Setting reflective boundary for {key}")
-            reflective.append(ii)
-
-    if len(periodic) == 0:
-        periodic = None
-    if len(reflective) == 0:
-        reflective = None
-    
-    return priors, sampling_keys, fixed_keys, periodic, reflective
-
-class AnalysisRun(object):
-    """
-    An object with methods for driving the sampling run.
-
-    Parameters: arguments to set the output path and control the dynesty sampler.
-    """
-
+class MainRun(object):
+   
     def __init__(
         self,
-        data_dump=None,
+        sampling_keys,
+        pooled_log_likelihood_function,
+        pooled_prior_transform_function,
+        pooled_initial_point_function,
+        args=None,
         outdir=None,
         label=None,
+        periodic=None,
+        reflective = None,
         dynesty_sample="acceptance-walk",
         nlive=5,
         dynesty_bound="live",
@@ -133,34 +48,23 @@ class AnalysisRun(object):
         enlarge=1.5,
         sampling_seed=0,
         proposals=None,
-        bilby_zero_likelihood_mode=False
     ):
         ## Set some basic attributes
+        self.sampling_keys = sampling_keys
+        self.ndim = len(sampling_keys)
         self.maxmcmc = maxmcmc
         self.nact = nact
         self.naccept = naccept
         self.proposals = convert_string_to_list(proposals)
-        self.zero_likelihood_mode = bilby_zero_likelihood_mode
         self.nlive = nlive
+        self.periodic = periodic
+        self.reflective = reflective
+        self.args = args
+        self.pooled_log_likelihood_function = pooled_log_likelihood_function
+        self.pooled_prior_transform_function= pooled_prior_transform_function
+        self.pooled_initial_point_function =  pooled_initial_point_function
 
-        ## Load the data dump
-        if data_dump is None:
-            if outdir is None:
-                test_out = os.path.join(os.getcwd(), 'outdir')
-            else:
-                test_out = outdir
-            test_dump = glob(f"{test_out}/data/*_dump.pickle")
-            data_dump = test_dump[0]
-        # Read data dump from the pickle file
-        with open(data_dump, "rb") as file:
-            data_dump = pickle.load(file)
 
-        ## Set properties from the data dump
-        self.data_dump = data_dump
-        self.args = data_dump["args"]
-        self.messengers= data_dump["messengers"]
-        self.analysis_modifiers = data_dump['analysis_modifiers']
-        self.injection_parameters = data_dump.get("injection_parameters", None)
 
         # If the run dir has not been specified, get it from the args
         if outdir is None:
@@ -174,37 +78,6 @@ class AnalysisRun(object):
         if label is None:
             label = self.args.label
         self.label = label
-
-
-        ## Set up the priors
-        (priors, sampling_keys, fixed_keys, periodic, reflective) = compose_priors(data_dump["prior_file"], self.args, self.analysis_modifiers, logger)
-        self.sampling_keys = sampling_keys
-        self.fixed_keys = fixed_keys
-        self.periodic = periodic
-        self.reflective = reflective
-        
-        fixed_prior = {key: priors[key].peak for key in fixed_keys}
-        # FIXME should not the RL-likelihood set this intrinsically?
-        # if self.args.likelihood_type ==  'RelativeBinningGravitationalWaveTransient':
-        #     fixed_prior.update(fiducial=0)
-        self.fixed_prior = fixed_prior
-        self.priors=priors
-
-
-        self.parameter_conversion=MultimessengerConversion(self.args, self.messengers, self.analysis_modifiers)
-        
-        
-        # priors.conversion_function = param_conv.priors_conversion_function
-
-        logger.setLevel(logging.WARNING)
-        
-        self.likelihood= setup_nmma_likelihood(data_dump,
-            priors, self.args, self.messengers,  logger
-            )
-        
-        logger.setLevel(logging.INFO)
-        # for p in fixed_keys:
-        #     self.likelihood.parameters[p] = priors[p].peak
 
         self.init_sampler_kwargs = dict(
             nlive=nlive,
@@ -295,6 +168,249 @@ class AnalysisRun(object):
             self.init_sampler_kwargs["sample"] = sample
             logger.info(f"Using the dynesty-implemented {sample} sample method")
 
+    def get_nested_sampler(self, live_points, pool, pool_size):
+        """
+        Returns the dynested nested sampler, getting most arguments
+        from the object's attributes
+
+        Parameters
+        ----------
+        live_points: (numpy.ndarraym, numpy.ndarray, numpy.ndarray)
+            The set of live points, in the same format as returned by
+            get_initial_points_from_prior
+
+        pool: schwimmbad.MPIPool
+            Schwimmbad pool for MPI parallelisation
+            (pbilby implements a modified version: MPIPoolFast)
+
+        pool_size: int
+            Number of workers in the pool
+
+        Returns
+        -------
+        dynesty.NestedSampler
+
+        """
+        sampler = dynesty.NestedSampler(
+            self.pooled_log_likelihood_function,
+            self.pooled_prior_transform_function,
+            self.ndim,
+            pool=pool,
+            queue_size=pool_size,
+            periodic=self.periodic,
+            reflective=self.reflective,
+            live_points=live_points,
+            rstate=self.rstate,
+            use_pool=dict(
+                update_bound=True,
+                propose_point=True,
+                prior_transform=True,
+                loglikelihood=True,
+            ),
+            **self.init_sampler_kwargs,
+        )
+
+        return sampler
+
+    def get_initial_points_from_prior(self, pool, calculate_likelihood=True):
+        """
+        Generates a set of initial points, drawn from the prior
+
+        Parameters
+        ----------
+        pool: schwimmbad.MPIPool
+            Schwimmbad pool for MPI parallelisation
+            (pbilby implements a modified version: MPIPoolFast)
+
+        calculate_likelihood: bool
+            Option to calculate the likelihood for the generated points
+            (default: True)
+
+        Returns
+        -------
+        (numpy.ndarraym, numpy.ndarray, numpy.ndarray, None)
+            Returns a tuple (unit, theta, logl, blob)
+            unit: point in the unit cube
+            theta: scaled value
+            logl: log(likelihood)
+            blob: None
+
+        """
+        # Create a new rstate for each point, otherwise each task will generate
+        # the same random number, and the rstate on master will not be incremented.
+        # The argument to self.rstate.integers() is a very large integer.
+        # These rstates aren't used after this map, but each time they are created,
+        # a different (but deterministic) seed is used.
+        sg = np.random.SeedSequence(self.rstate.integers(9223372036854775807))
+        map_rstates = [
+            np.random.Generator(np.random.PCG64(n)) for n in sg.spawn(self.nlive)
+        ]
+
+        args_list = [
+            (
+                calculate_likelihood,
+                map_rstates[i],
+            )
+            for i in range(self.nlive)
+        ]
+        initial_points = pool.map(self.pooled_initial_point_function, args_list)
+        u_list = [point[0] for point in initial_points]
+        v_list = [point[1] for point in initial_points]
+        l_list = [point[2] for point in initial_points]
+        blobs = None
+
+        return np.array(u_list), np.array(v_list), np.array(l_list), blobs
+
+
+class WorkerRun(object):
+    """
+    An object with methods to be called in parallelised tasks.
+
+    Parameters: 
+    data_dump: a pickle-file containing all relevant data to create priors and likelihoods.
+    """
+    def __init__(
+            self, 
+            data_dump,
+            bilby_zero_likelihood_mode=False
+            ):
+
+        ## Load the data dump
+        if data_dump is None:
+            test_out = os.path.join(os.getcwd(), 'outdir')
+            test_dump = glob(f"{test_out}/data/*_dump.pickle")
+            data_dump = test_dump[0]
+
+        # Read data dump from the pickle file
+        with open(data_dump, "rb") as file:
+            data_dump = pickle.load(file)
+
+        ## Set properties from the data dump
+        self.data_dump = data_dump
+        self.args = data_dump["args"]
+        self.messengers= data_dump["messengers"]
+        self.analysis_modifiers = data_dump['analysis_modifiers']
+        self.injection_parameters = data_dump.get("injection_parameters", None)
+        self.zero_likelihood_mode=bilby_zero_likelihood_mode
+
+        ## Set up the priors
+        self.compose_priors(
+                data_dump["prior_file"], self.args, 
+                self.analysis_modifiers, logger
+            )
+
+
+        self.parameter_conversion=MultimessengerConversion(self.args, self.messengers, self.analysis_modifiers)
+        # priors.conversion_function = param_conv.priors_conversion_function
+
+        logger.setLevel(logging.WARNING)
+        
+        self.likelihood= setup_nmma_likelihood(data_dump,
+            self.priors, self.args, self.messengers,  logger
+            )
+        
+        logger.setLevel(logging.INFO)
+
+
+    def compose_priors(self, prior_file, args, ana_modifiers, logger):
+        """
+        Routine to create a bilby-Prior object from a prior-file and to modify it for NMMA
+
+        Parameters
+        ----------
+        prior_file: str
+            The path to the prior-file
+        args: Namespace
+            The parser arguments
+
+        Returns
+        -------
+        priors: bilby.gw.prior.PriorDict
+            a bilby-Prior object
+
+        """
+        priors = PriorDict.from_json(prior_file)
+        priors.convert_floats_to_delta_functions()
+
+        ###adjust hubble prior if applicable
+        if args.Hubble_weight:
+            logger.info("Sampling over Hubble constant with pre-calculated prior")
+            logger.info("Assuming the redshift prior is the Hubble flow")
+            logger.info("Overwriting any Hubble prior in the prior file")
+            try:
+                Hubble_prior_data = pd.read_csv(args.Hubble_weight, delimiter=" ", header=0)
+                xx = Hubble_prior_data.Hubble.to_numpy()
+                yy = Hubble_prior_data.prior_weight.to_numpy()
+            except:
+                xx, yy =  np.loadtxt(args.Hubble_weight).T
+
+            Hmin = xx[0]
+            Hmax = xx[-1]
+
+            priors["Hubble_constant"] = Interped(
+                xx, yy, minimum=Hmin, maximum=Hmax, name="Hubble_constant"
+            )
+
+        # construct the eos prior
+        if "tabulated_eos" in ana_modifiers:
+            
+            logger.info("Sampling over precomputed EOSs")
+            xx = np.arange(0, args.Neos + 1)
+            if args.eos_weight:
+                eos_weight = np.loadtxt(args.eos_weight)
+                yy = np.concatenate((eos_weight, [eos_weight[-1]]))
+            else: 
+                yy = np.ones_like(xx)/len(xx)
+            eos_prior = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
+            priors["EOS"] = eos_prior
+
+
+        # add the ratio_epsilon in case it is not present (for no-grb case)
+        if "ratio_epsilon" not in priors:
+            priors["ratio_epsilon"] = DeltaFunction(0.01, name="ratio_epsilon")
+        
+        self.priors=priors
+
+        # check prior properties
+        sampling_keys = []
+        fixed_keys = []
+        for p in priors:
+            if isinstance(priors[p], Constraint):
+                continue
+            elif priors[p].is_fixed:
+                fixed_keys.append(p)
+            else:
+                sampling_keys.append(p)
+
+        self.sampling_keys = sampling_keys
+        self.ndim = len(sampling_keys)
+        self.fixed_keys = fixed_keys
+
+        fixed_prior = {key: priors[key].peak for key in fixed_keys}
+        # FIXME should not the RL-likelihood set this intrinsically?
+        # if self.args.likelihood_type ==  'RelativeBinningGravitationalWaveTransient':
+        #     fixed_prior.update(fiducial=0)
+        self.fixed_prior = fixed_prior
+
+        periodic = []
+        reflective = []
+        for ii, key in enumerate(sampling_keys):
+            if priors[key].boundary == "periodic":
+                logger.debug(f"Setting periodic boundary for {key}")
+                periodic.append(ii)
+            elif priors[key].boundary == "reflective":
+                logger.debug(f"Setting reflective boundary for {key}")
+                reflective.append(ii)
+
+        if len(periodic) == 0:
+            periodic = None
+        if len(reflective) == 0:
+            reflective = None
+        
+        self.periodic = periodic
+        self.reflective = reflective
+    
+
     def prior_transform_function(self, u_array):
         """
         Calls the bilby rescaling function on an array of values
@@ -369,62 +485,9 @@ class AnalysisRun(object):
         # print(params.keys())
         return self.priors.ln_prob(params)
 
-    def get_initial_points_from_prior(self, pool, calculate_likelihood=True):
-        """
-        Generates a set of initial points, drawn from the prior
 
-        Parameters
-        ----------
-        pool: schwimmbad.MPIPool
-            Schwimmbad pool for MPI parallelisation
-            (pbilby implements a modified version: MPIPoolFast)
-
-        calculate_likelihood: bool
-            Option to calculate the likelihood for the generated points
-            (default: True)
-
-        Returns
-        -------
-        (numpy.ndarraym, numpy.ndarray, numpy.ndarray, None)
-            Returns a tuple (unit, theta, logl, blob)
-            unit: point in the unit cube
-            theta: scaled value
-            logl: log(likelihood)
-            blob: None
-
-        """
-        # Create a new rstate for each point, otherwise each task will generate
-        # the same random number, and the rstate on master will not be incremented.
-        # The argument to self.rstate.integers() is a very large integer.
-        # These rstates aren't used after this map, but each time they are created,
-        # a different (but deterministic) seed is used.
-        sg = np.random.SeedSequence(self.rstate.integers(9223372036854775807))
-        map_rstates = [
-            np.random.Generator(np.random.PCG64(n)) for n in sg.spawn(self.nlive)
-        ]
-        ndim = len(self.sampling_keys)
-
-        args_list = [
-            (
-                self.prior_transform_function,
-                self.log_prior_function,
-                self.log_likelihood_function,
-                ndim,
-                calculate_likelihood,
-                map_rstates[i],
-            )
-            for i in range(self.nlive)
-        ]
-        initial_points = pool.map(self.get_initial_point_from_prior, args_list)
-        u_list = [point[0] for point in initial_points]
-        v_list = [point[1] for point in initial_points]
-        l_list = [point[2] for point in initial_points]
-        blobs = None
-
-        return np.array(u_list), np.array(v_list), np.array(l_list), blobs
-
-    @staticmethod
-    def get_initial_point_from_prior(args):
+    # @staticmethod
+    def get_initial_point_from_prior(self, args):
         """
         Draw initial points from the prior subject to constraints applied both to
         the prior and the likelihood.
@@ -436,67 +499,18 @@ class AnalysisRun(object):
         """
 
         (
-            prior_transform_function,
-            log_prior_function,
-            log_likelihood_function,
-            ndim,
             calculate_likelihood,
             rstate,
         ) = args
         bad_values = [np.inf, np.nan_to_num(np.inf), np.nan]
         while True:
-            unit = rstate.random(ndim)
-            theta = prior_transform_function(unit)
+            unit = rstate.random(self.ndim)
+            theta = self.prior_transform_function(unit)
 
-            if abs(log_prior_function(theta)) not in bad_values:
+            if abs(self.log_prior_function(theta)) not in bad_values:
                 if calculate_likelihood:
-                    logl = log_likelihood_function(theta)
+                    logl = self.log_likelihood_function(theta)
                     if abs(logl) not in bad_values:
                         return unit, theta, logl
                 else:
                     return unit, theta, np.nan
-
-    def get_nested_sampler(self, live_points, pool, pool_size):
-        """
-        Returns the dynested nested sampler, getting most arguments
-        from the object's attributes
-
-        Parameters
-        ----------
-        live_points: (numpy.ndarraym, numpy.ndarray, numpy.ndarray)
-            The set of live points, in the same format as returned by
-            get_initial_points_from_prior
-
-        pool: schwimmbad.MPIPool
-            Schwimmbad pool for MPI parallelisation
-            (pbilby implements a modified version: MPIPoolFast)
-
-        pool_size: int
-            Number of workers in the pool
-
-        Returns
-        -------
-        dynesty.NestedSampler
-
-        """
-        ndim = len(self.sampling_keys)
-        sampler = dynesty.NestedSampler(
-            self.log_likelihood_function,
-            self.prior_transform_function,
-            ndim,
-            pool=pool,
-            queue_size=pool_size,
-            periodic=self.periodic,
-            reflective=self.reflective,
-            live_points=live_points,
-            rstate=self.rstate,
-            use_pool=dict(
-                update_bound=True,
-                propose_point=True,
-                prior_transform=True,
-                loglikelihood=True,
-            ),
-            **self.init_sampler_kwargs,
-        )
-
-        return sampler
