@@ -1,40 +1,44 @@
 import numpy as np
 from glob import glob
 import os
+import json
+from ast import literal_eval
 
 def setup_eos_generator(args):
     eos_model_type = args.micro_eos_model.lower()
     if eos_model_type == 'nep-5':
-        return NEP5EoSGenerator(args.tov_emulator, args.emulator_backend, getattr(args, 'emulator_type', None))
+        return NEP5EoSGenerator(args.emulator_metadata)
     ## add more models
     else:
         raise ValueError(f"Unknown eos model type: {eos_model_type}")
 
 class EoSGenerator(object):
-    def __init__(self, emulator_path, backend ='tensorflow', 
-                  emulator_type=None, eos_parameters=None):
+    def __init__(self, emulator_path, backend ='jax', eos_parameters=None):
         
-        # identify architecture-type
-        if emulator_type is None:
-            emulator_type = emulator_path.split('.')[-1]
-
         # load the emulator
-        if 'keras' in emulator_type:
+        try:
             os.environ["KERAS_BACKEND"] = backend
             import keras as k
+            if k.backend.backend() != backend:
+                ## reimport keras with the correct backend
+                import sys
+                keys = list(sys.modules.keys())
+                for key in keys:
+                    if 'keras' in key:
+                        del sys.modules[key]        
+                print('KERAS_BACKEND reset to ', os.environ['KERAS_BACKEND'])
+                import keras as k
             self.emulator =  k.saving.load_model(emulator_path, custom_objects=None, compile= False)
 
             # formatting function to convert the input parameters to the expected format
-            # NOTE: a warning is raised when using tensorflow backend on more than 5 threads, suggesting excessive retracing. This can be ignored
             self.format_conv= k.ops.convert_to_tensor
         
-        elif 'pickle' in emulator_type or 'pkl' in emulator_type:
+        except:
             import pickle
             with open(emulator_path, 'rb') as f:
                 self.emulator =  pickle.load(f)
             self.format_conv = np.array
-        else:
-            raise ValueError(f"Unknown emulator type: {emulator_type}")
+            
 
         ## set the parameter-keys to be passed to the emulator
         if eos_parameters is None:
@@ -65,18 +69,49 @@ class EoSGenerator(object):
 
     
 class NEP5EoSGenerator(EoSGenerator):
-    def __init__(self, emulator_path, backend='tensorflow', emulator_type=None, eos_parameters=None):
-        super().__init__(emulator_path, backend, emulator_type=emulator_type)
+    def __init__(self, metadata):
+        try:
+            with open(metadata, 'r') as f:
+                meta_dict = json.load(f)
+        except TypeError:
+            meta_dict = metadata
+        except FileNotFoundError:
+            meta_dict = literal_eval(metadata)
+
+        emulator_path = meta_dict['emulator_path']
+        backend = meta_dict.get('backend', 'jax')
+        super().__init__(emulator_path, backend, meta_dict.get('eos_parameters', None))
+
+        n_mass_samples = meta_dict.get('n_mass_samples', 40)
+        self.set_mass_construction(n_mass_samples)
+
+        
+    def equal_distance_masses(self, mtov):
+        return np.linspace(1, mtov, self.n_mass_samples, axis =-1)
+    def disjoint_masses(self, mtov):
+        mass_range_low = np.linspace(1,2.*np.ones_like(mtov),self.mass_samples_low, axis=-1)
+        mass_range_high = np.linspace(mtov, 2., self.mass_samples_high, endpoint=False, axis=-1)
+        mass_range_high = mass_range_high[..., ::-1]
+        return np.concatenate([mass_range_low, mass_range_high], axis=-1)  
+
+    def set_mass_construction(self, n_mass_samples):
+        if isinstance(n_mass_samples, int):
+            self.n_mass_samples = n_mass_samples
+            self.decompose_mass_data = self.equal_distance_masses
+        elif isinstance(n_mass_samples, (tuple, list)):
+            self.mass_samples_low, self.mass_samples_high = n_mass_samples
+            self.n_mass_samples = self.mass_samples_low + self.mass_samples_high
+            self.decompose_mass_data = self.disjoint_masses
 
     def identify_eos_parameters(self):
         return ['K_sat', 'L_sym', 'K_sym', '3n_sat', '5n_sat']
     
     def adjust_format(self, predictions):
-        radius_data, lam_data, mtov_data = predictions
-        _, n_mass_samples = radius_data.shape
-        mass_data =np.linspace(1, mtov_data.squeeze(axis=1), n_mass_samples).T
+        rad_data, lam_data, mtov_data = np.split(predictions, [self.n_mass_samples, 2*self.n_mass_samples], axis=-1)
+        mass_range = np.squeeze(self.decompose_mass_data(mtov_data), axis=0)
+        lam_data = 10**lam_data
         
-        return np.stack([radius_data, mass_data, 10**lam_data], axis=1)
+        return np.stack([rad_data, mass_range, lam_data], axis=1)
         
 
 
@@ -106,9 +141,9 @@ def load_macro_characteristics_from_tabulated_eos_set(eos_data, Neos, masses_for
     Neos: int
         Number of equations of state to consider
     masses_for_char_radii: int or tuple-like, default: None
-        mass(es) at which characterisitc radii should be evaluated
+        mass(es) at which characteristic radii should be evaluated
     masses_for_char_lambdas: int or tuple-like, default: None
-        mass(es) at which characterisitc tidal deformabilities should be evaluated
+        mass(es) at which characteristic tidal deformabilities should be evaluated
 
     --------
     Returns:
