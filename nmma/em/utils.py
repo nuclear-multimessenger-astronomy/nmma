@@ -657,7 +657,21 @@ def grb_lc(t_day, Ebv, param_dict, filters=None):
 
     # output flux density is in milliJansky
     try:
-        mJys = fluxDensity(times, nus, **param_dict)
+        if isinstance(param_dict['E0'], np.ndarray):
+            E0 = param_dict.pop('E0')
+            vec_func = np.vectorize(
+                lambda i: fluxDensity(
+                    default_time[i], 
+                    nu_0s, 
+                    E0=E0[i], 
+                    **param_dict
+                ), 
+                otypes=[np.ndarray]
+            )
+            mJys = vec_func(np.arange(times.shape[0]))
+            mJys = np.stack(mJys)
+        else:
+            mJys = fluxDensity(times, nus, **param_dict)
 
     except TimeoutError:
         return t_day, np.zeros(t_day.shape), {}

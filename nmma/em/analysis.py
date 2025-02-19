@@ -149,6 +149,12 @@ def get_parser(**kwargs):
         help="Jet type to used used for GRB afterglow light curve (default: 0)",
     )
     parser.add_argument(
+        "--energy-injection",
+        action="store_true",
+        default=False,
+        help="To include energy injection for GRB model (default: False)",
+    )
+    parser.add_argument(
         "--error-budget",
         type=str,
         default="1.0",

@@ -448,6 +448,7 @@ class GRBLightCurveModel(LightCurveMixin):
         resolution=12,
         jetType=0,
         filters=None,
+        energy_injection=False,
     ):
         """A light curve model object
 
@@ -474,6 +475,7 @@ class GRBLightCurveModel(LightCurveMixin):
         self.resolution = resolution
         self.jetType = jetType
         self.filters = filters
+        self.energy_injection = energy_injection
 
     def __repr__(self):
         return self.__class__.__name__ + "(model={0})".format(self.model)
@@ -501,7 +503,6 @@ class GRBLightCurveModel(LightCurveMixin):
         grb_param_dict["specType"] = 0
 
         grb_param_dict["thetaObs"] = new_parameters["inclination_EM"]
-        grb_param_dict["E0"] = 10 ** new_parameters["log10_E0"]
         grb_param_dict["thetaCore"] = new_parameters["thetaCore"]
         grb_param_dict["n0"] = 10 ** new_parameters["log10_n0"]
         grb_param_dict["p"] = new_parameters["p"]
@@ -509,6 +510,30 @@ class GRBLightCurveModel(LightCurveMixin):
         grb_param_dict["epsilon_B"] = 10 ** new_parameters["log10_epsilon_B"]
         grb_param_dict["z"] = z
 
+        # energy handling
+        if not self.energy_injection:
+            grb_param_dict["E0"] = 10 ** new_parameters["log10_E0"]
+        else:
+            # additional parameters
+            energy_injection_params = ['energy_exponential', 'log10_Eend',
+                                       't_start', 't_end']
+            assert all(key in new_parameters for key in energy_injection_params)
+            # fetch parameters
+            log10_Eend = new_parameters['log10_Eend']
+            t_start = new_parameters['t_start']
+            t_end = new_parameters['t_end']
+            energy_exponential = new_parameters['energy_exponential']
+            # populate the E0 along the sample_times
+            log10_Estart = log10_Eend + energy_exponential * np.log10(t_start / t_end)
+            log10_E0 = log10_Eend * np.ones(len(sample_times))
+            # now adjust the log10_E0
+            log10_E0[sample_times <= t_start] = log10_Estart
+            log10_E0[sample_times >= t_end] = log10_Eend
+            mask = (sample_times > t_start) * (sample_times < t_end)
+            time_scale = np.log10(sample_times / t_end)
+            log10_E0[mask] = log10_Eend + energy_exponential * time_scale[mask] 
+            # now place the array into the param_dict
+            grb_param_dict["E0"] = 10 ** log10_E0
         # make sure L0, q and ts are also passed
         for param in ['L0', 'q', 'ts']:
             if param in new_parameters:
@@ -1030,6 +1055,7 @@ def create_light_curve_model_from_args(
                 jetType=args.jet_type,
                 parameter_conversion=parameter_conversion,
                 filters=filters,
+                energy_injection=args.energy_injection
             )
 
         elif model_name in sncosmo_names:
