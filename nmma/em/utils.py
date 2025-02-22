@@ -1649,7 +1649,8 @@ def get_knprops_from_LANLfilename(filename):
                     md /= 100
                 elif md in [2]:
                     md /= 1000
-
+            
+            
             # Record velocity
             elif "v" == info[0]:
                 vd = float(info[1:]) / 100
@@ -1673,7 +1674,7 @@ def get_knprops_from_LANLfilename(filename):
     knprops = {}
     for prop in [
         # "morphology",
-        # "Ye_wind",
+        "Ye_wind",
         "mej_dyn",
         "vej_dyn",
         "mej_wind",

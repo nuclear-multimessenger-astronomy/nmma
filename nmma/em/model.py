@@ -97,6 +97,11 @@ model_parameters_dict = {
         "vej_wind",
         "KNtheta",
     ],
+    "LANL1D": [
+        "Ye_wind",
+        "log10_mej_dyn",
+        "vej_dyn",
+    ],
 }
 
 
@@ -108,6 +113,7 @@ class LightCurveMixin:
         citation_dict = {
             **dict.fromkeys(["LANLTP1", "LANLTP2", "LANLTS1", "LANLTS2"], ["https://arxiv.org/abs/2105.11543"]),
             "Ka2017": ["https://arxiv.org/abs/1710.05463"],
+            **dict.fromkeys(["LANL1D"] , ["https://arxiv.org/abs/1905.05089"]),
             **dict.fromkeys(
                 ["Bu2019lm", "Bu2019lm_sparse"], ["https://arxiv.org/abs/2002.11355", "https://arxiv.org/abs/1906.04205"]
             ),
