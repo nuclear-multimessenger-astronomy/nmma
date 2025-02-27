@@ -13,11 +13,10 @@ from bilby.core.utils import logger
 from nestcheck import data_processing
 from pandas import DataFrame
 
-from parallel_bilby.schwimmbad_fast import MPIPoolFast as MPIPool
+from schwimmbad import MPIPool
 from parallel_bilby.utils import get_cli_args, stdout_sampling_log
 from parallel_bilby.analysis.plotting import plot_current_state
 from parallel_bilby.analysis.read_write import (
-    format_result,
     read_saved_state,
     write_current_state,
     write_sample_dump,
@@ -27,7 +26,7 @@ from ..parser import (
     create_nmma_analysis_parser,
     parse_analysis_args
     )
-from .analysis_run import MainRun, WorkerRun
+from .analysis_run import MainRun, WorkerRun, format_result
 
 
 def analysis_runner(
@@ -49,9 +48,6 @@ def analysis_runner(
     bilby_zero_likelihood_mode=False,
     rejection_sample_posterior=True,
     #
-    fast_mpi=False,
-    mpi_timing=False,
-    mpi_timing_interval=0,
     check_point_deltaT=3600,
     n_effective=np.inf,
     dlogz=10,
@@ -87,15 +83,9 @@ def analysis_runner(
         data_dump,
         bilby_zero_likelihood_mode= bilby_zero_likelihood_mode
     )
-
     t0 = datetime.datetime.now()
     sampling_time = 0
-    with MPIPool(
-        parallel_comms=fast_mpi,
-        time_mpi=mpi_timing,
-        timing_interval=mpi_timing_interval,
-        use_dill=True,
-    ) as pool:
+    with MPIPool(use_dill=True) as pool:
         if pool.is_master():
             POOL_SIZE = pool.size
             run = MainRun(
@@ -265,9 +255,10 @@ def analysis_runner(
                 nested_samples = DataFrame(out.samples, columns=run.sampling_keys)
                 nested_samples["weights"] = weights
                 nested_samples["log_likelihood"] = out.logl
-
+                run.priors = worker_run.priors
                 result = format_result(
                     run,
+                    worker_run,
                     data_dump,
                     out,
                     weights,
@@ -280,12 +271,8 @@ def analysis_runner(
 
                 logger.info(
                     "Generating posterior from marginalized parameters for"
-                    f" nsamples={len(result.posterior)}, POOL={pool.size}"
+                    f" nsamples={len(result.posterior)}"
                 )
-                #fill_args = [
-                #    (ii, row, run.likelihood) for ii, row in posterior.iterrows()
-                #]
-                #samples = pool.map(fill_sample, fill_args)
                 result.posterior, _ = worker_run.parameter_conversion.convert_to_multimessenger_parameters(result.posterior)
 
                 logger.debug(

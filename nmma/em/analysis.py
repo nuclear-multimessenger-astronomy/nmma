@@ -53,7 +53,6 @@ def em_only_sampling(likelihood, priors, args):
             sampler_kwargs["niter"] = 1
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
-            
     result = bilby.run_sampler(
         likelihood,
         priors,
@@ -185,7 +184,7 @@ def make_injection(args, filters = None, fixed_timestep=False, injection_model =
             injection_model, args, filters=filters, 
         )
     
-    sample_times = setup_sample_times(args, timeshift=timeshift)
+    sample_times = setup_sample_times(args)
     data = create_light_curve_data(
         injection_parameters, args, 
         light_curve_model=injection_model,
@@ -339,9 +338,7 @@ def bolometric_analysis(args):
             save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
         )
     return
-
 def analysis(args):
-
     filters = set_filters(args)
 
     # create the  data if an injection set is given
@@ -352,7 +349,7 @@ def analysis(args):
         ## configure the output file
         if args.injection_outfile is not None:
             store_injections(args, filters, data)
-
+        trigger_time = injection_parameters["kilonova_trigger_time"]
     else:
         # load observational data
         try:
@@ -364,23 +361,19 @@ def analysis(args):
                 for key in data.keys():
                     data[key] = np.array(data[key])
 
-    if args.trigger_time is None:
-        # load the minimum time as trigger time
-        min_time = np.inf
-        for key, array in data.items():
-            min_time = np.minimum(min_time, np.min(array[:, 0]))
-        trigger_time = min_time
-        print(
-            f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}"
-        )
-    else:
-        trigger_time = args.trigger_time
-
+        trigger_time = getattr(args, 'trigger_time', None)
+        if trigger_time is None:
+            # load the minimum time as trigger time
+            min_time = np.inf
+            for key, array in data.items():
+                min_time = np.minimum(min_time, np.min(array[:, 0]))
+            trigger_time = min_time
+            print(
+                f"trigger_time is not provided, analysis will continue using a trigger time of {trigger_time}"
+            )
 
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze, error_budget = set_error_budget_and_filters(args, data)
-
-
 
     # initialize light curve model
 
@@ -415,7 +408,6 @@ def analysis(args):
     )
 
     likelihood = EMTransientLikelihood(**likelihood_kwargs)
-    
     result = em_only_sampling(likelihood, priors, args)
     
     if args.injection:
@@ -437,8 +429,8 @@ def analysis(args):
         constant_columns = {col for col in result.posterior if len(result.posterior[col].unique()) == 1}
         var_inj_params = injlist_all - constant_columns
         injection = {key: injection_parameters[key] 
-                     for key in var_inj_params 
-                     if key in injection_parameters}
+                        for key in var_inj_params 
+                        if key in injection_parameters}
         result.plot_corner(parameters=injection)
     else:
         result.plot_corner()
@@ -560,6 +552,7 @@ def nnanalysis(args):
     from nflows.flows import Flow
     from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform
     from nflows.transforms import CompositeTransform, RandomPermutation
+
     import nflows.utils as torchutils
 
     # only continue if the Kasen model is selected

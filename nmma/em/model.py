@@ -10,7 +10,7 @@ from . import utils
 from . import lightcurve_generation as lc_gen
 
 from nmma.joint.base import initialisation_args_from_signature_and_namespace
-from nmma.joint.constants import default_cosmology
+from nmma.joint.constants import default_cosmology, c_SI
 from nmma.joint.conversion import observation_angle_conversion, get_redshift, Hubble_constant_to_distance, distance_modulus_nmma
 from nmma.utils.models import get_models_home, get_model
 
@@ -212,6 +212,25 @@ class LightCurveModelContainer(object):
 
         return param_dict
 
+
+    def extinction_correction(self, mag, redshift, Ebv, filts=None):
+        ext_mag = self.get_extinction_mags(redshift, Ebv, filts)
+        return self.apply_extinction_correction(mag, ext_mag, self.default_filts)
+    
+    def get_extinction_mags(self, redshift, Ebv, filts= None):
+        try:
+            ext_mag = np.zeros(len(self.nu_0s))
+        except AttributeError:
+            self.default_filts, self.lambdas = utils.get_default_filts_lambdas(filters=filts)
+            self.nu_0s = c_SI / self.lambdas
+            ext_mag = np.zeros(len(self.nu_0s))
+
+        if Ebv != 0.0:
+            ext = utils.extinctionFactorP92SMC(self.nu_0s, Ebv, redshift)
+            ext_mag = -2.5 * np.log10(ext)
+
+        return ext_mag
+
     def apply_extinction_correction(self, mag, ext_mags, filters):
         for ext_mag, filt in zip(ext_mags, filters):
             try:
@@ -219,11 +238,7 @@ class LightCurveModelContainer(object):
             except:
                 continue
         return mag  
-
-    def extinction_correction(self, mag, redshift, Ebv, filts=None):
-        def_filts ,_,  ext_mag = utils.get_extinction_mags(redshift, Ebv, filts)
-        return self.apply_extinction_correction(mag, ext_mag, def_filts)
-
+    
     @property
     def citation(self):
         return {self.model: citation_dict[self.model]}
@@ -276,12 +291,12 @@ class SVDLightCurveModel(LightCurveModelContainer):
     parameter_conversion: func, optional
         Function to convert from sampled parameters to parameters of the
         light curve model. By default, no conversion takes place.
-    mag_ncoeff: int, optional
+    svd_mag_ncoeff: int, optional
         Number of highest eigenvalues to be taken for magnitude's SVD evaluation.
-    lbol_ncoeff: int, optional
+    svd_lbol_ncoeff: int, optional
         Number of highest eigenvalues to be taken for bolometric luminosity's SVD evaluation.
     interpolation_type: str, optional
-        Type of interpolation to use. Can be 'sklearn_gp', 'api_gp', or 'tensorflow'.
+        Type of interpolation to use. Can be 'keras','sklearn_gp', 'api_gp', or a keras-backend.
     model_parameters: list, optional
         List of alternative model parameters. If not specified, default will be used.
     filters: list of str, optional
@@ -301,17 +316,17 @@ class SVDLightCurveModel(LightCurveModelContainer):
         model,
         svd_path=None,
         parameter_conversion=None,
-        mag_ncoeff=None,
-        lbol_ncoeff=None,
-        interpolation_type="sklearn_gp",
+        svd_mag_ncoeff=None,
+        svd_lbol_ncoeff=None,
+        interpolation_type="keras",
         model_parameters=None,
         filters=None,
         local_only=False,
     ):
         super().__init__(model, parameter_conversion, filters, model_parameters)
 
-        self.mag_ncoeff = mag_ncoeff
-        self.lbol_ncoeff = lbol_ncoeff
+        self.mag_ncoeff = svd_mag_ncoeff
+        self.lbol_ncoeff = svd_lbol_ncoeff
         self.interpolation_type = interpolation_type
         self.svd_path = get_models_home(svd_path)
 
@@ -323,7 +338,6 @@ class SVDLightCurveModel(LightCurveModelContainer):
         core_model_name = "_".join(model_name_components)
 
         modelfile   = os.path.join(self.svd_path, f"{core_model_name}.joblib")
-
 
         if interpolation_type == "tensorflow":
             self.model_specifier = "_tf"
@@ -342,6 +356,8 @@ class SVDLightCurveModel(LightCurveModelContainer):
 
         if self.filters is None:
             self.filters = list(self.svd_mag_model.keys())
+        elif isinstance(self.filters, str):
+            self.filters = [self.filters]
 
 
         if self.interpolation_type == "sklearn_gp":
@@ -353,13 +369,16 @@ class SVDLightCurveModel(LightCurveModelContainer):
                 for ii, gp_model in enumerate(self.svd_mag_model[filt]["gps"]):
                     self.svd_mag_model[filt]["gps"][ii] = load_api_gp_model(gp_model)
             
-        elif self.interpolation_type == "tensorflow":
-            import tensorflow as tf
-            tf.get_logger().setLevel("ERROR")
-            from tensorflow.keras.models import load_model
-            def tensorflow_load_model(model_file):
-                return load_model(model_file, compile=False)
-            self.load_filt_model(model, tensorflow_load_model, fn_ext= 'h5', target_name='model')
+        elif self.interpolation_type in ("keras", "tensorflow", "torch", 'jax'):
+
+            import keras as k
+            def keras_load_model(model_file):
+                return k.saving.load_model(model_file, compile=False)
+            try:
+                self.load_filt_model(model, keras_load_model, fn_ext='keras', target_name='model')
+            # if no filter- model is found, try to load the legacy h5 model
+            except ValueError:
+                self.load_filt_model(model, keras_load_model, fn_ext= 'h5', target_name='model')
 
         else:
             raise ValueError("--interpolation-type must be sklearn_gp, api_gp or tensorflow")
@@ -373,16 +392,20 @@ class SVDLightCurveModel(LightCurveModelContainer):
     def load_filt_model(self, model, load_method, fn_ext='joblib', target_name='gps'):
         
         outdir = os.path.join(self.svd_path, f"{model}{self.model_specifier}")
+        found_any_model = False
         for filt in self.filters:
             outfile = os.path.join(outdir, f"{filt}.{fn_ext}")
             if os.path.isfile(outfile):
                 print(f"Load filter {filt}")
                 self.svd_mag_model[filt][target_name] = load_method(outfile)
+                found_any_model = True
             else:
                 print(f"Could not find model file for filter {filt}")
                 if filt not in self.svd_mag_model:
                     self.svd_mag_model[filt] = {}
                 self.svd_mag_model[filt][target_name] = None
+        if not found_any_model:
+            raise ValueError(f"No {fn_ext}-model files found for {model} in {outdir}")
         
     def __repr__(self):
         return super().__repr__() + f"(model={self.model}, svd_path={self.svd_path})"
@@ -400,13 +423,12 @@ class SVDLightCurveModel(LightCurveModelContainer):
             svd_lbol_model=self.svd_lbol_model,
             mag_ncoeff=self.mag_ncoeff,
             lbol_ncoeff=self.lbol_ncoeff,
-            interpolation_type=self.interpolation_type,
             filters=filters,
         )
         lbol *= 1.0 + z
 
         filts = mag.keys()
-        _, _, ext_mags = utils.get_extinction_mags(z, parameters.get("Ebv", 0.0), filts)
+        ext_mags = self.get_extinction_mags(z, parameters.get("Ebv", 0.0), filts)
         for i, filt in enumerate(filts):
             mag[filt] -= 2.5 * np.log10(1.0 + z)
             mag[filt] += ext_mags[i]
@@ -500,11 +522,11 @@ class GRBLightCurveModel(LightCurveModelContainer):
         if grb_param_dict["epsilon_e"] + grb_param_dict["epsilon_B"] > 1.0:
             return np.zeros(len(sample_times)), {}
         
-        filts, nu_0s, ext_mag = utils.get_extinction_mags(new_parameters['redshift'], new_parameters.get("Ebv", 0.0), self.filters)
+        ext_mag = self.get_extinction_mags(new_parameters['redshift'], new_parameters.get("Ebv", 0.0), self.filters)
         lbol, mag = lc_gen.grb_lc(
-            sample_times, grb_param_dict, filters=filts, obs_frequencies= nu_0s
+            sample_times, grb_param_dict, filters=self.default_filts, obs_frequencies= self.nu_0s
         )
-        mag = self.apply_extinction_correction(mag, ext_mag, filts )
+        mag = self.apply_extinction_correction(mag, ext_mag, self.default_filts)
         return lbol, mag
 
 
@@ -590,7 +612,7 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
 
     def generate_lightcurve(self, sample_times, parameters):
         em_param_dict = self.em_parameter_setup(parameters, extinction=True)
-        filts, lambdas, ext_mag = utils.get_extinction_mags(em_param_dict['redshift'], em_param_dict.get("Ebv", 0.0), self.filters, out='lambdas')
+        ext_mag = self.get_extinction_mags(em_param_dict['redshift'], em_param_dict.get("Ebv", 0.0), self.filters)
         
         stretch = em_param_dict.get("supernova_mag_stretch", 1)
 
@@ -599,11 +621,11 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
             em_param_dict,
             cosmology=default_cosmology,
             model_name=self.model,
-            filters=filts,
-            lambdas=lambdas
+            filters=self.default_filts,
+            lambdas=self.lambdas
         )
         mag_boost = em_param_dict.get("supernova_mag_boost", 0.0)
-        for i, filt in enumerate(filts):
+        for i, filt in enumerate(self.default_filts):
             mag[filt] += ext_mag[i] + mag_boost
 
         return lbol, mag
@@ -633,11 +655,11 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
 
     def generate_lightcurve(self, sample_times, parameters):
         lc_param_dict = self.em_parameter_setup(parameters)
-        filts, nus, ext_mag = utils.get_extinction_mags(lc_param_dict['redshift'], lc_param_dict.get("Ebv", 0.0), self.filters)
+        ext_mag = self.get_extinction_mags(lc_param_dict['redshift'], lc_param_dict.get("Ebv", 0.0), self.filters)
 
-        lbol, mag = lc_gen.sc_lc(sample_times, lc_param_dict, nus, filters=filts)
+        lbol, mag = lc_gen.sc_lc(sample_times, lc_param_dict, self.nu_0s, filters=self.default_filts)
 
-        mag = self.apply_extinction_correction(mag, ext_mag, filts)
+        mag = self.apply_extinction_correction(mag, ext_mag, self.default_filts)
         return lbol, mag
 
 
@@ -679,13 +701,13 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
     def generate_lightcurve(self, sample_times, parameters):
         param_dict = self.em_parameter_setup(parameters, extinction=True)
 
-        filts, nu_obs, ext_mags = utils.get_extinction_mags(param_dict['redshift'], param_dict.get("Ebv", 0.0), self.filters)
+        ext_mags = self.get_extinction_mags(param_dict['redshift'], param_dict.get("Ebv", 0.0), self.filters)
 
         # prevent the output message flooded by these warning messages
         old = np.seterr()
         np.seterr(invalid="ignore")
         np.seterr(divide="ignore")
-        lbol, mag = self.lc_func(sample_times, param_dict, nu_obs, self.filters)
+        lbol, mag = self.lc_func(sample_times, param_dict, self.nu_0s, self.filters)
         np.seterr(**old)
         if self.model == "synchrotron_powerlaw":
             # remove the distance modulus for the synchrotron powerlaw
@@ -693,7 +715,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
             dist_mod = distance_modulus_nmma(param_dict["luminosity_distance"])
             for filt in mag.keys():
                 mag[filt] -= dist_mod
-        mag = self.apply_extinction_correction(mag, ext_mags, filts)
+        mag = self.apply_extinction_correction(mag, ext_mags, self.default_filts)
 
         return lbol, mag
 
@@ -939,8 +961,8 @@ def create_injection_model(args):
     kilonova_kwargs = dict(
         model=getattr(args, 'em_injection_model', args.model),
         svd_path=getattr(args, 'injection_svd_path', args.svd_path),
-        mag_ncoeff = getattr(args, 'injection_svd_mag_ncoeff', args.svd_mag_ncoeff),   
-        lbol_ncoeff = getattr(args, 'injection_svd_lbol_ncoeff', args.svd_lbol_ncoeff),
+        svd_mag_ncoeff = getattr(args, 'injection_svd_mag_ncoeff', args.svd_mag_ncoeff),   
+        svd_lbol_ncoeff = getattr(args, 'injection_svd_lbol_ncoeff', args.svd_lbol_ncoeff),
     )
     if args.with_grb_injection:
         return KilonovaGRBLightCurveModel(

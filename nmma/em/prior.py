@@ -287,7 +287,7 @@ def create_prior_from_args(model_names, args):
 
         print(f"The prior on Ebv is set to fixed value of {priors['Ebv']}")
 
-    if args.systematics_file is not None:
+    if getattr(args, 'systematics_file', None) is not None:
         systematics_priors = systematics.main(args.systematics_file)
         priors.from_list(systematics_priors)
     return priors

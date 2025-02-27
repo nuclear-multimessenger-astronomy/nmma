@@ -154,7 +154,7 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
     """
 
     def __init__(self,priors, param_conv_func, interferometers,  
-                 waveform_generator, gw_likelihood_type, time_marginalization=False, distance_marginalization=False, phase_marginalization=False, distance_marginalization_lookup_table=None, jitter_time=True, reference_frame="sky", time_reference="geocenter", **kwargs):
+                 waveform_generator, gw_likelihood_type='GravitationalWaveTransient', time_marginalization=False, distance_marginalization=False, phase_marginalization=False, distance_marginalization_lookup_table=None, jitter_time=True, reference_frame="sky", time_reference="geocenter", **kwargs):
 
         if param_conv_func is None:
             param_conv_func = self.identity_conversion

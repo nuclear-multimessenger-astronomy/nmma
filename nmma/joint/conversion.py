@@ -161,7 +161,7 @@ def radii_from_qur(converted_parameters, added_keys):
     return converted_parameters, added_keys
 
 def macro_props_from_eos(eos_data, converted_parameters, added_keys):
-    eos_keys = ["TOV_radius", "TOV_mass", "lambda_1", "lambda_2",
+    eos_keys = ["TOV_mass", "TOV_radius", "lambda_1", "lambda_2",
                 "radius_1", "radius_2", "R_14", "R_16"]
     added_keys += eos_keys
     
@@ -171,7 +171,7 @@ def macro_props_from_eos(eos_data, converted_parameters, added_keys):
         for key, val_array in zip(eos_keys, 
         EOS2Parameters(*eos_data[0],m1_source, m2_source)
         ):
-            converted_parameters[key] = val_array
+            converted_parameters[key] = val_array.item()
     else:
         ### assuming TOV mass and radius are the last entries of the respective arrays
         TOV_mass_list = []
@@ -198,7 +198,7 @@ def macro_props_from_eos(eos_data, converted_parameters, added_keys):
             R_16_list.append(R_16)
     
         for key, _list in zip(eos_keys, [
-            TOV_radius_list, TOV_mass_list, lambda_1_list,
+             TOV_mass_list, TOV_radius_list, lambda_1_list,
             lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list
         ]):
             converted_parameters[key] = np.array(_list)

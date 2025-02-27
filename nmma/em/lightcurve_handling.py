@@ -176,8 +176,8 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
             kilonova_kwargs = dict(
                 model=args.model,
                 svd_path=args.svd_path,
-                mag_ncoeff=args.svd_mag_ncoeff,
-                lbol_ncoeff=args.svd_lbol_ncoeff,
+                svd_mag_ncoeff =args.svd_mag_ncoeff,
+                svd_lbol_ncoeff=args.svd_lbol_ncoeff,
             )
 
             light_curve_model = KilonovaGRBLightCurveModel(
@@ -207,8 +207,8 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
             light_curve_kwargs = dict(
                 model=args.model,
                 svd_path=args.svd_path,
-                mag_ncoeff=args.svd_mag_ncoeff,
-                lbol_ncoeff=args.svd_lbol_ncoeff,
+                svd_mag_ncoeff=args.svd_mag_ncoeff,
+                svd_lbol_ncoeff=args.svd_lbol_ncoeff,
             )
             light_curve_model = SVDLightCurveModel(  # noqa: F841
                 **light_curve_kwargs, interpolation_type=args.interpolation_type

@@ -58,9 +58,9 @@ DEFAULT_FILTERS = [
     "ultrasat",
 ]
 
-def setup_sample_times(args, timeshift=0.):
-    tmin = args.tmin + timeshift
-    tmax = args.tmax + timeshift
+def setup_sample_times(args):
+    tmin = args.tmin
+    tmax = args.tmax
     n_step = int((tmax - tmin) / args.dt) +1
     if getattr(args, 'log_space_time', False):
         return np.geomspace(tmin, tmax, n_step)
@@ -132,19 +132,6 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
 
     return ext
 
-def get_extinction_mags(redshift, Ebv, filts= None, out= 'nus'):
-    default_filts, lambdas = get_default_filts_lambdas(filters=filts)
-    nu_0s = c_SI / lambdas
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_0s, Ebv, redshift)
-        ext_mag = -2.5 * np.log10(ext)
-    else:
-        ext_mag = np.zeros(len(nu_0s))
-    if out == 'lambdas':
-        return default_filts, lambdas, ext_mag
-    else:
-        return default_filts, nu_0s, ext_mag
 
 def get_all_bandpass_metadata():
     """

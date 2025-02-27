@@ -177,7 +177,7 @@ def create_benchmark(
     light_curve_model = SVDLightCurveModel(
         model,
         svd_path=svd_path,
-        mag_ncoeff=svd_ncoeff,
+        svd_mag_ncoeff=svd_ncoeff,
         interpolation_type=interpolation_type,
         filters=filts,
         local_only=local_only,

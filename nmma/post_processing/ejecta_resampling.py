@@ -10,11 +10,11 @@ from bilby.core.prior import Uniform
 
 from .parser import resampling_parser
 from ..joint.conversion import (
-    BNSEjectaFitting, NSBHEjectaFitting, BBHEjectaFitting,
+    BNSEjectaFitting, NSBHEjectaFitting,
     luminosity_distance_to_redshift, chirp_mass_and_eta_to_component_masses,
-    tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities
         )
 from ..joint.constants import geom_msun_km
+from .plotting_routines import resampling_corner_plot
 
 from pymultinest.solve import Solver
 
@@ -35,70 +35,6 @@ def construct_EM_KDE(EMsamples, combine_ejecta_mass):
     else:
         raise ValueError("EM samples must either contain ejecta mass as 'log10_mej' or seperate ejecta masses as 'log10_mej_dyn' and 'log10_mej_wind'.")
 
-
-
-
-def corner_plot(posterior_samples, solution, outdir, withNSBH):
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import corner
-    matplotlib.rcParams.update({'font.size': 16, 'text.usetex': True, 'font.family': 'Times New Roman'})
-    kwargs = dict(bins=50, smooth=1.3, label_kwargs=dict(fontsize=16), show_titles=True,
-                  title_kwargs=dict(fontsize=16), color='#0072C1',
-                  truth_color='tab:orange', quantiles=[0.05, 0.95],
-                  levels=(0.10, 0.32, 0.68, 0.95), median_line=True,
-                  plot_density=False, plot_datapoints=False, fill_contours=True,
-                  max_n_ticks=4, hist_kwargs={'density': True})
-    
-        
-    mc = posterior_samples['chirp_mass'].to_numpy()
-    invq = posterior_samples['mass_ratio'].to_numpy()
-    alpha = posterior_samples['alpha'].to_numpy()
-    zeta = posterior_samples['zeta'].to_numpy()
-
-    eta = invq / np.power(1. + invq, 2)
-    m1, m2 = chirp_mass_and_eta_to_component_masses(mc, eta)
-    q = m1 / m2  # inverted
-
-
-
-    if withNSBH:#NSBH resampling result corner plot
-        labels = [r'$\mathcal{M}_c[M_{\odot}]$', r'$q$', r'$\alpha[M_{\odot}]$', r'$\zeta$']
-        plotSamples = np.vstack((mc, q, alpha, zeta))
-        limits = ((np.amin(mc), np.amax(mc)), (np.amin(q), 3), (np.amin(alpha), np.amax(alpha)), (np.amin(zeta), np.amax(zeta)))
-        plt.figure(1)
-        corner.corner(plotSamples.T, labels=labels, range=limits, **kwargs)
-        plt.savefig(f'{outdir}/corner.pdf', bbox_inches='tight')
-        
-
-    else: #BNS resampling result corner plot
-        labels = [r'$\mathcal{M}_c[M_{\odot}]$', r'$q$', r'$\tilde{\Lambda}$', r'$\alpha[M_{\odot}]$', r'$\zeta$', r'$M_{\rm{max}}[M_{\odot}]$']
-
-        EOS = posterior_samples['EOS'].astype(int) + 1
-        lambda1 = []
-        lambda2 = []
-        for i in range(len(EOS)):
-            EOSsample = EOS[i]
-            lam1, lam2 = np.interp([m1[i], m2[i]], solution.EOS_masses_dict[EOSsample], solution.EOS_lambda_dict[EOSsample])
-            lambda1.append(lam1)
-            lambda2.append(lam2)
-        lambda1 = np.array(lambda1)
-        lambda2 = np.array(lambda2)
-        lambdaT, _ = tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(lambda1, lambda2, q)
-
-        MTOV = []
-        for EOSsample in EOS:
-            MTOV.append(solution.EOS_masses_dict[EOSsample][-1])
-        MTOV = np.array(MTOV)
-
-        plotSamples = np.vstack((mc, q, lambdaT, alpha, zeta, MTOV))
-        limits = ((np.amin(mc), np.amax(mc)), (np.amin(q), 3), (np.amin(lambdaT), np.amax(lambdaT)), (np.amin(alpha), np.amax(alpha)), (np.amin(zeta), np.amax(zeta)), (np.amin(MTOV), 2.7))
-        plt.figure(1)
-        corner.corner(plotSamples.T, labels=labels, range=limits, **kwargs)
-        plt.savefig(f'{outdir}/corner.pdf', bbox_inches='tight')
-        print("The 90% upper bound for lambdaT is {0}".format(np.quantile(lambdaT, 0.9)))
 
 class EjectaResampler(Solver):
 
@@ -294,7 +230,7 @@ def main_resampling():
     posterior_samples = pd.DataFrame.from_dict(posterior_samples)
     posterior_samples.to_csv(f"{args.outdir}/posterior_samples.dat", sep=" ", index=False)
 
-    corner_plot(posterior_samples, solution, args.outdir, args.withNSBH)
+    resampling_corner_plot(posterior_samples, solution, args.outdir, args.withNSBH)
 
 
 if __name__ == "__main__":
