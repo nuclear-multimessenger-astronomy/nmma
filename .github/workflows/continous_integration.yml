@@ -2,11 +2,15 @@ name: Unit Test nmma
 
 on:
   push:
-    branches: [main]
+    branches: 
+      - main
+      - direct_eos_sampling
     paths-ignore:
       - "doc/**"
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - direct_eos_sampling
     paths-ignore:
       - "doc/**"
   workflow_dispatch:
