@@ -67,9 +67,9 @@ def _add_em_settings_to_parser(parser):
     
     ## emulator args
     em_input_parser.add(
-        "--em-transient-interpolation-type","--kilonova-interpolation-type", type=str,
-        help="Interpolation method to be used for EM transient model (sklearn_gp or tensorflow)",
-    )
+        "--em-transient-interpolation-type","--kilonova-interpolation-type", 
+        type=str, default="keras",
+        help="Interpolation library to be used for EM transient model. Default: keras, options: sklearn_gp, api_gp" )
     em_input_parser.add( "--svd-path", "--kilonova-model-svd", type=str, 
         help="Path to the lightcurve model's SVD data" )
     em_input_parser.add("--svd-mag-ncoeff", type=int, default=10,

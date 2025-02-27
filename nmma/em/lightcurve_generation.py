@@ -48,8 +48,7 @@ def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared = abs_mag_dist_fac
 ## Arnett model convenience functions
 def arnett_lc_get_int_A_non_vec(x, y):
     r = quad(lambda z: 2 * z * np.exp(-2 * z * y + z**2), 0, x)
-    int_A = r[0]
-    return int_A
+    return r[0]
 
 
 arnett_lc_get_int_A = np.vectorize(arnett_lc_get_int_A_non_vec, excluded=["y"])
@@ -57,8 +56,7 @@ arnett_lc_get_int_A = np.vectorize(arnett_lc_get_int_A_non_vec, excluded=["y"])
 
 def arnett_lc_get_int_B_non_vec(x, y, s):
     r = quad(lambda z: 2 * z * np.exp(-2 * z * y + 2 * z * s + z**2), 0, x)
-    int_B = r[0]
-    return int_B
+    return r[0]
 
 
 arnett_lc_get_int_B =  np.vectorize(arnett_lc_get_int_B_non_vec, excluded=["y", "s"])
@@ -95,7 +93,8 @@ def arnett_lc(t_day, param_dict):
     int_B = arnett_lc_get_int_B(x, y, s)
 
     Lbol = Mni * np.exp(-x**2) * (
-        (epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
+        (epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B
+    )
 
     return Lbol
 
@@ -126,7 +125,6 @@ def calc_lc(
     svd_lbol_model = None,
     mag_ncoeff: int = None,
     lbol_ncoeff: int = None,
-    interpolation_type: str = "sklearn_gp",
     filters: list = None,
 ) -> "tuple[np.array, np.array]":
     """
@@ -138,7 +136,6 @@ def calc_lc(
         svd_lbol_model (SVDTrainingModel): Trained surrogate model for lbol
         mag_ncoeff (int): Number of coefficients after SVD projection for mag
         lbol_ncoeff (int): Number of coefficients after SVD projection for lbol
-        interpolation_type (str): String denoting which interpolation type is used for the surrogate model
         filters (Array): List/array of filters at which we want to evaluate the model
     """
 
@@ -155,20 +152,20 @@ def calc_lc(
     for filt in filters:
         if filt in mAB:
             continue
-        tt_interp, mag_back = eval_svd_model(svd_mag_model[filt], mag_ncoeff, param_list, interpolation_type)
+        tt_interp, mag_back = eval_svd_model(svd_mag_model[filt], mag_ncoeff, param_list)
 
         mag_back[tt_interp>=20]= np.inf ### FIXME quick-fix to not trust lightcurve after 20 days 
         mAB[filt] = autocomplete_data(tt, tt_interp, mag_back )
 
     if svd_lbol_model is not None:
-        tt_interp, lbol_back =eval_svd_model(svd_lbol_model, lbol_ncoeff, param_list, interpolation_type)
+        tt_interp, lbol_back =eval_svd_model(svd_lbol_model, lbol_ncoeff, param_list)
         lbol = 10**autocomplete_data(tt, tt_interp, lbol_back)
     else:
         lbol = np.full_like(tt, np.nan)
 
     return np.squeeze(lbol), mAB
 
-def eval_svd_model(svd_model, ass_ncoeff, param_list, interpolation_type):
+def eval_svd_model(svd_model, ass_ncoeff, param_list):
     """Evaluate the SVD model"""
     if ass_ncoeff:
         n_coeff = min(ass_ncoeff, svd_model["n_coeff"])
@@ -183,11 +180,11 @@ def eval_svd_model(svd_model, ass_ncoeff, param_list, interpolation_type):
 
     param_list_postprocess = np.array(param_list)
     param_list_postprocess = (param_list_postprocess- param_mins) / (param_maxs- param_mins)
-
-    if interpolation_type == "tensorflow":
+    try:
         model = svd_model["model"]
-        cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
-    else:
+        #NOTE: This is much(!) faster for small batch sizes than model.predict. Since we mostly call for single params, we should avoid .predict!!!
+        cAproj = model(np.atleast_2d(param_list_postprocess)).numpy().T.flatten()
+    except KeyError:
         cAproj = np.zeros((n_coeff,))
         gps = svd_model["gps"]
         if gps is None:
@@ -199,11 +196,12 @@ def eval_svd_model(svd_model, ass_ncoeff, param_list, interpolation_type):
             y_pred, sigma2_pred = gp.predict(
                 np.atleast_2d(param_list_postprocess), return_std=True
             )
-            cAproj[i] = y_pred
+            cAproj[i] = y_pred.item()
 
     
     svd_back = np.dot(VA[:, :n_coeff], cAproj)
-    svd_back*= (maxs - mins) + mins
+    svd_back*= (maxs - mins) 
+    svd_back+= mins
     return tt_interp, svd_back
 
 

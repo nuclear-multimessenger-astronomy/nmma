@@ -7,7 +7,7 @@ import numpy as np
 
 from . import model_parameters
 from .model import SVDLightCurveModel
-from .training import SVDTrainingModel
+from .training import SVDTrainingModel, KerasTrainingModel
 from .utils import interpolate_nans, setup_sample_times
 from .io import read_photometry_files, read_spectroscopy_files
 from .em_parsing import parsing_and_logging, svd_training_parser
@@ -88,31 +88,40 @@ def main():
         keys = list(data.keys())
         filts = sorted(list(set(data[keys[0]].keys()) - {"t"}))
 
-    training_model = SVDTrainingModel(
+    training_args = [
         args.model,
         training_data,
         parameters,
         sample_times,
         filts,
-        n_coeff=args.svd_ncoeff,
-        n_epochs=args.nepochs,
-        svd_path=args.svd_path,
-        interpolation_type=args.interpolation_type,
-        data_type=args.data_type,
-        data_time_unit=args.data_time_unit,
-        plot=args.plot,
-        plotdir=args.outdir,
-        ncpus=args.ncpus,
-        univariate_spline=args.use_UnivariateSpline,
-        univariate_spline_s=args.UnivariateSpline_s,
-        random_seed=args.random_seed,
-        continue_training=args.continue_training,
+        ]
+    training_kwargs = dict(
+            n_coeff=args.svd_mag_ncoeff,
+            n_epochs=args.nepochs,
+            svd_path=args.svd_path,
+            data_type=args.data_type,
+            data_time_unit=args.data_time_unit,
+            plot=args.plot,
+            plotdir=args.outdir,
+            ncpus=args.ncpus,
+            univariate_spline=args.use_UnivariateSpline,
+            univariate_spline_s=args.UnivariateSpline_s,
+            random_seed=args.random_seed,
+            continue_training=args.continue_training,
     )
+    try:
+        training_model = KerasTrainingModel(*training_args, **training_kwargs)
+    except:
+        print("Your settings are not compatible with a keras training model.\n \
+              Please consider adjusting your setup.\n \
+            We will now try to train a legacy SVD model.")
+        training_kwargs['interpolation_type'] = args.interpolation_type
+        training_model = SVDTrainingModel(*training_args, **training_kwargs)
 
     light_curve_model = SVDLightCurveModel(
         args.model,
         svd_path=args.svd_path,
-        mag_ncoeff=args.svd_ncoeff,
+        svd_mag_ncoeff=args.svd_mag_ncoeff,
         interpolation_type=args.interpolation_type,
         model_parameters=training_model.model_parameters,
         local_only=True,

@@ -242,7 +242,7 @@ def basic_em_analysis_parsing(parser):
 
 def em_model_parsing(parser):
     parser.add_argument("--interpolation-type", "--gptype", type=str, 
-        default="sklearn", help="SVD interpolation scheme.")
+        default="keras", help="SVD interpolation scheme.")
     parser.add_argument("--refresh-models-list", type=bool, default=False,
         help="Refresh the list of models available on Gitlab")
     parser.add_argument("--local-only", action=StoreBoolean, default=False,
@@ -286,7 +286,7 @@ def data_processing_parsing(parser):
 def ml_training_parsing(parser):
     parser.add_argument(
         "--nepochs","--tensorflow-nepochs", type=int, default=15,
-        help="Number of epochs for tensorflow training (default: 15)",)
+        help="Number of epochs for ml training (default: 15)",)
     parser.add_argument("--ncpus", default=1, type=int,
         help="number of cpus to be used, only support for sklearn_gp")
     parser.add_argument(

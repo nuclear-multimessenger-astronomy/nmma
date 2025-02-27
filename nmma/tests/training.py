@@ -40,7 +40,7 @@ def test_training():
     training_data, parameters = model_parameters.Bu2019lm_sparse(data)
 
     interpolation_type = "sklearn_gp"
-    training.SVDTrainingModel(
+    training.SklearnGPTrainingModel(
         model_name,
         copy.deepcopy(training_data),
         parameters,
@@ -48,7 +48,6 @@ def test_training():
         filts,
         n_coeff=n_coeff,
         svd_path=ModelPath,
-        interpolation_type=interpolation_type,
     )
 
     svdmodel_benchmark.create_benchmark(
@@ -59,8 +58,8 @@ def test_training():
         filters=filts,
     )
 
-    interpolation_type = "tensorflow"
-    training.SVDTrainingModel(
+    interpolation_type = "keras"
+    training.KerasTrainingModel(
         model_name,
         copy.deepcopy(training_data),
         parameters,
@@ -68,7 +67,6 @@ def test_training():
         filts,
         n_coeff=n_coeff,
         svd_path=ModelPath,
-        interpolation_type=interpolation_type,
     )
 
     svdmodel_benchmark.create_benchmark(

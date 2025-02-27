@@ -87,6 +87,7 @@ def args():
         ra=None,
         dec=None,
         fetch_Ebv_from_dustmap=False,
+        systematics_file = None
     )
 
     return args
@@ -109,7 +110,7 @@ def test_analysis_tensorflow(args):
 
 
 def test_analysis_sklearn_gp(args):
-
+    args.systematics_file = None
     args.interpolation_type = "sklearn_gp"
     analysis.main(args)
 

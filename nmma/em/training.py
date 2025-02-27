@@ -8,18 +8,16 @@ from .utils import autocomplete_data
 from ..utils.models import get_models_home, get_model
 
 try:
-    import tensorflow as tf
-    from tensorflow.keras import Sequential
-    from tensorflow.keras.layers import Dense, Dropout
-    from tensorflow.keras.models import load_model as load_tf_model
+    import keras as k
 except ImportError:
-    print("Install tensorflow if you want to use it...")
+    print("Install keras and better explicitly set the 'KERAS_BACKEND' \
+          as env-variable if you want to use it...")
 
 try:
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import RationalQuadratic
 
-    #NOTE this is used by the tensorflow model!
+    #NOTE this is used by the keras model!
     from sklearn.model_selection import train_test_split 
 except ImportError:
     print("Install scikit-learn if you want to use it...")
@@ -30,8 +28,7 @@ try:
 except ImportError:
     print("Install gaussian-process-api if you want to use it...")
 
-
-class SVDTrainingModel(object):
+class BaseTrainingModel(object):
     """A light curve training model object
 
     An object to train a light curve model across filters
@@ -52,23 +49,21 @@ class SVDTrainingModel(object):
     svd_path: str, optional
         Path to the svd directory
     n_coeff: int, optional
-        Number of eigenvalues to be taken for SVD evaluation
+        Number of eigenvalues to be taken for SVD evaluation. Default is 10
     n_epochs: int, optional
-        Number of epochs for tensorflow training
-    interpolation_type: str, optional
-        Type of interpolation, must be one of sklearn_gp, api_gp or tensorflow
+        Number of epochs for model training. Default is 15
     data_type: str, optional
         Data type for interpolation [photometry or spectroscopy]
     data_time_unit: str, optional
-        Unit of time for the data [days, hours, minutes, or seconds]
+        Unit of time for the data [days, hours, minutes, or seconds]. Default is days
     plot: bool, optional
-        Whether to show plots or not
+        Whether to show plots or not. Default is False
     plotdir: str, optional
         Directory for plotting
     ncpus: int, optional
         Number of CPUs to use for training
     univariate_spline: bool, optional
-        Whether to use univariate spline for interpolation
+        Whether to use univariate spline for interpolation. Default is False
     univariate_spline_s: int, optional
         Smoothing factor for univariate spline
     random_seed: int, optional
@@ -78,64 +73,6 @@ class SVDTrainingModel(object):
     continue_training: bool, optional
         Indicate whether we want to continue training an existing model
     """
-    def __init__(
-        self,
-        model,
-        data,
-        parameters,
-        sample_times,
-        filters,
-        svd_path=None,
-        n_coeff=10,
-        n_epochs=15,
-        interpolation_type="sklearn_gp",
-        data_type="photometry",
-        data_time_unit="days",
-        plot=False,
-        plotdir=os.path.join(os.getcwd(), "plot"),
-        ncpus=1,
-        univariate_spline=False,
-        univariate_spline_s=2,
-        random_seed=42,
-        start_training=True,
-        continue_training=False,
-    ):
-        # NOTE: This class is implemented for backwards compatibility. 
-        # Directly initiating a TensorflowTrainingModel, SklearnGPTrainingModel, 
-        # GPAPITrainingModel should be preferred.
-        # Most of the previous attributes and methods are now implemented in BaseTrainingModel which again is subclassed subject to the interpolation_type. 
-        # The __init__ creates a corresponding instance as a backend-attribute and
-        # __getattr__ retrieves any properties or methods from them
-
-        ##collect all arguments of __init__ to pass on
-        setup_kwargs = locals()
-        setup_kwargs.pop("self")
-        ## set interpolation_type here, pass everything else
-        self.interpolation_type = setup_kwargs.pop("interpolation_type")
-
-        if (interpolation_type != "tensorflow") and continue_training:
-            print(
-                "--continue-training only supported with --interpolation-type \
-                 tensorflow, this will have no effect"
-            )
-        if self.interpolation_type == "tensorflow":
-            self.backend = TensorflowTrainingModel(**setup_kwargs)
-        elif self.interpolation_type == "sklearn_gp":
-            self.backend = SklearnGPTrainingModel(**setup_kwargs)
-        elif self.interpolation_type == "api_gp":
-            self.backend = GPAPITrainingModel(**setup_kwargs)
-        else:
-            raise ValueError(
-                "interpolation_type must be sklearn_gp, api_gp or tensorflow"
-            )
-
-    # called when an attribute is not found, so almost always:
-    def __getattr__(self, name):
-        # We assume it is implemented in the backend
-        return self.backend.__getattribute__(name)
-
-        
-class BaseTrainingModel(object):
     def __init__(
         self,
         model,
@@ -377,18 +314,19 @@ class BaseTrainingModel(object):
     def training_func(self, param_array_postprocess, cAmat, filt):
         raise NotImplementedError("This method should be implemented by subclasses.")
     
-class TensorflowTrainingModel(BaseTrainingModel):
-    def __init__(self, **kwargs):
+    
+class KerasTrainingModel(BaseTrainingModel):
+    def __init__(self, *args, **kwargs):
 
-        self.model_specifier = "_tf"
-        self.file_ending = 'h5'
-        if kwargs['plot'] and not os.path.isdir(kwargs['plotdir']):
-            os.mkdir(kwargs['plotdir'])
-        super().__init__(**kwargs)
+        self.model_specifier = ""
+        self.file_ending = 'keras'
+        super().__init__( *args, **kwargs)
+        if self.plot and not os.path.isdir(self.plotdir):
+            os.mkdir(self.plotdir)
 
     def load_routine(self, filt):
         outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
-        self.svd_model[filt]["model"] = load_tf_model(outfile, compile=False)
+        self.svd_model[filt]["model"] = k.saving.load_model(outfile, compile=False)
         self.svd_model[filt]["model"].compile(optimizer="adam", loss="mse")
 
     def save_routine(self, filt, outfile):
@@ -407,23 +345,23 @@ class TensorflowTrainingModel(BaseTrainingModel):
             random_state=self.random_seed,
         )
 
-        tf.keras.utils.set_random_seed(self.random_seed)
+        k.utils.set_random_seed(self.random_seed)
 
         if self.model_exists and self.continue_training:
             model = self.svd_model[filt]["model"]
         else:
-            model = Sequential()
+            model = k.Sequential()
+            model.add(k.Input((train_X.shape[1],)))
             # One/few layers of wide NN approximate GP
             model.add(
-                Dense(
+                k.layers.Dense(
                     2048,
                     activation="relu",
                     kernel_initializer="he_normal",
-                    input_shape=(train_X.shape[1],),
                 )
             )
-            model.add(Dropout(dropout_rate))
-            model.add(Dense(self.n_coeff))
+            model.add(k.layers.Dropout(dropout_rate))
+            model.add(k.layers.Dense(self.n_coeff))
 
             # compile the model
             model.compile(optimizer="adam", loss="mse")
@@ -458,12 +396,25 @@ class TensorflowTrainingModel(BaseTrainingModel):
 
         self.svd_model[filt]["model"] = model
 
+class TensorflowTrainingModel(KerasTrainingModel):
+    """legacy class for compatibility with older tensorflow.keras-calls"""
+    def __init__(self, *args,  **kwargs):
+        super().__init__( *args, **kwargs)
+
+        self.model_specifier = "_tf"
+        self.file_ending = 'h5'
+
+    
+    def save_routine(self, filt, outfile):
+        self.svd_model[filt]["model"].save(outfile, save_format=self.file_ending)
+        del self.svd_model[filt]["model"]
+
 class SklearnGPTrainingModel(BaseTrainingModel):
-    def __init__(self, **kwargs):
+    def __init__(self, *args,  **kwargs):
         
         self.model_specifier = ""
         self.file_ending = 'joblib'
-        super().__init__(**kwargs)
+        super().__init__( *args, **kwargs)
 
     def load_routine(self, filt):
         outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
@@ -504,9 +455,9 @@ class SklearnGPTrainingModel(BaseTrainingModel):
         self.svd_model[filt]["gps"] = gps
 
 class GPAPITrainingModel(BaseTrainingModel):
-    def __init__(self, **kwargs):
+    def __init__(self,  *args, **kwargs):
         self.model_specifier = "_api"
-        super().__init__(**kwargs)
+        super().__init__( *args, **kwargs)
 
     def load_routine(self, filt):
         for i, sub_model in enumerate(self.svd_model[filt]["gps"]):
@@ -564,6 +515,73 @@ class GPAPITrainingModel(BaseTrainingModel):
             gps.append(gp_dict)
 
         self.svd_model[filt]["gps"] = gps
+
+
+
+class SVDTrainingModel(object):
+    def __init__(
+        self,
+        model,
+        data,
+        parameters,
+        sample_times,
+        filters,
+        svd_path=None,
+        n_coeff=10,
+        n_epochs=15,
+        interpolation_type="keras",
+        data_type="photometry",
+        data_time_unit="days",
+        plot=False,
+        plotdir=os.path.join(os.getcwd(), "plot"),
+        ncpus=1,
+        univariate_spline=False,
+        univariate_spline_s=2,
+        random_seed=42,
+        start_training=True,
+        continue_training=False,
+    ):
+        """interpolation_type: str, optional
+        Type of interpolation, must be one keras (or explicitly its backends),sklearn_gp, api_gp"""
+        # NOTE: This class is implemented for backwards compatibility. 
+        # Directly initiating a KerasTrainingModel, SklearnGPTrainingModel, 
+        # GPAPITrainingModel should be preferred.
+        # Most of the previous attributes and methods are now implemented in BaseTrainingModel which again is subclassed subject to the interpolation_type. 
+        # The __init__ creates a corresponding instance as a backend-attribute and
+        # __getattr__ retrieves any properties or methods from them
+
+        ##collect all arguments of __init__ to pass on
+        setup_kwargs = locals()
+        setup_kwargs.pop("self")
+        ## set interpolation_type here, pass everything else
+        self.interpolation_type = setup_kwargs.pop("interpolation_type")
+        keras_backends = ["keras", "tensorflow", "jax", "torch"]
+        if (interpolation_type not in keras_backends) and continue_training:
+            print(
+                "--continue-training only supported with --interpolation-type \
+                 keras/tensorflow/jax/torch, this will have no effect"
+            )
+        if self.interpolation_type in keras_backends:
+            try:
+                ## We prefer keras over tensorflow, but can try the older fashion
+                self.backend = KerasTrainingModel(**setup_kwargs)
+            except:
+                self.backend = TensorflowTrainingModel(**setup_kwargs)
+        elif self.interpolation_type == "sklearn_gp":
+            self.backend = SklearnGPTrainingModel(**setup_kwargs)
+        elif self.interpolation_type == "api_gp":
+            self.backend = GPAPITrainingModel(**setup_kwargs)
+        else:
+            raise ValueError(
+                "interpolation_type must be sklearn_gp, api_gp or tensorflow"
+            )
+
+    # called when an attribute is not found, so almost always:
+    def __getattr__(self, name):
+        # We assume it is implemented in the backend
+        return self.backend.__getattribute__(name)
+
+        
 
 
 def min_max_scaling(data):

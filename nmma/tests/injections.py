@@ -34,7 +34,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
     print(
         "current working directory: ", os.getcwd()
     )  # assumes run in root nmma folder, will need to modify if this is not true
-
     workingDir=os.path.dirname(__file__)
     dataDir = os.path.join(workingDir, 'data')
     test_directory = os.path.join(dataDir, model_name)
@@ -208,10 +207,13 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         assert os.path.exists(injection_file), "injection file does not exist"
         lightcurve_parameters = get_parameters_from_injection_file(injection_file)
         time_series = np.arange(0.01, 20.0 + 0.5, 0.5)
-        lightcurve_model = model_lightcurve_function(
+        init_kwargs = dict(
             model=model_name,
             filters=["sdssu"],
         )
+        if model_name == "Ka2017":
+            init_kwargs['interpolation_type'] = "sklearn_gp"
+        lightcurve_model = model_lightcurve_function(**init_kwargs)
         lightcurve_from_function = lightcurve_model.generate_lightcurve(
             sample_times=time_series, parameters=lightcurve_parameters
         )[1]
@@ -264,6 +266,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         """
         shutil.rmtree(test_directory)
         assert not os.path.exists(test_directory), "test directory has not been deleted"
+    
     injection_file = create_injection_from_command_line(model_name)
     command_line_lightcurve_dictionary = create_lightcurve_from_command_line(
         model_name, injection_file
