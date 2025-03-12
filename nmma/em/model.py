@@ -516,12 +516,12 @@ class GRBLightCurveModel(LightCurveMixin):
         else:
             # additional parameters
             energy_injection_params = ['energy_exponential', 'log10_Eend',
-                                       't_start', 't_end']
+                                       't_start', 'injection_duration']
             assert all(key in new_parameters for key in energy_injection_params)
             # fetch parameters
             log10_Eend = new_parameters['log10_Eend']
             t_start = new_parameters['t_start']
-            t_end = new_parameters['t_end']
+            t_end = new_parameters['t_start'] + new_parameters['injection_duration']
             energy_exponential = new_parameters['energy_exponential']
             # populate the E0 along the sample_times
             log10_Estart = log10_Eend + energy_exponential * np.log10(t_start / t_end)
