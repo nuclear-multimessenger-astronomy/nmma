@@ -34,7 +34,7 @@ def args():
         tmax=10.0,
         dt=0.5,
         log_space_time=False,
-        photometric_error_budget=0.1,
+        em_transient_error=0.1,
         soft_init=False,
         bestfit=True,
         svd_mag_ncoeff=10,
@@ -87,13 +87,13 @@ def args():
         ra=None,
         dec=None,
         fetch_Ebv_from_dustmap=False,
+        systematics_file = None
     )
 
     return args
 
 
 def test_analysis_systematics_with_time(args):
-
     args.systematics_file = f"{DATA_DIR}/systematics_with_time.yaml"
     analysis.main(args)
 
@@ -110,7 +110,7 @@ def test_analysis_tensorflow(args):
 
 
 def test_analysis_sklearn_gp(args):
-
+    args.systematics_file = None
     args.interpolation_type = "sklearn_gp"
     analysis.main(args)
 

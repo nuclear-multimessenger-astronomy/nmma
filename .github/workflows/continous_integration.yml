@@ -2,11 +2,15 @@ name: Unit Test nmma
 
 on:
   push:
-    branches: [main]
+    branches: 
+      - main
+      - direct_eos_sampling
     paths-ignore:
       - "doc/**"
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - direct_eos_sampling
     paths-ignore:
       - "doc/**"
   workflow_dispatch:
@@ -63,7 +67,7 @@ jobs:
       - name: Update Homebrew
         if: matrix.os == 'macos-latest'
         run: |
-          brew update --preinstall
+          brew update --auto-update
 
       - name: Configure Homebrew cache
         if: matrix.os == 'macos-latest'
@@ -125,7 +129,7 @@ jobs:
         run: |
           python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
           python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib coveralls
-          python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r tf_requirements.txt -r sklearn_requirements.txt
+          python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r training_requirements.txt
           python -m pip install .
           git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake .. && make && cd ../..
           pwd

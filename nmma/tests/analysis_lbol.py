@@ -3,7 +3,7 @@ import os
 import pytest
 
 
-from ..em import analysis_lbol
+from ..em import analysis
 
 
 @pytest.fixture(scope="module")
@@ -45,7 +45,8 @@ def args():
         ra=None,
         dec=None,
         fetch_Ebv_from_dustmap=False,
-        systematics_file=None
+        systematics_file=None,
+        config = None
     )
 
     return args
@@ -53,4 +54,4 @@ def args():
 
 def test_analysis_lbol(args):
 
-    analysis_lbol.main(args)
+    analysis.lbol_main(args)

@@ -1,3 +1,2 @@
-parallel_bilby>=2.0.2
 nestcheck
 mpi4py
