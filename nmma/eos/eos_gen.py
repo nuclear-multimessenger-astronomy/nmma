@@ -4,52 +4,6 @@ from scipy.integrate import solve_ivp, cumulative_trapezoid
 from scipy.optimize import minimize_scalar
 from .tov import TOVSolver
 import lal
-import json
-from bilby_pipe.utils import convert_string_to_dict, convert_string_to_list
-
-
-def read_constraint_from_args(args, constraint_kind):
-    ##preferred: Have the dict with the subconstraints already set up
-    prep_dict= getattr(args, constraint_kind, None) 
-    if prep_dict is not None:
-        return convert_string_to_dict(prep_dict)
-    
-    ###otherwise try to construct it:
-        ### read in provided attributes 
-    prel_dict= {key.removeprefix(constraint_kind+'_'): ##cut identifier
-                convert_string_to_list(getattr(args, key)) ## read in list or float
-                for key in dir(args)            ## search args for attrs 
-                if key.startswith(constraint_kind+'_')} ## related with kind
-    new_constraints = prel_dict.pop('name', None)
-    if new_constraints is not None: ## there needs to be a unique label
-        ext_dict={} 
-        ### iterate through constrs.
-        for i, name in enumerate(new_constraints): 
-            ext_dict[name] ={k:v[i] for k,v in prel_dict.items()} 
-        return ext_dict
-
-def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
-    if args.eos_constraint_dict:
-        try:
-            with open(args.eos_constraint_dict, 'r') as f:
-                constraint_dict = json.load(f) 
-        except:
-            constraint_dict = {}
-
-        for constraint_kind in constraint_kinds:
-            new_dict= read_constraint_from_args(args,constraint_kind)
-            if new_dict is None:
-                continue
-            try:
-                constraint_dict[constraint_kind].update(new_dict)
-            except KeyError:
-                constraint_dict[constraint_kind] = new_dict
-            except AttributeError:
-                constraint_dict[constraint_kind] = new_dict
-
-    with open(args.eos_constraint_dict, "w") as f:
-        json.dump(constraint_dict, f, indent=4)
-    return constraint_dict
 
 ### Test routine for EOS generation, to be replaced
 def eos_from_nep (S0_val, L_val, nsat_val = 0.16, 

@@ -25,6 +25,7 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     gw_kwargs = default_gw_kwargs | dict(
             interferometers=data_dump["ifo_list"],
             waveform_generator=data_dump["waveform_generator"],
+        
         )
     if args.likelihood_type == 'ROQGravitationalWaveTransient':
         gw_kwargs.pop("time_marginalization", None)
@@ -41,6 +42,10 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     elif args.likelihood_type == 'MBGravitationalWaveTransient':
         gw_kwargs.pop("time_marginalization", None)
         gw_kwargs.pop("jitter_time", None)
+        ## NOTE: This is a temporary fix to remove defaults set by bilby-pipe. 
+        # Will likely be adressed in bilby-pipe in the future.
+        gw_kwargs['waveform_generator'].waveform_arguments.pop('minimum_frequency', None)
+        gw_kwargs['waveform_generator'].waveform_arguments.pop('maximum_frequency', None)
         gw_kwargs.update(reference_chirp_mass=args.reference_chirp_mass)
 
     gw_kwargs.update(**kwargs)

@@ -201,7 +201,7 @@ def _add_eos_settings_to_parser(parser):
     
         ### args to set up eos likelihood evaluation based on constraints
     eos_input_parser.add(
-        "--eos-constraint-dict", type = bilby_pipe.utils.nonestr,
+        "--eos-constraint-json", type = bilby_pipe.utils.nonestr,
         help="path to .json-file from which eos-constraints are read and/or to which they should be stored. Can be appended with additional constraints."
     )
 

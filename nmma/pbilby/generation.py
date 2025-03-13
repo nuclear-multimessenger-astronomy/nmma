@@ -6,20 +6,17 @@ output files, logs and plots. It will also generate a `data_dump` that stores
 information on the run settings and data to be analysed.
 """
 import os
+import sys
 import pickle
-import subprocess
 from argparse import Namespace
 
 import bilby
 import bilby_pipe
-import parallel_bilby
 import bilby_pipe.data_generation
 import dynesty
 import lalsimulation
 import numpy as np
 
-from parallel_bilby import slurm
-from parallel_bilby.utils import get_cli_args
 
 from .parser import (
     create_nmma_generation_parser,
@@ -29,46 +26,15 @@ from .parser import (
 from ..em.io import loadEvent
 from ..em.model import create_injection_model
 from ..em.lightcurve_generation import create_light_curve_data
-from ..eos.eos_gen import compose_eos_constraints
+from ..eos.eos_likelihood import compose_eos_constraints
 
 from .. import __version__
-
-
-def find_sh_scripts(file_path):
-    # Open the file
-    with open(file_path, "r") as f:
-        # Read the content
-        content = f.read()
-
-    # Split the content into words using any whitespace as a separator
-    words = content.split()
-
-    # Filter out the words that end with '.sh'
-    sh_scripts = [word for word in words if word.endswith(".sh)")]
-
-    return sh_scripts
-
-
-def replace_pbilby_in_file(file_path, name):
-    # Read the contents of the file
-    with open(file_path, "r") as file:
-        file_contents = file.read()
-
-    # Replace the text
-    new_contents = file_contents.replace("parallel_bilby", name)
-
-    # Write the updated contents back to the file
-    with open(file_path, "w+") as file:
-        file.write(new_contents)
-
-    return
 
 
 def get_version_info():
     return dict(
         bilby_version=bilby.__version__,
         bilby_pipe_version=bilby_pipe.__version__,
-        parallel_bilby_version=parallel_bilby.__version__,
         dynesty_version=dynesty.__version__,
         lalsimulation_version=lalsimulation.__version__,
         nmma_version=__version__,
@@ -310,14 +276,14 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         if args.with_gw:
             self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, unknown_args)
             #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
-            self.gw_likelihood_type = self.gw_inputs.likelihood_type
+            args.gw_likelihood_type = self.gw_inputs.likelihood_type
             self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)
 
-            # We build the likelihood here to ensure the 
-            # distance marginalization exist before sampling
-            self.gw_inputs.likelihood
+            # # We build the likelihood here to ensure the 
+            # # distance marginalization exist before sampling
+            # self.gw_inputs.likelihood
 
-            if self.gw_likelihood_type == "ROQGravitationalWaveTransient":
+            if args.gw_likelihood_type == "ROQGravitationalWaveTransient":
                 self.gw_inputs.save_roq_weights()
 
 
@@ -381,22 +347,12 @@ def nmma_generation():
     """
 
     # Parse command line arguments
-    cli_args = get_cli_args()
+    cli_args = sys.argv[1:]
     generation_parser = create_nmma_generation_parser()
     args = parse_generation_args(generation_parser, cli_args, as_namespace=True)
 
     # Initialise run
     inputs, logger = generate_runner(parser=generation_parser, **vars(args)
     )
-
-    # Write slurm script
-    bash_file = slurm.setup_submit(inputs.data_dump_file, inputs, args, cli_args)
-    # change the parallel_bilby_analysis to nmma_analysis
-    sh_scripts = find_sh_scripts(bash_file)
-    for sh_script in sh_scripts:
-        replace_pbilby_in_file(sh_script.replace(")", ""), "nmma")
-    if args.submit:
-        subprocess.run([f"bash {bash_file}"], shell=True)
-    else:
-        logger.info(f"Setup complete, now run:\n $ bash {bash_file}")
+    logger.info(f"Setup complete")
 
