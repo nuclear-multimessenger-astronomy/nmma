@@ -212,8 +212,10 @@ def EOS2Parameters(radius_val, mass_val, Lambda_val, m1_source, m2_source
     TOV_mass = mass_val.max(axis=-1)
     TOV_radius = radius_val[np.argmax(mass_val)]
 
-    (lambda_1, lambda_2) = np.interp(x=[m1_source, m2_source],
-            xp= mass_val, fp=Lambda_val, left=0, right=0)
+    (log_lambda_1, log_lambda_2) = np.interp(x=[m1_source, m2_source],
+            xp= mass_val, fp=np.log(Lambda_val), left=0, right=0)
+    lambda_1 = np.exp(log_lambda_1)
+    lambda_2 = np.exp(log_lambda_2)
     try:
         (radius_1, radius_2, R_14, R_16) = np.interp(
                 x=[m1_source, m2_source, 1.4, 1.6],
