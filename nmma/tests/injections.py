@@ -89,6 +89,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             indices_file=None,
             original_parameters=True,
             repeated_simulations=0,
+            energy_injection=False,
         )
 
         create_injection.main(args)
