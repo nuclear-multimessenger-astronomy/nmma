@@ -82,6 +82,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             duration=4,
             generation_seed=42,
             grb_resolution=5,
+            energy_injection=False,
             eos_file="example_files/eos/ALF2.dat",
             binary_type="BNS",
             eject=False,
