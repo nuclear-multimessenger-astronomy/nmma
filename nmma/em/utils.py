@@ -8,6 +8,8 @@ import scipy.interpolate as interp
 import scipy.signal
 import scipy.constants
 import scipy.stats
+import scipy.special
+import scipy.integrate
 from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
 
 import sncosmo
@@ -1755,3 +1757,143 @@ def parse_LANLfile(filename, key="band"):
 
     return nrows, keys_in_file
 
+
+# the following functions are for the semi-analytic model using Hotokezaka & Nakar heating rate
+def heating_rate_HoNa(t, eth=0.5):
+    """Computes the nuclear specific heating rate over time.
+    
+    This implementation is based on a model from Korobkin et al. 2012
+    (DOI: 10.1111/j.1365-2966.2012.21859.x), derived from nucleosynthesis
+    simulations in compact binary merger ejecta. The model uses these
+    parameters: eps0 = 2e18, t0 = 1.3, sig = 0.11, alpha = 1.3.
+    
+    Args:
+        t: float or numpy.ndarray
+           Time(s) in rest-frame to evaluate the light curve. Can be an array
+           for multiple time points.
+        eth: float or numpy.ndarray, default=0.5
+           Efficiency parameter representing the fraction of nuclear power
+           retained in the matter, as defined by Korobkin et al. 2012.
+    
+    Returns:
+        float or numpy.ndarray: Nuclear specific heating rate in erg/g/s
+        (units implied but not explicitly used).
+    """
+    # Define model constants
+    eps0 = 2e18  # erg/g/s
+    t0 = 1.3     # s
+    sig = 0.11   # s
+    alpha = 1.3  # dimensionless
+    # Calculate the time evolution term
+    time_term = 0.5 - 1.0 / np.pi * np.arctan((t-t0) / sig)
+    # Return the heating rate
+    return eps0 * np.power(time_term, alpha) * eth / 0.5
+
+def luminosity_HoNa(E, t, td, be):
+    # Calculate diffusion time ratio
+    t_dif = td / t
+    # Determine escape time
+    tesc = np.minimum(t, t_dif) + be * t
+    # Calculate maximum y value
+    ymax = np.sqrt(0.5 * t_dif / t)
+    # Return luminosity using complementary error function
+    return scipy.special.erfc(ymax) * E / tesc
+
+def dEdt_HoNa(t, E, dM, td, be):
+    # Calculate heating contribution
+    heat = dM * heating_rate_HoNa(t)
+    # Calculate luminosity
+    L = luminosity_HoNa(E, t, td, be)
+    dEdt = -E / t - L + heat
+    return dEdt
+
+
+def lightcurve_HoNa(t, mass, velocities, opacities, n):
+    # Validate arguments
+    t0 = 1e-3 * astropy.units.day
+    opacities = np.atleast_1d(opacities)
+    if np.any(t <= t0):
+        raise ValueError(f'Times must be > {t0}')
+    if len(velocities) != len(opacities) + 1:
+        raise ValueError('len(velocities) must be len(opacities) + 1')
+    # define constants
+    c = astropy.constants.c
+    sigSB = astropy.constants.sigma_sb
+
+    # add unit to input
+    t *= astropy.units.day
+    mass *= astropy.constants.M_sun
+    velocities *= astropy.constants.c
+    opacities *= astropy.units.cm**2 / astropy.units.g
+    
+    # convert to internal units - using vectorized operations
+    t = t.to_value(astropy.units.s)
+    t0 = t0.to_value(astropy.units.s)
+    mej = mass.to_value(astropy.units.g)
+    bej = (velocities / c).to_value(astropy.units.dimensionless_unscaled)
+    vej_0 = velocities[0].to_value(astropy.units.cm / astropy.units.s)
+    kappas = opacities.to_valastropy.unitse(astropy.units.cm**2 / astropy.units.g)
+    
+    # Prepare velocity shells
+    n_shells = 100
+    be_0 = bej[0]
+    be_max = bej[-1]
+    rho_0 = mej * (n - 3) / (4 * np.pi * vej_0**3) / (1 - (be_max/be_0)**(3 - n))
+    
+    # Use inverse log spacing for velocity steps - simplified with direct calculation
+    bes = be_max + be_0 - np.geomspace(be_0, be_max, n_shells)
+    bes = np.flipud(bes)[:-1]  # Flip and remove last element in one operation
+    dbe = np.diff(np.append(bes, be_max))  # Calculate diff by appending be_max
+    
+    # Calculate optical depths more efficiently
+    i = np.searchsorted(bej, bes)
+    
+    # Calculate power factors once for reuse
+    bej_power = (bej / be_0)**(1 - n)
+    bes_power = (bes / be_0)**(1 - n)
+    
+    # Vectorized calculation of tau_accum
+    tau_accum = -np.cumsum((kappas * np.diff(bej_power))[::-1])[::-1]
+    tau_accum = np.append(tau_accum, 0)    
+    # Vectorized calculation of taus
+    taus = tau_accum[i] + kappas[i - 1] * (bes_power - bej_power[i])
+    taus *= vej_0 * rho_0 / (n - 1)
+    
+    # Mass and time delay calculations
+    bes_power_2n = (bes / be_0)**(2 - n)  # Calculate power once
+    dMs = 4. * np.pi * vej_0**3 * rho_0 * bes_power_2n * dbe / be_0
+    tds = taus * bes
+    
+    # Prepare arrays for solve_ivp - use broadcasting directly
+    bes_col = bes[:, np.newaxis]
+    tds_col = tds[:, np.newaxis]
+    dMs_col = dMs[:, np.newaxis]
+    
+    # Evolve in time
+    out = scipy.integrate.solve_ivp(
+        dEdt_HoNa, (t0, t.max()), np.zeros(len(bes)), first_step=t0,
+        args=(dMs_col, tds_col, bes_col), vectorized=True)
+    
+    # Total luminosity calculation
+    LL = luminosity_HoNa(out.y, out.t[np.newaxis, :], tds_col, bes_col).sum(0)
+    
+    # Log-log space interpolation - preserve only necessary portion
+    log_t = np.log(out.t[1:])
+    log_LL = np.log(LL[1:])
+    log_L_interp = interp.interp1d(log_t, log_LL, kind='cubic', assume_sorted=True)
+    
+    # Calculate final results in vectorized operations
+    L = np.exp(log_L_interp(np.log(t))) * (astropy.units.erg / astropy.units.s)
+    
+    # Effective radius - use vectorized log operations
+    log_taus = np.log(taus[::-1])
+    log_bes = np.log(bes[::-1])
+    log_t_doubled = 2 * np.log(t)
+    be = np.exp(np.interp(log_t_doubled, log_taus, log_bes))
+    r = be * t * (c * astropy.units.s)
+    
+    # Effective temperature - use broadcasting for squaring
+    T = ((L / (4 * np.pi * sigma_sb * r**2))**0.25).to(astropy.units.K)
+    
+    # Return results
+    return L, T, r.to(astropy.units.cm)

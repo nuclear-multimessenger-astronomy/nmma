@@ -954,7 +954,7 @@ class SimpleKilonovaLightCurveModel(LightCurveMixin):
     def __init__(self, sample_times, parameter_conversion=None, model="Me2017", filters=None):
         """A light curve model object
 
-        An object to evaluted the kilonova (with Me2017) light curve across filters
+        An object to evaluted the kilonova (with Me2017 or HoNa2020) light curve across filters
 
         Parameters
         ----------
@@ -997,6 +997,28 @@ class SimpleKilonovaLightCurveModel(LightCurveMixin):
 
         if self.model == "Me2017":
             _, lbol, mag = utils.metzger_lc(sample_times, param_dict, filters=self.filters)
+        elif self.model == "HoNa2020":
+            default_parameters = {"n": 4.5}
+            for key in default_parameters.keys():
+                if key not in param_dict.keys():
+                    param_dict[key] = default_parameters[key]
+            # now handle the velocities
+            vej_max = param_dict["vej_max"]
+            vej_min = param_dict["vej_min"]
+            vej_range = vej_max - vej_min
+            vej = param_dict["vej_frac"] * vej_range + vej_min 
+            # calculate the temperature and luminosity to feed into the blackbody radiation calculation
+            L, T, _ = utils.lightcurve_HoNa(
+                sample_times,
+                10**param_dict["log10_Mej"],
+                [param_dict["vej_min"], vej, param_dict["vej_max"]],
+                [10**param_dict["log10_kappa_low_vej"], 
+                 10**param_dict["log10_kappa_high_vej"]],
+                param_dict["n"]
+            )
+            param_dict["bb_luminosity"] = L.cgs.value
+            param_dict["temperature"] = T.si.value
+            _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(sample_times, param_dict, filters=self.filters)
         elif self.model == "PL_BB_fixedT":
             _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(sample_times, param_dict, filters=self.filters)
         elif self.model == "blackbody_fixedT":
