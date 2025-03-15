@@ -1,4 +1,4 @@
-name: Unit Test nmma
+name: Unit Test nmma [ubuntu]
 
 on:
   push:
@@ -13,14 +13,13 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: "ubuntu-latest"
     defaults:
       run:
         shell: bash -el {0}
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest", "macos-latest"]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
@@ -31,7 +30,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: ${{ matrix.os == 'macos-latest' && 'arm64' || 'x86_64' }}
           miniforge-version: latest
           use-mamba: true
           mamba-version: "*"
@@ -59,62 +57,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-2-
 
-      - name: Update Homebrew
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew update --auto-update
-
-      - name: Restore Homebrew cache
-        if: matrix.os == 'macos-latest'
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/Library/Caches/Homebrew/openmpi--*
-            ~/Library/Caches/Homebrew/downloads/*--openmpi-*
-            ~/Library/Caches/Homebrew/hdf5--*
-            ~/Library/Caches/Homebrew/downloads/*--hdf5-*
-            ~/Library/Caches/Homebrew/gcc--*
-            ~/Library/Caches/Homebrew/downloads/*--gcc-*
-            ~/Library/Caches/Homebrew/openblas--*
-            ~/Library/Caches/Homebrew/downloads/*--openblas-*
-            ~/Library/Caches/Homebrew/lapack--*
-            ~/Library/Caches/Homebrew/downloads/*--lapack-*
-            ~/Library/Caches/Homebrew/basictex--*
-            ~/Library/Caches/Homebrew/downloads/*--basictex-*
-            ~/Library/Caches/Homebrew/cmake--*
-            ~/Library/Caches/Homebrew/downloads/*--cmake-*
-          key: brew-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: brew-
-
-      - name: Install Homebrew dependencies
-        if: matrix.os == 'macos-latest'
-        run: |
-          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack basictex cmake
-          eval "$(/usr/libexec/path_helper)"
-          sudo tlmgr update --self
-          sudo tlmgr install collection-latex
-          sudo tlmgr install collection-fontsrecommended
-          sudo tlmgr install dvipng
-          sudo tlmgr install cm-super
-          sudo tlmgr install type1cm
-
       - name: Install Linux Dependencies
-        if: matrix.os == 'ubuntu-latest'
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super
           execute_install_scripts: true
 
-      - name: Install dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          conda install -c conda-forge pyfftw c-compiler ligo-segments python-ligo-lw
-          echo "FC=$(which gfortran-14)" >> $GITHUB_ENV
-          echo "CC=$(which gcc)" >> $GITHUB_ENV
-          echo "CXX=$(which g++)" >> $GITHUB_ENV
-
       - name: Install dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super python3-mpi4py
@@ -126,12 +75,11 @@ jobs:
           python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r tf_requirements.txt -r sklearn_requirements.txt
           python -m pip install .
           git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake .. && make && cd ../..
-          pwd
 
       - name: Export Libraries
         run: |
-          echo "LD_LIBRARY_PATH=$HOME/work/nmma/nmma/MultiNest/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "DYLD_LIBRARY_PATH=$HOME/work/nmma/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/MultiNest/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=$GITHUB_WORKSPACE/MultiNest/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Lint with flake8
         run: |
@@ -142,8 +90,13 @@ jobs:
 
       - name: Test with pytest
         run: |
+          echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+          echo "DYLD_LIBRARY_PATH: $DYLD_LIBRARY_PATH"
           python -m coverage run --source nmma -m pytest nmma/tests/*.py
-
+        env:
+          LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
+          DYLD_LIBRARY_PATH: ${{ env.DYLD_LIBRARY_PATH }}
+                
       - name: Run Coveralls
         if: ${{ success() }}
         run: |
@@ -164,24 +117,3 @@ jobs:
         with:
           path: ${{ steps.pip-cache.outputs.dir }}
           key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
-
-      - name: Save Homebrew cache
-        if: always() && matrix.os == 'macos-latest'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/Library/Caches/Homebrew/openmpi--*
-            ~/Library/Caches/Homebrew/downloads/*--openmpi-*
-            ~/Library/Caches/Homebrew/hdf5--*
-            ~/Library/Caches/Homebrew/downloads/*--hdf5-*
-            ~/Library/Caches/Homebrew/gcc--*
-            ~/Library/Caches/Homebrew/downloads/*--gcc-*
-            ~/Library/Caches/Homebrew/openblas--*
-            ~/Library/Caches/Homebrew/downloads/*--openblas-*
-            ~/Library/Caches/Homebrew/lapack--*
-            ~/Library/Caches/Homebrew/downloads/*--lapack-*
-            ~/Library/Caches/Homebrew/basictex--*
-            ~/Library/Caches/Homebrew/downloads/*--basictex-*
-            ~/Library/Caches/Homebrew/cmake--*
-            ~/Library/Caches/Homebrew/downloads/*--cmake-*
-          key: brew-${{ hashFiles('**/pyproject.toml') }}
