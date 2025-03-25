@@ -930,7 +930,19 @@ def models_list_from_names(model_names, args, filters):
 
 def create_light_curve_model_from_args(
     em_transient, args, filters=None
-):  #case 1: we have a single object
+):  
+    #case 1: we have the model_names and need to find the classes first
+    # this is equivalent to the previous behaviour of this function
+    if isinstance(em_transient, str):   
+        model_names = em_transient.split(",")
+        models_list =models_list_from_names(model_names, args, filters)
+        if len(models_list)==1:
+            return models_list[0]
+        else:
+            print("Running with combination of multiple light curve models")
+            return CombinedLightCurveModelContainer(models_list)
+
+    #case 2: we have a model_class 
     if issubclass(em_transient, LightCurveModelContainer):
         return single_model_from_args(em_transient, args.em_transient_model, args, filters)
     
@@ -945,19 +957,6 @@ def create_light_curve_model_from_args(
             models_list = models_list_from_names(model_names, args, filters)
         return CombinedLightCurveModelContainer(models_list)
         
-
-    # case 3: we have the model_names and need to find the classes first
-    # this is equivalent to the previous behaviour of this function
-    else:
-        model_names = em_transient.split(",")
-        models_list =models_list_from_names(model_names, args, filters)
-        if len(models_list)==1:
-            return models_list[0]
-        else:
-            print("Running with combination of multiple light curve models")
-            return CombinedLightCurveModelContainer(models_list)
-       
-   
 def create_injection_model(args):
     #FIXME allow more flexible handling of injection models
     kilonova_kwargs = dict(
