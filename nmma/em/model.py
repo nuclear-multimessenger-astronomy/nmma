@@ -323,13 +323,6 @@ class SVDLightCurveModel(LightCurveModelContainer):
         filters=None,
         local_only=False,
     ):
-        super().__init__(model, parameter_conversion, filters, model_parameters)
-
-        self.mag_ncoeff = svd_mag_ncoeff
-        self.lbol_ncoeff = svd_lbol_ncoeff
-        self.interpolation_type = interpolation_type
-        self.svd_path = get_models_home(svd_path)
-
         # Some models have underscores. Keep those, but drop '_tf' if it exists
         model_name_components = model.split("_")
         if "tf" in model_name_components:
@@ -337,8 +330,14 @@ class SVDLightCurveModel(LightCurveModelContainer):
 
         core_model_name = "_".join(model_name_components)
 
-        modelfile   = os.path.join(self.svd_path, f"{core_model_name}.joblib")
+        super().__init__(core_model_name, parameter_conversion, filters, model_parameters)
 
+        self.mag_ncoeff = svd_mag_ncoeff
+        self.lbol_ncoeff = svd_lbol_ncoeff
+        self.interpolation_type = interpolation_type
+        self.svd_path = get_models_home(svd_path)
+
+        modelfile   = os.path.join(self.svd_path, f"{core_model_name}.joblib")
         if interpolation_type == "tensorflow":
             self.model_specifier = "_tf"
         else:
@@ -375,10 +374,10 @@ class SVDLightCurveModel(LightCurveModelContainer):
             def keras_load_model(model_file):
                 return k.saving.load_model(model_file, compile=False)
             try:
-                self.load_filt_model(model, keras_load_model, fn_ext='keras', target_name='model')
+                self.load_filt_model(self.model, keras_load_model, fn_ext='keras', target_name='model')
             # if no filter- model is found, try to load the legacy h5 model
             except ValueError:
-                self.load_filt_model(model, keras_load_model, fn_ext= 'h5', target_name='model')
+                self.load_filt_model(self.model, keras_load_model, fn_ext= 'h5', target_name='model')
 
         else:
             raise ValueError("--interpolation-type must be sklearn_gp, api_gp or tensorflow")
@@ -393,6 +392,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
         
         outdir = os.path.join(self.svd_path, f"{model}{self.model_specifier}")
         found_any_model = False
+        not_found = []
         for filt in self.filters:
             outfile = os.path.join(outdir, f"{filt}.{fn_ext}")
             if os.path.isfile(outfile):
@@ -400,12 +400,14 @@ class SVDLightCurveModel(LightCurveModelContainer):
                 self.svd_mag_model[filt][target_name] = load_method(outfile)
                 found_any_model = True
             else:
-                print(f"Could not find model file for filter {filt}")
+                not_found.append(filt)
                 if filt not in self.svd_mag_model:
                     self.svd_mag_model[filt] = {}
                 self.svd_mag_model[filt][target_name] = None
         if not found_any_model:
             raise ValueError(f"No {fn_ext}-model files found for {model} in {outdir}")
+        elif len(not_found) > 0:
+            print(f"Warning: No {fn_ext}-model files found for filters: {not_found} at {outdir}")   
         
     def __repr__(self):
         return super().__repr__() + f"(model={self.model}, svd_path={self.svd_path})"
@@ -929,11 +931,11 @@ def models_list_from_names(model_names, args, filters):
 def create_light_curve_model_from_args(
     em_transient, args, filters=None
 ):  #case 1: we have a single object
-    if isinstance(em_transient, LightCurveModelContainer):
+    if issubclass(em_transient, LightCurveModelContainer):
         return single_model_from_args(em_transient, args.em_transient_model, args, filters)
     
     #case 2: we have a combined model, this is a bit more complex
-    elif isinstance(em_transient, CombinedLightCurveModelContainer):
+    elif issubclass(em_transient, CombinedLightCurveModelContainer):
         model_names = args.em_injection_model.split(",")
         if len(model_names)==1:
             #NOTE default to GRB if only one model_name is given

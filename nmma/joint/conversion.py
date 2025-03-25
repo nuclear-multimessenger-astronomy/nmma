@@ -237,19 +237,23 @@ def EOS2Parameters(radius_val, mass_val, Lambda_val, m1_source, m2_source
 
 class BBHEjectaFitting(object):
     def __init__(self):
-        pass
+        self.mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
+    def vals_only_ejecta_parameter_conversion(self, converted_parameters):
+        return  np.full((4,)+ converted_parameters["mass_1_source"].shape, -np.inf)
+        
 
     def ejecta_parameter_conversion(self, converted_parameters, added_keys):
-        added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind"]
-        converted_parameters['log10mej_dyn'] = np.full_like(converted_parameters['mass_1_source'], -np.inf)
-        converted_parameters['log10mej_wind'] =np.full_like(converted_parameters['mass_1_source'], -np.inf)
-
+        added_keys = added_keys + self.mass_fitting_keys
+        for key, val in zip(self.mass_fitting_keys, self.vals_only_ejecta_parameter_conversion(converted_parameters)):
+            converted_parameters[key] = val
+        
         return converted_parameters, added_keys
     
 
 class NSBHEjectaFitting(object):
     def __init__(self):
-        self.mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind"]
+        self.proper_mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind"]
+        self.uniform_mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
     def chibh2risco(self, chi_bh):
 
@@ -283,24 +287,24 @@ class NSBHEjectaFitting(object):
         '''
 
         mass_ratio_invert = mass_1_source / mass_2_source
-        symm_mass_ratio = mass_ratio_invert / np.power(1.0 + mass_ratio_invert, 2.0)
+        symm_mass_ratio = mass_ratio_invert / (1.0 + mass_ratio_invert)**2
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
         baryon_mass_2 = self.baryon_mass_NS(mass_2_source, compactness_2)
 
-        remant_mass = (
+        remnant_mass = (
             a * np.power(symm_mass_ratio, -1.0 / 3.0) * (1.0 - 2.0 * compactness_2)
         )
-        remant_mass += -b * risco / symm_mass_ratio * compactness_2 + c
+        remnant_mass += -b * risco / symm_mass_ratio * compactness_2 + c
 
-        remant_mass = np.maximum(remant_mass, 0.0)
+        remnant_mass = np.maximum(remnant_mass, 0.0)
 
-        remant_mass = np.power(remant_mass, 1.0 + d)
+        remnant_mass = np.power(remnant_mass, 1.0 + d)
 
-        remant_mass *= baryon_mass_2
+        remnant_mass *= baryon_mass_2
 
-        return remant_mass
+        return remnant_mass
 
     def dynamic_mass_fitting(
         self,
@@ -338,18 +342,19 @@ class NSBHEjectaFitting(object):
 
         return mdyn
 
-    def ejecta_parameter_conversion(self, converted_parameters, added_keys):
+    def vals_only_ejecta_parameter_conversion(self, converted_parameters, uniform_output =False):
 
         mass_1_source = converted_parameters["mass_1_source"]
         mass_2_source = converted_parameters["mass_2_source"]
 
         radius_2 = converted_parameters["radius_2"]
         compactness_2 = mass_2_source * geom_msun_km / radius_2
+        try:
+            chi_1 = converted_parameters["chi_1"]
+        except KeyError:
+            cos_tilt_1 = converted_parameters.get("cos_tilt_1", np.cos(converted_parameters["tilt_1"]))
+            chi_1 = converted_parameters["a_1"] * cos_tilt_1
 
-        if "cos_tilt_1" not in converted_parameters:
-            converted_parameters["cos_tilt_1"] = np.cos(converted_parameters["tilt_1"])
-
-        chi_1 = converted_parameters["a_1"] * converted_parameters["cos_tilt_1"]
 
         mdyn_fit = self.dynamic_mass_fitting(
             mass_1_source, mass_2_source, compactness_2, chi_1
@@ -359,21 +364,41 @@ class NSBHEjectaFitting(object):
         )
         mdisk_fit = remnant_disk_fit - mdyn_fit
 
-        ### compute ejecta parameters if there si a disk
-        converted_parameters["log10_mej_wind"] =  np.where(mdisk_fit>0.,
-            np.log10(mdisk_fit) + np.log10(converted_parameters["ratio_zeta"]), -np.inf
-        )
+        # prevent the output message from being flooded by these warning messages
+        old = np.seterr()
+        np.seterr(invalid='ignore')
+        np.seterr(divide='ignore')
 
-        log_mdyn_fit = np.log(mdyn_fit)
-        log_alpha = converted_parameters["log10_alpha"] * np.log(10.0)
-        log_mej_dyn = np.logaddexp(log_mdyn_fit, log_alpha)
-        converted_parameters["log10_mej_dyn"]  = np.where(mdisk_fit>0,
-            log_mej_dyn / np.log(10.0), -np.inf
-        )
+        log_mej_wind = np.full_like(mdisk_fit, -np.inf)
+        log_mej_dyn = np.full_like(mdisk_fit, -np.inf)
+        disc_mask = mdisk_fit > 0.
 
+        log_alpha = converted_parameters.get("log10_alpha",np.log10(converted_parameters['alpha']))* np.log(10.0)
+        log_mej_dyn[disc_mask] = np.logaddexp( np.log(mdisk_fit[disc_mask]), log_alpha[disc_mask] )/ np.log(10.0)
+        log_mej_wind[disc_mask] = np.log10(mdisk_fit[disc_mask]) + np.log10(converted_parameters["ratio_zeta"])[disc_mask]
+        
+        np.seterr(**old)
 
-        added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind"]
+        if uniform_output:
+            total_ejeta_mass = 10**log_mej_dyn + 10**log_mej_wind
+            log10_mej = np.log10(total_ejeta_mass)
 
+            return np.stack((log_mej_dyn, log_mej_wind, log10_mej, np.full_like(log_mej_wind, -np.inf)))
+        else:
+
+            np.seterr(**old)
+            return log_mej_dyn, log_mej_wind 
+    
+    def ejecta_parameter_conversion(self, converted_parameters, added_keys, uniform_output=False):
+        if uniform_output:
+            add_keys = self.uniform_mass_fitting_keys
+        else: 
+            add_keys = self.proper_mass_fitting_keys
+
+        added_keys = added_keys + add_keys
+        for key, val in zip(add_keys, 
+                self.vals_only_ejecta_parameter_conversion(converted_parameters, uniform_output)):
+            converted_parameters[key] = val
         return converted_parameters, added_keys
 
 
@@ -466,7 +491,7 @@ class BNSEjectaFitting(object):
 
         return mdyn
 
-    def ejecta_parameter_conversion(self, converted_parameters, added_keys):
+    def vals_only_ejecta_parameter_conversion(self, converted_parameters):
 
         # prevent the output message flooded by these warning messages
         old = np.seterr()
@@ -507,40 +532,45 @@ class BNSEjectaFitting(object):
             + np.log10(1.0 - converted_parameters["ratio_zeta"])
             + log10_mdisk_fit
         )
+        
+        np.seterr(**old)
+        converted_ejecta = np.stack((log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_E0_MSUN + np.log10(msun_to_ergs) ))
 
-        converted_parameters["log10_mej_dyn"] = log10_mej_dyn
-        converted_parameters["log10_mej_wind"] = log10_mej_wind
-        converted_parameters["log10_mej"] = np.log10(total_ejeta_mass)
-        converted_parameters["log10_E0"] =  log10_E0_MSUN + np.log10(msun_to_ergs) 
+        return  np.where(np.isfinite(converted_ejecta), converted_ejecta, -np.inf)
+        # converted_parameters["log10_mej_dyn"] = log10_mej_dyn
+        # converted_parameters["log10_mej_wind"] = log10_mej_wind
+        # converted_parameters["log10_mej"] = np.log10(total_ejeta_mass)
+        # converted_parameters["log10_E0"] =  log10_E0_MSUN + np.log10(msun_to_ergs) 
  
 
-        if (
-            isinstance(compactness_1, (list, tuple, pd.core.series.Series, np.ndarray))
-            and len(compactness_1) > 1
-        ):
-            for key in self.mass_fitting_keys:
-                nan_index = np.where((~np.isfinite(converted_parameters[key])))[0]
-                try:
-                    converted_parameters[key][nan_index] = -np.inf
-                except:
-                    ## this should only be the case for parameter conversion of a result object, using a pandas df.
-                    converted_parameters.loc[nan_index, key] = -np.inf
+        # if (
+        #     isinstance(compactness_1, (list, tuple, pd.core.series.Series, np.ndarray))
+        #     and len(compactness_1) > 1
+        # ):
+        #     for key in self.mass_fitting_keys:
+        #         nan_index = np.where((~np.isfinite(converted_parameters[key])))[0]
+        #         try:
+        #             converted_parameters[key][nan_index] = -np.inf
+        #         except:
+        #             ## this should only be the case for parameter conversion of a result object, using a pandas df.
+        #             converted_parameters.loc[nan_index, key] = -np.inf
 
-        else:
-            for key in self.mass_fitting_keys:
-                ##correct for NaNs
-                if not np.isfinite(converted_parameters[key] ):
-                    converted_parameters[key] = -np.inf
+        # else:
+        #     for key in self.mass_fitting_keys:
+        #         ##correct for NaNs
+        #         if not np.isfinite(converted_parameters[key] ):
+        #             converted_parameters[key] = -np.inf
                     
-                else:
-                    converted_parameters[key] = float(converted_parameters[key])
+        #         else:
+        #             converted_parameters[key] = float(converted_parameters[key])
 
 
+    def ejecta_parameter_conversion(self, converted_parameters, added_keys): 
+        for key, val in zip(self.mass_fitting_keys, 
+                self.vals_only_ejecta_parameter_conversion(converted_parameters)):
+            converted_parameters[key] = val
 
-        added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
-
-        np.seterr(**old)
-
+        added_keys = added_keys + self.mass_fitting_keys
         return converted_parameters, added_keys
 
 
@@ -594,14 +624,10 @@ class MultimessengerConversion(object):
 
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
     
-    
     def eos_from_emulator(self, converted_parameters, added_keys):
         eos_data = self.tov_emulator.generate_macro_eos(converted_parameters)
 
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
-
-    
-
 
     def convert_to_multimessenger_parameters(self, parameters):
         converted_parameters = parameters.copy()
@@ -645,26 +671,33 @@ class MultimessengerConversion(object):
     
 
     def ejecta_parameter_conversion(self, parameters, added_keys):
-        ## chose pointwise conditional ejecta_fitting
-        return np.where(
-            ## check if component 1 is a NS
-            parameters["radius_1"]>0., 
-                ## and check if component 2 is a NS, too
-                np.where(parameters["radius_2"]>0.,
-                         ## then compute BNS ejecta
-                         self.BNSejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
-                         ## else compute NSBH ejecta
-                         self.NSBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
-                        ),
-                ## if component 1 is a BH, check if component 2 is NS
-                np.where(parameters["radius_2"]>0.,
-                        ### then do NSBH ejecta
-                         self.NSBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
-                         ### otherwise assume BBH (i.e., no ejecta)
-                          self.BBHejectaFitting.ejecta_parameter_conversion(parameters, added_keys),
-                        )
+        try:
+            #heavier object is a NS
+            if parameters['radius_1'] > 0.:
+                ejecta_parameters = self.BNSejectaFitting.vals_only_ejecta_parameter_conversion(parameters)
+            # heavier object is BH, but lighter object is NS
+            elif parameters['radius_2']>0.:
+                ejecta_parameters = self.NSBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters, True)
+            # both objects are BHs
+            else:
+                ejecta_parameters = self.BBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters)
+        except ValueError:
+            #ValueError occurs when trying to obtain truth values of arrays 
+            # -> evaluate many points at once otchose conditional ejecta_fitting
+            ejecta_parameters = np.where(parameters["radius_1"]>0.,   #heavier object is a NS
+                self.BNSejectaFitting.vals_only_ejecta_parameter_conversion(parameters),
+                np.where(parameters["radius_2"]>0., ## elif component 2 is a NS
+                    self.NSBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters, True),
+                    ### else assume BBH (i.e., no ejecta)
+                    self.BBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters),
+                    )
                 )
-    
+            
+        for key, val in zip(self.BNSejectaFitting.mass_fitting_keys,
+                ejecta_parameters):
+            parameters[key] = val
+        added_keys = added_keys + self.BNSejectaFitting.mass_fitting_keys
+        return parameters, added_keys
 
     def identity_conversion(self, parameters):
         return parameters, []
