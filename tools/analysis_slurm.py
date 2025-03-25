@@ -2,13 +2,13 @@
 import argparse
 import pathlib
 import os
-from nmma.em.analysis import get_parser
+from nmma.em.em_parsing import em_analysis_parser
 import numpy as np
 
 BASE_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
 # Get analysis.py parser
-nmma_parser = get_parser(add_help=False)
+nmma_parser = em_analysis_parser(add_help=False)
 
 # Get argument names from nmma_parser
 nmma_arg_list = []

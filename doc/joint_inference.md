@@ -93,7 +93,6 @@ In order to prepare the joint inference, a `config.ini` file is required which s
     ## EM arguments
     ################################################################################
         
-    binary-type=BNS
     light-curve-data=data/AT2017gfo-GRB170817A/AT2017gfo_GRB170817A.dat
     kilonova-model=Bu2019lm
     kilonova-model-svd=data/AT2017gfo-GRB170817A/svdmodels_reduced

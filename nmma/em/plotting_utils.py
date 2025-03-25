@@ -1,0 +1,291 @@
+import matplotlib.pyplot as plt
+import matplotlib
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import numpy as np
+
+matplotlib.use("agg")
+params = {
+    "backend": "pdf",
+    "axes.labelsize": 42,
+    "legend.fontsize": 42,
+    "xtick.labelsize": 42,
+    "ytick.labelsize": 42,
+    "text.usetex": True,
+    "font.family": "Times New Roman",
+    "figure.figsize": [18, 25],
+}
+matplotlib.rcParams.update(params)
+
+##############################################
+################# MAIN PLOTS #################
+##############################################
+def basic_em_analysis_plot(
+        data, error_budget, filters_to_plot, mags_to_plot, 
+        sub_model_plot_props, sample_times, delta_t, xlim, ylim, save_path,
+        ncol = 2):
+
+
+    xlim = check_limit(xlim)
+    ylim = check_limit(ylim)
+
+    fig, axes = analysis_plot_geometry(filters_to_plot, ncol=ncol)
+    colors = plt.cm.Spectral(np.linspace(0, 1, len(filters_to_plot)))[::-1]
+    for cnt, filt in enumerate(filters_to_plot):
+
+        # summary plot
+        row, col = divmod(cnt, ncol)
+        ax_sum = axes[row, col]
+        # adding the ax for the Delta
+        divider = make_axes_locatable(ax_sum)
+        ax_delta = divider.append_axes('bottom',
+                                        size='30%',
+                                        sharex=ax_sum)
+
+        # configuring ax_sum
+        ax_sum.set_ylabel("AB magnitude", rotation=90)
+        ax_delta.set_ylabel(r"$\Delta (\sigma)$")
+        if cnt == len(filters_to_plot)-1:
+            ax_delta.set_xlabel("Time [days]")
+        else:
+            ax_delta.set_xticklabels([])
+
+        samples = data[filt]
+        t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
+        t -= delta_t
+        mag_plot = mags_to_plot[cnt]
+        ax_sum, detections = plot_observations(ax_sum, t, y, sigma_y, color=colors[cnt])
+        
+        # calculating the chi2
+        mag_per_data = np.interp(t[detections],sample_times, mag_plot)
+        diff_per_data = mag_per_data - y[detections]
+        sigma_per_data = np.sqrt((sigma_y[detections]**2 + error_budget[filt]**2))
+        chi2_per_data = (diff_per_data/sigma_per_data)**2
+        chi2_total = np.sum(chi2_per_data)
+        N_data = len(t[detections])
+
+
+        # plot the best-fit lc with errors
+        ax_sum.plot(sample_times, mag_plot,
+            color='coral', linewidth=3, linestyle="--")
+        
+        label = 'combined' if sub_model_plot_props is not None else ""
+        ax_sum.fill_between(sample_times,
+            mag_plot + error_budget[filt],
+            mag_plot - error_budget[filt],
+            facecolor='coral',
+            alpha=0.2,
+            label=label,
+            )
+
+        if sub_model_plot_props is not None:
+            ## plot additional lcs for each sub_model
+            for model_name, prop_dict in sub_model_plot_props:
+                mag_plot = prop_dict['plot_mags'][cnt]
+                ax_sum.plot(sample_times, mag_plot,
+                    color='coral', linewidth=3, linestyle="--")
+                ax_sum.fill_between(sample_times,
+                    mag_plot + error_budget[filt],
+                    mag_plot - error_budget[filt],
+                    facecolor=prop_dict['color'],
+                    alpha=0.2,
+                    label=model_name,
+                )
+
+        ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
+        ax_sum.set_xlim(xlim)
+        ax_sum.set_ylim(ylim)
+        
+        # plot the mismatch between the model and the data
+        ax_delta.scatter(t[detections], diff_per_data / sigma_per_data, color=colors[cnt])
+        ax_delta.axhline(0, linestyle='--', color='k')
+        ax_delta.set_xlim(xlim)
+
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close()
+
+def bolometric_lc_plot(data_times, y, sigma_y, lbol_dict, save_path, color = "coral"):
+    matplotlib.rcParams.update(
+        {'font.size': 12,
+        'text.usetex': True,
+        'font.family': 'Times New Roman'}
+    )
+    fig, ax = plt.subplots(1, 1)
+    ax, _ = plot_observations(ax, data_times, y, sigma_y, markersize=12)
+
+    ### plot the bestfit model
+    ax.plot(lbol_dict['bestfit_sample_times'], lbol_dict['lbol'],
+            color=color, linewidth=3, linestyle="--")
+
+    ax.set_ylabel("L [erg / s]")
+    ax.set_xlabel("Time [days]")
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close()
+
+    
+
+def basic_photo_lc_plot(
+        plot_fc, filters, save_path, fontsize=30, figsize=(15, 18), colorbar=False, xlim = [0,14], ylim = [-12, -18], n_yticks = 4, ylabel_kwargs = dict(fontsize=30, rotation=90, labelpad=8),**kwargs):
+
+    fig = plt.figure(figsize=figsize)
+    ncols = 1
+    nrows = int(np.ceil(len(filters) / ncols))
+    gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
+
+    xlim = check_limit(xlim)
+    ylim = check_limit(ylim)
+
+    axs = []
+    for ii, filt in enumerate(filters):
+        loc_x, loc_y = np.divmod(ii, nrows)
+        loc_x, loc_y = int(loc_x), int(loc_y)
+        ax = fig.add_subplot(gs[loc_y, loc_x])
+
+        ax, cb = plot_fc(ax, filt, ii)
+
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        if ii == len(filters) - 1:
+            ax.set_xticks([np.ceil(x) for x in np.linspace(xlim[0], xlim[1], 8)])
+        else:
+            plt.setp(ax.get_xticklabels(), visible=False)
+
+        ax.set_yticks([np.ceil(x) for x in np.linspace(ylim[0], ylim[1], n_yticks)])
+        
+        ax.set_ylabel(filt, **ylabel_kwargs)
+
+        ax.tick_params(axis="x", labelsize=fontsize)
+        ax.tick_params(axis="y", labelsize=fontsize)
+        ax.grid(which="both", alpha=0.5)
+        axs.append(ax)
+
+    if colorbar:
+        fig.colorbar(cb, ax=axs, location="right", shrink=0.6)
+
+    fig.text(0.45, 0.05, "Time [days]", fontsize=fontsize)
+    ylabel = "Absolute Magnitude"
+
+    fig.text(0.01, 0.5, ylabel, fontsize=fontsize,
+        va="center", rotation="vertical")
+    
+    plt.tight_layout()
+    plt.savefig(save_path, bbox_inches="tight")
+    plt.close()
+
+
+def lc_comparison_plot(mag_dict, training_data, filters, sample_times, save_path,  **kwargs):
+    def lc_plot_fc(ax, filt, ii):
+        ax.plot(sample_times, training_data[:, ii], "k--", label="grid")
+        ax.plot(sample_times, mag_dict[filt], "b-", label="interpolated")
+        if ii == 0:
+            ax.legend(fontsize=kwargs.get("fontsize", 30)//2)
+        return ax, None
+    
+    basic_photo_lc_plot(lc_plot_fc, filters, save_path=save_path,  **kwargs)
+
+
+def lc_plot_with_histogram(filters, data_dict, sample_times, save_path, percentiles = (10, 50, 90) , **kwargs):
+    def lc_hist_fc(ax, filt, ii):
+        plot_data = data_dict[filt]
+
+        bins = np.linspace(-20, 30, 100)
+        def return_hist(x):
+            hist, _ = np.histogram(x, bins=bins)
+            return hist
+
+        hist = np.apply_along_axis(lambda x: return_hist(x), -1, plot_data.T)
+        bins = (bins[1:] + bins[:-1]) / 2.0
+
+        X, Y = np.meshgrid(sample_times, bins)
+        hist = hist.astype(np.float64)
+        hist[hist == 0.0] = np.nan
+
+        cb = ax.pcolormesh(X, Y, hist.T, shading="auto", cmap="cividis", alpha=0.7)
+        # plot 10th, 50th, 90th percentiles
+        for pct in percentiles:
+            ax.plot(sample_times, np.nanpercentile(plot_data, pct, axis=0), "k--")
+
+        return ax, cb
+    basic_photo_lc_plot(lc_hist_fc, filters, save_path, **kwargs)
+
+
+def spec_subplot(
+        fig, ax, X, Y, Z, data_label, vmin =-10, vmax =-2, fontsize=30, cbar_label="log10(Flux)"
+        ):
+    pcm = ax.pcolormesh(X, Y, Z, vmin=vmin, vmax=vmax)
+    ax.set_title(data_label, fontsize=fontsize)
+    ax.set_xlabel("Time [days]", fontsize=fontsize)
+    ax.set_ylabel("Wavelength [AA]", fontsize=fontsize)
+    ax.tick_params(axis="x", labelsize=fontsize)
+    ax.tick_params(axis="y", labelsize=fontsize)
+    ax.grid(which="both", alpha=0.5)
+    cbar = fig.colorbar(pcm, ax=ax)
+    cbar.set_label(cbar_label, fontsize=fontsize)
+    cbar.ax.tick_params(labelsize=fontsize)
+    return fig, ax
+
+def basic_spec_plot(
+        mesh_X, mesh_Y, spec_func, plot_entries, save_path, figsize=(32, 14)):
+    
+    XX, YY = np.meshgrid(mesh_X, mesh_Y)
+    fig = plt.figure(figsize=figsize)
+    ncols = len(plot_entries)
+    nrows = 1
+    gs = fig.add_gridspec(nrows=nrows, ncols=ncols, wspace=0.6, hspace=0.5)
+    for ii, (label, plot_data) in enumerate(plot_entries.items()):
+        loc_x, loc_y = np.divmod(ii, nrows)
+        loc_x, loc_y = int(loc_x), int(loc_y)
+        ax = fig.add_subplot(gs[loc_x,loc_y])
+        fig, ax = spec_func(fig, ax, XX, YY, plot_data, label)
+
+
+    plt.tight_layout()
+    plt.savefig(save_path, bbox_inches="tight")
+    plt.close()
+
+
+##############################################
+############### HELPER FUNCTIONS #############
+##############################################
+def check_limit(lim):
+    if isinstance(lim, str):
+        lim = [float(val) for val in lim.split(",")]
+    assert len(lim) == 2, f"{lim} is no valid plot-limit." 
+    return lim
+
+def plot_observations(ax, obs_times, obs_mags, obs_unc, color="k",**kwargs):
+    detections = np.isfinite(obs_mags) ## does not include nans or infs
+    ax.errorbar(obs_times[detections], obs_mags[detections], obs_unc[detections], fmt="o", color =color, **kwargs)
+
+    non_detections = np.isinf(obs_mags) ## does only include +-inf, not nans
+    ax.errorbar(obs_times[non_detections], obs_mags[non_detections], obs_unc[non_detections], fmt="v", color=color, **kwargs)
+    return ax, detections
+
+def analysis_plot_geometry(filters_to_plot, ncol=2):
+    # NOTE Should this be the preferred geometry for the plots?
+    # set up the geometry for the all-in-one figure
+    wspace = 0.6  # All in inches.
+    hspace = 0.3
+    lspace = 1.0
+    bspace = 0.7
+    trspace = 0.2
+    hpanel = 2.25
+    wpanel = 3.
+
+    nrow = int(np.ceil(len(filters_to_plot) / ncol))
+    fig, axes = plt.subplots(nrow, ncol)
+
+    figsize = (1.5 * (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace),
+                1.5 * (bspace + hpanel * nrow + hspace * (nrow - 1) + trspace))
+    # Create the figure and axes.
+    fig, axes = plt.subplots(nrow, ncol, figsize=figsize, squeeze=False)
+    fig.subplots_adjust(left=lspace / figsize[0],
+                        bottom=bspace / figsize[1],
+                        right=1. - trspace / figsize[0],
+                        top=1. - trspace / figsize[1],
+                        wspace=wspace / wpanel,
+                        hspace=hspace / hpanel)
+
+    if len(filters_to_plot) % 2:
+        axes[-1, -1].axis('off')
+    return fig, axes
+

@@ -4,39 +4,34 @@ Module to run parallel bilby using MPI
 import datetime
 import json
 import os
+import sys
 import pickle
 import time
+import signal
 
 import bilby
 import numpy as np
-import pandas as pd
 from bilby.core.utils import logger
-from bilby.gw import conversion
 from nestcheck import data_processing
 from pandas import DataFrame
 
-from parallel_bilby.schwimmbad_fast import MPIPoolFast as MPIPool
-from parallel_bilby.utils import get_cli_args, stdout_sampling_log
-from parallel_bilby.analysis.plotting import plot_current_state
-from parallel_bilby.analysis.read_write import (
-    format_result,
-    read_saved_state,
-    write_current_state,
-    write_sample_dump,
-)
-from parallel_bilby.analysis.sample_space import fill_sample
+from schwimmbad import MPIPool
 
+from .. import pb_utils
 from ..parser import (
     create_nmma_analysis_parser,
-    create_nmma_gw_analysis_parser,
     parse_analysis_args
     )
-from .analysis_run import AnalysisRun
+from .analysis_run import MainRun, WorkerRun
 
+def checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot):
+    pb_utils.write_current_state(sampler, resume_file, sampling_time )
+    pb_utils.write_sample_dump(sampler, samples_file, run.sampling_keys)
+    if no_plot is False:
+        pb_utils.plot_current_state(sampler, run.sampling_keys, run.outdir, run.label)
 
 def analysis_runner(
     data_dump,
-    inference_favour,
     outdir=None,
     label=None,
     dynesty_sample="acceptance-walk",
@@ -54,9 +49,6 @@ def analysis_runner(
     bilby_zero_likelihood_mode=False,
     rejection_sample_posterior=True,
     #
-    fast_mpi=False,
-    mpi_timing=False,
-    mpi_timing_interval=0,
     check_point_deltaT=3600,
     n_effective=np.inf,
     dlogz=10,
@@ -64,7 +56,6 @@ def analysis_runner(
     n_check_point=1000,
     max_its=1e10,
     max_run_time=1e10,
-    rotate_checkpoints=False,
     no_plot=False,
     nestcheck=False,
     result_format="hdf5",
@@ -84,39 +75,42 @@ def analysis_runner(
         MPI worker tasks always return -1
 
     """
-
-    # Initialise a run
-    run = AnalysisRun(
-        data_dump=data_dump,
-        inference_favour=inference_favour,
-        outdir=outdir,
-        label=label,
-        dynesty_sample=dynesty_sample,
-        nlive=nlive,
-        dynesty_bound=dynesty_bound,
-        walks=walks,
-        maxmcmc=maxmcmc,
-        nact=nact,
-        naccept=naccept,
-        facc=facc,
-        min_eff=min_eff,
-        enlarge=enlarge,
-        sampling_seed=sampling_seed,
-        proposals=proposals,
-        bilby_zero_likelihood_mode=bilby_zero_likelihood_mode,
+    # Initialise a WorkerRun. this needs a global scope to allow 
+    # persistence of states beyond the pool's scope.
+    # Otherwise emulators retrace on each evaluation.
+    global worker_run
+    worker_run = WorkerRun(
+        data_dump,
+        bilby_zero_likelihood_mode= bilby_zero_likelihood_mode
     )
-
     t0 = datetime.datetime.now()
     sampling_time = 0
-    with MPIPool(
-        parallel_comms=fast_mpi,
-        time_mpi=mpi_timing,
-        timing_interval=mpi_timing_interval,
-        use_dill=True,
-    ) as pool:
+    with MPIPool(use_dill=True) as pool:
         if pool.is_master():
             POOL_SIZE = pool.size
-
+            run = MainRun(
+                worker_run.sampling_keys,
+                pooled_log_likelihood, 
+                pooled_prior_transform,
+                pooled_initial_point_from_prior,
+                args=worker_run.args,
+                outdir=outdir,
+                label=label,
+                periodic=worker_run.periodic,
+                reflective=worker_run.reflective,
+                dynesty_sample=dynesty_sample,
+                nlive=nlive,
+                dynesty_bound=dynesty_bound,
+                walks=walks,
+                maxmcmc=maxmcmc,
+                nact=nact,
+                naccept=naccept,
+                facc=facc,
+                min_eff=min_eff,
+                enlarge=enlarge,
+                sampling_seed=sampling_seed,
+                proposals=proposals,
+            )
             logger.info(f"sampling_keys={run.sampling_keys}")
             if run.periodic:
                 logger.info(
@@ -127,13 +121,12 @@ def analysis_runner(
                     f"Reflective keys: {[run.sampling_keys[ii] for ii in run.reflective]}"
                 )
             logger.info("Using priors:")
-            for key in run.priors:
-                logger.info(f"{key}: {run.priors[key]}")
+            for key in worker_run.priors:
+                logger.info(f"{key}: {worker_run.priors[key]}")
 
             resume_file = f"{run.outdir}/{run.label}_checkpoint_resume.pickle"
-            samples_file = f"{run.outdir}/{run.label}_samples.dat"
-
-            sampler, sampling_time = read_saved_state(resume_file)
+            samples_file= f"{run.outdir}/{run.label}_samples.parquet"
+            sampler, sampling_time = pb_utils.read_saved_state(resume_file)
 
             if sampler is False:
                 logger.info(f"Initializing sampling points with pool size={POOL_SIZE}")
@@ -166,8 +159,20 @@ def analysis_runner(
             run_time = 0
             early_stop = False
 
+            ## graceful handling of preemptive shutdowns
+            def handle_sigterm(signum, frame):
+                logger.info("Received SIGTERM, writing checkpoint and exiting.")
+                pool.abort()
+                ## no time for plotting when file_size becomes larger
+                checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot=True)
+                logger.info("Exited gracefully.")
+                sys.exit(0)
+
+            signal.signal(signal.SIGTERM, handle_sigterm)
+            signal.signal(signal.SIGINT, handle_sigterm)
+
             for it, res in enumerate(sampler.sample(**sampler_kwargs)):
-                stdout_sampling_log(
+                pb_utils.stdout_sampling_log(
                     results=res, niter=it, ncall=sampler.ncall, dlogz=dlogz
                 )
 
@@ -196,19 +201,7 @@ def analysis_runner(
                     or it == max_its
                     or run_time > max_run_time
                 ):
-
-                    write_current_state(
-                        sampler,
-                        resume_file,
-                        sampling_time,
-                        rotate_checkpoints,
-                    )
-                    write_sample_dump(sampler, samples_file, run.sampling_keys)
-                    if no_plot is False:
-                        plot_current_state(
-                            sampler, run.sampling_keys, run.outdir, run.label
-                        )
-
+                    checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot)
                     if it == max_its:
                         exit_reason = 1
                         logger.info(
@@ -232,14 +225,7 @@ def analysis_runner(
                     pass
 
                 # Create a final checkpoint and set of plots
-                write_current_state(
-                    sampler, resume_file, sampling_time, rotate_checkpoints
-                )
-                write_sample_dump(sampler, samples_file, run.sampling_keys)
-                if no_plot is False:
-                    plot_current_state(
-                        sampler, run.sampling_keys, run.outdir, run.label
-                    )
+                checkpointing( run, sampler, resume_file, samples_file.replace('.parquet','.dat'), sampling_time, no_plot)
 
                 sampling_time += (datetime.datetime.now() - t0).total_seconds()
 
@@ -257,43 +243,26 @@ def analysis_runner(
                     with open(nestcheck_result, "wb") as file_nest:
                         pickle.dump(ns_run, file_nest)
 
-                weights = np.exp(out["logwt"] - out["logz"][-1])
                 nested_samples = DataFrame(out.samples, columns=run.sampling_keys)
-                nested_samples["weights"] = weights
                 nested_samples["log_likelihood"] = out.logl
-
-                result = format_result(
+                run.priors = worker_run.priors
+                result = pb_utils.format_result(
                     run,
+                    worker_run,
                     data_dump,
                     out,
-                    weights,
                     nested_samples,
                     sampler_kwargs,
                     sampling_time,
                     rejection_sample_posterior=rejection_sample_posterior
                 )
 
-                posterior = conversion.fill_from_fixed_priors(
-                    result.posterior, run.priors
-                )
 
                 logger.info(
                     "Generating posterior from marginalized parameters for"
-                    f" nsamples={len(posterior)}, POOL={pool.size}"
+                    f" nsamples={len(result.posterior)}"
                 )
-                #fill_args = [
-                #    (ii, row, run.likelihood) for ii, row in posterior.iterrows()
-                #]
-                #samples = pool.map(fill_sample, fill_args)
-                posterior, _ = run.likelihood.parameter_conversion(
-                    posterior,
-                )
-
-                result.posterior = conversion._generate_all_cbc_parameters(
-                    posterior,
-                    run.likelihood.GWLikelihood.waveform_generator.waveform_arguments,
-                    conversion.convert_to_lal_binary_neutron_star_parameters,
-                )
+                result.posterior, _ = worker_run.parameter_conversion.convert_to_multimessenger_parameters(result.posterior)
 
                 logger.debug(
                     "Updating prior to the actual prior (undoing marginalization)"
@@ -302,11 +271,11 @@ def analysis_runner(
                     ["distance", "phase", "time"],
                     ["luminosity_distance", "phase", "geocent_time"],
                 ):
-                    if getattr(run.likelihood, f"{par}_marginalization", False):
-                        run.priors[name] = run.likelihood.priors[name]
-                result.priors = run.priors
+                    if getattr(worker_run.likelihood, f"{par}_marginalization", False):
+                        worker_run.priors[name] = worker_run.likelihood.priors[name]
+                result.priors = worker_run.priors
 
-                result.posterior = result.posterior.applymap(
+                result.posterior = result.posterior.map(
                     lambda x: x[0] if isinstance(x, list) else x
                 )
                 result.posterior = result.posterior.select_dtypes([np.number])
@@ -329,35 +298,28 @@ def analysis_runner(
         return exit_reason
 
 
-def main_nmma():
+# Worker functions. These are read in the global scope by each worker
+def pooled_initial_point_from_prior(args):
+    return worker_run.get_initial_point_from_prior(args)
+
+def pooled_log_likelihood(v_array):
+    return worker_run.log_likelihood_function(v_array)
+
+def pooled_prior_transform(u_array):
+    return worker_run.prior_transform_function(u_array)
+
+def nmma_analysis():
     """
     nmma_analysis entrypoint.
 
     This function is a wrapper around analysis_runner(),
     giving it a command line interface.
     """
-    cli_args = get_cli_args()
+    cli_args = sys.argv[1:]
 
     # Parse command line arguments
     analysis_parser = create_nmma_analysis_parser(sampler="dynesty")
     input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
 
     # Run the analysis
-    analysis_runner(**vars(input_args), inference_favour='nmma')
-
-
-def main_nmma_gw():
-    """
-    nmma_analysis entrypoint.
-
-    This function is a wrapper around analysis_runner(),
-    giving it a command line interface.
-    """
-    cli_args = get_cli_args()
-
-    # Parse command line arguments
-    analysis_parser = create_nmma_gw_analysis_parser(sampler="dynesty")
-    input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
-
-    # Run the analysis
-    analysis_runner(**vars(input_args), inference_favour='nmma_gw')
+    analysis_runner(**vars(input_args))
