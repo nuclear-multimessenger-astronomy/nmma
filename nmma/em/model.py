@@ -149,6 +149,7 @@ class LightCurveMixin:
             "TrPi2018": ["https://arxiv.org/abs/1909.11691"],
             "Piro2021": ["https://arxiv.org/abs/2007.08543"],
             "Me2017": ["https://arxiv.org/abs/1910.01617"],
+            "HoNa2020": ["https://arxiv.org/abs/1909.02581", "https://arxiv.org/abs/1206.2379"],
             "Sr2023": [None],  # TODO: add citation,
             "nugent-hyper": [
                 "https://sncosmo.readthedocs.io/en/stable/source-list.html"
