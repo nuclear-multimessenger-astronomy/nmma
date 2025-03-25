@@ -1823,10 +1823,10 @@ def lightcurve_HoNa(t, mass, velocities, opacities, n):
     sigma_sb = astropy.constants.sigma_sb
 
     # add unit to input
-    t *= astropy.units.day
-    mass *= astropy.constants.M_sun
-    velocities *= astropy.constants.c
-    opacities *= astropy.units.cm**2 / astropy.units.g
+    t = t * astropy.units.day
+    mass = mass * astropy.constants.M_sun
+    velocities = velocities * astropy.constants.c
+    opacities = opacities * astropy.units.cm**2 / astropy.units.g
     
     # convert to internal units - using vectorized operations
     t = t.to_value(astropy.units.s)
