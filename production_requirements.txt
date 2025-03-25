@@ -1,2 +1,4 @@
 nestcheck
 mpi4py
+pyarrow
+parquet

@@ -18,9 +18,8 @@ from bilby.core.sampler.dynesty_utils import (
 from bilby.core.utils import logger
 from bilby_pipe.utils import convert_string_to_list
 from bilby.core.prior import Interped, DeltaFunction, PriorDict, Constraint
-from bilby.core.result import Result
 
-from ...joint.joint_likelihood import setup_nmma_likelihood, reorder_loglikelihoods
+from ...joint.joint_likelihood import setup_nmma_likelihood
 from ...joint.conversion import MultimessengerConversion
 
 
@@ -515,83 +514,3 @@ class WorkerRun(object):
                         return unit, theta, logl
                 else:
                     return unit, theta, np.nan
-                
-
-def format_result(
-    run,
-    worker_run,
-    data_dump,
-    out,
-    weights,
-    nested_samples,
-    sampler_kwargs,
-    sampling_time,
-    rejection_sample_posterior=True,
-):
-    """
-    Packs the variables from the run into a bilby result object
-
-    Parameters
-    ----------
-    run: AnalysisRun
-        Parallel Bilby run object
-    data_dump: str
-        Path to the *_data_dump.pickle file
-    out: dynesty.results.Results
-        Results from the dynesty sampler
-    weights: numpy.ndarray
-        Array of weights for the points
-    nested_samples: pandas.core.frame.DataFrame
-        DataFrame of the weights and likelihoods
-    sampler_kwargs: dict
-        Dictionary of keyword arguments for the sampler
-    sampling_time: float
-        Time in seconds spent sampling
-    rejection_sample_posterior: bool
-        Whether to generate the posterior samples by rejection sampling the
-        nested samples or resampling with replacement
-
-    Returns
-    -------
-    result: bilby.core.result.Result
-        result object with values written into its attributes
-    """
-
-    result = Result(
-        label=run.label, outdir=run.outdir, search_parameter_keys=run.sampling_keys
-    )
-    result.priors = worker_run.priors
-    result.nested_samples = nested_samples
-    result.meta_data = worker_run.data_dump["meta_data"]
-    result.meta_data["command_line_args"]["sampler"] = "parallel_bilby"
-    result.meta_data["data_dump"] = data_dump
-    result.meta_data["likelihood"] = worker_run.likelihood.meta_data
-    result.meta_data["sampler_kwargs"] = run.init_sampler_kwargs
-    result.meta_data["run_sampler_kwargs"] = sampler_kwargs
-    result.meta_data["injection_parameters"] = worker_run.injection_parameters
-    result.injection_parameters = worker_run.injection_parameters
-
-    if rejection_sample_posterior:
-        keep = weights > np.random.uniform(0, max(weights), len(weights))
-        result.samples = out.samples[keep]
-        result.log_likelihood_evaluations = out.logl[keep]
-        logger.info(
-            f"Rejection sampling nested samples to obtain {sum(keep)} posterior samples"
-        )
-    else:
-        result.samples = dynesty.utils.resample_equal(out.samples, weights)
-        result.log_likelihood_evaluations = reorder_loglikelihoods(
-            unsorted_loglikelihoods=out.logl,
-            unsorted_samples=out.samples,
-            sorted_samples=result.samples,
-        )
-        logger.info("Resampling nested samples to posterior samples in place.")
-
-    result.log_evidence = out.logz[-1] + worker_run.likelihood.noise_log_likelihood()
-    result.log_evidence_err = out.logzerr[-1]
-    result.log_bayes_factor = result.log_evidence - result.log_noise_evidence
-    result.sampling_time = sampling_time
-    result.num_likelihood_evaluations = np.sum(out.ncall)
-
-    result.samples_to_posterior(likelihood=worker_run.likelihood, priors=result.priors)
-    return result
