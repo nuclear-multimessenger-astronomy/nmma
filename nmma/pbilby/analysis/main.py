@@ -7,6 +7,7 @@ import os
 import sys
 import pickle
 import time
+import signal
 
 import bilby
 import numpy as np
@@ -16,19 +17,18 @@ from pandas import DataFrame
 
 from schwimmbad import MPIPool
 
-from ..pb_utils import (
-    write_sample_dump,
-    write_current_state,
-    plot_current_state,
-    read_saved_state,
-    stdout_sampling_log
-)
+from .. import pb_utils
 from ..parser import (
     create_nmma_analysis_parser,
     parse_analysis_args
     )
-from .analysis_run import MainRun, WorkerRun, format_result
+from .analysis_run import MainRun, WorkerRun
 
+def checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot):
+    pb_utils.write_current_state(sampler, resume_file, sampling_time )
+    pb_utils.write_sample_dump(sampler, samples_file, run.sampling_keys)
+    if no_plot is False:
+        pb_utils.plot_current_state(sampler, run.sampling_keys, run.outdir, run.label)
 
 def analysis_runner(
     data_dump,
@@ -125,9 +125,8 @@ def analysis_runner(
                 logger.info(f"{key}: {worker_run.priors[key]}")
 
             resume_file = f"{run.outdir}/{run.label}_checkpoint_resume.pickle"
-            samples_file = f"{run.outdir}/{run.label}_samples.dat"
-
-            sampler, sampling_time = read_saved_state(resume_file)
+            samples_file= f"{run.outdir}/{run.label}_samples.parquet"
+            sampler, sampling_time = pb_utils.read_saved_state(resume_file)
 
             if sampler is False:
                 logger.info(f"Initializing sampling points with pool size={POOL_SIZE}")
@@ -160,8 +159,20 @@ def analysis_runner(
             run_time = 0
             early_stop = False
 
+            ## graceful handling of preemptive shutdowns
+            def handle_sigterm(signum, frame):
+                logger.info("Received SIGTERM, writing checkpoint and exiting.")
+                pool.abort()
+                ## no time for plotting when file_size becomes larger
+                checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot=True)
+                logger.info("Exited gracefully.")
+                sys.exit(0)
+
+            signal.signal(signal.SIGTERM, handle_sigterm)
+            signal.signal(signal.SIGINT, handle_sigterm)
+
             for it, res in enumerate(sampler.sample(**sampler_kwargs)):
-                stdout_sampling_log(
+                pb_utils.stdout_sampling_log(
                     results=res, niter=it, ncall=sampler.ncall, dlogz=dlogz
                 )
 
@@ -190,18 +201,7 @@ def analysis_runner(
                     or it == max_its
                     or run_time > max_run_time
                 ):
-
-                    write_current_state(
-                        sampler,
-                        resume_file,
-                        sampling_time
-                    )
-                    write_sample_dump(sampler, samples_file, run.sampling_keys)
-                    if no_plot is False:
-                        plot_current_state(
-                            sampler, run.sampling_keys, run.outdir, run.label
-                        )
-
+                    checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot)
                     if it == max_its:
                         exit_reason = 1
                         logger.info(
@@ -225,14 +225,7 @@ def analysis_runner(
                     pass
 
                 # Create a final checkpoint and set of plots
-                write_current_state(
-                    sampler, resume_file, sampling_time
-                )
-                write_sample_dump(sampler, samples_file, run.sampling_keys)
-                if no_plot is False:
-                    plot_current_state(
-                        sampler, run.sampling_keys, run.outdir, run.label
-                    )
+                checkpointing( run, sampler, resume_file, samples_file.replace('.parquet','.dat'), sampling_time, no_plot)
 
                 sampling_time += (datetime.datetime.now() - t0).total_seconds()
 
@@ -250,17 +243,14 @@ def analysis_runner(
                     with open(nestcheck_result, "wb") as file_nest:
                         pickle.dump(ns_run, file_nest)
 
-                weights = np.exp(out["logwt"] - out["logz"][-1])
                 nested_samples = DataFrame(out.samples, columns=run.sampling_keys)
-                nested_samples["weights"] = weights
                 nested_samples["log_likelihood"] = out.logl
                 run.priors = worker_run.priors
-                result = format_result(
+                result = pb_utils.format_result(
                     run,
                     worker_run,
                     data_dump,
                     out,
-                    weights,
                     nested_samples,
                     sampler_kwargs,
                     sampling_time,
