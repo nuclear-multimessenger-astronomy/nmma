@@ -200,9 +200,9 @@ class OpticalLightCurve(Likelihood):
                     if yaml_filters is not None and yaml_filters != []:
                         for yaml_filt in yaml_filters:
                             if yaml_filt is not None and filt in yaml_filt:
-                                if len(yaml_filt) == 1:
-                                    filters_to_use = yaml_filt[0]
-                                else:
+                                if isinstance(yaml_filt, str):
+                                    filters_to_use = yaml_filt
+                                elif isinstance(yaml_filt, list):
                                     filters_to_use = "___".join(yaml_filt)
                                 filter_group_finite_idx_match = True
                                 break
@@ -255,9 +255,9 @@ class OpticalLightCurve(Likelihood):
                         if yaml_filters is not None and yaml_filters != []:
                             for yaml_filt in yaml_filters:
                                 if yaml_filt is not None and filt in yaml_filt:
-                                    if len(yaml_filt) == 1:
+                                    if isinstance(yaml_filt, str):
                                         upperlim_sigma = globals()[f"sys_err_{yaml_filt}_interped"](data_time)[infIdx]
-                                    else:
+                                    elif isinstance(yaml_filt, list):
                                         filters_to_use = "___".join(yaml_filt)
                                         upperlim_sigma = globals()[f"sys_err_{filters_to_use}_interped"](data_time)[infIdx]
                                     filter_group_infinite_idx_match = True
