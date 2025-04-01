@@ -16,7 +16,7 @@ DATA_DIR = os.path.join(WORKING_DIR, "data")
 def cleanup_outdir(args):
     yield
     if os.path.exists(args.outdir):
-        shutil.rmtree(args.outdir)
+        shutil.rmtree(args.outdir, ignore_errors=True)
 
 
 @pytest.fixture(scope="module")
@@ -87,6 +87,7 @@ def args():
         ra=None,
         dec=None,
         fetch_Ebv_from_dustmap=False,
+        systematics_file=None,
     )
 
     return args
@@ -94,23 +95,34 @@ def args():
 
 def test_analysis_systematics_with_time(args):
 
+    args.filters = "ztfr"
     args.systematics_file = f"{DATA_DIR}/systematics_with_time.yaml"
     analysis.main(args)
 
 
-def test_analysis_systematics_without_time(args):
+def test_analysis_systematics_with_time_and_filters(args):
 
+    args.filters = "ztfr,sdssu,2massks"
+    args.systematics_file = f"{DATA_DIR}/systematics_with_time_combined_filters.yaml"
+    analysis.main(args)
+
+
+def test_analysis_systematics_without_time(args):
+    
+    args.filters = "ztfr"
     args.systematics_file = f"{DATA_DIR}/systematics_without_time.yaml"
     analysis.main(args)
 
 
 def test_analysis_tensorflow(args):
 
+    args.filters = "ztfr"
     analysis.main(args)
 
 
 def test_analysis_sklearn_gp(args):
 
+    args.filters = "ztfr"
     args.interpolation_type = "sklearn_gp"
     analysis.main(args)
 
@@ -148,4 +160,5 @@ def test_analysis_slurm(args):
 
     args.__dict__.update(args_slurm.__dict__)
 
+    args.filters = "ztfr"
     analysis_slurm.main(args)
