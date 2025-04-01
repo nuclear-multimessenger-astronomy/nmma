@@ -39,7 +39,7 @@ def args():
         bestfit=True,
         svd_mag_ncoeff=10,
         svd_lbol_ncoeff=10,
-        filters="ztfr,sdssu,2massks",
+        filters="ztfr",
         Ebv_max=0.0,
         grb_resolution=5,
         jet_type=0,
@@ -101,6 +101,7 @@ def test_analysis_systematics_with_time(args):
 
 def test_analysis_systematics_with_time_and_filters(args):
 
+    args.filters = "ztfr,sdssu,2massks",
     args.systematics_file = f"{DATA_DIR}/systematics_with_time_combined_filters.yaml"
     analysis.main(args)
 
