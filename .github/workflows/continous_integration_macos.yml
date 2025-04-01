@@ -30,7 +30,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: 'arm64'
+          architecture: "arm64"
           miniforge-version: latest
           use-mamba: true
           mamba-version: "*"
@@ -102,7 +102,7 @@ jobs:
           python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib coveralls
           python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r tf_requirements.txt -r sklearn_requirements.txt
           python -m pip install .
-          git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake .. && make && cd ../..
+          git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .. && make && cd ../..
           pwd
       - name: Export Libraries
         run: |

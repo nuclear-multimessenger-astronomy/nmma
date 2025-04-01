@@ -74,7 +74,7 @@ jobs:
           python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib coveralls
           python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r tf_requirements.txt -r sklearn_requirements.txt
           python -m pip install .
-          git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake .. && make && cd ../..
+          git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .. && make && cd ../..
 
       - name: Export Libraries
         run: |
@@ -96,7 +96,7 @@ jobs:
         env:
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
           DYLD_LIBRARY_PATH: ${{ env.DYLD_LIBRARY_PATH }}
-                
+
       - name: Run Coveralls
         if: ${{ success() }}
         run: |
