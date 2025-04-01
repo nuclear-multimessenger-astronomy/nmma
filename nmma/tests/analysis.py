@@ -16,7 +16,7 @@ DATA_DIR = os.path.join(WORKING_DIR, "data")
 def cleanup_outdir(args):
     yield
     if os.path.exists(args.outdir):
-        shutil.rmtree(args.outdir)
+        shutil.rmtree(args.outdir, ignore_errors=True)
 
 
 @pytest.fixture(scope="module")
@@ -39,7 +39,7 @@ def args():
         bestfit=True,
         svd_mag_ncoeff=10,
         svd_lbol_ncoeff=10,
-        filters="ztfr",
+        filters="ztfr,sdssu,2massks",
         Ebv_max=0.0,
         grb_resolution=5,
         jet_type=0,
@@ -87,6 +87,7 @@ def args():
         ra=None,
         dec=None,
         fetch_Ebv_from_dustmap=False,
+        systematics_file=None,
     )
 
     return args
@@ -95,6 +96,12 @@ def args():
 def test_analysis_systematics_with_time(args):
 
     args.systematics_file = f"{DATA_DIR}/systematics_with_time.yaml"
+    analysis.main(args)
+
+
+def test_analysis_systematics_with_time_and_filters(args):
+
+    args.systematics_file = f"{DATA_DIR}/systematics_with_time_combined_filters.yaml"
     analysis.main(args)
 
 
