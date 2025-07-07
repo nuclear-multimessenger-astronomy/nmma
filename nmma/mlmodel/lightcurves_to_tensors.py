@@ -4,10 +4,6 @@ import os, sys, time, glob
 import json
 import warnings
 from tqdm import tqdm
-import nflows.utils as torchutils
-from IPython.display import clear_output
-from time import time
-from time import sleep
 import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
 from os.path import exists
@@ -44,13 +40,15 @@ def main():
         help='Label of the fixed light curves. Use None to skip.',
     )
     parser.add_argument(
-        '--detection_limit', type=float, required=True,
+        '--detection_limits', 
+        type=lambda s: [f.strip() for f in s.split(',')],
+        required=True,
         help='Photometric detection limit.',
-        default=22.0, 
     )
     parser.add_argument(
         '--filters',
         type=lambda s: [f.strip() for f in s.split(',')],
+        required=True,
         help='Comma-separated list of photometric bands, e.g. ztfg,ztfr,ztfi',
     )
     parser.add_argument(
@@ -59,8 +57,8 @@ def main():
         default=0.1, 
     )
     parser.add_argument(
-        '--data_filler', type=float,
-        help='Value to use for data padding.',
+        '--data_fillers', type=float,
+        help='Values to use for data padding per band.',
         default=22.0, 
     )
     parser.add_argument(
@@ -100,10 +98,10 @@ def main():
             dir_path_fix=args.dir_path_fix,
             inj_file_fix=args.inj_file_fix,
             label_fix=args.label_fix,
-            detection_limit=args.detection_limit,
+            detection_limits=args.detection_limits,
             bands=args.filters,
             step=args.dt,
-            data_filler=args.data_filler,
+            data_fillers=args.data_fillers,
             params=args.params,
             num_repeats=args.num_repeats,
         )
@@ -116,10 +114,10 @@ def main():
             dir_path_fix=None,
             inj_file_fix=None,
             label_fix=None,
-            detection_limit=args.detection_limit,
+            detection_limits=args.detection_limits,
             bands=args.filters,
             step=args.dt,
-            data_filler=args.data_filler,
+            data_fillers=args.data_fillers,
             params=args.params,
             num_repeats=args.num_repeats,
         )
