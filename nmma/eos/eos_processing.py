@@ -7,7 +7,9 @@ import keras as k
 
 def setup_eos_generator(args):
     eos_model_type = args.micro_eos_model.lower()
-    if eos_model_type == 'nep-5':
+    if eos_model_type == 'nep':
+        return NEPEoSGenerator(args.emulator_metadata)
+    elif eos_model_type == 'nep-5':
         return NEP5EoSGenerator(args.emulator_metadata)
     ## add more models
     else:
@@ -72,8 +74,8 @@ class EoSGenerator(object):
         """Identify the parameters for the EoS model"""
         #This should be implemented in the subclass
         return None
-    
-class NEP5EoSGenerator(EoSGenerator):
+
+class NEPEoSGenerator(EoSGenerator):
     def __init__(self, metadata):
         try:
             with open(metadata, 'r') as f:
@@ -89,10 +91,36 @@ class NEP5EoSGenerator(EoSGenerator):
         super().__init__(emulator_path, meta_dict.get('eos_parameters', None))
 
         n_mass_samples = meta_dict.get('n_mass_samples', 40)
-        self.set_mass_construction(n_mass_samples)
+        self.set_mass_construction(n_mass_samples)  
+    
+    def set_mass_construction(self, n_mass_samples):
+        """Set the mass construction"""
+        if isinstance(n_mass_samples, int):
+            # if this is a single integer, use equally spaced masses
+            self.n_mass_samples = n_mass_samples
+            self.decompose_mass_data = self.equal_distance_masses
+        elif isinstance(n_mass_samples, (tuple, list)):
+            # iterable containing mass points for fixed-distance lower end, variably spaced upper end and optionally mass value at which these methods will be concatenated; if not given, the default is 2.0
+            try:
+                self.mass_samples_low, self.mass_samples_high, self.split_value = n_mass_samples
+            except ValueError:
+                self.mass_samples_low, self.mass_samples_high = n_mass_samples
+                self.split_value= 2.0
+            self.n_mass_samples = self.mass_samples_low + self.mass_samples_high
+            self.decompose_mass_data = self.disjoint_masses
 
-        
+    def disjoint_masses(self, mtov):
+        """ Helper function when using split mass construction. 
+        Some predicted TOV-masses may be lower than the split value 
+        for concatenation and would lead to unexpected behaviour. 
+        In that case we fall back to equally spaced mass arrays. 
+        However, this should not happen for EoSs with a physically 
+        reasonable TOV-mass and should only be seen as a graceful fallback.
+        """
+        return np.where(mtov > self.split_value, self.properly_disjoint_masses(mtov), self.equal_distance_masses(mtov))
+    
     def equal_distance_masses(self, mtov):
+        "Get mass array(s) from 1 to mtov of length n_mass_samples"
         mass_range= np.linspace(1, mtov, self.n_mass_samples, axis =-1)
         try: 
             mass_range = np.squeeze(mass_range, axis=1)
@@ -101,8 +129,8 @@ class NEP5EoSGenerator(EoSGenerator):
         return mass_range
     
     def properly_disjoint_masses(self, mtov):
-        mass_range_low = np.linspace(1, 2.*np.ones_like(mtov),self.mass_samples_low, axis=-1)
-        mass_range_high= np.linspace(mtov, 2., self.mass_samples_high, endpoint=False, axis=-1)
+        mass_range_low = np.linspace(1, self.split_value*np.ones_like(mtov),self.mass_samples_low, axis=-1)
+        mass_range_high= np.linspace(mtov, self.split_value, self.mass_samples_high, endpoint=False, axis=-1)
         mass_range_high= mass_range_high[..., ::-1]
         mass_range= np.concatenate([mass_range_low, mass_range_high], axis=-1)  
         try: 
@@ -111,21 +139,7 @@ class NEP5EoSGenerator(EoSGenerator):
             pass
         return mass_range
     
-    def disjoint_masses(self, mtov):
-        return np.where(mtov > 2., self.properly_disjoint_masses(mtov), self.equal_distance_masses(mtov))
-
-    def set_mass_construction(self, n_mass_samples):
-        if isinstance(n_mass_samples, int):
-            self.n_mass_samples = n_mass_samples
-            self.decompose_mass_data = self.equal_distance_masses
-        elif isinstance(n_mass_samples, (tuple, list)):
-            self.mass_samples_low, self.mass_samples_high = n_mass_samples
-            self.n_mass_samples = self.mass_samples_low + self.mass_samples_high
-            self.decompose_mass_data = self.disjoint_masses
-
-    def identify_eos_parameters(self):
-        return ['K_sat', 'L_sym', 'K_sym', '3n_sat', '5n_sat']
-    
+  
     def adjust_format(self, predictions):
         rad_data, lam_data, mtov_data = np.split(predictions, [self.n_mass_samples, 2*self.n_mass_samples], axis=-1)
         mass_range = self.decompose_mass_data(mtov_data)
@@ -134,6 +148,10 @@ class NEP5EoSGenerator(EoSGenerator):
         
         return np.stack([rad_data, mass_range, lam_data], axis=1)
         
+
+class NEP5EoSGenerator(NEPEoSGenerator):
+    def identify_eos_parameters(self):
+        return ['K_sat', 'L_sym', 'K_sym', '3n_sat', '5n_sat']
 
 
 def load_eos_files(eos_data, Neos):
