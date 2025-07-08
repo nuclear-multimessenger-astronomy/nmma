@@ -83,7 +83,7 @@ def main(args=None):
                     continue
 
                 if key not in main_args:
-                    print(f"{key} not a known argument... please remove")
+                    raise ValueError(f"{key} not a known argument... please remove")
                     exit()
                 key = key.replace("_", "-")
 

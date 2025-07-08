@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import json
 import scipy.signal
-from sncosmo.bandpasses import _BANDPASSES
+# from sncosmo.bandpasses import _BANDPASSES
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -33,10 +33,10 @@ def loadEvent(filename):
                 data[key] = np.array(data[key])
     else:
         lines = [line.rstrip("\n") for line in open(filename)]
-        lines = filter(None, lines)
+        lines = filter(None, lines) #get non-empty lines
 
-        sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
-        sncosmo_maps = {name: name.replace(":", "_") for name in sncosmo_filts}
+        # sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
+        # sncosmo_maps = {name: name.replace(":", "_") for name in sncosmo_filts}
 
         data = {}
         for line in lines:
@@ -45,8 +45,8 @@ def loadEvent(filename):
             mjd = Time(lineSplit[0], format="isot").mjd
             filt = lineSplit[1]
 
-            if filt in sncosmo_maps:
-                filt = sncosmo_maps[filt]
+            # if filt in sncosmo_maps:
+            #     filt = sncosmo_maps[filt]
 
             mag = float(lineSplit[2])
             dmag = float(lineSplit[3])
@@ -114,7 +114,7 @@ def read_spectroscopy_files(
     return data
 
 
-def read_photometry_files(files: list, filters: list = None, tt: np.array = np.linspace(0, 14, 100), datatype:str ="bulla") -> dict:
+def read_photometry_files(files: list, filters: list = None, tt: np.array = np.linspace(0, 14, 100), format:str ="bulla") -> dict:
     """
     Read in a list of photometry files with given filenames and process them in a dictionary
     
@@ -122,18 +122,18 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
         files (list): List of filenames with the photometry files.
         filters (list): List of photometry filters to be extracted.
         tt (np.array): Array containing the time grid at which photometry values are given.
-        datatype (str): Which model we are considering. Currently supports
+        format (str): Which model we are considering. Currently supports
         
     Returns:
         data: Dictionary with keys being the given filenames and values being dictionaries themselves, with keys 
         being t (time) and specified filters and values being the time grid, and values the time grid and lightcurves.
     """
     
-    # First, check whether given datatype is supported in this function
-    supported_datatypes = ["ztf", "bulla", "standard", "hdf5"]
-    if datatype not in supported_datatypes:
+    # First, check whether given format is supported in this function
+    supported_formats = ["ztf", "bulla", "standard", "hdf5"]
+    if format not in supported_formats:
         space = " "
-        raise ValueError(f"datatype {datatype} unknown. Currently supported datatypes are: {space.join(supported_datatypes)}")
+        raise ValueError(f"format {format} unknown. Currently supported formats are: {space.join(supported_formats)}")
 
     # Return value 
     data = {}
@@ -150,7 +150,7 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
         )
 
         # ZTF rest style file
-        if datatype == "ztf":
+        if format == "ztf":
             df = pd.read_csv(filename)
 
             if "mag" in df:
@@ -187,8 +187,8 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
                     group["jd"].iloc[idx] - jd_min,
                     group[mag_key].iloc[idx],left=np.nan, right=np.nan )
         
-        # Bulla datatype
-        elif datatype == "bulla":
+        # Bulla format
+        elif format == "bulla":
             with open(filename, "r") as f:
                 header = list(filter(None, f.readline().rstrip().strip("#").split(" ")))
             df = pd.read_csv(
@@ -205,8 +205,8 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
                 k.replace(":", "_"): v.to_numpy() for k, v in data[name].items()
             }
 
-        # Standard datatype
-        elif datatype == "standard":
+        # Standard format
+        elif format == "standard":
             mag_d = np.loadtxt(filename)
             mag_d_shape = mag_d.shape
 
@@ -229,8 +229,8 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
                 data[name]["R"] = mag_d[:, 13]
                 data[name]["I"] = mag_d[:, 14]
 
-        # HDF5 datatype
-        elif datatype == "hdf5":
+        # HDF5 format
+        elif format == "hdf5":
             f = h5py.File(filename, "r")
             keys = list(f.keys())
             for key in keys:
@@ -300,6 +300,17 @@ def read_lightcurve_file(filename: str) -> dict:
     df.rename(columns={"t[days]": "t"}, inplace=True)
 
     return df.to_dict(orient="series")
+
+def write_lightcurve_file(lc_outfile, data, filters):
+    #FIXME: This format is readable for injections, but not for realistic lightcurves,
+    # it would be better to use a time-filter-mag-error format
+    save_data = np.array([
+        [time, *[data[filt][ii, 1] for filt in filters] ] 
+        for ii, time in enumerate(data[filters[0]][:, 0])
+        ])
+    np.savetxt(lc_outfile, save_data, fmt="%.5f"+" ".join(["%.3f"]*len(filters)), 
+               delimiter=" ", header="t[days]" + " ".join(filters), comments="#")
+
 
 def return_from_json(json_file):
     with open(json_file, "r") as f:
