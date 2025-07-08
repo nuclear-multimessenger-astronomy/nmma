@@ -184,41 +184,32 @@ def inclination_prior_from_fits(priors, args):
         maximum=np.pi / 2)
 
     if args.plot:
-        figIdx = np.random.randint(1000)
-        plt.figure(figIdx)
+        plt.figure()
         plt.xlabel('Inclination')
         plt.ylabel('PDF')
         plt.plot(iota_EM, prob_iota_EM)
         plt.savefig(f"{args.outdir}/Fits_motivated_inclination_prior.png")
-
+        plt.close()
+    print("Inclination prior is set based on the fits file input")
     return priors
 
+def convert_mtot_mni(paramms):
 
-def create_prior_from_args(model_names, args):
+    for par in ["mni", "mtot", "mrp"]:
+        if par not in paramms:
+            paramms[par] = 10**paramms[f"log10_{par}"]
 
-    AnBa2022_intersect = list(set(['AnBa2022_linear', 'AnBa2022_log']) &
-                              set(model_names))
+    paramms["mni_c"] = paramms["mni"] / paramms["mtot"]
+    paramms["mrp_c"] = (paramms["xmix"]*(paramms["mtot"]-paramms["mni"])-paramms["mrp"])
+    return paramms
 
-    if len(AnBa2022_intersect) > 0:
+def create_prior_from_args(args, param_conv=None):
 
-        def convert_mtot_mni(parameters):
+    if param_conv == 'AnBa2022':
+        param_conv = convert_mtot_mni
 
-            for param in ["mni", "mtot", "mrp"]:
-                if param not in parameters:
-                    parameters[param] = 10**parameters[f"log10_{param}"]
-
-            parameters["mni_c"] = parameters["mni"] / parameters["mtot"]
-            parameters["mrp_c"] = (
-                parameters["xmix"] * (parameters["mtot"] - parameters["mni"])
-                - parameters["mrp"]
-            )
-            return parameters
-
-        priors = bilby.core.prior.PriorDict(
-            args.prior, conversion_function=convert_mtot_mni
-        )
-    else:
-        priors = bilby.gw.prior.PriorDict(args.prior)
+    priors = bilby.gw.prior.PriorDict(
+        args.prior, conversion_function=param_conv)
 
     # setup for Ebv
     if 'Ebv' not in priors:
@@ -255,7 +246,7 @@ def create_prior_from_args(model_names, args):
         priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
         priors = bilby.gw.prior.ConditionalPriorDict(priors_dict)
 
-    if args.fits_file:
+    if getattr(args,'fits_file', False):
         priors = inclination_prior_from_fits(priors, args)
 
     if args.fetch_Ebv_from_dustmap:
@@ -287,7 +278,8 @@ def create_prior_from_args(model_names, args):
 
         print(f"The prior on Ebv is set to fixed value of {priors['Ebv']}")
 
-    if getattr(args, 'systematics_file', None) is not None:
+    if getattr(args, 'systematics_file', None):
         systematics_priors = systematics.main(args.systematics_file)
         priors.from_list(systematics_priors)
+
     return priors

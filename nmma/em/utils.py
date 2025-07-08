@@ -1,9 +1,8 @@
-import copy
 import numpy as np
 import os
 import pandas as pd
 import scipy.interpolate as interp
-import scipy.signal
+from ast import literal_eval
 import scipy.stats
 
 import sncosmo
@@ -59,13 +58,60 @@ DEFAULT_FILTERS = [
 ]
 
 def setup_sample_times(args):
-    tmin = args.tmin
-    tmax = args.tmax
-    n_step = int((tmax - tmin) / args.dt) +1
-    if getattr(args, 'log_space_time', False):
-        return np.geomspace(tmin, tmax, n_step)
+    "create an array of sample times used for generating EM model lightcurves from args"
+    tmin = args.em_tmin
+    tmax = args.em_tmax
+
+    # first check the legacy case of a transient with a fixed time step
+    if args.em_tstep:
+        return np.arange(tmin, tmax + args.em_tstep, args.em_tstep)
+    
+    # otherwise, create the array based on selected scale
+    if 'lin' in args.em_timescale:
+        return np.linspace(tmin, tmax, args.em_nsteps)
+    elif any(scale in args.em_timescale for scale in ['log', 'geo']):
+        return np.geomspace(tmin, tmax, args.em_nsteps)
     else:
-        return np.linspace(tmin, tmax, n_step)
+        raise ValueError(
+            f"Unknown time scale {args.em_timescale}. "
+            "Please use 'lin(ear)' or 'log(arithmic)' / 'geo(metric)'."
+        )
+
+def setup_lin_sample_times(tmin, tmax, nsteps=None):
+    return np.linspace(tmin, tmax, nsteps)
+
+
+
+
+def create_detection_limit(args, filters, default_limit = np.inf):
+    if filters is None:
+        return {}
+    
+    elif getattr(args, 'detection_limit', None) is None:
+        if getattr(args,'rubin_ToO_type', None):
+            detection_limit = {'ps1__g':25.8,'ps1__r':25.5,'ps1__i':24.8,'ps1__z':24.1,'ps1__y':22.9}
+        else:
+            detection_limit = default_limit
+    else:
+        detection_limit = literal_eval(args.detection_limit)
+
+    return set_filter_associated_dict(detection_limit, filters, default_limit)
+
+def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
+    if isinstance(quantity, (int, float)):
+        # If a single value is provided, apply it to all filters
+        return {x: float(quantity) for x in filters}
+    
+    elif isinstance(quantity, (list, tuple)):
+        assert len(quantity) == len(filters), (
+            f" {quantity} must match the number of filters: {filters}."
+        )
+        return {x: float(y) for x, y in zip(filters, quantity) }
+    
+    elif isinstance(quantity, dict):
+        # If a dict is provided, ensure it has the correct filters
+        return {filt: float(quantity.get(filt, default_limit)) for filt in filters}
+
 
 def transform_to_app_mag_dict(mag_dict, params):
     d_lum = params.get("luminosity_distance", 1e-5) ## assume 10 pc =1e-5 Mpc for abs_mag
@@ -148,9 +194,14 @@ def get_all_bandpass_metadata():
 
     return combined_metadata
 
+def get_filter_name_mapping(observed_filters):
+    """
+    Creates a mapping of filter names between their observation channel signature and a corresponding model filter.
 
-def getFilteredMag(mag, filt):
-    unprocessed_filt = [
+    Returns:
+        dict: A dictionary mapping between observed and modelled filters.
+    """
+    unprocessed_filts = [
         "u",
         "g",
         "r",
@@ -175,50 +226,86 @@ def getFilteredMag(mag, filt):
         "swope2__J",
         "swope2__H",
     ]
-    sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
-    sncosmo_maps  = {
-        name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts
-    }
-    sncosmo_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
+    unprocessed_filts.extend([val["name"] for val in get_all_bandpass_metadata()])
+    filter_maps = {name:name for name in unprocessed_filts}
 
+    # sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
+    # filter_maps.update({name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts})
+    # filter_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
+
+    #hardcoded filter names
+    filter_maps.update({
+        'B': 'g',
+        'R': 'z',
+        'F160W':'H',
+        'U': 'u',
+        'UVW2': 'u',
+        'UVW1': 'u',
+        'UVM2': 'u' 
+        })
+
+    direct_map = {}
+    averaging_map= {}
+
+    if isinstance(observed_filters, str):
+        # If a single filter is provided as a string, convert it to a list
+        observed_filters = [observed_filters]
+
+    for obs_filt in observed_filters:
+        if obs_filt in filter_maps:
+            direct_map[obs_filt] = filter_maps[obs_filt]
+        elif obs_filt.startswith("radio") or obs_filt.startswith("X-ray"):
+            direct_map[obs_filt] = obs_filt
+        else:
+            averaging_map[obs_filt] = map_observable_to_modelled_filters(obs_filt)
+        
+
+    return direct_map, averaging_map
+
+def map_observable_to_modelled_filters(obs_filter):
+    # NOTE: this is a hardcoded mapping of observable filters to modelled filters,
+    # needs to correspond to the filters in average_mags
+    map_dict = {'w':["g", "r", "i"],
+                'o': ["r", "i"],
+                }
+    for filt in ["c", "V", "F606W"]:
+        map_dict[filt] = ["g", "r"]
+    for filt in ["I", "F814W"]:
+        map_dict[filt] = ["z", "y"]
+    if obs_filter in map_dict:
+        return map_dict[obs_filter]
+    else:
+        raise ValueError(f"Unknown filter: {obs_filter}. Cannot be processed")
+
+def average_mags(mag, filt):
     # These average between filters is equivalent to
     # the geometric mean of the flux. These averages
     # are kind of justifiable because the spectral
     # commonly goes as F_\nu \propto \nu^\alpha,
     # where \nu is the frequency.
-    if filt in unprocessed_filt or filt.startswith(("radio", "X-ray")):
-        return mag[filt]
-    elif filt in sncosmo_maps:
-        return mag[sncosmo_maps[filt]]
-    elif filt == "w":
+    
+
+    ## NOTE: If editing, also update the corresponding part 
+    # in map_observable_to_modelled_filters
+    if filt == "w":
         return (mag["g"] + mag["r"] + mag["i"]) / 3.0
-    elif filt in ["U", "UVW2", "UVW1", "UVM2"]:
-        return mag["u"]
-    elif filt == "B":
-        return mag["g"]
     elif filt in ["c", "V", "F606W"]:
-        return (mag["g"] + mag["r"]) / 2.0
+        return(mag["g"] + mag["r"]) / 2.0
     elif filt == "o":
         return (mag["r"] + mag["i"]) / 2.0
-    elif filt == "R":
-        return mag["z"]
     elif filt in ["I", "F814W"]:
-        return (mag["z"] + mag["y"]) / 2.0
-    elif filt == "F160W":
-        return mag["H"]
+        return(mag["z"] + mag["y"]) / 2.0
     else:
         raise ValueError(f"Unknown filter: {filt}")
-
-
-def process_data(raw_data, trigger_time, tmin, tmax):
-    unprocessed_data = copy.deepcopy(raw_data)
-    processedData = {}
-    for filt, data in unprocessed_data.items():
-        time, mag, dmag = data[:, 0] - trigger_time, data[:, 1], data[:, 2]
-        idx = (time > tmin) & (time < tmax)
-        processedData[filt] = np.vstack((time[idx], mag[idx], dmag[idx])).T
-
-    return processedData
+    
+    
+    
+def get_filtered_mag(mag, filt):
+    direct_map, averaging_filters = get_filter_name_mapping(filt)
+    if filt in averaging_filters:
+        return average_mags(mag, filt)
+    else:
+        return mag[direct_map[filt]]
 
 def interpolate_nans(data_dict: dict) -> dict:
     """
@@ -251,18 +338,18 @@ def interpolate_nans(data_dict: dict) -> dict:
 
     return data_dict
 
-def autocomplete_data(interp_points, ref_points, ref_data, extrapolate='linear', ref_value=np.nan):
+def autocomplete_data(interp_points, ref_points, ref_data, extrapolate='linear', ref_value=np.inf):
     """
     Interpolates and extrapolates reference data to a 1-D array of arguments. This can be wide off!
     This basically extends np.interp to ignore nans and provide simple extrapolations. 
     """
     
-    ii = np.where(np.isfinite(ref_data))[0]
-    if len(ii) < 2:
+    data_mask = np.isfinite(ref_data)
+    if np.sum(data_mask) < 2:
         return np.full_like(interp_points, ref_value)
     
-    fin_ref= np.asarray(ref_points)[ii]
-    fin_data=np.asarray(ref_data)[ii]
+    fin_ref= np.asarray(ref_points)[data_mask]
+    fin_data=np.asarray(ref_data)[data_mask]
     interp_points=np.atleast_1d(interp_points)
 
     if isinstance(extrapolate, (float , int)):
