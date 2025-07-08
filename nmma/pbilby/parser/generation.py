@@ -1,10 +1,7 @@
 import bilby
 import bilby_pipe.data_generation
 
-from .shared import (
-    _create_base_nmma_parser,
-    _add_slurm_settings_to_parser
-    )
+from .shared import _create_base_nmma_parser
 
 logger = bilby.core.utils.logger
 
@@ -77,6 +74,36 @@ def add_extra_args_from_bilby_pipe_namespace(cli_args, parallel_bilby_args):
         if key not in parallel_bilby_args:
             setattr(parallel_bilby_args, key, val)
     return parallel_bilby_args
+
+
+def _add_slurm_settings_to_parser(parser):
+    slurm_group = parser.add_argument_group(title="Slurm Settings")
+    slurm_group.add_argument(
+        "--nodes", type=int, default=1, help="Number of nodes to use (default 1)"
+    )
+    slurm_group.add_argument(
+        "--ntasks-per-node",
+        type=int,
+        default=2,
+        help="Number of tasks per node (default 2)",
+    )
+    slurm_group.add_argument( "--time", type=str, default="24:00:00",
+        help="Maximum wall time (defaults to 24:00:00)" )
+    slurm_group.add_argument("--mem-per-cpu", type=str, default="2G",
+        help="Memory per CPU (defaults to 2GB)", )
+    slurm_group.add_argument(
+        "--extra-lines",
+        type=str,
+        default=None,
+        help="Additional lines, separated by ';', use for setting up conda env or module imports",
+    )
+    slurm_group.add_argument(
+        "--slurm-extra-lines",
+        type=str,
+        default=None,
+        help="additional slurm args (args that need #SBATCH in front) of the form arg=val separated by sapce",
+    )
+    return parser
 
 
 def create_nmma_generation_parser():

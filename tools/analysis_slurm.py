@@ -116,26 +116,26 @@ def main(args=None):
     args_vars = vars(args)
 
     wildcard_mapper = {
-        "model": "$MODEL",
+        "em_model": "$MODEL",
         "label": "$LABEL",
         "trigger_time": "$TT",
         "data": "$DATA",
         "prior": "priors/$PRIOR.prior",
-        "tmin": "$TMIN",
-        "tmax": "$TMAX",
-        "dt": "$DT",
+        "em_tmin": "$TMIN",
+        "em_tmax": "$TMAX",
+        "em_tstep": "$DT",
         "skip_sampling": "$SKIP_SAMPLING",
     }
 
     wildcard_keys = [
-        "model",
+        "em_model",
         "label",
         "trigger_time",
         "data",
         "prior",
-        "tmin",
-        "tmax",
-        "dt",
+        "em_tmin",
+        "em_tmax",
+        "em_tstep",
     ]
     wildcard_boolean_keys = ["skip_sampling"]
 

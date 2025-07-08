@@ -13,9 +13,8 @@ from nmma.em.model import (
     SVDLightCurveModel,
 )
 
-from ..em import lightcurve_handling as lch
+from ..em import em_parsing, lightcurve_handling as lch
 from ..em.io import read_lightcurve_file
-from ..em.lightcurve_handling import validate_lightcurve
 from ..joint import create_injection
 from ..joint.conversion import distance_modulus_nmma
 
@@ -112,45 +111,22 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         # prior_path = os.path.join("./priors/", model_name + ".prior")
         output_directory = test_directory
         command_line_lightcurve_label = model_name + "_command_line_lightcurve"
-        time_series = np.arange(0.01, 20.0 + 0.5, 0.5)
 
-        args = Namespace(
+        args = em_parsing.parsing_and_logging(em_parsing.lightcurve_parser, [])
+        non_default_args = dict(
             injection=injection_file,
             label=command_line_lightcurve_label,
-            model=model_name,
+            em_model=model_name,
             svd_path=svdmodels,
-            tmin=time_series[0],
-            tmax=time_series[-1],
-            dt=time_series[1] - time_series[0],
-            svd_mag_ncoeff=10,
-            svd_lbol_ncoeff=10,
+            em_tmin=0.01,
+            em_tmax=20.0,
+            em_tstep=0.5,
             filters="sdssu",
-            grb_resolution=5,
-            jet_type=0,
-            ztf_sampling=False,
-            ztf_uncertainties=False,
-            ztf_ToO=None,
-            rubin_ToO=False,
-            rubin_ToO_type=None,
-            photometry_augmentation=False,
-            photometry_augmentation_seed=0,
-            photometry_augmentation_N_points=10,
-            photometry_augmentation_filters=None,
-            photometry_augmentation_times=None,
-            plot=False,
-            joint_light_curve=False,
-            with_grb_injection=False,
             outdir=output_directory,
-            absolute=False,
-            injection_detection_limit=None,
-            generation_seed=42,
             interpolation_type="sklearn_gp",
-            outfile_type="csv",
-            xlim="0,14",
-            ylim="22,16",
-            em_transient_error=0.0,
-            increment_seeds=False,
+            em_error=0.0,
         )
+        args.__dict__.update(non_default_args)
 
         lch.lcs_from_injection_parameters(args)
 
@@ -214,16 +190,12 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         if model_name == "Ka2017":
             init_kwargs['interpolation_type'] = "sklearn_gp"
         lightcurve_model = model_lightcurve_function(**init_kwargs)
-        lightcurve_from_function = lightcurve_model.generate_lightcurve(
+        obs_times, lightcurve_from_function = lightcurve_model.gen_detector_lc(
             sample_times=time_series, parameters=lightcurve_parameters
-        )[1]
-        # need to adjust magnitudes to be absolute
-        distance_modulus = distance_modulus_nmma(lightcurve_parameters["luminosity_distance"])
-        adjusted_lightcurve_from_function = {key: mag +distance_modulus 
-                        for key, mag in lightcurve_from_function.items()}
-        adjusted_lightcurve_from_function["t"] = time_series
+        )
+        lightcurve_from_function["t"] = obs_times
 
-        return adjusted_lightcurve_from_function
+        return lightcurve_from_function
 
     def compare_lightcurves(lightcurve_from_function, lightcurve_from_command_line):
         """
@@ -245,7 +217,6 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         assert set(filters_from_function) == set(
             filters_from_command_line
         ), "filters from function and command line do not match"
-
         # goes filter by filter and checks that each array matches
         for filter_name in filters_from_function:
             assert all(
@@ -304,21 +275,21 @@ def test_validate_lightcurves():
         filters="ztfg",
         min_obs=3,
         cutoff_time=0,
-        silent=False,
+        verbose=True,
     )
-    assert validate_lightcurve(**vars(args)) == True, "Test for 3 observations in the ztf g filter failed"
+    assert lch.validate_lightcurve(**vars(args)) == True, "Test for 3 observations in the ztf g filter failed"
 
     args.filters = "ztfr"
     args.min_obs = 1
-    assert validate_lightcurve(**vars(args)) == True, "Test for 1 observation in the ztf r filter failed"
+    assert lch.validate_lightcurve(**vars(args)) == True, "Test for 1 observation in the ztf r filter failed"
 
     args.filters = "ztfg,ztfr"
-    assert validate_lightcurve(**vars(args)) == True, "Test for  passing multiple filters failed"
+    assert lch.validate_lightcurve(**vars(args)) == True, "Test for  passing multiple filters failed"
 
     args.filters = ""
     args.min_obs = 0
-    assert validate_lightcurve(**vars(args)) == True, "Test for automatic filter selection failed"
+    assert lch.validate_lightcurve(**vars(args)) == True, "Test for automatic filter selection failed"
 
     args.cutoff_time = 1
     args.min_obs = 1
-    assert validate_lightcurve(**vars(args)) == False, "Test for setting cutoff time failed"
+    assert lch.validate_lightcurve(**vars(args)) == False, "Test for setting cutoff time failed"

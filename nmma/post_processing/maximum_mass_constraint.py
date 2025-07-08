@@ -1,5 +1,6 @@
 from . import maximum_mass_constraint_utils as utils
 from .parser import maximum_mass_parser
+from ..joint.base_parsing import nmma_base_parsing
 import pandas as pd
 import bilby
 import os
@@ -61,8 +62,7 @@ def maximum_mass_resampling(args):
         
 def main(args = None):
     if args is None:
-        parser = maximum_mass_parser()
-        args = parser.parse_args()
+        args = nmma_base_parsing(maximum_mass_parser)
     maximum_mass_resampling(args)
     
 if __name__ == "__main__":

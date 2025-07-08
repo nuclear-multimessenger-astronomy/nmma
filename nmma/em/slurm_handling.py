@@ -1,5 +1,5 @@
 import os
-from .em_parsing import slurm_parser
+from .em_parsing import slurm_parser, parsing_and_logging
 import json
 
 import numpy as np
@@ -7,7 +7,6 @@ import numpy as np
 import bilby
 
 import os
-import argparse
 import json
 import pandas as pd
 
@@ -16,8 +15,7 @@ from bilby_pipe.create_injections import InjectionCreator
 
 
 def main():
-    parser = slurm_parser
-    args = parser.parse_args()
+    args = parsing_and_logging(slurm_parser)
 
     # load the injection json file
     if args.injection_file:
@@ -59,8 +57,7 @@ def main():
             analysis = file.read()
 
         outdir = os.path.join(args.outdir, str(index))
-        if not os.path.isdir(outdir):
-            os.makedirs(outdir)
+        os.makedirs(outdir, exist_ok=True)
 
         priors = bilby.gw.prior.PriorDict(args.prior_file)
         priors.to_file(outdir, label="injection")
@@ -81,15 +78,13 @@ def main():
 
 
 def lc_creation():
-    parser = slurm_parser()
-    args = parser.parse_args()
+    args = parsing_and_logging(slurm_parser)
 
     with open(args.injection, "r") as f:
         injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
 
     logdir = os.path.join(args.outdir, "logs")
-    if not os.path.isdir(logdir):
-        os.makedirs(logdir)
+    os.makedirs(logdir, exist_ok=True)
 
     number_jobs = int(
         np.ceil(len(injection_dict["injections"]) / args.lightcurves_per_job)

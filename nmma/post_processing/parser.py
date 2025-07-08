@@ -1,8 +1,7 @@
-import argparse
-from nmma.pbilby.parser.shared import StoreBoolean
+
+from nmma.joint.base_parsing import StoreBoolean
 
 def joint_postprocess_parser(parser):
-
     parser.add_argument("--outdir", metavar="PATH", type=str, required=True)
     parser.add_argument("--cred-interval", type=float, default=0.95, help="Credible interval to be calculated (default: 0.95)")
     parser.add_argument("--seed", type=int, required=False, default=42, help="Random seed (default: 42)")
@@ -10,11 +9,11 @@ def joint_postprocess_parser(parser):
     parser.add_argument("--Nevent", type=int, required=False)
     parser.add_argument("--N-reordering", type=int, default=100, help="Number of reodering realisation to be comsidered (default: 100)")
     parser.add_argument("--N-posterior-samples", type=int, required=False, default=10000, help="Number of posterior samples to be drawn during the resampling (default: 10000)")
+    return parser
 
-def R14_parser():
-    parser = argparse.ArgumentParser(
-            description="Calculate the trend of estimated R14 with GW+EM input"
-        )
+def R14_parser(parser):
+    parser.description="Calculate the trend of estimated R14 with GW+EM input"
+    
     parser = joint_postprocess_parser(parser)
     parser.add_argument("--label", metavar="NAME", type=str, required=True)
     parser.add_argument("--R14-true", type=float, default=11.55,
@@ -30,10 +29,12 @@ def R14_parser():
     parser.add_argument(
         "--pdet", type=str, required=False,
         help="Path to the probability of detection as a function of maximum mass (for correcting selection bias")
+    return parser
     
 
-def Hubble_parser(): 
-    parser = argparse.ArgumentParser(description="Calculate the combination and seperate trend of estimated Hubble constant with GW and EM input")
+def Hubble_parser(parser): 
+    parser.description="Calculate the combination and seperate trend of estimated Hubble constant with GW and EM input"
+
     parser = joint_postprocess_parser(parser)
     parser.add_argument("--output-label", metavar="NAME", type=str, required=True)
     parser.add_argument("--GWsamples", metavar='PATH', type=str, required=True, help="Path to the GW posterior samples directory, the samples files are expected to be in the format of posterior_samples_{i}.dat")
@@ -44,9 +45,9 @@ def Hubble_parser():
     parser.add_argument("--p-value-threshold", type=float, required=False, help="p-value threshold used to remove badly recoved injections")
     return parser
 
-def resampling_parser():
-    parser = argparse.ArgumentParser(
-        description="Inference on binary source parameters with kilonova ejecta posterior and GW source posterior given.")
+def resampling_parser(parser):
+    parser.description="Inference on binary source parameters with kilonova ejecta posterior and GW source posterior given."
+
     parser.add_argument("--outdir", metavar="PATH", type=str, required=True)
     parser.add_argument("--GWsamples", metavar="PATH", type=str, required=True,
             help="posterior samples file from a previous Bayesian inference run on GW signals.")
@@ -64,10 +65,9 @@ def resampling_parser():
             help="Compute GW-EM-resampling for NSBH source, else: for BNS source.")
     return parser
 
-def maximum_mass_parser():
-    parser = argparse.ArgumentParser(
-        description="Inference on the maximum mass constraint of the EOS when a joint posterior for binary components, ejecta and EOS is provided."
-    )
+def maximum_mass_parser(parser):
+    parser.description="Inference on the maximum mass constraint of the EOS when a joint posterior for binary components, ejecta and EOS is provided."
+
     parser.add_argument("--outdir", metavar="PATH", type=str, required=True)
     parser.add_argument("--joint-posterior", type=str,  required=True,
         help="Posterior file with chirp mass, eta_star, EOSID, log10_mdisk, log10_mej_dyn as columns.")

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import shutil
 
-from ..em import training, model_parameters, io, svdmodel_benchmark
+from ..em import training, model_parameters, io
 @pytest.fixture(autouse=True)
 def cleanup_outdir():
     ModelPath = "svdtrainingmodel"
@@ -50,7 +50,7 @@ def test_training():
         svd_path=ModelPath,
     )
 
-    svdmodel_benchmark.create_benchmark(
+    training.create_benchmark(
         model_name,
         ModelPath,
         dataDir,
@@ -69,7 +69,7 @@ def test_training():
         svd_path=ModelPath,
     )
 
-    svdmodel_benchmark.create_benchmark(
+    training.create_benchmark(
         model_name,
         ModelPath,
         dataDir,
