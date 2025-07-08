@@ -1,11 +1,24 @@
 import json
 import os
+import copy
+import inspect
+from glob import glob
 import joblib
 import warnings
 import matplotlib.pyplot as plt
 import numpy as np
-from .utils import autocomplete_data
-from ..utils.models import get_models_home, get_model
+
+from .utils import autocomplete_data, interpolate_nans, setup_sample_times
+from ..utils.models import get_models_home, get_model  
+
+
+from . import model_parameters
+from .model import SVDLightCurveModel
+from .io import read_photometry_files, read_spectroscopy_files
+from .em_parsing import parsing_and_logging, svd_training_parser, svd_model_benchmark_parser
+from .plotting_utils import visualise_model_performance, chi2_hists_from_dict
+
+
 
 try:
     import keras as k
@@ -107,7 +120,7 @@ class BaseTrainingModel(object):
         self.n_coeff = n_coeff
         self.n_epochs = n_epochs
         self.data_type = data_type
-        self.data_time_unit = data_time_unit
+        self.time_scale_factor = setup_time_conversion(data_time_unit)
         self.plot = plot
         self.plotdir = plotdir
         self.ncpus = ncpus
@@ -122,7 +135,7 @@ class BaseTrainingModel(object):
         if self.ncpus > 1:
             print(f"Running with {self.ncpus} CPUs")
 
-        self.interpolate_data(data_time_unit=data_time_unit)
+        self.interpolate_data()
 
         self.model_exists = self.check_model()
         self.start_training = start_training
@@ -148,20 +161,7 @@ class BaseTrainingModel(object):
         self.load_model()
 
 
-    def interpolate_data(self, data_time_unit="days"):
-        # Before interpolation, convert input data time values to days
-        if data_time_unit in ["days", "day", "d"]:
-            time_scale_factor = 1.0
-        elif data_time_unit in ["hours", "hour", "hr", "h"]:
-            time_scale_factor = 24.0
-        elif data_time_unit in ["minutes", "minute", "min", "m"]:
-            time_scale_factor = 1440.0
-        elif data_time_unit in ["seconds", "second", "sec", "s"]:
-            time_scale_factor = 86400.0
-        else:
-            raise ValueError(
-                "data_time_unit must be one of days, hours, minutes, or seconds."
-            )
+    def interpolate_data(self):
         if self.univariate_spline:
             extension_mode = "spline"
             ref_value = self.univariate_spline_s
@@ -175,7 +175,7 @@ class BaseTrainingModel(object):
             self.data[key]["data"] = np.zeros(
                 (len(self.sample_times), len(self.filters))
                 )
-            obs_times = self.data[key]["t"]/ time_scale_factor
+            obs_times = self.data[key]["t"]/ self.time_scale_factor
 
             # Interpolate data onto grid
             if self.data_type == "photometry":
@@ -516,73 +516,324 @@ class GPAPITrainingModel(BaseTrainingModel):
 
         self.svd_model[filt]["gps"] = gps
 
+def SVDTrainingModel(
+    *args,  
+    interpolation_type="keras",
+    **kwargs
+    ):
+    # NOTE: This function is implemented for backwards compatibility.
+    # Directly initiating a KerasTrainingModel, SklearnGPTrainingModel,
+    # GPAPITrainingModel should be preferred.
+    
+    
+    keras_backends = ["keras", "tensorflow", "jax", "torch"]
+    if interpolation_type in keras_backends:
+        try:
+            ## We prefer keras over tensorflow, but can try the older fashion
+            return KerasTrainingModel(*args, **kwargs)
+        except:
+            return TensorflowTrainingModel(*args, **kwargs)
+    elif interpolation_type == "sklearn_gp":
+        return SklearnGPTrainingModel(*args, **kwargs)
+    elif interpolation_type == "api_gp":
+        return GPAPITrainingModel(*args, **kwargs)
+    else:
+        raise ValueError(
+            "interpolation_type unknown, must be one of: keras, tensorflow, jax, torch, sklearn_gp, api_gp"
+        )
 
+      
+def create_svdmodel():
+    """Create a SVD model from command line arguments."""
 
-class SVDTrainingModel(object):
-    def __init__(
-        self,
-        model,
-        data,
+    args = parsing_and_logging(svd_training_parser)
+    svd_filenames = find_svd_files( args.data_path, args.ignore_bolometric )
+    read_data = read_training_data(svd_filenames, args.format, args.data_type, args)
+    training_data, parameters = create_svd_data( args.em_model,read_data)
+    
+    # filts = next(iter(training_data.values()))["lambda"] # for spectroscopy
+    filts = setup_filters(args.filters, training_data, parameters)
+
+    if args.axial_symmetry:
+        training_data = axial_symmetry(training_data)
+
+     # Specify the sample times in model training, implying a range of validity
+    sample_times = setup_sample_times(args)
+
+    training_args = [
+        args.em_model,
+        training_data,
         parameters,
         sample_times,
-        filters,
-        svd_path=None,
-        n_coeff=10,
-        n_epochs=15,
-        interpolation_type="keras",
-        data_type="photometry",
-        data_time_unit="days",
-        plot=False,
-        plotdir=os.path.join(os.getcwd(), "plot"),
-        ncpus=1,
-        univariate_spline=False,
-        univariate_spline_s=2,
-        random_seed=42,
-        start_training=True,
-        continue_training=False,
-    ):
-        """interpolation_type: str, optional
-        Type of interpolation, must be one keras (or explicitly its backends),sklearn_gp, api_gp"""
-        # NOTE: This class is implemented for backwards compatibility. 
-        # Directly initiating a KerasTrainingModel, SklearnGPTrainingModel, 
-        # GPAPITrainingModel should be preferred.
-        # Most of the previous attributes and methods are now implemented in BaseTrainingModel which again is subclassed subject to the interpolation_type. 
-        # The __init__ creates a corresponding instance as a backend-attribute and
-        # __getattr__ retrieves any properties or methods from them
+        filts,
+        ]
+    training_kwargs = dict(
+            n_coeff=args.svd_mag_ncoeff,
+            n_epochs=args.nepochs,
+            svd_path=args.svd_path,
+            data_type=args.data_type,
+            data_time_unit=args.data_time_unit,
+            plot=args.plot,
+            plotdir=args.outdir,
+            ncpus=args.ncpus,
+            univariate_spline=args.use_UnivariateSpline,
+            univariate_spline_s=args.UnivariateSpline_s,
+            random_seed=args.random_seed,
+            continue_training=args.continue_training,
+    )
+    try:
+        training_model = KerasTrainingModel(*training_args, **training_kwargs)
+    except:
+        print("Your settings are not compatible with a keras training model.\n \
+              Please consider adjusting your setup.\n \
+            We will now try to train a legacy SVD model.")
+        training_kwargs['interpolation_type'] = args.interpolation_type
+        training_model = SVDTrainingModel(*training_args, **training_kwargs)
 
-        ##collect all arguments of __init__ to pass on
-        setup_kwargs = locals()
-        setup_kwargs.pop("self")
-        ## set interpolation_type here, pass everything else
-        self.interpolation_type = setup_kwargs.pop("interpolation_type")
-        keras_backends = ["keras", "tensorflow", "jax", "torch"]
-        if (interpolation_type not in keras_backends) and continue_training:
-            print(
-                "--continue-training only supported with --interpolation-type \
-                 keras/tensorflow/jax/torch, this will have no effect"
-            )
-        if self.interpolation_type in keras_backends:
-            try:
-                ## We prefer keras over tensorflow, but can try the older fashion
-                self.backend = KerasTrainingModel(**setup_kwargs)
-            except:
-                self.backend = TensorflowTrainingModel(**setup_kwargs)
-        elif self.interpolation_type == "sklearn_gp":
-            self.backend = SklearnGPTrainingModel(**setup_kwargs)
-        elif self.interpolation_type == "api_gp":
-            self.backend = GPAPITrainingModel(**setup_kwargs)
-        else:
-            raise ValueError(
-                "interpolation_type must be sklearn_gp, api_gp or tensorflow"
-            )
-
-    # called when an attribute is not found, so almost always:
-    def __getattr__(self, name):
-        # We assume it is implemented in the backend
-        return self.backend.__getattribute__(name)
-
+    #test-load the just trained model
+    light_curve_model = SVDLightCurveModel(
+        args.em_model,
+        svd_path=args.svd_path,
+        svd_mag_ncoeff=args.svd_mag_ncoeff,
+        interpolation_type=args.interpolation_type,
+        model_parameters=training_model.model_parameters,
+        local_only=True,
+    )
+    if training_model.plot:
+        visualise_model_performance(
+            training_data, training_model, light_curve_model, args.data_type
+        )
         
+def benchmark():
+    """Create a SVD model benchmark from command line arguments."""
+    parser = svd_model_benchmark_parser()
+    args = parser.parse_args()
+    create_benchmark(**vars(args))
+    
+def create_benchmark(
+    em_model,
+    svd_path,
+    data_path,
+    format="bulla",
+    interpolation_type="tensorflow",
+    data_time_unit="days",
+    svd_mag_ncoeff=10,
+    tmin=0.0,
+    tmax=14.0,
+    filters=None,
+    ncpus=1,
+    outdir="benchmark_output",
+    ignore_bolometric=True,
+    local_only=False,
+    plot= True
+):
+    """Create a benchmark for the SVD model.
+    Parameters
+    ----------
+    em_model : str
+        Name of the model to benchmark.
+    svd_path : str
+        Path to the svd directory.
+    data_path : str
+        Path to the data directory.
+    format : str, optional
+        Format of the data files. Default is "bulla".
+    interpolation_type : str, optional
+        Type of interpolation to use. Default is "tensorflow".
+    data_time_unit : str, optional
+        Unit of time for the data. Default is "days".
+    svd_mag_ncoeff : int, optional
+        Number of coefficients to use for the SVD model. Default is 10.
+    tmin : float, optional
+        Minimum time to consider for the benchmark. Default is 0.0.
+    tmax : float, optional
+        Maximum time to consider for the benchmark. Default is 14.0.
+    filters : list, optional
+        List of filters to use for the benchmark. If None, it will be determined from the data.
+    ncpus : int, optional
+        Number of CPUs to use for the benchmark. Default is 1.
+    outdir : str, optional
+        Output directory for the benchmark results. Default is "benchmark_output".
+    ignore_bolometric : bool, optional
+        Whether to ignore bolometric light curves in the data. Default is True.
+    local_only : bool, optional
+        Whether to use local files only. Default is False.
+    plot : bool, optional
+        Whether to plot the benchmark results. Default is True.
+    """
+    #### get the grid data file path
+    # Implicitly set default ignore_bolometric as True for backward compatibility
+    if ignore_bolometric is None:
+        ignore_bolometric = True
+    
+    svd_filenames = find_svd_files(data_path, ignore_bolometric )
+    read_data = read_training_data(svd_filenames, format)
+    grid_training_data, parameters = create_svd_data(em_model,read_data)
 
+    filts = setup_filters(filters, grid_training_data, parameters)
+    time_scale_factor = setup_time_conversion(data_time_unit)
+    # create the SVDlight curve model
+    light_curve_model = SVDLightCurveModel(
+        em_model,
+        svd_path=svd_path,
+        svd_mag_ncoeff=svd_mag_ncoeff,
+        interpolation_type=interpolation_type,
+        filters=filts,
+        local_only=local_only,
+    )
+
+    def chi2_func(grid_entry):
+        grid_t = np.array(grid_entry["t"])/ time_scale_factor
+        use_times = (grid_t > tmin) * (grid_t < tmax)
+
+        # fetch the grid parameters
+        parameter_entry = {param: grid_entry[param] for param in parameters}
+        parameter_entry["redshift"] = 0.0
+
+        # generate the corresponding light curve with SVD model
+        estimate_mAB = light_curve_model.generate_lightcurve(
+            grid_t[use_times], parameter_entry
+        )
+        # calculate chi2
+        return {filt: np.nanmean(
+                (np.array(grid_entry[filt])[use_times]  ##grid_mAB 
+                - estimate_mAB[filt])**2
+                )  for filt in filts}
+
+
+    print(f"Benchmarking model {em_model} on filter {filts} with {ncpus} cpus")
+
+    grid_entries = list(grid_training_data.values())
+    if ncpus == 1:
+        chi2_dict_array = [ chi2_func(entry) for entry in grid_entries ]
+    else:
+        from p_tqdm import p_map
+        chi2_dict_array = p_map( chi2_func, grid_entries,  num_cpus=ncpus )
+
+    chi2_array_by_filt = { filt: 
+        [dict_entry[filt] for dict_entry in chi2_dict_array]
+        for filt in filts } 
+
+    # make the outdir
+    model_subscript = "_tf" if interpolation_type == "tensorflow" else ""
+    outpath = f"{outdir}/{em_model}{model_subscript}"
+    os.makedirs(outpath, exist_ok=True)
+
+    percentiles = [0, 25, 50, 75, 100]
+    results_dct = { em_model: {
+            filt:[np.round(np.percentile(chi2_array_by_filt[filt], val), 2) 
+                            for val in percentiles] 
+            for filt in filts
+        } }
+    outfile = f"{outpath}/benchmark_chi2_percentiles_{'_'.join(map(str, percentiles))}.json"
+    with open(outfile, "w") as f:
+        # save json file with filter-by-filter details
+        json.dump(results_dct, f, indent=2)
+    print(f"Saved file containing reduced chi2 percentiles at {outfile}.")
+    print(f"Stats below are reduced chi2 distribution percentiles \
+           {percentiles} for each filter:" )
+    print(results_dct[em_model])
+
+    if plot:
+        chi2_hists_from_dict(chi2_array_by_filt, outpath)
+
+
+def axial_symmetry(training_data):
+
+    modelkeys = list(training_data.keys())
+    if any(["KNtheta" not in training_data[key] for key in modelkeys]):
+        raise ValueError("unknown symmetry parameter")
+
+    for key in modelkeys:
+        training = training_data[key]
+        key_new = key + "_flipped"
+        training_data[key_new] = copy.deepcopy(training)
+        training_data[key_new]["KNtheta"] = -training_data[key_new]["KNtheta"]
+        key_new = key + "_flipped_180"
+        training_data[key_new] = copy.deepcopy(training)
+        training_data[key_new]["KNtheta"] = 180 - training_data[key_new]["KNtheta"]
+
+    return training_data
+
+def find_svd_files(data_path, ignore_bolometric):
+    """
+    Set up the SVD data by finding all relevant files in the given data path.
+    """
+
+    link_string = '/*[!_Lbol].' if ignore_bolometric else '/*.'
+    file_extensions = ["dat", "csv", "dat.gz", "h5"]
+    
+    filenames_lists = [glob(f"{data_path}{link_string}{ext}") for ext in file_extensions]
+    filenames = [f for ext_list in filenames_lists for f in ext_list]
+    if len(filenames) == 0:
+        raise ValueError("Need at least one file to interpolate.")
+    return filenames
+
+
+def read_training_data(filenames, format, data_type = "photometry", args=None):
+
+    # read the grid data
+    if data_type == "photometry":
+        try:
+            data = read_photometry_files(filenames, format=format)
+        except IndexError:
+            raise IndexError(
+                "If there are bolometric light curves in your --data-path, try setting --ignore-bolometric"
+            )
+
+    elif data_type == "spectroscopy":
+        data = read_spectroscopy_files(
+            filenames, wavelength_min=args.lmin, wavelength_max=args.lmax, smooth=True
+        )
+    else:
+        raise ValueError("data-type should be photometry or spectroscopy")
+
+    return interpolate_nans(data)
+
+def create_svd_data(em_model, data):
+    # create the SVD training data
+    MODEL_FUNCTIONS = {
+        k: v for k, v in model_parameters.__dict__.items() if inspect.isfunction(v)
+    }
+    if em_model not in list(MODEL_FUNCTIONS.keys()):
+        raise ValueError(
+            f"{em_model} unknown. Please add to nmma.em.model_parameters"
+        )
+    model_function = MODEL_FUNCTIONS[em_model]
+    return model_function(data)
+
+def setup_filters(filters, training_data, parameters):
+
+    # get the filts
+    if isinstance(filters, str):
+        filts = filters.replace(" ", "")  # remove all whitespace
+        filts = filts.split(",")
+    elif not filters:
+        first_entry = next(iter(training_data.values()))
+        filts = first_entry.keys() - set(["t"]+ parameters)
+        filts = list(filts)
+    else:
+        # list input from analysis test code
+        filts = filters
+
+    if len(filts) == 0:
+        raise ValueError("Need at least one valid filter.")
+    
+def setup_time_conversion(data_time_unit="days"):
+    """Set up the time conversion factor based on the data_time_unit."""
+    if data_time_unit in ["days", "day", "d"]:
+        time_scale_factor = 1.0
+    elif data_time_unit in ["hours", "hour", "hr", "h"]:
+        time_scale_factor = 24.0
+    elif data_time_unit in ["minutes", "minute", "min", "m"]:
+        time_scale_factor = 1440.0
+    elif data_time_unit in ["seconds", "second", "sec", "s"]:
+        time_scale_factor = 86400.0
+    else:
+        raise ValueError(
+            "data_time_unit must be one of days, hours, minutes, or seconds."
+        )
+    return time_scale_factor
 
 def min_max_scaling(data):
     """
