@@ -37,6 +37,10 @@ class NMMABaseLikelihood(Likelihood):
 
     def __sync_parameters(self):
         self.sub_model.parameters = self.parameters
+        try:
+            self.sub_model.local_parameters = self.local_parameters
+        except AttributeError:
+            pass
 
     def identity_conversion(self, parameters):
         return parameters, []

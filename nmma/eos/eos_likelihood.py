@@ -113,6 +113,7 @@ class EquationofStateLikelihood(NMMABaseLikelihood):
 class JointEoSConstraint(object):
     def __init__(self, *constraints):
         self.constraints = constraints
+        self.local_parameters = {}
 
     def __repr__(self):
         if len(self.constraints) == 1:
@@ -126,7 +127,7 @@ class JointEoSConstraint(object):
         logl = 0.
 
         for constraint in self.constraints:
-            logl += constraint.log_likelihood(self.parameters)
+            logl += constraint.log_likelihood(self.parameters, self.local_parameters)
 
         return np.squeeze(logl)
     
@@ -167,7 +168,7 @@ class MassConstraint(object):
             out = f'{out} (see arxiv:{self.arxiv_ref})'
         return  out
     
-    def log_likelihood(self, parameters):
+    def log_likelihood(self, parameters, local_parameters=None):
         return self.lognorm_method(parameters['TOV_mass'], loc=self.mass, scale=self.error)
     
 class LowerMTOVConstraint(MassConstraint):
@@ -255,11 +256,11 @@ class MassRadiusConstraint(object):
             out = f'{out} (see arxiv:{self.arxiv_ref})'
         return  out
 
-    def log_likelihood(self, parameters):
+    def log_likelihood(self, parameters, local_parameters):
         ## interpolate radii along equally spaced mass grid up to MTov
         test_mass_range=self.test_masses[self.test_masses<parameters['TOV_mass']]
-        test_radii=np.interp(test_mass_range, parameters['masses'], parameters['radii'])
-        return logsumexp(self.KDE(test_radii, test_mass_range))
+        test_radii=np.interp(test_mass_range, local_parameters['masses'], local_parameters['radii'])
+        return logsumexp(self.KDE((test_radii, test_mass_range)))
 
 class PulsarConstraint(LowerMTOVConstraint):
     '''legacy synonym for general LowerMTOVConstraint'''

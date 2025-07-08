@@ -51,6 +51,10 @@ class MultiMessengerLikelihood(Likelihood):
         logL=0
         for lhood in self.sub_likelihoods:
             lhood.parameters = self.parameters
+            try:
+                lhood.local_parameters = self.local_parameters
+            except AttributeError:
+                pass
             logL+= lhood.sub_log_likelihood()
         if not np.isfinite(logL):
             return np.nan_to_num(-np.inf)

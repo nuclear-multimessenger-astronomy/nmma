@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from astropy import units
 from astropy import cosmology as cosmo
-
 from nmma.joint.constants import geom_msun_km, msun_to_ergs, default_cosmology
 
 from bilby.gw.conversion import (
@@ -12,6 +11,7 @@ from bilby.gw.conversion import (
     lambda_1_lambda_2_to_lambda_tilde,
     convert_to_lal_binary_black_hole_parameters,
     generate_mass_parameters,
+    chirp_mass_and_mass_ratio_to_total_mass
 )
 
 from ..eos.eos_processing import setup_eos_generator
@@ -29,6 +29,7 @@ def luminosity_distance_to_redshift(distance, cosmology = default_cosmology):
         distance = distance.values
 
     if hasattr(distance, '__len__') and len(distance)>50: #luminosity_distance_to_redshift gets really slow if too many distances are put in at once
+        # zmax since solutions can be non-unique at high distances!
         zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance.min() * units.Mpc)
         zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
         zgrid = np.geomspace(zmin, zmax, 50)
@@ -48,17 +49,35 @@ def get_redshift(parameters):
 
 def Hubble_constant_to_distance(parameters, added_keys, cosmology= default_cosmology):
     # Hubble constant is supposed to be km/s/Mpc
-    alt_cosmo = cosmology.clone(H0= parameters["Hubble_constant"] )
     try:
-        ### get distance in Mpc, assuming redshift is available
-        parameters["luminosity_distance"] = alt_cosmo.luminosity_distance(parameters["redshift"])
-        added_keys = added_keys + ["luminosity_distance"]
-    except KeyError:
-        # if redshift is not available as a Key, "luminosity_distance" should be
-        parameters["redshift"] = luminosity_distance_to_redshift(
-                                parameters["luminosity_distance"], cosmology=alt_cosmo)
-        added_keys = added_keys + ["redshift"]
-        
+        alt_cosmo = cosmology.clone(H0= parameters["Hubble_constant"] )
+        if "luminosity_distance" in parameters:
+            # if luminosity distance is available, we assume it is in Mpc
+            parameters["redshift"] = luminosity_distance_to_redshift(
+                parameters["luminosity_distance"], cosmology=alt_cosmo)
+            added_keys = added_keys + ["redshift"]
+        elif "redshift" in parameters:
+            parameters["luminosity_distance"] = alt_cosmo.luminosity_distance(parameters["redshift"]).value
+            added_keys = added_keys + ["luminosity_distance"]
+        else:
+            raise KeyError("Either redshift or luminosity_distance must be in parameters")
+
+    except ValueError:
+        # if H0 is an array cloning raises a ValueError
+        alt_cosmos = [cosmology.clone(H0= H0) for H0 in parameters["Hubble_constant"]]  
+
+        if 'luminosity_distance' in parameters:
+            # if luminosity distance is available, we assume it is in Mpc
+            parameters["redshift"] = np.array(
+                [luminosity_distance_to_redshift(
+                    parameters["luminosity_distance"][i], cosmology=alt_cosmo) 
+                for i, alt_cosmo in enumerate(alt_cosmos)])
+            added_keys = added_keys + ["redshift"]
+        elif "redshift" in parameters:
+            parameters["luminosity_distance"] = np.array(
+                [alt_cosmo.luminosity_distance(parameters["redshift"][i]).value 
+                for i, alt_cosmo in enumerate(alt_cosmos)])
+            added_keys = added_keys + ["luminosity_distance"]
     return parameters, added_keys
 
 def source_frame_masses(converted_parameters, added_keys):
@@ -123,6 +142,12 @@ def tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(lambda1, l
     return lambdaT, dlambdaT
 
 
+def reweight_to_flat_mass_prior(df):
+    total_mass = chirp_mass_and_mass_ratio_to_total_mass(df.chirp_mass, df.mass_ratio)
+    m1 = total_mass / (1. + df.mass_ratio)
+    jacobian = m1 * m1 / df.chirp_mass
+    df_new = df.sample(frac=0.3, weights=jacobian)
+    return df_new
 
 ############################## EOS-related conversions ####################################
 def lambda_to_compactness(lambda_i):
@@ -134,7 +159,7 @@ def mass_and_compactness_to_radius(mass, comp):
     ### returns 0 if compactness is greater than 0.5, i.e. black hole
     return np.where(comp<0.5, mass / comp * geom_msun_km, 0.0)
 
-def radii_from_qur(converted_parameters, added_keys):
+def radii_from_qur(converted_parameters, added_keys, local_parameters= {}):
     mass_1_source = converted_parameters["mass_1_source"]
     mass_2_source = converted_parameters["mass_2_source"]    
     lambda_1 = converted_parameters["lambda_1"]
@@ -158,9 +183,9 @@ def radii_from_qur(converted_parameters, added_keys):
     )
 
     added_keys += ["radius_1", "radius_2", "R_16"]
-    return converted_parameters, added_keys
+    return converted_parameters, added_keys, local_parameters
 
-def macro_props_from_eos(eos_data, converted_parameters, added_keys):
+def macro_props_from_eos(eos_data, converted_parameters, added_keys, local_parameters={}):
     eos_keys = ["TOV_mass", "TOV_radius", "lambda_1", "lambda_2",
                 "radius_1", "radius_2", "R_14", "R_16"]
     added_keys += eos_keys
@@ -168,25 +193,27 @@ def macro_props_from_eos(eos_data, converted_parameters, added_keys):
     m1_source = np.atleast_1d(converted_parameters["mass_1_source"])
     m2_source = np.atleast_1d(converted_parameters["mass_2_source"])
     if len(eos_data)==1:
+        radii, masses, lambdas = eos_data[0]
+        local_parameters['radii']   = radii
+        local_parameters['masses']  = masses
+        local_parameters['lambdas'] = lambdas
         for key, val_array in zip(eos_keys, 
-        EOS2Parameters(*eos_data[0],m1_source, m2_source)
+        EOS2Parameters(radii, masses, lambdas, m1_source, m2_source)
         ):
             converted_parameters[key] = val_array.item()
     else:
         ### assuming TOV mass and radius are the last entries of the respective arrays
-        TOV_mass_list = []
-        TOV_radius_list = []
-        lambda_1_list = []
-        lambda_2_list = []
-        radius_1_list = []
-        radius_2_list = []
-        R_14_list = []
-        R_16_list = []
+        TOV_mass_list, TOV_radius_list, R_14_list, R_16_list = [], [], [], []
+        lambda_1_list, lambda_2_list, radius_1_list, radius_2_list = [], [], [], []
+        rad_list, mass_list, lam_list = [], [], []
         for i, eos_vals in enumerate(eos_data):
-            
+            rad, mass, lam = eos_vals
+            rad_list.append(rad)
+            mass_list.append(mass)
+            lam_list.append(lam)
             (TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1,
                 radius_2, R_14, R_16
-            ) = EOS2Parameters(*eos_vals, m1_source[i],  m2_source[i] )
+            ) = EOS2Parameters(rad, mass, lam, m1_source[i],  m2_source[i] )
                 
             TOV_radius_list.append(TOV_radius)
             TOV_mass_list.append(TOV_mass)
@@ -202,8 +229,12 @@ def macro_props_from_eos(eos_data, converted_parameters, added_keys):
             lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list
         ]):
             converted_parameters[key] = np.array(_list)
+        local_parameters['radii']   = np.array(rad_list)
+        local_parameters['masses']  = np.array(mass_list)
+        local_parameters['lambdas'] = np.array(lam_list)
 
-    return converted_parameters, added_keys
+
+    return converted_parameters, added_keys, local_parameters
 
 
 def EOS2Parameters(radius_val, mass_val, Lambda_val, m1_source, m2_source
@@ -377,12 +408,13 @@ class NSBHEjectaFitting(object):
         log_mej_dyn[disc_mask] = np.logaddexp( np.log(mdisk_fit[disc_mask]), log_alpha[disc_mask] )/ np.log(10.0)
         log_mej_wind[disc_mask] = np.log10(mdisk_fit[disc_mask]) + np.log10(converted_parameters["ratio_zeta"])[disc_mask]
         
-        np.seterr(**old)
 
         if uniform_output:
             total_ejeta_mass = 10**log_mej_dyn + 10**log_mej_wind
+
             log10_mej = np.log10(total_ejeta_mass)
 
+            np.seterr(**old)
             return np.stack((log_mej_dyn, log_mej_wind, log10_mej, np.full_like(log_mej_wind, -np.inf)))
         else:
 
@@ -583,7 +615,11 @@ class MultimessengerConversion(object):
         self.BNSejectaFitting   = BNSEjectaFitting()
         self.NSBHejectaFitting  = NSBHEjectaFitting()
         self.BBHejectaFitting   = BBHEjectaFitting()
-
+        run_cosmo = getattr(args, 'cosmology', None)
+        if run_cosmo is None:
+            self.cosmology = default_cosmology
+        else:
+            self.cosmology = run_cosmo
         self.macro_eos_conversion = self.setup_eos_converter(args)
         
     def setup_eos_converter(self, args):
@@ -610,33 +646,34 @@ class MultimessengerConversion(object):
             return radii_from_qur 
         
 
-    def eos_direct_load(self, converted_parameters, added_keys):
+    def eos_direct_load(self, converted_parameters, added_keys, local_parameters ={}):
         try:
             EOSID = np.array(converted_parameters["EOS"]).astype(int)
             eos_data =np.array([np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID])
         except:
             #In case we only use one eos, e.g. for injection
             eos_data = np.array([np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T])
-        return macro_props_from_eos(eos_data, converted_parameters, added_keys)
+        return macro_props_from_eos(eos_data, converted_parameters, added_keys, local_parameters)
 
-    def eos_from_ram(self, converted_parameters, added_keys):
+    def eos_from_ram(self, converted_parameters, added_keys, local_parameters ={}):
         eos_data = self.EOSdata[np.array(converted_parameters["EOS"]).astype(int)]
 
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
     
-    def eos_from_emulator(self, converted_parameters, added_keys):
+    def eos_from_emulator(self, converted_parameters, added_keys, local_parameters ={}):
         eos_data = self.tov_emulator.generate_macro_eos(converted_parameters)
 
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
 
-    def convert_to_multimessenger_parameters(self, parameters):
+    def convert_to_multimessenger_parameters(self, parameters, return_internal=False):
         converted_parameters = parameters.copy()
         original_keys = list(converted_parameters.keys())
         added_keys = []
+        local_parameters = {}
 
         if "Hubble" in self.modifiers:
             converted_parameters, added_keys = Hubble_constant_to_distance(
-            converted_parameters, added_keys
+            converted_parameters, added_keys, cosmology=self.cosmology
         )
         if "gw" in self.messengers:
             
@@ -650,7 +687,7 @@ class MultimessengerConversion(object):
         )
 
         ####EOS/ tidal treatment
-        converted_parameters, added_keys = self.macro_eos_conversion(converted_parameters, added_keys)
+        converted_parameters, added_keys, local_parameters = self.macro_eos_conversion(converted_parameters, added_keys, local_parameters)
 
             
         if "em" in self.messengers:
@@ -666,7 +703,8 @@ class MultimessengerConversion(object):
         added_keys = [
             key for key in converted_parameters.keys() if key not in original_keys
         ]
-
+        if return_internal:
+            return converted_parameters, local_parameters
         return converted_parameters, added_keys
     
 
