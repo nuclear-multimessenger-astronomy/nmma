@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
+import os
 
 matplotlib.use("agg")
 params = {
@@ -13,6 +14,7 @@ params = {
     "text.usetex": True,
     "font.family": "Times New Roman",
     "figure.figsize": [18, 25],
+    "font.size": 16,
 }
 matplotlib.rcParams.update(params)
 
@@ -20,8 +22,8 @@ matplotlib.rcParams.update(params)
 ################# MAIN PLOTS #################
 ##############################################
 def basic_em_analysis_plot(
-        data, error_budget, filters_to_plot, mags_to_plot, 
-        sub_model_plot_props, sample_times, delta_t, xlim, ylim, save_path,
+        transient, filters_to_plot, mags_to_plot, 
+        sub_model_plot_props, sample_times, xlim, ylim, save_path,
         ncol = 2):
 
 
@@ -31,7 +33,7 @@ def basic_em_analysis_plot(
     fig, axes = analysis_plot_geometry(filters_to_plot, ncol=ncol)
     colors = plt.cm.Spectral(np.linspace(0, 1, len(filters_to_plot)))[::-1]
     for cnt, filt in enumerate(filters_to_plot):
-
+        
         # summary plot
         row, col = divmod(cnt, ncol)
         ax_sum = axes[row, col]
@@ -49,16 +51,16 @@ def basic_em_analysis_plot(
         else:
             ax_delta.set_xticklabels([])
 
-        samples = data[filt]
-        t, y, sigma_y = samples[:, 0], samples[:, 1], samples[:, 2]
-        t -= delta_t
+        t = transient.light_curve_times[filt]
+        y = transient.light_curve_mags[filt]
+        sigma_y = transient.light_curve_uncertainties[filt]
         mag_plot = mags_to_plot[cnt]
         ax_sum, detections = plot_observations(ax_sum, t, y, sigma_y, color=colors[cnt])
-        
         # calculating the chi2
         mag_per_data = np.interp(t[detections],sample_times, mag_plot)
         diff_per_data = mag_per_data - y[detections]
-        sigma_per_data = np.sqrt((sigma_y[detections]**2 + error_budget[filt]**2))
+        error_budget = transient.compute_em_err(filt, t[detections])
+        sigma_per_data = np.sqrt((sigma_y[detections]**2 + error_budget**2))
         chi2_per_data = (diff_per_data/sigma_per_data)**2
         chi2_total = np.sum(chi2_per_data)
         N_data = len(t[detections])
@@ -69,9 +71,11 @@ def basic_em_analysis_plot(
             color='coral', linewidth=3, linestyle="--")
         
         label = 'combined' if sub_model_plot_props is not None else ""
+
+        error_budget = transient.compute_em_err(filt, sample_times)
         ax_sum.fill_between(sample_times,
-            mag_plot + error_budget[filt],
-            mag_plot - error_budget[filt],
+            mag_plot + error_budget,
+            mag_plot - error_budget,
             facecolor='coral',
             alpha=0.2,
             label=label,
@@ -81,11 +85,12 @@ def basic_em_analysis_plot(
             ## plot additional lcs for each sub_model
             for model_name, prop_dict in sub_model_plot_props:
                 mag_plot = prop_dict['plot_mags'][cnt]
-                ax_sum.plot(sample_times, mag_plot,
+                plot_times = prop_dict['plot_times'][cnt]
+                ax_sum.plot(plot_times, mag_plot,
                     color='coral', linewidth=3, linestyle="--")
-                ax_sum.fill_between(sample_times,
-                    mag_plot + error_budget[filt],
-                    mag_plot - error_budget[filt],
+                ax_sum.fill_between(plot_times,
+                    mag_plot + error_budget,
+                    mag_plot - error_budget,
                     facecolor=prop_dict['color'],
                     alpha=0.2,
                     label=model_name,
@@ -99,7 +104,7 @@ def basic_em_analysis_plot(
         ax_delta.scatter(t[detections], diff_per_data / sigma_per_data, color=colors[cnt])
         ax_delta.axhline(0, linestyle='--', color='k')
         ax_delta.set_xlim(xlim)
-
+    plt.tight_layout()
     plt.savefig(save_path, bbox_inches='tight')
     plt.close()
 
@@ -121,7 +126,71 @@ def bolometric_lc_plot(data_times, y, sigma_y, lbol_dict, save_path, color = "co
     plt.savefig(save_path, bbox_inches='tight')
     plt.close()
 
-    
+def visualise_model_performance(training_data, training_model, light_curve_model, data_type):
+    """Function to visualise training success and model performance by 
+    comparing the model's light curves or spectra to the training data."""
+    # we can plot an example where we compare the model performance
+    # to the grid points
+
+    training = next(iter(training_data.values()))  # get the first entry
+    data = {param: training[param] for param in training_model.model_parameters}
+    data["redshift"] = 0
+    plotName = os.path.join(
+        training_model.outdir, "injection_" + training_model.model + "_lightcurves.png"
+    )
+    sample_times = training_model.sample_times
+    filters = training_model.filters
+
+    if data_type == "photometry":
+        mag = light_curve_model.generate_lightcurve(sample_times, data)
+        lc_comparison_plot(mag_dict=mag, training_data=training["data"], filters= filters, sample_times=sample_times, save_path=plotName, ylabel_kwargs=dict( fontsize=30, rotation=0, labelpad=14))
+
+    elif data_type == "spectroscopy":
+        spec = light_curve_model.generate_spectra(
+            sample_times, training_model.filters, data)
+        
+        training_data =np.log10(training["data"])
+        interpolated_data = np.log10(np.array([spec[key] for key in filters]))
+        residual = interpolated_data - training_data
+        norm_residual = np.log10(np.abs(residual/training_data))
+        plot_entries = {"Original": training_data.T, 
+                            "Interpolated": interpolated_data,
+                        "(Original - Interpolated) / Interpolated": norm_residual.T}
+        def spec_plot_func(fig, ax, XX, YY, plot_data, label):
+            if label == "(Original - Interpolated) / Interpolated":
+                vmin = -3
+                vmax = 0
+                cbar_label = "Relative Difference"
+            else:
+                vmin = -10
+                vmax = -2
+                cbar_label = "log10(Flux)"
+            return spec_subplot(fig, ax, XX, YY, plot_data, label, vmin=vmin, vmax=vmax, cbar_label=cbar_label)
+        
+        basic_spec_plot(
+            mesh_X=sample_times,
+            mesh_Y=filters,
+            spec_func = spec_plot_func,
+            plot_entries=plot_entries,
+            save_path=plotName,
+            figsize=(32, 14))  
+
+def chi2_hists_from_dict(chi2_dict, outpath):
+    matplotlib.rcParams.update(
+        {"font.size": 16, "text.usetex": True, "font.family": "Times New Roman"}
+    )
+    for filt, chi2_array in chi2_dict.items():
+        plt.figure()
+        plt.xlabel(r"$\chi^2 / {\rm d.o.f.}$")
+        plt.ylabel("Count")
+        plt.hist(chi2_array, label=filt, bins=51, histtype="step")
+        plt.legend()
+        plt.savefig(f"{outpath}/{filt}.pdf", bbox_inches="tight")
+        plt.close()
+
+###################################################
+################# PLOT STRUCTURES #################
+###################################################
 
 def basic_photo_lc_plot(
         plot_fc, filters, save_path, fontsize=30, figsize=(15, 18), colorbar=False, xlim = [0,14], ylim = [-12, -18], n_yticks = 4, ylabel_kwargs = dict(fontsize=30, rotation=90, labelpad=8),**kwargs):
@@ -207,7 +276,7 @@ def lc_plot_with_histogram(filters, data_dict, sample_times, save_path, percenti
         return ax, cb
     basic_photo_lc_plot(lc_hist_fc, filters, save_path, **kwargs)
 
-
+        
 def spec_subplot(
         fig, ax, X, Y, Z, data_label, vmin =-10, vmax =-2, fontsize=30, cbar_label="log10(Flux)"
         ):
@@ -253,11 +322,11 @@ def check_limit(lim):
     return lim
 
 def plot_observations(ax, obs_times, obs_mags, obs_unc, color="k",**kwargs):
-    detections = np.isfinite(obs_mags) ## does not include nans or infs
+    detections = np.isfinite(obs_unc) ## does not include nans or infs
     ax.errorbar(obs_times[detections], obs_mags[detections], obs_unc[detections], fmt="o", color =color, **kwargs)
 
-    non_detections = np.isinf(obs_mags) ## does only include +-inf, not nans
-    ax.errorbar(obs_times[non_detections], obs_mags[non_detections], obs_unc[non_detections], fmt="v", color=color, **kwargs)
+    non_detections = np.isinf(obs_unc) ## does only include +-inf, not nans
+    ax.errorbar(obs_times[non_detections], obs_mags[non_detections], fmt="v", color=color, **kwargs)
     return ax, detections
 
 def analysis_plot_geometry(filters_to_plot, ncol=2):
