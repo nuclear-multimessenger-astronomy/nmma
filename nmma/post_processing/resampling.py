@@ -1,14 +1,13 @@
 import numpy as np
 import pandas as pd
 import os
-
+from arviz import hdi
 import scipy.stats
-import scipy.special
-import scipy.interpolate
 from bilby.gw.prior import PriorDict
 from bilby.core.prior import Uniform
 
 from .parser import resampling_parser
+from ..joint.base_parsing import nmma_base_parsing
 from ..joint.conversion import (
     BNSEjectaFitting, NSBHEjectaFitting,
     luminosity_distance_to_redshift, chirp_mass_and_eta_to_component_masses,
@@ -17,6 +16,23 @@ from ..joint.constants import geom_msun_km
 from .plotting_routines import resampling_corner_plot
 
 from pymultinest.solve import Solver
+
+def find_spread_from_resampling(resampling_method, cumprod, prior_dist, post_samplesize, cred_interval):
+    med, uplim, lowlim = [], [], []
+    for weight in cumprod:
+        samples = resampling_method(prior_dist, weight, post_samplesize)
+        # calculate the posterior distribution using the prior samples
+        # and the weighting that we previously calculated
+        samples = resampling_method(prior_dist, weight, post_samplesize)
+
+        # calculate the median and append it to the list
+        med.append(np.median(samples))
+        # calculate the 95% credible interval
+        cred_range = hdi(samples, hdi_prob=cred_interval)
+        # append the bound to the list
+        uplim.append(cred_range[1])
+        lowlim.append(cred_range[0])
+    return np.array(med), np.array(uplim), np.array(lowlim)
 
 
 
@@ -167,8 +183,7 @@ class EjectaMassInference(EjectaResampler):
         super().__init__(GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, combine_ejecta_mass=False, **kwargs)
 
 def main_resampling():
-    parser = resampling_parser()
-    args = parser.parse_args()
+    args = nmma_base_parsing(resampling_parser)
 
     # read the GW samples
     GWsamples = pd.read_csv(args.GWsamples, header=0, delimiter=" ")

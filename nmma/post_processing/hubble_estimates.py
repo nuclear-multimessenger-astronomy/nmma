@@ -4,9 +4,11 @@ import scipy.stats
 import bilby
 from tqdm import tqdm
 import json
-from nmma.joint.constants import c_kms
+from ..joint.constants import c_kms
+from ..joint.conversion import reweight_to_flat_mass_prior
+from ..joint.base_parsing import nmma_base_parsing
 from .parser import Hubble_parser
-from .event_resampling import reweight_to_flat_mass_prior, find_spread_from_resampling
+from .resampling import  find_spread_from_resampling
 
 def H0_resampling(prior_dist, weight, post_samplesize):
     kde = scipy.stats.gaussian_kde(prior_dist, weights=weight)
@@ -53,13 +55,10 @@ def H0_means_from_probs(gw_prob, em_prob, H0_sample, args, idx):
     tot_H0_estimates = [H0_med_tot, H0_uplim_tot,H0_lowlim_tot ]
     all_estimates = [gw_H0_estimates, em_H0_estimates, tot_H0_estimates]
 
-
-    # setup the seed
-    np.random.seed(args.seed)
     for _ in tqdm(range(args.N_reordering)):
 
         # randomly shuffle the ordering of the index to mimic different ordering realisation
-        np.random.shuffle(idx)
+        args.rng.shuffle(idx)
         #  generate cumulative probability product
         gw_cumprods, em_cumprods, total_cumprods = ([], [], [])
         cumprods = (gw_cumprods, em_cumprods, total_cumprods)
@@ -109,7 +108,7 @@ def load_in_posteriors(injection_df, event_to_loop, args):
                 continue
 
         # generate redshift samples and Hubble samples
-        redshift_samples = np.random.normal(float(z_true), 1e-3, size=len(distanceEM))
+        redshift_samples = args.rng.normal(float(z_true), 1e-3, size=len(distanceEM))
         H0_samples_EM = redshift_samples * c_kms / distanceEM  # Hubble samples in km s^-1 Mpc^-1
 
         # generate the posterior on H0 with a gaussian_kde with weighting back to the uniform in volume
@@ -118,7 +117,7 @@ def load_in_posteriors(injection_df, event_to_loop, args):
         # if the EM analysis is already using a uniform-in-volume prior for distance, this line is to be commented out
         probs_EM[i] = scipy.stats.gaussian_kde(H0_samples_EM, weights=distanceEM * distanceEM)
         # now do it for GW
-        redshift_samples = np.random.normal(float(z_true), 1e-3, size=len(distanceGW))
+        redshift_samples = args.rng.normal(float(z_true), 1e-3, size=len(distanceGW))
         H0_samples_GW = redshift_samples * c_kms / distanceGW
         probs_GW[i] = scipy.stats.gaussian_kde(H0_samples_GW)
 
@@ -127,8 +126,7 @@ def load_in_posteriors(injection_df, event_to_loop, args):
 
 
 def main():
-    parser= Hubble_parser()
-    args = parser.parse_args()
+    args = nmma_base_parsing(Hubble_parser)
     # load the detectable events
     try:
         if args.detections_file:
@@ -145,11 +143,14 @@ def main():
         )
     injection_df = injection_dict["injections"]
 
+    # setup the seed
+    rng = np.random.default_rng(args.seed)
+    args.rng = rng
     ##get posterios
     probs_EM, probs_GW = load_in_posteriors(injection_df, event_to_loop, args)
 
     # preset a H0 prior samples to be used for further resampling
-    H0_prior_samples = np.random.uniform(5, 120, size=args.N_prior_samples)
+    H0_prior_samples = rng.uniform(5, 120, size=args.N_prior_samples)
 
     # get the list of index with result
     index = list(probs_GW.keys())
