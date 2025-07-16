@@ -18,15 +18,13 @@ import lalsimulation
 import numpy as np
 
 
-from .parser import (
-    create_nmma_generation_parser,
-    parse_generation_args,
-)
+from . multi_parsing import create_nmma_generation_parser, parse_generation_args
 
-from ..em.io import loadEvent
+from ..em.io import load_em_observations
 from ..em.model import create_injection_model
 from ..em.lightcurve_generation import create_light_curve_data
 from ..eos.eos_likelihood import compose_eos_constraints
+from ..joint.constants import default_cosmology
 
 from .. import __version__
 
@@ -119,7 +117,10 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
     """
     ###FIXME get rid of compulsory GW structure
     def __init__(self, args, unknown_args):
-        
+
+        # nmma-defaults that might conflict with bilby/bilby_pipe defaults
+        args.cosmology = getattr(args, "cosmology", default_cosmology)
+
         super().__init__(args, unknown_args)
         # Generic setup, ripped from bilby pipe
         # Admin arguments
@@ -189,19 +190,19 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
 
         ### identify messengers, to be extended
         messengers=[]
-        if args.with_eos:
+        if getattr(args, "emulator_metadata", None):
             messengers.append("eos")
-        if args.with_em:
+        if getattr(args, "em_model", False):
             messengers.append("em")
-        if args.with_gw:
+        if getattr(args, "waveform_approximant", None):
             messengers.append("gw")
 
         self.messengers = messengers
 
         analysis_modifiers= []
-        if args.with_Hubble:
+        if args.Hubble:
             analysis_modifiers.append("Hubble")
-        if args.with_tabulated_eos:
+        if getattr(args, "eos_data", None):
             analysis_modifiers.append('tabulated_eos')
         self.analysis_modifiers= analysis_modifiers
         
@@ -259,21 +260,22 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         else: 
             self.injection_parameters=None
 
-        if args.with_eos:
+        if getattr(args, "emulator_metadata", None):
             #FIXME add routine for eos model training!
-            self.eos_constraint_dict = compose_eos_constraints(self.args)
+            self.eos_constraint_dict = compose_eos_constraints(args)
 
-        if args.with_em:
+        if getattr(args, "em_model", False):
             if self.injection_parameters:
                 injection_model = create_injection_model(args)
                 self.light_curve_data = create_light_curve_data(
-                    self.injection_parameters, self.args, injection_model
+                    self.injection_parameters, args, injection_model
                 )
             else:
-                self.light_curve_data = loadEvent(self.args.light_curve_data)
+                self.light_curve_data = load_em_observations(args)
+            ## Test-build the model already here to ensure that svd is properly loaded
             
 
-        if args.with_gw:
+        if getattr(args, "waveform_approximant", None):
             self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, unknown_args)
             #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
             args.gw_likelihood_type = self.gw_inputs.likelihood_type
@@ -345,7 +347,6 @@ def nmma_generation():
     This function is a wrapper around generate_runner(),
     giving it a command line interface.
     """
-
     # Parse command line arguments
     cli_args = sys.argv[1:]
     generation_parser = create_nmma_generation_parser()

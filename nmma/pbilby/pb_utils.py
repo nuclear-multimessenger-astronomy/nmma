@@ -8,13 +8,12 @@ from time import time
 import numpy as np
 from pandas import DataFrame
 from bilby.core.utils import logger
-from bilby.core.result import  Result
 from bilby.core.sampler.dynesty import dynesty_stats_plot
 
-
-
 import dynesty.plotting as dyplot 
-from dynesty.utils import get_print_fn_args, resample_equal
+from dynesty.utils import get_print_fn_args
+
+from ..joint.utils import rejection_sample
 
 import matplotlib.pyplot as plt
 
@@ -27,8 +26,6 @@ def time_storage(func):
         return result
 
     return wrapper
-
-
 
 def stdout_sampling_log(**kwargs):
     """Logs will look like:
@@ -44,10 +41,10 @@ def stdout_sampling_log(**kwargs):
     sys.stdout.flush()
 
 @time_storage
-def write_sample_dump(sampler, samples_file, search_parameter_keys):
+def write_sample_dump(sampler, samples_file, search_parameter_keys, rng):
     """Writes a checkpoint file """
     weights = np.exp(sampler.saved_run.D["logwt"] - sampler.saved_run.D["logz"][-1])
-    samples, keep = rejection_sample(sampler.saved_run.D["v"], weights)
+    samples, keep = rejection_sample(sampler.saved_run.D["v"], weights, rng)
 
     logger.info(f"Writing {np.sum(keep)} current samples to {samples_file}")
     df = DataFrame(samples, columns=search_parameter_keys)
@@ -182,120 +179,3 @@ def read_saved_state(resume_file):
         logger.info(f"Resume file {resume_file} does not exist.")
         return False, 0
 
-
-def format_result(
-    run,
-    worker_run,
-    data_dump,
-    out,
-    nested_samples,
-    sampler_kwargs,
-    sampling_time,
-    rejection_sample_posterior=True,
-):
-    """
-    Packs the variables from the run into a bilby result object
-
-    Parameters
-    ----------
-    run: MainRun
-    worker_run: WorkerRun
-    data_dump: str
-        Path to the *_data_dump.pickle file
-    out: dynesty.results.Results
-        Results from the dynesty sampler
-    nested_samples: pandas.core.frame.DataFrame
-        DataFrame of the weights and likelihoods
-    sampler_kwargs: dict
-        Dictionary of keyword arguments for the sampler
-    sampling_time: float
-        Time in seconds spent sampling
-    rejection_sample_posterior: bool
-        Whether to generate the posterior samples by rejection sampling the
-        nested samples or resampling with replacement
-
-    Returns
-    -------
-    result: bilby.core.result.Result
-        result object with values written into its attributes
-    """
-
-    result = Result(
-        label=run.label, outdir=run.outdir, search_parameter_keys=run.sampling_keys
-    )
-    result.priors = worker_run.priors
-    result.nested_samples = nested_samples
-    result.meta_data = worker_run.data_dump["meta_data"]
-    result.meta_data["command_line_args"]["sampler"] = "parallel_bilby"
-    result.meta_data["data_dump"] = data_dump
-    result.meta_data["likelihood"] = worker_run.likelihood.meta_data
-    result.meta_data["sampler_kwargs"] = run.init_sampler_kwargs
-    result.meta_data["run_sampler_kwargs"] = sampler_kwargs
-    result.meta_data["injection_parameters"] = worker_run.injection_parameters
-    result.injection_parameters = worker_run.injection_parameters
-
-    weights = np.exp(out["logwt"] - out["logz"][-1])
-    if rejection_sample_posterior:
-        result.samples, keep = rejection_sample(out.samples, weights)
-        result.log_likelihood_evaluations = out.logl[keep]
-        logger.info(
-            f"Rejection sampling nested samples to obtain {sum(keep)} posterior samples"
-        )
-    else:
-        result.samples = resample_equal(out.samples, weights)
-        result.log_likelihood_evaluations = reorder_loglikelihoods(
-            unsorted_loglikelihoods=out.logl,
-            unsorted_samples=out.samples,
-            sorted_samples=result.samples,
-        )
-        logger.info("Resampling nested samples to posterior samples in place.")
-
-    result.log_evidence = out.logz[-1] + worker_run.likelihood.noise_log_likelihood()
-    result.log_evidence_err = out.logzerr[-1]
-    result.log_bayes_factor = result.log_evidence - result.log_noise_evidence
-    result.sampling_time = sampling_time
-    result.num_likelihood_evaluations = np.sum(out.ncall)
-
-    result.samples_to_posterior(likelihood=worker_run.likelihood, priors=result.priors)
-    return result
-
-def rejection_sample(posterior, weights, seed =42):
-    rng = np.random.default_rng(seed)
-    keep = (weights > rng.uniform(0, max(weights), weights.shape))
-    return np.array(posterior)[keep], keep
-
-
-def reorder_loglikelihoods(unsorted_loglikelihoods, unsorted_samples, sorted_samples):
-    """Reorders the stored log-likelihood after they have been reweighted
-
-    This creates a sorting index by matching the reweights `result.samples`
-    against the raw samples, then uses this index to sort the
-    loglikelihoods
-
-    Parameters
-    ----------
-    sorted_samples, unsorted_samples: array-like
-        Sorted and unsorted values of the samples. These should be of the
-        same shape and contain the same sample values, but in different
-        orders
-    unsorted_loglikelihoods: array-like
-        The loglikelihoods corresponding to the unsorted_samples
-
-    Returns
-    -------
-    sorted_loglikelihoods: array-like
-        The loglikelihoods reordered to match that of the sorted_samples
-
-
-    """
-
-    idxs = []
-    for ii in range(len(unsorted_loglikelihoods)):
-        idx = np.where(np.all(sorted_samples[ii] == unsorted_samples, axis=1))[0]
-        if len(idx) > 1:
-            print(
-                "Multiple likelihood matches found between sorted and "
-                "unsorted samples. Taking the first match."
-            )
-        idxs.append(idx[0])
-    return unsorted_loglikelihoods[idxs]

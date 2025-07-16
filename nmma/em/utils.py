@@ -4,6 +4,7 @@ import pandas as pd
 import scipy.interpolate as interp
 from ast import literal_eval
 import scipy.stats
+from astropy import time
 
 import sncosmo
 from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
@@ -57,11 +58,34 @@ DEFAULT_FILTERS = [
     "ultrasat",
 ]
 
+def set_filters(args):
+    filters = None  # default value
+    if args.filters:
+        filters = args.filters.replace(" ", "")  # remove all whitespace
+        filters = filters.split(",")
+        if len(filters) == 0:
+            raise ValueError("Need at least one valid filter.")
+    elif hasattr(args, "rubin_ToO_type"):
+        if args.rubin_ToO_type == 'platinum':
+            filters = ["ps1::g","ps1::r","ps1::i","ps1::z","ps1::y"]
+        elif args.rubin_ToO_type == 'gold':
+            filters = ["ps1::g","ps1::r","ps1::i"]
+        elif args.rubin_ToO_type == 'gold_z':
+            filters = ["ps1::g","ps1::r","ps1::z"]
+        elif args.rubin_ToO_type == 'silver':
+            filters = ["ps1::g""ps1::i"]
+        elif args.rubin_ToO_type == 'silver_z':
+            filters = ["ps1::g","ps1::z"]
+    return filters
+
 def setup_sample_times(args):
     "create an array of sample times used for generating EM model lightcurves from args"
     tmin = args.em_tmin
     tmax = args.em_tmax
 
+    if tmin is None and tmax is None:
+        return None         # Default, we normally let the model decide the time range
+    
     # first check the legacy case of a transient with a fixed time step
     if args.em_tstep:
         return np.arange(tmin, tmax + args.em_tstep, args.em_tstep)
@@ -77,19 +101,13 @@ def setup_sample_times(args):
             "Please use 'lin(ear)' or 'log(arithmic)' / 'geo(metric)'."
         )
 
-def setup_lin_sample_times(tmin, tmax, nsteps=None):
-    return np.linspace(tmin, tmax, nsteps)
-
-
-
-
 def create_detection_limit(args, filters, default_limit = np.inf):
     if filters is None:
         return {}
     
     elif getattr(args, 'detection_limit', None) is None:
         if getattr(args,'rubin_ToO_type', None):
-            detection_limit = {'ps1__g':25.8,'ps1__r':25.5,'ps1__i':24.8,'ps1__z':24.1,'ps1__y':22.9}
+            detection_limit = {'ps1::g':25.8,'ps1::r':25.5,'ps1::i':24.8,'ps1::z':24.1,'ps1::y':22.9}
         else:
             detection_limit = default_limit
     else:
@@ -112,6 +130,24 @@ def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
         # If a dict is provided, ensure it has the correct filters
         return {filt: float(quantity.get(filt, default_limit)) for filt in filters}
 
+
+def read_trigger_time(parameters=None, args=None):
+    if parameters is not None:
+        if "trigger_time" in parameters:
+            return parameters["trigger_time"]
+        elif "geocent_time_x" in parameters:
+            return time.Time( parameters["geocent_time_x"], format="gps").mjd
+        elif "geocent_time" in parameters:
+            return time.Time(parameters["geocent_time"], format="gps").mjd
+    if args is not None:
+        if args.trigger_time:
+            return time.Time(args.trigger_time, format= args.time_format).mjd
+        elif args.gps:
+            return time.Time( args.gps, format="gps").mjd
+    
+    else:
+        print("Neither trigger_time, geocent_time nor geocent_time_x provided")
+        return None
 
 def transform_to_app_mag_dict(mag_dict, params):
     d_lum = params.get("luminosity_distance", 1e-5) ## assume 10 pc =1e-5 Mpc for abs_mag
@@ -217,18 +253,19 @@ def get_filter_name_mapping(observed_filters):
         "radio-1.25GHz",
         "radio-6GHz",
         "radio-3GHz",
-        "sdss__u",
-        "sdss__g",
-        "sdss__r",
-        "sdss__i",
-        "sdss__z",
-        "swope2__y",
-        "swope2__J",
-        "swope2__H",
+        "sdss::u",
+        "sdss::g",
+        "sdss::r",
+        "sdss::i",
+        "sdss::z",
+        "swope2::y",
+        "swope2::J",
+        "swope2::H",
     ]
     unprocessed_filts.extend([val["name"] for val in get_all_bandpass_metadata()])
     filter_maps = {name:name for name in unprocessed_filts}
 
+    # FIXME: Left here as a reminder, to be removed 
     # sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
     # filter_maps.update({name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts})
     # filter_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
@@ -448,9 +485,10 @@ def get_default_filts_lambdas(filters=None):
                     filts_slice.append(filts[ii])
                     lambdas_slice.append(lambdas[ii])
                 except ValueError:
-                    ii = filts.index(filt.replace("_", ":"))
-                    filts_slice.append(filts[ii].replace(":", "_"))
-                    lambdas_slice.append(lambdas[ii])
+                    print(f"Warning: {filt} not found in filter list.")
+                    # ii = filts.index(filt.replace("_", ":"))
+                    # filts_slice.append(filts[ii].replace(":", "_"))
+                    # lambdas_slice.append(lambdas[ii])
 
         filts = filts_slice
         lambdas = np.array(lambdas_slice)

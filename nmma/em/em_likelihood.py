@@ -1,9 +1,9 @@
 from __future__ import division
 import numpy as np
 from scipy.stats import norm, truncnorm
+from ast import literal_eval
 
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
-from ..joint.conversion import distance_modulus_nmma
 from . import model, utils, systematics
 
 
@@ -16,22 +16,21 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     if not filters:
         filters = list(light_curve_data.keys())
 
-    ## identify what kind of transient we are dealing with
-    lc_model_class= model.lc_model_class_from_str(args.em_transient_class)
     ## setup the light curve model for this transient class and filters
-    light_curve_model = model.create_light_curve_model_from_args(lc_model_class, args, filters)
+    lc_model = model.identify_model_type(args)
+    light_curve_model = model.create_light_curve_model_from_args(lc_model, args, filters)
 
 
 
     em_kwargs = initialisation_args_from_signature_and_namespace(
-        EMTransientLikelihood, args, ['em_transient_', 'kilonova_']
+        EMTransientLikelihood, args, ['em_', 'kilonova_']
         )
 
     # add kwargs manually
     em_likelihood_kwargs = dict(
         light_curve_model=light_curve_model,light_curve_data=light_curve_data,
         priors = priors, filters=filters,
-        error_budget=args.em_transient_error,
+        error_budget=args.em_error_budget,
     )
     return em_kwargs | em_likelihood_kwargs
 
@@ -48,19 +47,18 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         And object which computes the light curve of a kilonova-like signal,
         given a set of parameters
     light_curve_data: dict
-        Dictionary of light curve data returned from nmma.em.utils.loadEvent
+        Dictionary of light curve data 
+    priors: dict, optional
+        A dictionary of prior distributions for the model parameters
     filters: list, str, None
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
-    trigger_time: float
-        Time of the kilonova trigger in Modified Julian Day
-    error_budget: float (default:1)
+    detection_limit: float or dict, default: np.inf
+    trigger_time: float, default: None
+        Time of the em trigger in Modified Julian Day, by default earliest time in the light curve data
+    error_budget: Any (default:1)
         Additionally introduced statistical error on the light curve data,
         so as to keep the systematic error under control. This will only be used if the parameters-dict does not containt a 'em_syserr' sampling parameter.
-    tmin: float (default:0)
-        Days from trigger_time to be started analysing
-    tmax: float (default:14)
-        Days from trigger_time to be ended analysing
 
     Returns
     -------
@@ -76,15 +74,13 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         priors = None,
         filters=None,
         detection_limit=None,
-        trigger_time=0.,
+        trigger_time=None,
         error_budget=1.0,
-        tmin=0.0,
-        tmax=14.0,
         verbose=False,
         param_conv_func = None, 
         **kwargs
     ):  
-        sample_times = kwargs.get('sample_times', np.arange(tmin, tmax, 0.1))
+
         ### FIXME add better criterion to switch modes
         if filters:
             model_type = OpticalTransient
@@ -92,7 +88,7 @@ class EMTransientLikelihood(NMMABaseLikelihood):
             model_type=BolometricTransient
 
         sub_model = model_type(
-                light_curve_model, sample_times, light_curve_data, 
+                light_curve_model, light_curve_data, 
                 filters = filters, 
                 trigger_time=trigger_time,
                 error_budget= error_budget, 
@@ -126,11 +122,8 @@ class BaseEMTransient(object):
     """
 
 
-    def __init__(self, light_curve_model, sample_times, 
-                 detection_limit, error_budget, verbose
-                 ):
+    def __init__(self, light_curve_model, detection_limit, error_budget, verbose):
         self.light_curve_model = light_curve_model
-        self.sample_times = sample_times
         self.error_budget = error_budget
         
         self.verbose = verbose
@@ -147,32 +140,33 @@ class BaseEMTransient(object):
     def __repr__(self):
         return f"{self.__class__.__name__} (light_curve_model={self.light_curve_model})"
                
-               
+    def sanity_check_passed(self, model_lc):
+        if model_lc is None:
+            if self.verbose:
+                print(f"Model light curve generation failed for {self.parameters}"\
+                      "returning -inf log_likelihood")
+            return False
+        return True
     
     def log_likelihood(self):
-        model_lbol, model_mags = self.light_curve_model.generate_lightcurve(
-            self.sample_times, self.parameters
-        )        
-        # sanity checking
-        if len(np.isfinite(model_lbol)) == 0:
-            return np.nan_to_num(-np.inf)
-        if np.sum(model_lbol) == 0.0:
+        model_lc_data = self.light_curve_model.gen_detector_lc(self.parameters)
+        
+        if not self.sanity_check_passed(model_lc_data):      
             return np.nan_to_num(-np.inf)
         
-
         # retrieve usable lightcurve data
-        lc_data = self.update_lightcurve_reference(model_lbol, model_mags)
+        expected_observations = self.update_lightcurve_reference(model_lc_data)
 
         # compare the estimated light curve and the measured data
-        logL_model = self.band_log_likelihood(lc_data)
+        logL_model = self.band_log_likelihood(expected_observations)
         if self.verbose:
             print(self.parameters, logL_model)
         return logL_model
 
-    def update_lightcurve_reference(self, model_lbol, model_mags):
+    def update_lightcurve_reference(self, model_lc_data):
         raise NotImplementedError("This method should be implemented in the subclass")
     
-    def band_log_likelihood(self, lc_data):
+    def band_log_likelihood(self, expected_lc):
         raise NotImplementedError("This method should be implemented in the subclass")
 
     def truncated_gaussian(self, m_det, m_err, m_est, lim):
@@ -183,25 +177,27 @@ class BaseEMTransient(object):
     def chisquare_gaussianlog_from_lc_data(self, est_mag, data_mag, data_sigma, upperlim_sigma, lim=np.inf):
 
         # seperate the data into bounds (inf err) and actual measurement
-        infIdx = np.where(~np.isfinite(data_sigma))[0]
-        finiteIdx = np.where(np.isfinite(data_sigma))[0]
+        finiteIdx = np.isfinite(data_sigma)
+        infIdx = ~finiteIdx
 
         # evaluate the chisquare
-        if len(finiteIdx) >= 1:
+        if finiteIdx.sum() >= 1:
             minus_chisquare = np.sum(
                 self.truncated_gaussian(data_mag[finiteIdx], data_sigma[finiteIdx],
                                 est_mag[finiteIdx], lim)
                     )
+            
+            ## santiy check:if the chisquare is ill-behaved, 
+            # we explicitly catch it as Bool in band_log_likelihood
+            if np.isnan(minus_chisquare):
+                sanity_check_passed = False 
+                return sanity_check_passed, -np.inf
         else:
             minus_chisquare = 0.0
 
-        if np.isnan(minus_chisquare):
-            sanity_check_passed = False 
-            return sanity_check_passed, -np.inf
-
         # evaluate the data with infinite error
         gausslogsf=np.zeros(2) ##hack if len(infIdx)==0
-        if len(infIdx) > 0:
+        if infIdx.sum() > 0:
             gausslogsf = norm.logsf(
                     data_mag[infIdx], est_mag[infIdx], upperlim_sigma
                 )
@@ -215,10 +211,8 @@ class OpticalTransient(BaseEMTransient):
     light_curve_model: `nmma.em.LightCurveModelContainer`
         An object which computes the light curve of a transient ignal,
         given a set of parameters
-    sample_times: array-like
-        Array of times at which the light curve is sampled
     light_curve_data: dict
-        Dictionary of light curve data returned from nmma.em.utils.loadEvent
+        Dictionary of light curve data 
     filters: list, str
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
@@ -240,7 +234,7 @@ class OpticalTransient(BaseEMTransient):
 
     def __init__(
         self,
-        light_curve_model, sample_times, light_curve_data,
+        light_curve_model, light_curve_data,
         filters,
         trigger_time,
         error_budget=1.0,
@@ -251,15 +245,17 @@ class OpticalTransient(BaseEMTransient):
         **kwargs
     ):  
         
-        self.filters = filters
+        self.observed_filters = filters
+        self.model_filter_mapping, self.obs_average_mapping = utils.get_filter_name_mapping(filters)
+
+        super().__init__(light_curve_model, detection_limit, error_budget, verbose)
+        
+        if priors is not None:
+            self.light_curve_model.check_vs_priors(priors)
+        
         ##setup light curve data
-        self.light_curve_data = utils.process_data(
-            light_curve_data, trigger_time, sample_times[0], sample_times[-1])
-        
-        super().__init__( light_curve_model, sample_times, 
-                         detection_limit, error_budget, verbose)
-        
-        
+        self.setup_light_curve_data(light_curve_data, trigger_time)
+
         #determine_systematic_error_handling
         ## case 1: use systematics_file
         if systematics_file:
@@ -283,24 +279,56 @@ class OpticalTransient(BaseEMTransient):
         else:
             self.adjust_error_budget(self.error_budget)
 
+    def setup_light_curve_data(self, light_curve_data, trigger_time):
+        """Set up the light curve data for the EM transient
+
+        Parameters
+        ----------
+        light_curve_data: dict
+            Dictionary of light curve data, with keys as filters and values as arrays of time, magnitude, and uncertainty
+        trigger_time: float, optional
+            Time of the kilonova trigger in Modified Julian Day. If not provided, the minimum time in the data will be used
+
+        """
+
+        lc_times = {}
+        lc_mags = {}
+        lc_uncertainties = {}
+
+        min_time = np.inf
+        for filt, sub_dict in light_curve_data.items():
+            lc_mags[filt] = np.array(sub_dict['mag'])
+            lc_uncertainties[filt] = np.array(sub_dict['mag_error'])
+            lc_times[filt] = np.array(sub_dict['time'])
+            min_time = np.minimum(min_time, np.min(sub_dict['time']))
+
+        if trigger_time is None:
+            trigger_time = min_time
+            if self.verbose:
+                print(f"trigger_time is not provided, analysis \
+                will use inferred trigger time of {trigger_time}")
+        elif trigger_time > min_time:
+            raise ValueError(
+                f"trigger_time {trigger_time} is later than earliest data time {min_time}. "
+                "Please provide a valid trigger time."
+            )
+        lc_times = {filt: lc_times[filt] - trigger_time for filt in lc_times}
+
+        self.light_curve_times = lc_times
+        self.light_curves = lc_mags
+        self.light_curve_uncertainties = lc_uncertainties
+        self.trigger_time = trigger_time
+
     def set_detection_limit(self, detection_limit):
         if detection_limit is None:
             detection_limit = np.inf
-        if isinstance(detection_limit, (int, float)):
-            self.detection_limit = {filt: detection_limit for filt in self.filters}
-        elif isinstance(self.detection_limit, dict):
-            self.detection_limit = {filt: detection_limit.get(filt, np.inf) for filt in self.filters}
+        self.detection_limit = utils.set_filter_associated_dict(detection_limit, self.observed_filters)
 
     def adjust_error_budget(self, error_budget):
-        if isinstance(error_budget, (int, float, complex)):
-            self.error_budget = {filt:error_budget for filt in self.filters}
-
-        elif isinstance(error_budget, dict):
-            for filt in self.filters:
-                if filt not in error_budget:
-                    raise ValueError(f"filter {filt} missing from error_budget")
-            # NOTE We could be more generous and set a default (1?) instead
-                    
+        if isinstance(error_budget, str):
+            error_budget = literal_eval(error_budget)
+        self.error_budget   = utils.set_filter_associated_dict(error_budget, self.observed_filters, default_limit=1.)
+                                
         self.compute_em_err = self.em_err_from_budget
 
     def em_err_from_budget(self, filt, _):
@@ -309,9 +337,10 @@ class OpticalTransient(BaseEMTransient):
     def setup_time_systematics(self, time_dep_sys_dict):
         #get the time nodes and the filters
         self.systematics_time_nodes = np.round(
-            np.linspace(self.sample_times[0], self.sample_times[-1],
+            np.linspace(self.light_curve_model.model_times[0], 
+                        self.light_curve_model.model_times[-1],
                         time_dep_sys_dict["time_nodes"]),
-            2)
+            decimals=2)
         yaml_filters = list(time_dep_sys_dict["filters"])
         systematics.validate_filters(yaml_filters)
 
@@ -320,7 +349,7 @@ class OpticalTransient(BaseEMTransient):
         for filter_group in yaml_filters:
             #this should only be the case if no filters are specified
             if filter_group is None:
-                systematics_filters = {filt: 'all' for filt in self.filters}
+                systematics_filters = {filt: 'all' for filt in self.observed_filters}
                 break
             elif isinstance(filter_group, list):
                 for filt in filter_group:
@@ -338,44 +367,47 @@ class OpticalTransient(BaseEMTransient):
         sampled_filter_systematics = [self.parameters[f"em_syserr_{systematics_filt}{i}"] for i in range(len(self.systematics_time_nodes))]
         return utils.autocomplete_data(data_time, self.systematics_time_nodes, sampled_filter_systematics)
     
-    
-    ##FIXME Check if this is the right way to handle the error budget
     def em_err_from_parameters(self, *_):
         return self.parameters['em_syserr']
-
-
             
-    def update_lightcurve_reference(self, _, model_mags):
-        lc_data = {}
-        t0 = self.parameters["timeshift"]
-        d_lum = self.parameters.get("luminosity_distance", 1e-5) ## default 10pc = 1e-5 Mpc
-        distance_modulus = distance_modulus_nmma(d_lum)
-        for filt, model_mag in model_mags.items():
-            usedIdx = np.where(np.isfinite(model_mag))[0]
-            if len(usedIdx)<2:
-                #no meaningful inter-/extrapolation possible
-                lc_data[filt] = (self.sample_times + t0, np.full_like(self.sample_times, np.inf))
-            else:
-                apparent_magnitude = utils.getFilteredMag(model_mags, filt) + distance_modulus
-                lc_data[filt] = (self.sample_times[usedIdx] + t0, apparent_magnitude[usedIdx])
-        return lc_data
-    
-    def band_log_likelihood(self, lc_data):
+    def update_lightcurve_reference(self, model_lc_data):
+        "Map the output of the light curve model to the expected observations"
+        expected_mags = {}
+        obs_times, lc_data = model_lc_data
+        for filt in self.observed_filters:
+            try:
+                # observable times and magnitudes according to the model
+                obs_mags = lc_data[self.model_filter_mapping[filt]]
+
+                # modelled mags at actual observing times, assume non-detections 
+                # if the observed times fall outside the reliably modelled times
+                expected_mags[filt] = utils.autocomplete_data(
+                    self.light_curve_times[filt], obs_times, obs_mags,extrapolate=np.inf)
+            except KeyError:
+                # if the model does not provide data for an observed filter, 
+                # we can try some known averages
+                helper_mags = {}
+                for helper_filt in self.obs_average_mapping[filt]:
+                    obs_mags = lc_data[self.model_filter_mapping[helper_filt]]
+                    helper_mags[helper_filt] = utils.autocomplete_data(
+                        self.light_curve_times[filt], obs_times, obs_mags, extrapolate=np.inf)
+                expected_mags[filt] = utils.average_mags(helper_mags, filt)
+            # if not np.isfinite(expected_mags[filt]).all():
+            #     breakpoint()
+        return expected_mags
+
+    def band_log_likelihood(self, expected_mags):
         minus_chisquare_total = 0.0
         gaussprob_total = 0.0
-        for filt in self.filters:
-            # decompose the data
-            data_time, data_mag, data_sigma  = self.light_curve_data[filt].T
-            systematic_em_err = self.compute_em_err(filt, data_time)
-            data_sigma = np.sqrt(data_sigma**2 + systematic_em_err**2)
-            model_time, model_mags = lc_data[filt]
-            # evaluate the light curve magnitude at the data points
-            est_mag = utils.autocomplete_data(data_time, model_time, model_mags)
+        for filt in self.observed_filters:
+            systematic_em_err = self.compute_em_err(filt, self.light_curve_times[filt])
+            data_sigma = np.sqrt(self.light_curve_uncertainties[filt]**2 + systematic_em_err**2)
             minus_chisquare, gaussprob = self.chisquare_gaussianlog_from_lc_data( 
-                est_mag, data_mag , data_sigma,  systematic_em_err, 
+                expected_mags[filt], self.light_curves[filt] , data_sigma,  systematic_em_err, 
                 lim=self.detection_limit[filt]
             )
-            if isinstance(minus_chisquare, bool):
+            if (minus_chisquare is False):
+                #this should only be the case if also (self.parameters['timeshift'] <= self.light_curve_times[filt][0] ):
                 return np.nan_to_num(-np.inf)
             else:
                 minus_chisquare_total+=minus_chisquare
@@ -391,10 +423,8 @@ class BolometricTransient(BaseEMTransient):
     light_curve_model: `nmma.em.SimpleBolometricLightCurveModel`
         An object which computes the light curve of a kilonova signal,
         given a set of parameters
-    sample_times: array-like
-        Array of times at which the light curve is sampled
     light_curve_data: dict
-        Dictionary of light curve data returned from nmma.em.utils.loadEvent
+        Dictionary of light curve data 
     trigger_time: float (default: 0.0)
         Time of the kilonova trigger in Modified Julian Day
     error_budget: float (default: 1.0)
@@ -416,35 +446,43 @@ class BolometricTransient(BaseEMTransient):
     def __init__(
         self,
         light_curve_model,
-        sample_times,
         light_curve_data,
-        trigger_time=0.0,
+        trigger_time=None,
         error_budget=1.0,
         detection_limit=np.inf,
         verbose=False,
         **kwargs # to catch a few args of an OpticalTransient
     ):
-        super().__init__(light_curve_model, sample_times, 
-                         detection_limit, error_budget, verbose)
+        super().__init__(light_curve_model, detection_limit, error_budget, verbose)
         data_time = light_curve_data['phase'].to_numpy()
-        self.data_time = data_time - trigger_time
-        self.data_lum = light_curve_data['Lbb'].to_numpy()
-        self.data_sigma = light_curve_data['Lbb_unc'].to_numpy()
+        if trigger_time is None:
+            trigger_time = np.min(data_time)
+        self.light_curve_times = data_time - trigger_time
+        self.light_curves = light_curve_data['Lbb'].to_numpy()
+        self.light_curve_uncertainties = light_curve_data['Lbb_unc'].to_numpy()
+        self.trigger_time = trigger_time
 
     def __repr__(self):
         return self.__class__.__name__
     
-    def update_lightcurve_reference(self, lbol, _):
-        return (self.sample_times + self.parameters["timeshift"], lbol)
+    def update_lightcurve_reference(self, model_lc_data):
+        return utils.autocomplete_data(self.light_curve_times, *model_lc_data)
     
-    def band_log_likelihood(self, lc_data):
+    def sanity_check_passed(self, model_lbol):
+        ## FIXME when would the latter ever be the case?
+        # Better let lc return None!
+        time, model = model_lbol
+        if not np.isfinite(model).any() or (model == 0.0).all():
+            return False
+        return True
+    
+    def band_log_likelihood(self, expected_lum):
         em_err_param = self.parameters.get('em_syserr', self.error_budget)
+        data_sigma = np.sqrt(self.light_curve_uncertainties**2 + em_err_param**2)
         
-        data_sigma = np.sqrt(self.data_sigma**2 + em_err_param**2)
-        est_lum = utils.autocomplete_data(self.data_time, *lc_data)
         minus_chisquare, gaussprob = self.chisquare_gaussianlog_from_lc_data(
-            est_lum, self.data_lum, data_sigma, em_err_param, lim=self.detection_limit)
-        if isinstance(minus_chisquare, bool):
+            expected_lum, self.light_curves, data_sigma, em_err_param, lim=self.detection_limit)
+        if minus_chisquare is False:
             return np.nan_to_num(-np.inf)
         else:
             return minus_chisquare + gaussprob
@@ -462,16 +500,12 @@ class OpticalLightCurve(EMTransientLikelihood):
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
     light_curve_data: dict
-        Dictionary of light curve data returned from nmma.em.utils.loadEvent
+        Dictionary of light curve data 
     trigger_time: float
         Time of the kilonova trigger in Modified Julian Day
     error_budget: float (default:1)
         Additionally introduced statistical error on the light curve data,
         so as to keep the systematic error in control
-    tmin: float (default:0)
-        Days from trigger_time to be started analysing
-    tmax: float (default:14)
-        Days from trigger_time to be ended analysing
 
     Returns
     -------
@@ -489,10 +523,9 @@ class OpticalLightCurve(EMTransientLikelihood):
         trigger_time,
         detection_limit=None,
         error_budget=1.0,
-        tmin=0.0,
-        tmax=14.0,
         verbose=False,
     ):
+        
         super().__init__(
                 light_curve_model=light_curve_model,
                 light_curve_data = light_curve_data,
@@ -500,8 +533,6 @@ class OpticalLightCurve(EMTransientLikelihood):
                 filters= filters,
                 detection_limit = detection_limit,
                 error_budget = error_budget,
-                tmin = tmin,
-                tmax = tmax, 
                 verbose = verbose
                 )
 class BolometricLightCurve(EMTransientLikelihood):
@@ -513,14 +544,10 @@ class BolometricLightCurve(EMTransientLikelihood):
         And object which computes the light curve of a kilonova signal,
         given a set of parameters
     light_curve_data: dict
-        Dictionary of light curve data returned from nmma.em.utils.loadEvent
+        Dictionary of light curve data 
     error_budget: float (default:1)
         Additionally introduced statistical error on the light curve data,
         so as to keep the systematic error in control
-    tmin: float (default:0)
-        Days from trigger_time to be started analysing
-    tmax: float (default:14)
-        Days from trigger_time to be ended analysing
 
     Returns
     -------
@@ -536,8 +563,6 @@ class BolometricLightCurve(EMTransientLikelihood):
         light_curve_data,
         detection_limit=None,
         error_budget=1.0,
-        tmin=0.0,
-        tmax=14.0,
         verbose=False
     ):
         super().__init__(
@@ -545,7 +570,5 @@ class BolometricLightCurve(EMTransientLikelihood):
                 light_curve_data = light_curve_data,
                 detection_limit = detection_limit,
                 error_budget = error_budget,
-                tmin = tmin,
-                tmax = tmax, 
                 verbose = verbose
                 )

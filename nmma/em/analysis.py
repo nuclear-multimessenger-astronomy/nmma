@@ -3,10 +3,8 @@ import os
 from pathlib import Path
 import yaml
 from ast import literal_eval
-from copy import deepcopy
 
 import bilby
-import bilby.core
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -14,16 +12,55 @@ from bilby.core.likelihood import ZeroLikelihood
 
 from matplotlib.pyplot import cm
 
-from nmma.em import lightcurve_handling as lch
-from .lightcurve_generation import create_light_curve_data
+from .lightcurve_handling import make_injection
 from .em_likelihood import EMTransientLikelihood
-from nmma.em import model  
 from .prior import create_prior_from_args
-from .utils import setup_sample_times, create_detection_limit, get_filtered_mag 
-from .io import loadEvent
+from . import io, model, utils  
 from .plotting_utils import basic_em_analysis_plot, bolometric_lc_plot
-from .em_parsing import parsing_and_logging, em_analysis_parser, bolometric_parser
+from .em_parsing import parsing_and_logging, multi_wavelength_analysis_parser, bolometric_parser
+from ..joint.conversion import convert_mtot_mni
+from ..joint.utils import read_injection_file, set_filename, fetch_bestfit
 matplotlib.use("agg")
+
+def data_from_injection(args, filters, detection_limit):
+    injection_df = read_injection_file(args)
+    injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+    data, injection_parameters = make_injection(injection_parameters, args, filters)
+    data = inspect_detection_limit(detection_limit, data)
+    inj_outfile = set_filename(args.label, args, f"_lc_{args.injection_num}")
+    io.write_em_observations(inj_outfile, data, format='model')
+    return data, injection_parameters
+
+def inspect_detection_limit(detection_limit, data):
+    #checking produced data for magnitudes dimmer than the detection limit
+    for filt, limit in detection_limit.items():
+        filt_dict = data[filt]
+        non_detections = filt_dict['mag'] > limit
+
+        filt_dict['mag'] = np.where(non_detections, limit, filt_dict['mag'])
+        filt_dict['mag_error'] = np.where(non_detections, np.inf,filt_dict['mag_error'] )
+    return data
+
+def check_detections(data, remove_nondetections=False):
+    if remove_nondetections:
+        for filt, filt_dict in data.items():
+            detections = np.isfinite(filt_dict['mag_error'])
+            if detections.any():
+                data[filt] = {k: v[detections] for k, v in filt_dict.items()}
+            else:
+                data.pop(filt)
+
+    if not any(np.isfinite(data[filt]['mag_error']).any()  for filt in data):
+        print("No detection available, fits only on non-detections.")
+    return data
+
+def set_analysis_filters(filters, data):
+    if filters is None:
+        filters = list(data.keys())
+
+    filters_to_analyze = [filt for filt in data.keys() if filt in filters]
+    print(f"Running with filters {filters_to_analyze}")
+    return filters_to_analyze
 
 def em_only_sampling(likelihood, priors, args):
 
@@ -81,174 +118,130 @@ def em_only_sampling(likelihood, priors, args):
     result.save_posterior_samples()
     return result
 
+def post_process_bestfit(bestfit_params, transient, args, result=None):
+    best_mags = bestfit_lightcurve(transient, bestfit_params)
+    model_error = {filt: transient.compute_em_err(filt, best_mags["time"])
+                    for filt in best_mags.keys() if filt != "time"}
+    # model may not necessarily work on observed filters:
+    for filt in set(transient.observed_filters) - set(best_mags.keys()):
+        best_mags[filt] =  utils.get_filtered_mag(best_mags, filt)
+        model_error[filt]= utils.get_filtered_mag(model_error, filt)
 
-def set_filters(args):
-    if args.filters:
-        filters = args.filters.replace(" ", "")  # remove all whitespace
-        filters = filters.split(",")
-        if len(filters) == 0:
-            raise ValueError("Need at least one valid filter.")
-    elif hasattr(args, "rubin_ToO_type"):
-        if args.rubin_ToO_type == 'platinum':
-            filters = ["ps1__g","ps1__r","ps1__i","ps1__z","ps1__y"]
-        elif args.rubin_ToO_type == 'gold':
-            filters = ["ps1__g","ps1__r","ps1__i"]
-        elif args.rubin_ToO_type == 'gold_z':
-            filters = ["ps1__g","ps1__r","ps1__z"]
-        elif args.rubin_ToO_type == 'silver':
-            filters = ["ps1__g""ps1__i"]
-        elif args.rubin_ToO_type == 'silver_z':
-            filters = ["ps1__g","ps1__z"]
-    else:
-        filters = None
-    return filters
+    
+    transient.parameters = bestfit_params
+    chi2_dict, mismatches = compute_chisquare_dict(transient, best_mags, 
+                                        model_error, verbose=args.verbose)
 
-def fetch_bestfit(args, light_curve_model, sample_times):
-    posterior_file = os.path.join(
-        args.outdir, f"{args.label}_posterior_samples.dat"
-    )
-    posterior_samples = pd.read_csv(posterior_file, header=0, delimiter=" ")
-    bestfit_idx = np.argmax(posterior_samples.log_likelihood.to_numpy())
-    bestfit_params = posterior_samples.to_dict(orient="list")
-    for key in bestfit_params.keys():
-        bestfit_params[key] = bestfit_params[key][bestfit_idx]
-    print(
-        f"Best fit parameters: {str(bestfit_params)}\nBest fit index: {bestfit_idx}"
-    )
+    if getattr(args, "bestfit", False):
+        bestfit_to_write = bestfit_params.copy()
+        if result is not None:
+            bestfit_to_write["log_bayes_factor"] = result.log_bayes_factor
+            bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
+        bestfit_to_write["Magnitudes"] = {filt: best_mags[filt].tolist() 
+                                          for filt in transient.observed_filters}
+        bestfit_to_write["chi2_per_dof"] = chi2_dict["total"]
+        bestfit_to_write["chi2_dict"] = chi2_dict
+        bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
 
-    obs_sample_times, obs_lightcurve = light_curve_model.gen_detector_lc(
+        with open(bestfit_file, "w") as file:
+            json.dump(bestfit_to_write, file, indent=4)
+
+        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
+
+    if args.plot:
+        filters_to_plot = [
+            filt for filt in transient.observed_filters
+            if not np.isnan(transient.light_curves[filt]).all()
+        ]
+        plot_error = {filt: model_error[filt] for filt in filters_to_plot}
+        mags_to_plot = {filt: best_mags[filt] for filt in filters_to_plot}
+        mags_to_plot["time"] = best_mags["time"]
+
+        if isinstance(transient.light_curve_model, model.CombinedLightCurveModelContainer):
+            sub_models = transient.light_curve_model.models
+            model_colors = cm.Spectral(np.linspace(0, 1, len(sub_models)))[::-1]
+            obs_times , mag_all = transient.light_curve_model.gen_detector_lc(
+                bestfit_params, return_all=True
+            )
+            sub_model_plot_props = {}
+            for i, sub_model in enumerate(sub_models):
+                sub_model_plot_props[sub_model.model] ={
+                    'color': model_colors[i], 
+                    'plot_mags' : [utils.get_filtered_mag(mag_all[i], filt) for filt in filters_to_plot],
+                    'plot_times': obs_times[i]
+                }
+        else: sub_model_plot_props = None
+
+        
+        basic_em_analysis_plot(
+            transient, mags_to_plot, plot_error, chi2_dict, mismatches,
+            sub_model_plot_props, xlim = args.xlim, ylim = args.ylim, 
+            save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
+        )
+
+def bestfit_lightcurve(transient, bestfit_params, sample_times=None):
+    
+    light_curve_model = transient.light_curve_model
+    observable_times, obs_lightcurve = light_curve_model.gen_detector_lc(
         bestfit_params, sample_times
     )
     if not isinstance(obs_lightcurve, dict): # bolometric model, have to turn it into a dict
         obs_lightcurve = {'lbol': obs_lightcurve}
-    obs_lightcurve["bestfit_sample_times"] = obs_sample_times
+    obs_lightcurve["time"] = observable_times
 
-    bestfit_params["Best fit index"] = int(bestfit_idx)
 
-    return obs_lightcurve, bestfit_params
+    return obs_lightcurve
+       
+def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
+    chi2 = 0.0
+    dof = 0.0
+    chi2_dict = {}
+    mismatches = {}
+    for filt, mag  in transient.light_curves.items():
+        t = transient.light_curve_times[filt]
+        sigma_y = transient.light_curve_uncertainties[filt]
+        # only the detection data are needed
+        finite_idx = np.isfinite(sigma_y)
+        n_finite = finite_idx.sum()
+        if n_finite > 0:
+            t_det, y_det, sigma_y_det = (
+                t[finite_idx],
+                mag[finite_idx],
+                sigma_y[finite_idx],
+            )
 
-def make_injection(args, filters = None, fixed_timestep=False, injection_model = None):
+            offset = (y_det - np.interp(t_det,model_data["time"], model_data[filt])) ** 2
+            total_unc = sigma_y_det**2 + model_error[filt]**2
+            chi2_per_filt = np.sum(offset / total_unc)
+            # store the data
+            chi2 += chi2_per_filt
+            dof += n_finite
+            mismatches[filt] = (offset, total_unc)
+            chi2_dict[filt] = float(chi2_per_filt / n_finite)
 
-    if isinstance(args.injection, str):
-        args.injection_file = args.injection
-    with open(args.injection_file, "r") as f:
-        injection_dict = json.load(
-            f, object_hook=bilby.core.utils.decode_bilby_json
-        )
-    injection_df = injection_dict["injections"]
-    injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+            if verbose:
+                print(f"the {filt} data being analyzed is: ", t, y, sigma_y)
+                print(f"for {filt} the length of the detections array is: ", n_finite, "increasing the dof to", dof)
 
-    injection_parameters = lch.read_trigger_time(injection_parameters, args)
-    
-    if args.ignore_timeshift:
-        injection_parameters.pop('timeshift', None)
+    chi2_dict["total"] = chi2 / dof if dof > 0 else np.inf
+    chi2_dict["dof"] = dof
 
-    injection_parameters["em_trigger_time"] += injection_parameters.get("timeshift",0)
+    return chi2_dict, mismatches
 
-    if args.prompt_collapse:
-        injection_parameters["log10_mej_wind"] = -3.0
-
-    # sanity check for eject masses
-    if "log10_mej_dyn" in injection_parameters and not np.isfinite(
-        injection_parameters["log10_mej_dyn"]
-    ):
-        injection_parameters["log10_mej_dyn"] = -3.0
-    if "log10_mej_wind" in injection_parameters and not np.isfinite(
-        injection_parameters["log10_mej_wind"]
-    ):
-        injection_parameters["log10_mej_wind"] = -3.0
-
-    if fixed_timestep:
-        # FIXME: this is a temporary fix for the time step issue
-        # need to interpolate between data points if time step is not 0.25
-        if args.em_tstep:
-            time_step = args.em_tstep
-            if args.em_tstep != 0.25:
-                raise ValueError("Need em_tstep to be 0.25 until interpolation feature is incorporated.")
-                # currently no linear interpolation function
-                do_lin_interpolation = True
-            else:
-                do_lin_interpolation = False
-
-    if injection_model is None:
-        print("Creating injection light curve model")
-        injection_model = model.create_injection_model(args, filters)
-
-    sample_times = setup_sample_times(args)
-    data = create_light_curve_data(
-        injection_parameters, args, 
-        light_curve_model=injection_model,
-        sample_times=sample_times
-    )
-    print("Injection generated")
-
-    return data, injection_parameters 
-
-def inspect_detection_limit(detection_limit, data):
-
-    #checking produced data for magnitudes dimmer than the detection limit
-    for filt, limit in detection_limit.items():
-        for i, row in enumerate(data[filt]):
-            mjd, mag, _ = row
-            if mag > limit:
-                data[filt][i,:] = [mjd, limit, -np.inf]
-    return data
-
-def store_injections(detection_limit, filters, data, outfile):
-    ref_filts = filters if filters else data.keys()
-
-    data_out = []
-    for filt, rows in data.items():
-        if filt not in ref_filts:
-                continue
-
-        for mjd, mag, mag_unc in rows:
-            if not np.isfinite(mag_unc):
-                data_out.append([mjd, 99.0, 99.0, filt, mag, 0.0])
-            else:
-                limmag = detection_limit.get(filt, np.inf)
-                data_out.append([mjd, mag, mag_unc, filt, limmag, 0.0])
-
-    data_out = np.array(data_out)
-
-    columns = ["jd", "mag", "mag_unc", "filter", "limmag", "programid"]
-    lc = pd.DataFrame(data=data_out, columns=columns)
-    lc.sort_values("jd", inplace=True)
-    lc = lc.reset_index(drop=True)
-    lc.to_csv(outfile)
-
-def check_detections(data, remove_nondetections=False):
-    if remove_nondetections:
-        data = {filt: data[filt][np.isfinite(data[filt][:, 2])] for filt in data 
-                if np.isfinite(data[filt][:, 2]).any()}
-    
-    if not any(np.isfinite(data[filt][:, 2]).any() 
-               and np.isfinite(data[filt][:, 1]).any() 
-               for filt in data):
-        raise ValueError("Need at least one detection to do fitting.")
-    return data
-
-def set_analysis_filters(filters, data):
-    if filters is None:
-        filters = list(data.keys())
-
-    filters_to_analyze = [filt for filt in data.keys() if filt in filters]
-    print(f"Running with filters {filters_to_analyze}")
-    return filters_to_analyze
-
-    
 
 def bolometric_analysis(args):
 
-    sample_times = setup_sample_times(args)
     # create the data 
     # FIXME add  injection functionality
-    if args.injection:
-        pass
+    # if args.injection_file:
+    #     pass
 
     # load the bolometric data
-    data = pd.read_csv(args.data)
-    light_curve_model = model.SimpleBolometricLightCurveModel(model=args.em_model)
+    data = pd.read_csv(args.light_curve_data)
+    light_curve_model = model.SimpleBolometricLightCurveModel(
+        model = args.em_model,
+        sample_times = utils.setup_sample_times(args),  ## usually None, defaults to model_times
+        )
 
     # setup the prior
     priors = create_prior_from_args(args)
@@ -257,9 +250,8 @@ def bolometric_analysis(args):
     likelihood_kwargs = dict(
         light_curve_model=light_curve_model,
         light_curve_data=data,
-        priors = priors,
+        priors=priors,
         error_budget=args.error_budget,
-        sample_times = sample_times,
         verbose=args.verbose,
     )
     likelihood = EMTransientLikelihood(**likelihood_kwargs)
@@ -268,34 +260,29 @@ def bolometric_analysis(args):
     result.plot_corner()
 
     if args.bestfit or args.plot:
-        lbol_dict, _  = fetch_bestfit(args, light_curve_model, sample_times)
+        transient = likelihood.sub_model
+        bestfit_params = fetch_bestfit(args)
+        lbol_dict  = bestfit_lightcurve(transient, bestfit_params)
 
-        data_times = data["phase"].to_numpy()
-        y = data["Lbb"].to_numpy()
-        sigma_y = data["Lbb_unc"].to_numpy()
-        bolometric_lc_plot(data_times, y, sigma_y, lbol_dict, 
+        bolometric_lc_plot(transient, lbol_dict,
             save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
         )
     return
 
 def analysis(args):
-    filters = set_filters(args)
-    detection_limit = create_detection_limit(args, filters)
+    filters = utils.set_filters(args)
+    detection_limit = utils.create_detection_limit(args, filters)
 
-    # create the  data if an injection set is given
-    if args.injection:
-        data, injection_parameters = make_injection(args, filters)
-        data = inspect_detection_limit(detection_limit, data)
-        ## configure the output file
-        if args.injection_outfile is not None:
-            store_injections(detection_limit, filters, data, args.injection_outfile)
-        trigger_time = injection_parameters.get('em_trigger_time', None)
+    # create the data if an injection set is given
+    if args.injection_file:
+        data, injection_parameters = data_from_injection(args, filters, detection_limit)
+        trigger_time = injection_parameters['trigger_time']
         
     else:
         # load observational data
-        data = loadEvent(args.data)
+        data = io.load_em_observations(args, format='observations')
 
-        trigger_time = getattr(args, 'em_trigger_time', None)
+        trigger_time = utils.read_trigger_time(None,args)
 
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
@@ -315,20 +302,18 @@ def analysis(args):
     
     # setup the prior
     if any(model in ['AnBa2022_linear', 'AnBa2022_log'] for model in model_names):
-        param_conv = 'AnBa2022'
+        param_conv = convert_mtot_mni
     # elif to be extended...
     else:
         param_conv = None
     priors = create_prior_from_args(args, param_conv = param_conv)
 
-    sample_times = setup_sample_times(args)
     # setup the likelihood
     likelihood_kwargs = dict(
         light_curve_model=light_curve_model,
         filters=filters_to_analyze,
         light_curve_data=data,
         priors=priors,
-        sample_times = sample_times,
         trigger_time=trigger_time,
         error_budget=args.em_error_budget,
         verbose=args.verbose,
@@ -340,7 +325,7 @@ def analysis(args):
 
     result = em_only_sampling(likelihood, priors, args)
     
-    if args.injection:
+    if args.injection_file:
         injlist_all = ["luminosity_distance"]
         for model_name in model_names:
             add_params = model.model_parameters_dict[model_name]
@@ -366,106 +351,8 @@ def analysis(args):
         result.plot_corner()
 
     if args.bestfit or args.plot:
-        best_mags, bestfit_params = fetch_bestfit(args, light_curve_model, sample_times)
-        transient = likelihood.sub_model
-        transient.parameters = bestfit_params
-
-        ######################
-        # calculate the chi2 #
-        ######################
-        # fetch data
-        processed_times = deepcopy(transient.light_curve_times)
-        processed_mags = deepcopy(transient.light_curve_mags)
-        processed_uncertainties = deepcopy(transient.light_curve_uncertainties)
-        chi2 = 0.0
-        dof = 0.0
-        chi2_per_dof_dict = {}
-        for filt in filters_to_analyze:
-            # make best-fit lc interpolation
-            mag_used = best_mags[filt]
-            t, y, sigma_y = processed_times[filt], processed_mags[filt], processed_uncertainties[filt]
-            # print("the time values before adding timeshift are: ", t)
-            # # shift t values by timeshift
-            # if "timeshift" in bestfit_params:
-            #     print("timeshift found in bestfit_params is: ",bestfit_params["timeshift"])
-            #     t += bestfit_params["timeshift"]
-            # only the detection data are needed
-            finite_idx = np.isfinite(sigma_y)
-            n_finite = finite_idx.sum()
-            print(f"the {filt} data being analyzed is: ", t, y, sigma_y)
-            print(f"for {filt} the length of the detections array is: ", n_finite)
-            if n_finite > 0:
-                t_det, y_det, sigma_y_det = (
-                    t[finite_idx],
-                    y[finite_idx],
-                    sigma_y[finite_idx],
-                )
-                err = transient.compute_em_err(filt, t_det)
-                # print("the time passes into the interp is: ", t_det)
-                num = (y_det - np.interp(t_det,best_mags["bestfit_sample_times"], mag_used)) ** 2
-                den = sigma_y_det**2 + err**2
-                chi2_per_filt = np.sum(num / den)
-                # store the data
-                chi2 += chi2_per_filt
-                dof += n_finite
-                print("the number of dof are: ", dof)
-                chi2_per_dof_dict[filt] = chi2_per_filt / n_finite
-
-        if dof == 0:
-            print("Uh oh! the dof is zero")
-
-        chi2_per_dof = chi2 / dof
-
-    if args.bestfit:
-        bestfit_to_write = bestfit_params.copy()
-        bestfit_to_write["log_bayes_factor"] = result.log_bayes_factor
-        bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
-        bestfit_to_write["Best fit index"] = bestfit_params["Best fit index"]
-        bestfit_to_write["Magnitudes"] = {i: best_mags[i].tolist() for i in best_mags.keys()}
-        bestfit_to_write["chi2_per_dof"] = chi2_per_dof
-        bestfit_to_write["chi2_per_dof_per_filt"] = {
-            i: chi2_per_dof_dict[i].tolist() for i in chi2_per_dof_dict.keys()
-        }
-        bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
-
-        with open(bestfit_file, "w") as file:
-            json.dump(bestfit_to_write, file, indent=4)
-
-        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
-
-    if args.plot:
-        filters_to_plot = [
-            filt for filt in filters_to_analyze
-            if not np.isnan(data[filt][:, 1]).all()
-        ]
-        mags_to_plot = [get_filtered_mag(best_mags, filt) for filt in filters_to_plot]
-
-        if isinstance(light_curve_model, model.CombinedLightCurveModelContainer):
-            sub_models = light_curve_model.models
-            model_colors = cm.Spectral(np.linspace(0, 1, len(sub_models)))[::-1]
-            obs_times , mag_all = light_curve_model.gen_detector_lc(
-                sample_times, bestfit_params, return_all=True
-            )
-            sub_model_plot_props = {}
-            for i, sub_model in enumerate(sub_models):
-                sub_model_plot_props[sub_model.model] ={
-                    'color': model_colors[i], 
-                    'plot_mags' : [get_filtered_mag(mag_all[i], filt) for filt in filters_to_plot],
-                    'plot_times': obs_times[i]
-                }
-        else: sub_model_plot_props = None
-
-        breakpoint()
-        
-        basic_em_analysis_plot(
-            transient, filters_to_plot, mags_to_plot,
-            sub_model_plot_props,
-            sample_times = best_mags["bestfit_sample_times"],
-            xlim = args.xlim, ylim = args.ylim, 
-            save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
-        )
-        breakpoint()
-        print('completed')
+        bestfit_params = fetch_bestfit(args)
+        post_process_bestfit(bestfit_params, likelihood.sub_model, args)
 
 def nnanalysis(args):
 
@@ -487,20 +374,15 @@ def nnanalysis(args):
     # only can use ztfr, ztfg, and ztfi filters in the light curve data
     print('Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters.')
     filters = 'ztfg,ztfi,ztfr'.split(",")
-    
-    detection_limit = create_detection_limit(args, filters, 22.)
+
+    detection_limit = utils.create_detection_limit(args, filters, 22.)
 
     # create the kilonova data if an injection set is given
-    if args.injection:
-        data, injection_parameters = make_injection(args, filters, fixed_timestep=0.25)
-
-        if args.injection_outfile is not None:
-            store_injections(detection_limit, filters, data, args.injection_outfile)
-
+    if args.injection_file:
+        data, injection_parameters = data_from_injection(args, filters, detection_limit)
     else:
         # load the lightcurve data
-        # sample_times = setup_sample_times(args)
-        data = loadEvent(args.data)
+        data = io.load_em_observations(args)
         
 
     data = check_detections(data, args.remove_nondetections)
@@ -512,7 +394,6 @@ def nnanalysis(args):
     
     # setup the prior
     priors = create_prior_from_args(args)
-    
     
     # now that we have the kilonova light curve, we need to pad it with non-detections
     # this part is currently hard coded in terms of the times !!!! likely will need the most work
@@ -526,16 +407,14 @@ def nnanalysis(args):
 
     # Convert data dict to DataFrame with time and filter columns
     res = next(iter(data))
-    t_list = data[res][:, 0]
+    t_list = (data[res]['time']).tolist()
     data_df = pd.DataFrame({'t': t_list})
     for key in data:
-        data_df[key] = data[key][:, 1]
+        data_df[key] = data[key]['mag']
     column_list = data_df.columns.to_list()
 
-    column_list = data_df.columns.to_list()
+    # pad the data
 
-    # pad the data 
-    
     padded_data_df = pad_the_data(
         data_df, 
         column_list,
@@ -543,7 +422,6 @@ def nnanalysis(args):
         filler_time_step=time_step, 
         filler_data=detection_limit[column_list[-1]], ## some value from the detection limit dict
     )
-
     # change the data into pytorch tensors
     data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
 
@@ -566,21 +444,19 @@ def nnanalysis(args):
         samples = flow.sample(nsamples, context=data_tensor)
         samples = samples.cpu().reshape(nsamples,3)
         
-    if args.injection:
-        avail_parameters = injection_parameters.keys()
-        if ('log10_mej' in avail_parameters) and ('log10_vej' in avail_parameters) and ('log10_Xlan' in avail_parameters):
-            param_tensor = torch.tensor([injection_parameters['log10_mej'], injection_parameters['log10_vej'], injection_parameters['log10_Xlan']], dtype=torch.float32)
-            with torch.no_grad():
-               truth = param_tensor
-            flow_result = cast_as_bilby_result(samples, truth, priors=priors)
-            fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
-            print('saved posterior plot')
-        else:
-            raise ValueError('The injection parameters provided do not match the parameters the flow has been trained on')
-    else:
-        flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
-        fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
-        print('saved posterior plot')
+    
+    try:
+        param_tensor = torch.tensor([injection_parameters['log10_mej'], injection_parameters['log10_vej'], injection_parameters['log10_Xlan']], dtype=torch.float32)
+        with torch.no_grad():
+            truth = param_tensor
+    except NameError:
+        truth = None
+    except KeyError:
+        raise ValueError('The injection parameters provided do not match the parameters the flow has been trained on')
+    
+    flow_result = cast_as_bilby_result(samples, truth, priors=priors)
+    fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
+    print('saved posterior plot')
 
 def multi_analysis_loop(args, analysis_function):
     if getattr(args, 'config', None) is not None:
@@ -598,7 +474,7 @@ def multi_analysis_loop(args, analysis_function):
         analysis_function(args)
 
 def main(args=None):
-    args = parsing_and_logging(em_analysis_parser, args)
+    args = parsing_and_logging(multi_wavelength_analysis_parser, args)
     if args.sampler == "neuralnet":
         analysis_function = nnanalysis
     else:

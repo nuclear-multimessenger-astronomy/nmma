@@ -1,11 +1,11 @@
 """
 Module to run parallel bilby using MPI
 """
-import datetime
 import json
 import os
 import sys
 import pickle
+import datetime
 import time
 import signal
 
@@ -18,16 +18,13 @@ from pandas import DataFrame
 from schwimmbad import MPIPool
 
 from .. import pb_utils
-from ..parser import (
-    create_nmma_analysis_parser,
-    parse_analysis_args
-    )
+from ..multi_parsing import create_nmma_analysis_parser, parse_analysis_args
 from .analysis_run import MainRun, WorkerRun
 
-def checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot):
+def checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot=False):
     pb_utils.write_current_state(sampler, resume_file, sampling_time )
-    pb_utils.write_sample_dump(sampler, samples_file, run.sampling_keys)
-    if no_plot is False:
+    pb_utils.write_sample_dump(sampler, samples_file, run.sampling_keys, run.rstate)
+    if checkpoint_plot:
         pb_utils.plot_current_state(sampler, run.sampling_keys, run.outdir, run.label)
 
 def analysis_runner(
@@ -52,11 +49,11 @@ def analysis_runner(
     check_point_deltaT=3600,
     n_effective=np.inf,
     dlogz=10,
-    do_not_save_bounds_in_resume=True,
+    save_bounds=False,
     n_check_point=1000,
     max_its=1e10,
     max_run_time=1e10,
-    no_plot=False,
+    checkpoint_plot=False,
     nestcheck=False,
     result_format="hdf5",
     **kwargs,
@@ -152,7 +149,7 @@ def analysis_runner(
             sampler_kwargs = dict(
                 n_effective=n_effective,
                 dlogz=dlogz,
-                save_bounds=not do_not_save_bounds_in_resume,
+                save_bounds=save_bounds,
             )
             logger.info(f"Run criteria: {json.dumps(sampler_kwargs)}")
 
@@ -164,7 +161,7 @@ def analysis_runner(
                 logger.info("Received SIGTERM, writing checkpoint and exiting.")
                 pool.abort()
                 ## no time for plotting when file_size becomes larger
-                checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot=True)
+                checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot=False)
                 logger.info("Exited gracefully.")
                 sys.exit(0)
 
@@ -201,7 +198,7 @@ def analysis_runner(
                     or it == max_its
                     or run_time > max_run_time
                 ):
-                    checkpointing( run, sampler, resume_file, samples_file, sampling_time, no_plot)
+                    checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot)
                     if it == max_its:
                         exit_reason = 1
                         logger.info(
@@ -225,7 +222,7 @@ def analysis_runner(
                     pass
 
                 # Create a final checkpoint and set of plots
-                checkpointing( run, sampler, resume_file, samples_file.replace('.parquet','.dat'), sampling_time, no_plot)
+                checkpointing( run, sampler, resume_file, samples_file.replace('.parquet','.dat'), sampling_time, checkpoint_plot)
 
                 sampling_time += (datetime.datetime.now() - t0).total_seconds()
 
@@ -246,8 +243,7 @@ def analysis_runner(
                 nested_samples = DataFrame(out.samples, columns=run.sampling_keys)
                 nested_samples["log_likelihood"] = out.logl
                 run.priors = worker_run.priors
-                result = pb_utils.format_result(
-                    run,
+                result = run.format_result(
                     worker_run,
                     data_dump,
                     out,
@@ -285,14 +281,7 @@ def analysis_runner(
                 if result_format != "json":  # json is saved by default
                     result.save_to_file(extension="json")
                 result.save_to_file(extension=result_format)
-                print(
-                    f"Sampling time = {datetime.timedelta(seconds=result.sampling_time)}s"
-                )
-                print(f"Number of lnl calls = {result.num_likelihood_evaluations}")
-                print(result)
-                if no_plot is False:
-                    result.plot_corner()
-
+                worker_run.final_diagnostics(result)
         else:
             exit_reason = -1
         return exit_reason

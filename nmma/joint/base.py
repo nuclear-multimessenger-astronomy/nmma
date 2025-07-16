@@ -1,6 +1,8 @@
 import inspect
 import numpy as np
+import pandas as pd
 from bilby.core.likelihood import Likelihood
+from bilby.core.prior import Interped
 
 class NMMABaseLikelihood(Likelihood):
     """ The base likelihood object for modular multi-messenger analysis
@@ -82,3 +84,23 @@ def initialisation_args_from_signature_and_namespace(_callable, namespace, prefi
                 default_kwargs[key] = getattr(namespace, prefix+key)
                 break
     return default_kwargs
+
+def adjust_hubble_prior(priors, args, logger=None):
+    if args.Hubble_weight:
+        if logger:
+            logger.info("Sampling over Hubble constant with pre-calculated prior")
+            logger.info("Overwriting any Hubble prior in the prior file")
+        try:
+            Hubble_prior_data = pd.read_csv(args.Hubble_weight, delimiter=" ", header=0)
+            xx = Hubble_prior_data.Hubble.to_numpy()
+            yy = Hubble_prior_data.prior_weight.to_numpy()
+        except:
+            xx, yy =  np.loadtxt(args.Hubble_weight).T
+
+        Hmin = xx[0]
+        Hmax = xx[-1]
+
+        priors["Hubble_constant"] = Interped(
+            xx, yy, minimum=Hmin, maximum=Hmax, name="Hubble_constant"
+        )
+    return priors

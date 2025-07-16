@@ -1,11 +1,11 @@
 import logging
+import datetime
 import os
 from glob import glob
 import pickle
 
-import dynesty
 import numpy as np
-import pandas as pd
+from bilby.core.result import  Result
 from bilby.core.sampler.base_sampler import _SamplingContainer
 from bilby.core.sampler.dynesty import DynestySetupError, _set_sampling_kwargs
 from bilby.core.sampler.dynesty_utils import (
@@ -16,11 +16,19 @@ from bilby.core.sampler.dynesty_utils import (
     MultiEllipsoidLivePointSampler,
 )
 from bilby.core.utils import logger
+from bilby.core.prior import PriorDict, Constraint
+
 from bilby_pipe.utils import convert_string_to_list
-from bilby.core.prior import Interped, DeltaFunction, PriorDict, Constraint
+import dynesty
 
 from ...joint.joint_likelihood import setup_nmma_likelihood
 from ...joint.conversion import MultimessengerConversion
+from ...joint.base import adjust_hubble_prior
+from ...joint.utils import reorder_loglikelihoods, rejection_sample, fetch_bestfit
+from ...em.analysis import post_process_bestfit
+from ...em.prior import extinction_prior
+from ...eos.plotting_routines import plot_eos_vs_constraints
+from ...eos.eos_likelihood import setup_tabulated_eos_priors
 
 
 class MainRun(object):
@@ -261,6 +269,78 @@ class MainRun(object):
 
         return np.array(u_list), np.array(v_list), np.array(l_list), blobs
 
+    def format_result(
+        self,
+        worker_run,
+        data_dump,
+        out,
+        nested_samples,
+        sampler_kwargs,
+        sampling_time,
+        rejection_sample_posterior=True,
+    ):
+        """
+        Packs the variables from the run into a bilby result object
+
+        Parameters
+        ----------
+        worker_run: WorkerRun
+        data_dump: str
+            Path to the *_data_dump.pickle file
+        out: dynesty.results.Results
+            Results from the dynesty sampler
+        nested_samples: pandas.core.frame.DataFrame
+            DataFrame of the weights and likelihoods
+        sampler_kwargs: dict
+            Dictionary of keyword arguments for the sampler
+        sampling_time: float
+            Time in seconds spent sampling
+        rejection_sample_posterior: bool
+            Whether to generate the posterior samples by rejection sampling the
+            nested samples or resampling with replacement
+
+        Returns
+        -------
+        result: bilby.core.result.Result
+            result object with values written into its attributes
+        """
+
+        result = Result(self.label, self.outdir, search_parameter_keys=self.sampling_keys)
+        result.priors = worker_run.priors
+        result.nested_samples = nested_samples
+        result.meta_data = worker_run.data_dump["meta_data"]
+        result.meta_data["command_line_args"]["sampler"] = "parallel_bilby"
+        result.meta_data["data_dump"] = data_dump
+        result.meta_data["likelihood"] = worker_run.likelihood.meta_data
+        result.meta_data["sampler_kwargs"] = self.init_sampler_kwargs
+        result.meta_data["run_sampler_kwargs"] = sampler_kwargs
+        result.meta_data["injection_parameters"] = worker_run.injection_parameters
+        result.injection_parameters = worker_run.injection_parameters
+
+        weights = np.exp(out["logwt"] - out["logz"][-1])
+        if rejection_sample_posterior:
+            result.samples, keep = rejection_sample(out.samples, weights, self.rstate)
+            result.log_likelihood_evaluations = out.logl[keep]
+            logger.info(
+                f"Rejection sampling nested samples to obtain {sum(keep)} posterior samples"
+            )
+        else:
+            result.samples = dynesty.utils.resample_equal(out.samples, weights)
+            result.log_likelihood_evaluations = reorder_loglikelihoods(
+                unsorted_loglikelihoods=out.logl,
+                unsorted_samples=out.samples,
+                sorted_samples=result.samples,
+            )
+            logger.info("Resampling nested samples to posterior samples in place.")
+
+        result.log_evidence = out.logz[-1] + worker_run.likelihood.noise_log_likelihood()
+        result.log_evidence_err = out.logzerr[-1]
+        result.log_bayes_factor = result.log_evidence - result.log_noise_evidence
+        result.sampling_time = sampling_time
+        result.num_likelihood_evaluations = np.sum(out.ncall)
+
+        result.samples_to_posterior(likelihood=worker_run.likelihood, priors=result.priors)
+        return result
 
 class WorkerRun(object):
     """
@@ -294,8 +374,7 @@ class WorkerRun(object):
         self.zero_likelihood_mode=bilby_zero_likelihood_mode
 
         ## Set up the priors
-        self.compose_priors(
-                data_dump["prior_file"], self.args, 
+        self.compose_priors( data_dump["prior_file"], self.args, 
                 self.analysis_modifiers, logger
             )
 
@@ -330,44 +409,21 @@ class WorkerRun(object):
 
         """
         priors = PriorDict.from_json(prior_file)
+        # add the ratio_epsilon in case it is not present (for no-grb case)
+        if "ratio_epsilon" not in priors:
+            priors["ratio_epsilon"] = 0.01
         priors.convert_floats_to_delta_functions()
 
         ###adjust hubble prior if applicable
-        if args.Hubble_weight:
-            logger.info("Sampling over Hubble constant with pre-calculated prior")
-            logger.info("Assuming the redshift prior is the Hubble flow")
-            logger.info("Overwriting any Hubble prior in the prior file")
-            try:
-                Hubble_prior_data = pd.read_csv(args.Hubble_weight, delimiter=" ", header=0)
-                xx = Hubble_prior_data.Hubble.to_numpy()
-                yy = Hubble_prior_data.prior_weight.to_numpy()
-            except:
-                xx, yy =  np.loadtxt(args.Hubble_weight).T
+        priors = adjust_hubble_prior(priors, args, logger)
 
-            Hmin = xx[0]
-            Hmax = xx[-1]
-
-            priors["Hubble_constant"] = Interped(
-                xx, yy, minimum=Hmin, maximum=Hmax, name="Hubble_constant"
-            )
+        if getattr(args, 'em_model', False):
+            priors = extinction_prior(priors, args)
 
         # construct the eos prior
         if "tabulated_eos" in ana_modifiers:
-            
-            logger.info("Sampling over precomputed EOSs")
-            xx = np.arange(0, args.Neos + 1)
-            if args.eos_weight:
-                eos_weight = np.loadtxt(args.eos_weight)
-                yy = np.concatenate((eos_weight, [eos_weight[-1]]))
-            else: 
-                yy = np.ones_like(xx)/len(xx)
-            eos_prior = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
-            priors["EOS"] = eos_prior
+            priors = setup_tabulated_eos_priors(args, priors, logger)
 
-
-        # add the ratio_epsilon in case it is not present (for no-grb case)
-        if "ratio_epsilon" not in priors:
-            priors["ratio_epsilon"] = DeltaFunction(0.01, name="ratio_epsilon")
         
         self.priors=priors
 
@@ -385,12 +441,7 @@ class WorkerRun(object):
         self.sampling_keys = sampling_keys
         self.ndim = len(sampling_keys)
         self.fixed_keys = fixed_keys
-
-        fixed_prior = {key: priors[key].peak for key in fixed_keys}
-        # FIXME should not the RL-likelihood set this intrinsically?
-        # if self.args.likelihood_type ==  'RelativeBinningGravitationalWaveTransient':
-        #     fixed_prior.update(fiducial=0)
-        self.fixed_prior = fixed_prior
+        self.fixed_prior = {key: priors[key].peak for key in fixed_keys}
 
         periodic = []
         reflective = []
@@ -455,9 +506,10 @@ class WorkerRun(object):
             return 0
         parameters = {key: v for key, v in zip(self.sampling_keys, v_array)}
         parameters.update(self.fixed_prior)
-        parameters, added_keys = self.parameter_conversion.convert_to_multimessenger_parameters(parameters)
+        parameters, local_parameters = self.parameter_conversion.convert_to_multimessenger_parameters(parameters, return_internal=True)
         if self.evaluate_constraints(parameters) > 0:
             self.likelihood.parameters = parameters
+            self.likelihood.local_parameters = local_parameters
             return (
                 self.likelihood.sub_log_likelihood()
                 - self.likelihood.noise_log_likelihood()
@@ -514,3 +566,24 @@ class WorkerRun(object):
                         return unit, theta, logl
                 else:
                     return unit, theta, np.nan
+                
+    def final_diagnostics(self, result):
+
+        print(f"Sampling time = {datetime.timedelta(seconds=result.sampling_time)}s")
+        print(f"Number of lnl calls = {result.num_likelihood_evaluations}")
+        print(result)
+        if self.args.plot:
+            result.plot_corner()
+            bestfit_params = fetch_bestfit(self.args)
+            for i, msg in enumerate(self.messengers):
+                sub_model = self.likelihood.sub_likelihoods[i].sub_model
+                if msg == 'em':
+                    post_process_bestfit(bestfit_params, sub_model, self.args)
+                elif msg == 'gw':
+                    pass  # FIXME add suitable plotting for gw
+                elif msg == 'eos':
+                    eos_emulator = self.parameter_conversion.tov_emulator
+                    eos_data = eos_emulator.generate_macro_eos(bestfit_params)[0]
+                    plot_eos_vs_constraints(eos_data, sub_model.constraints, 
+                        save_path = os.path.join(
+                            self.args.outdir, f"{self.args.label}_mr_curve.png") )
