@@ -2,171 +2,103 @@
 import argparse
 import pathlib
 import os
-from nmma.em.analysis import get_parser
+from nmma.joint.base_parsing import nmma_base_parsing
+from nmma.em.em_parsing import multi_wavelength_analysis_parser
 import numpy as np
 
 BASE_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
-# Get analysis.py parser
-nmma_parser = get_parser(add_help=False)
-
-# Get argument names from nmma_parser
-nmma_arg_list = []
-for action in nmma_parser._actions:
-    arg_name = action.option_strings[0]
-    nmma_arg_list.append(arg_name[2:].replace("-", "_"))
 
 
-def get_slurm_parser():
-    # Create new parser that inherits analysis.py arguments
-    parser = argparse.ArgumentParser(parents=[nmma_parser])
-
+def get_slurm_parser(parser):
+    parser = multi_wavelength_analysis_parser(parser)
+    slurm_args = parser.add_argument_group(
+        title="Slurm arguments",
+        description="Arguments for running the lightcurve analysis on a Slurm HPC cluster",
+    )
     # Slurm-specific arguments
-    parser.add_argument(
-        "--Ncore",
-        default=8,
-        type=int,
-        help="number of cores for mpiexec",
-    )
-    parser.add_argument(
-        "--job-name",
-        type=str,
-        default="lightcurve-analysis",
-        help="job name",
-    )
-    parser.add_argument(
-        "--logs-dir-name",
-        type=str,
-        default="slurm_logs",
-        help="directory name for slurm logs",
-    )
-    parser.add_argument(
-        "--cluster-name",
-        type=str,
-        default="Expanse",
-        help="Name of HPC cluster",
-    )
-    parser.add_argument(
-        "--partition-type",
-        type=str,
-        default="shared",
-        help="Partition name to request for computing",
-    )
-    parser.add_argument(
-        "--nodes",
-        type=int,
-        default=1,
-        help="Number of nodes to request for computing",
-    )
-    parser.add_argument(
-        "--gpus",
-        type=int,
-        default=0,
-        help="Number of GPUs to request",
-    )
-    parser.add_argument(
-        "--memory-GB",
-        type=int,
-        default=64,
-        help="Memory allocation to request for computing",
-    )
-    parser.add_argument(
-        "--time",
-        type=str,
-        default="24:00:00",
-        help="Walltime for instance",
-    )
-    parser.add_argument(
-        "--mail-type",
-        type=str,
-        default="NONE",
-        help="slurm mail type (e.g. NONE, FAIL, ALL)",
-    )
-    parser.add_argument(
-        "--mail-user",
-        type=str,
-        default="",
-        help="contact email address",
-    )
-    parser.add_argument(
-        "--account-name",
-        type=str,
-        default="umn131",
-        help="Name of account with current HPC allocation",
-    )
-    parser.add_argument(
-        "--python-env-name",
-        type=str,
-        default="nmma_env",
-        help="Name of python environment to activate",
-    )
-    parser.add_argument(
-        "--script-name",
-        type=str,
-        default="slurm.sub",
-        help="script name",
-    )
+    slurm_args.add_argument("--Ncore", default=8, type=int,
+        help="number of cores for mpiexec")
+    slurm_args.add_argument("--job-name", type=str, default="lightcurve-analysis")
+    slurm_args.add_argument("--logs-dir-name", type=str, default="slurm_logs",
+        help="directory name for slurm logs")
+    slurm_args.add_argument("--cluster-name", type=str, default="Expanse",
+        help="Name of HPC cluster")
+    slurm_args.add_argument("--partition-type", type=str, default="shared",
+        help="Partition name to request for computing")
+    slurm_args.add_argument("--nodes", type=int, default=1,
+        help="Number of nodes to request for computing")
+    slurm_args.add_argument("--gpus", type=int, default=0,
+        help="Number of GPUs to request")
+    slurm_args.add_argument("--memory-GB", type=int, default=64,
+        help="Memory allocation to request for computing")
+    slurm_args.add_argument("--time", type=str, default="24:00:00",
+        help="Walltime for instance")
+    slurm_args.add_argument("--mail-type", type=str, default="NONE",
+        help="slurm mail type (e.g. NONE, FAIL, ALL)")
+    slurm_args.add_argument("--mail-user", type=str, default="",
+        help="contact email address")
+    slurm_args.add_argument("--python-env-name", type=str, default="nmma_env",
+        help="Name of python environment to activate")
+    slurm_args.add_argument("--script-name", type=str, default="slurm.sub")
+
     return parser
 
 
 def main(args=None):
+    parser = nmma_base_parsing(get_slurm_parser, return_parser=True)
     if args is None:
-        parser = get_slurm_parser()
         args = parser.parse_args()
+
     args_vars = vars(args)
 
     wildcard_mapper = {
-        "model": "$MODEL",
+        "em_model": "$MODEL",
         "label": "$LABEL",
         "trigger_time": "$TT",
-        "data": "$DATA",
+        "light_curve_data": "$DATA",
         "prior": "priors/$PRIOR.prior",
-        "tmin": "$TMIN",
-        "tmax": "$TMAX",
-        "dt": "$DT",
+        "em_tmin": "$TMIN",
+        "em_tmax": "$TMAX",
+        "em_tstep": "$DT",
         "skip_sampling": "$SKIP_SAMPLING",
     }
 
     wildcard_keys = [
-        "model",
+        "em_model",
         "label",
         "trigger_time",
-        "data",
+        "light_curve_data",
         "prior",
-        "tmin",
-        "tmax",
-        "dt",
+        "em_tmin",
+        "em_tmax",
+        "em_tstep",
     ]
-    wildcard_boolean_keys = ["skip_sampling"]
 
     args.outdir = f"{args.outdir}/$LABEL"
-
     for key in wildcard_keys:
-        if type(args_vars[key]) in [float, int]:
-            if np.isnan(args_vars[key]):
-                args_vars[key] = wildcard_mapper[key]
-        elif (args_vars[key] is None) | (args_vars[key] == "None"):
+        val = args_vars[key]
+        if isinstance(val, (float, int)) and np.isnan(val):
+            args_vars[key] = wildcard_mapper[key]
+        elif val in [None, "None"]:
             args_vars[key] = wildcard_mapper[key]
 
     # Manipulate args for easy inclusion in slurm script
+    ignore_args = ['help']
+    for g in parser._action_groups:
+        if g.title == "Slurm arguments":
+            for act in g._group_actions:
+                ignore_args.append(act.dest)
+
     args_to_add = []
-    for arg in args_vars.keys():
-        if arg in nmma_arg_list:
-            arg_value = args_vars[arg]
-            if type(arg_value) == bool:
-                if arg_value:
-                    if arg in wildcard_boolean_keys:
-                        args_to_add.append(wildcard_mapper[arg])
-                    else:
-                        hyphen_arg = arg.replace("_", "-")
-                        args_to_add.append(f"--{hyphen_arg}")
-            elif (arg_value is not None) & (arg_value != "None"):
-                hyphen_arg = arg.replace("_", "-")
-                args_to_add.append(f"--{hyphen_arg} {args_vars[arg]}")
-            else:
-                continue
+    for act in parser._actions:
+        if act.dest not in ignore_args:
+            args_to_add.append(f"{act.option_strings[0]} {args_vars[act.dest]}")
+
 
     all_args = " ".join(args_to_add)
+
+   
 
     scriptName = args.script_name
 
@@ -188,7 +120,6 @@ def main(args=None):
     fid.write(f"#SBATCH --gpus {args.gpus}\n")
     fid.write(f"#SBATCH --mem {args.memory_GB}G\n")
     fid.write(f"#SBATCH --time={args.time}\n")
-    fid.write(f"#SBATCH -A {args.account_name}\n")
     fid.write(f"#SBATCH --mail-type={args.mail_type}\n")
     if args.mail_type != "NONE":
         fid.write(f"#SBATCH --mail-user={args.mail_user}\n")
@@ -211,11 +142,11 @@ def main(args=None):
     )
     print()
     print(
-        "Default wildcard inputs are --model ($MODEL), --trigger-time ($TT), and --data ($DATA).\nNote that the default prior is priors/$MODEL.prior."
+        "Default wildcard inputs are --em-model ($MODEL), --trigger-time ($TT), and --light-curve-data ($DATA).\nNote that the default prior is priors/$MODEL.prior."
     )
     print()
     print(
-        "It is also recommended to set the following keywords to 'None' when running this script to allow them to be customized: --label ($LABEL), --tmin ($TMIN), --tmax ($TMAX), --dt ($DT), and --skip-sampling ($SKIP_SAMPLING)"
+        "It is also recommended to set the following keywords to 'None' when running this script to allow them to be customized: --label ($LABEL), --em-tmin ($TMIN), --em-tmax ($TMAX), --em-tstep ($DT), and --skip-sampling ($SKIP_SAMPLING)"
     )
     print()
     print(

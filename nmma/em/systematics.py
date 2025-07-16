@@ -162,8 +162,8 @@ def handle_withTime(values):
         else:
             filter_name = filter_group if filter_group is not None else "all"
 
-        for n in range(1, time_nodes + 1):
-            prior_name = f"sys_err_{filter_name}{n}"
+        for n in range(time_nodes):
+            prior_name = f"em_syserr_{filter_name}{n}"
             result.append(create_prior_string(prior_name, values.copy()))
 
     return result
@@ -171,7 +171,7 @@ def handle_withTime(values):
 
 def handle_withoutTime(values):
     validate_distribution(values)
-    return [create_prior_string("sys_err", values)]
+    return [create_prior_string("em_syserr", values)]
 
 
 config_handlers = {

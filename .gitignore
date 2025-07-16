@@ -7,6 +7,19 @@ nmma.egg-info/
 
 # development
 .vscode/
+.github/workflows/
 
 # models
 svdmodels/
+benchmark_output/
+svdtraingmodel/
+outdir/
+
+##custom files
+stable_eos_241205.txt
+slurm.sub
+nmma/eos/data
+nmma/tests/data
+
+##to be deprecated
+nmma/eos/manual.py

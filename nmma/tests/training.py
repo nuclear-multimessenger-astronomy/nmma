@@ -2,9 +2,16 @@ import os
 import copy
 import glob
 import numpy as np
+import pytest
+import shutil
 
-from ..em import training, model_parameters, io, svdmodel_benchmark
-
+from ..em import training, model_parameters, io
+@pytest.fixture(autouse=True)
+def cleanup_outdir():
+    ModelPath = "svdtrainingmodel"
+    yield
+    if os.path.exists(ModelPath):
+        shutil.rmtree(ModelPath, ignore_errors=True)
 
 def test_training():
 
@@ -27,13 +34,12 @@ def test_training():
     dataDir = os.path.join(workingDir, "data/bulla")
     ModelPath = "svdtrainingmodel"
     filenames = glob.glob(f"{dataDir}/*.dat")
-
     data = io.read_photometry_files(filenames, filters=filts)
     # Loads the model data
     training_data, parameters = model_parameters.Bu2019lm_sparse(data)
 
     interpolation_type = "sklearn_gp"
-    training.SVDTrainingModel(
+    training.SklearnGPTrainingModel(
         model_name,
         copy.deepcopy(training_data),
         parameters,
@@ -41,10 +47,9 @@ def test_training():
         filts,
         n_coeff=n_coeff,
         svd_path=ModelPath,
-        interpolation_type=interpolation_type,
     )
 
-    svdmodel_benchmark.create_benchmark(
+    training.create_benchmark(
         model_name,
         ModelPath,
         dataDir,
@@ -52,8 +57,8 @@ def test_training():
         filters=filts,
     )
 
-    interpolation_type = "tensorflow"
-    training.SVDTrainingModel(
+    interpolation_type = "keras"
+    training.KerasTrainingModel(
         model_name,
         copy.deepcopy(training_data),
         parameters,
@@ -61,10 +66,9 @@ def test_training():
         filts,
         n_coeff=n_coeff,
         svd_path=ModelPath,
-        interpolation_type=interpolation_type,
     )
 
-    svdmodel_benchmark.create_benchmark(
+    training.create_benchmark(
         model_name,
         ModelPath,
         dataDir,

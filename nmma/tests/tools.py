@@ -1,13 +1,12 @@
 import os
 from argparse import Namespace
-
+import shutil
 from tools import resample_grid
 from tools import convert_skyportal_lcs
 
 
 def test_resampling():
     workingDir = os.path.dirname(__file__)
-
     base_dirname = "lcs_grid"
     base_filename = "lcs"
     gridpath = os.path.join(workingDir, "data", "lowmass_collapsar_updated.h5")
@@ -22,6 +21,7 @@ def test_resampling():
         do_fragment=False,
         factor=5,
         shuffle=False,
+        remove = True,
     )
     resample_grid.main(args)
 

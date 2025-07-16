@@ -69,5 +69,5 @@ Install  `gwpy` in your NMMA environment before splitting the BNS and NSBH event
 [subpopulation-splitting]: https://github.com/weizmannk/ObservingScenariosInsights/blob/main/src/Subpopulation_Splitter.py
 [paper]: https://doi.org/10.3847/1538-4357/acfcb1
 
-[nmma-create-injection]: https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/eos/create_injection.py
+[nmma-create-injection]: https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/joint/injection_handling.py
 [lightcurve-analysis]: https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/nmma/em/analysis.py

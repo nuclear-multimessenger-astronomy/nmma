@@ -2,9 +2,10 @@ from argparse import Namespace
 import os
 from pathlib import Path
 import pytest
+import shutil
 
 
-from ..joint import maximum_mass_constraint
+from ..post_processing import maximum_mass_constraint
 
 @pytest.fixture(scope="module")
 def args():
@@ -25,6 +26,11 @@ def args():
 
     return args
 
+@pytest.fixture(autouse=True)
+def cleanup_outdir(args):
+    yield
+    if os.path.exists(args.outdir):
+        shutil.rmtree(args.outdir, ignore_errors=True)
 
 def test_maximum_mass_resampling(args):
     
