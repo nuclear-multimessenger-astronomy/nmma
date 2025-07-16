@@ -11,7 +11,7 @@ def cleanup_outdir():
     ModelPath = "svdtrainingmodel"
     yield
     if os.path.exists(ModelPath):
-        shutil.rmtree(ModelPath)
+        shutil.rmtree(ModelPath, ignore_errors=True)
 
 def test_training():
 
@@ -34,7 +34,6 @@ def test_training():
     dataDir = os.path.join(workingDir, "data/bulla")
     ModelPath = "svdtrainingmodel"
     filenames = glob.glob(f"{dataDir}/*.dat")
-
     data = io.read_photometry_files(filenames, filters=filts)
     # Loads the model data
     training_data, parameters = model_parameters.Bu2019lm_sparse(data)

@@ -1,9 +1,9 @@
 import argparse
+import os
 from ..utils.models import refresh_models_list
-from bilby.core import utils
-from ..joint.base_parsing import (
-    nmma_base_parsing, StoreBoolean, base_analysis_parsing, 
-    nonefloat, noneint, nonestr )
+from bilby.core.utils import setup_logger
+from ..joint.base_parsing import (nmma_base_parsing, StoreBoolean, base_analysis_parsing, 
+    base_injection_parsing, pipe_inj_parsing, nonefloat, noneint, nonestr )
 
 
 
@@ -11,12 +11,10 @@ def em_time_parsing(parser):
     em_time_parser = parser.add_argument_group(
         title="EM analysis time arguments", description="Specify EM analysis sample times"
     ) 
-    em_time_parser.add("--em-trigger-time","--kilonova-trigger-time", type=nonefloat, 
-        help="Time for the EM-transient trigger (in MJD)")
-    em_time_parser.add( "--em-tmin","--kilonova-tmin","--tmin", type=float, default=0.1, 
-        help="Days to be started analysing from the trigger time (default: 0.1)", )
-    em_time_parser.add("--em-tmax","--kilonova-tmax","--tmax", type=float, default=14.0, 
-        help="Days to be stoped analysing from the trigger time (default: 14)", )
+    em_time_parser.add( "--em-tmin","--kilonova-tmin","--tmin", type=nonefloat, 
+        help="Days to be started analysing from the trigger time. Default subject to model", )
+    em_time_parser.add("--em-tmax","--kilonova-tmax","--tmax", type=nonefloat, 
+        help="Days to be stoped analysing from the trigger time. Default subject to model", )
     em_time_parser.add("--em-nsteps", type=int, default=150,
         help="Number of steps to be used for light curve evaluation (default: 150)", )
     em_time_parser.add("--em-timescale", default='log', 
@@ -44,8 +42,10 @@ def basic_em_only_analysis_parsing(parser):
     parser.add_argument("--config", type=str, 
         help="Name of the configuration file containing parameter values.")
     parser.add_argument("--trigger-time", type=float,
-        help="Trigger time in modified julian day, not required if injection set is provided")
-    parser.add_argument("--data", type=str, help="Path to data in [time(isot) filter magnitude error] format")
+        help="Trigger time, format will be inferred but can be but can be explicitly adjusted with --time-format, not required if injection set is provided")
+    parser.add_argument("--light-curve-data", "--data", type=str, help="Path to data in [time filter magnitude error] format, time format will be inferred, but can be explicitly adjusted with --time-format. If not given, will try to generate data from the injection file.")
+    parser.add_argument("--time-format", type=str, default=None,
+        help="Time format of the light curve data, e.g. isot, mjd, see https://docs.astropy.org/en/stable/time/#time-format")
     parser.add_argument("--prior", type=str, help="Path to the prior file")
     parser.add_argument("--skip-sampling", action=StoreBoolean, default=False, 
         help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
@@ -62,8 +62,6 @@ def basic_em_only_analysis_parsing(parser):
     parser.add_argument("-n","--nlive", type=int, default=2048, help="Number of live points (default: 2048)")
     parser.add_argument("--reactive-sampling", action=StoreBoolean, default=False,
         help="To use reactive sampling in ultranest (default: False)")
-    parser.add_argument("--sample-over-Hubble", action=StoreBoolean, default=False,
-        help="To sample over Hubble constant and redshift")
     return parser
 
 def multi_wavelength_parsing(parser):
@@ -74,7 +72,6 @@ def multi_wavelength_parsing(parser):
         help="Detection limit per filter, optimally as a dict, e.g., {'r':22, 'g':23}, put a double quotation mark around the dictionary")
     em_input_parser.add("--em-error-budget", "--kilonova-error", type=str, 
         default="1.0", help="Additional statistical error (mag) to be introduced in each filter, can be passed as list or dict. (default: 1 for all filters). Will only be used if em_syserr is not given in prior")
-    ##FIXME: re-implement in EM-Likelihood! 
     em_input_parser.add_argument("--systematics-file", default=None,
         help="Path to systematics configuration file",
     )
@@ -158,52 +155,50 @@ def ml_training_parsing(parser):
         help="Continue training an existing model",)
     return parser
 
+def em_injection_parsing(parser):
+    lc_injection_parser = parser.add_argument_group(
+        title="Lightcurve injection arguments", description="Specify lightcurve injections"
+    )
+    lc_injection_parser.add("--injection-model-args", type = nonestr, 
+        help="Additional arguments for the injection model, given like a python-dict " \
+        "e.g. --injection_args='{\"param1\": 0.5, \"param2\": 1.0}'. All other parameters " \
+        "needed to create the injection should be specified in the --injection-file.")
+    
+    lc_injection_parser.add_argument("--injection-model", type=str,
+        help="Name of the transient model to be used for injection (default: the same as model used for recovery)")
 
-
-def injection_parsing(parser):
-    parser.add_argument("--injection", metavar="PATH", type=str, 
-        help="Legacy:Path to the injection json file")
-    parser.add_argument("--injection-file",  type=str, help="Path to the injection json file")
-    parser.add_argument("--injection-model", type=str,
-        help="Name of the kilonova model to be used for injection (default: the same as model used for recovery)")
-    parser.add_argument("--injection-num", type=int, default = 0,
-        help="The injection number to be taken from the injection set")
-    parser.add_argument("--generation-seed", type=int, default=42, help="Injection generation seed (default: 42)")
-    parser.add_argument("--injection-outfile",type=str, help="Path to the output injection lightcurve")
-    parser.add_argument("--outfile-type",type=str,default="csv", help="Type of output files, json or csv.")
+    lc_injection_parser.add_argument("--train-stats", action=StoreBoolean, default=False,
+        help="Creates a file too.csv to derive statistics")
+    lc_injection_parser.add_argument( "--prompt-collapse", action=StoreBoolean,
+        help="If the injection simulates prompt collapse and therefore only dynamical")
     parser.add_argument("--ignore-timeshift", action=StoreBoolean, default=False,
         help="If you want to ignore the timeshift parameter in an injection file.")
-    parser.add_argument("--train-stats", action=StoreBoolean, default=False,
-        help="Creates a file too.csv to derive statistics")
-    parser.add_argument(
-        "--prompt-collapse",
-        help="If the injection simulates prompt collapse and therefore only dynamical",
-        action=StoreBoolean,
-    )
-    parser.add_argument("--injection-error-budget","--photometric-error-budget",  type=float, default=0.1,
+    lc_injection_parser.add_argument("--injection-error-budget","--photometric-error-budget",  type=float, default=0.1,
         help="Photometric error (mag) on the injected lightcurve (default: 0.1)")
 
-    return parser
-
-def multi_wavelength_injection_parsing(parser):
-    injection_parser = parser.add_argument_group(
-        title="EM analysis injection arguments", description="Specify EM analysis injections"
-    )
-
-    injection_parser.add("--injection-model-args", type = nonestr, help="Additional arguments for the injection model, given like a python-dict e.g. --injection_args='{\"param1\": 0.5, \"param2\": 1.0}'. All other parameters needed to create the injection should be specified in the --injection-file.")
-
-
     #photometry modifiers
-    injection_parser.add_argument("--ztf-sampling", help="Use realistic ZTF sampling", action=StoreBoolean)
-    injection_parser.add_argument("--ztf-uncertainties", help="Use realistic ZTF uncertainties", action=StoreBoolean)
-    injection_parser.add_argument( "--ztf-ToO", type=nonestr, choices=[None,"180", "300"], 
+    lc_injection_parser.add_argument("--ztf-sampling", help="Use realistic ZTF sampling", action=StoreBoolean)
+    lc_injection_parser.add_argument("--ztf-uncertainties", help="Use realistic ZTF uncertainties", action=StoreBoolean)
+    lc_injection_parser.add_argument( "--ztf-ToO", type=nonestr, choices=[None,"180", "300"], 
         help="Adds realistic ToO obeservations during the first one or two days. Sampling depends on exposure time specified. Valid values are 180 (<1000sq deg) or 300 (>1000sq deg). Won't work w/o --ztf-sampling")
 
-    injection_parser.add_argument("--rubin-ToO-type", type=nonestr, 
+    lc_injection_parser.add_argument("--rubin-ToO-type", type=nonestr, 
         choices=[None,"platinum","gold","gold_z","silver","silver_z"], 
         help="Type of ToO observation based on the strategy presented in arxiv.org/abs/2111.01945.")
     
     return parser
+
+def em_only_injection_parsing(parser):
+    parser = base_injection_parsing(parser)
+    parser.add_argument("--injection", metavar="PATH", type=str, 
+        help="Legacy:Path to the injection json file")
+    parser.add_argument("--injection-num", type=int, default = 0,
+        help="The injection number to be taken from the injection set")
+    
+
+
+    return parser
+
 
 
 def skymap_parsing(parser):
@@ -254,25 +249,28 @@ def modified_em_prior_parsing(parser):
         help="Fetching Ebv from dustmap, to be used as fixed-value prior")
     return parser
 
-def em_analysis_parser(parser):
-    parser.description="Inference on kilonova ejecta parameters."
+def em_analysis_parsing(parser):
+    parser = em_time_parsing(parser)
+    parser = em_model_parsing(parser)
+    parser = grb_parsing(parser)
+    parser = modified_em_prior_parsing(parser)
+    parser = multi_wavelength_parsing(parser)
+    parser = em_injection_parsing(parser)
+    return parser
+
+def multi_wavelength_analysis_parser(parser):
+    parser.description="Inference on transient parameters from multi-wavelength observations."
     parser.add_help=True
     
     parser = basic_em_only_parsing(parser)
-    parser = em_time_parsing(parser)
-    parser = multi_wavelength_parsing(parser)
-    parser = grb_parsing(parser)
     parser = base_analysis_parsing(parser)
+    parser = em_analysis_parsing(parser)
     parser = basic_em_only_analysis_parsing(parser)
-    parser = em_model_parsing(parser)
-    parser = injection_parsing(parser)
-    parser = multi_wavelength_injection_parsing(parser)
+    parser = em_only_injection_parsing(parser)
     parser = skymap_parsing(parser)
-    parser = modified_em_prior_parsing(parser)
 
     # specific arguments
-    parser.add_argument("--remove-nondetections", 
-        action=StoreBoolean, default=False,
+    parser.add_argument("--remove-nondetections", action=StoreBoolean, default=False,
         help="remove non-detections from fitting analysis")
     
     return parser
@@ -290,7 +288,7 @@ def bolometric_parser(parser):
     parser = basic_em_only_analysis_parsing(parser)
     parser = modified_em_prior_parsing(parser)
     #FIXME: add injection to bol_ analysis, this currently does not work
-    parser = injection_parsing(parser)
+    # parser = injection_parsing(parser)
     
     # specific arguments
     parser.add_argument("--error-budget", type=float, default=0.1,
@@ -335,8 +333,10 @@ def svd_model_benchmark_parser(parser):
 def lc_validation_parser(parser):
     parser.description="Validation that a lightcurve meets a minimum number of observations within a set time."
     parser.add_help = True
+
     parser = basic_em_only_parsing(parser)
-    parser.add_argument("--data", type=str, 
+
+    parser.add_argument("--light-curve-data", "--data", type=str,
         help="Path to the data file in [time(isot) filter magnitude error] format")
     parser.add_argument("--filters", type=str,
         help="Comma separated list of filters to validate against. If not provided, all filters in the data will be used.",
@@ -352,18 +352,17 @@ def lc_validation_parser(parser):
 
 
 def lightcurve_parser(parser):
-    parser = argparse.ArgumentParser(description="Create lightcurves from injection parameters.")
+    parser.description="Create lightcurves from injection parameters."
 
     parser = basic_em_only_parsing(parser)
     parser = em_time_parsing(parser)
     parser = grb_parsing(parser)
     parser = em_model_parsing(parser)
-    parser = injection_parsing(parser)
-    parser = multi_wavelength_injection_parsing(parser)
+    parser = multi_wavelength_parsing(parser)
+
+    parser = em_only_injection_parsing(parser)
+    parser = em_injection_parsing(parser)
     
-    ##specific arguments
-    # parser.add_argument("--injection-error-budget","--photometric-error-budget", type=float, default=0.0,
-    #     help="Photometric error (mag) (default: 0.0)")
     return parser
 
 
@@ -374,7 +373,6 @@ def lc_marginalisation_parser(parser):
     parser = em_time_parsing(parser)
     parser = em_model_parsing(parser)
     parser = grb_parsing(parser)
-    parser = injection_parsing(parser)
 
     # specific arguments
     parser.add_argument(
@@ -385,28 +383,48 @@ def lc_marginalisation_parser(parser):
         help="The coinc xml file to be used")
     parser.add_argument("-g", "--gps", type=int, default=1187008882)
     parser.add_argument("-s", "--skymap", type=str,)
-    parser.add_argument("--eos-dir", type=str,  
-        help="EOS file directory in (radius [km], mass [solar mass], lambda)",)
+    parser.add_argument("--eos-data", "--eos-dir", type=str,  
+        help="EOS file directory in (radius [km], mass [solar mass], lambda)")
     parser.add_argument("-e", "--eos-weights", "--gw170817-eos", type=str)
     parser.add_argument("-n", "--Nmarg", type=int, default=100)
+    parser.add_argument("--generation-seed", type=int, default=42, help="Injection generation seed (default: 42)")
     # parser.add_argument("--filters", type=str, default="u,g,r,i,z,y,J,H,K",
     #     help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available")
     return parser
 
+def multi_config_parser(parser):
+    parser.description="Multi config analysis script for NMMA."
+    
+    parser.add_argument("--config", type=str,
+        help="Name of the configuration file containing parameter values." )
+    parser.add_argument("--parallel", action="store_true", default=False,
+        help="To run multiple configs in parallel" )
+    parser.add_argument("-p", "--process", type=int, help=(
+        "No of processess each configuration should have, if --parallel is set then process will be divided equally among all configs,"
+        "else each config will run sequentially with given no of process. Strictly required if  --process-per-config is not given" ))
+    parser.add_argument("--process-per-config", type=int, help=(
+            "If multiple configurations are given, how many MPI process should be assigned to each configuration. In the yaml"
+            " file, indicate the number of process for each configuration with the key 'process-per-config'. If not given, all"
+            " configurations will be run depending on the state and value of --parallel and --process. This takes precedence"
+            " over --process"
+        ), )
+
+    return parser
+
 def slurm_parser(parser):
     parser.description="Create lightcurve files from nmma injection file"
+    parser = pipe_inj_parsing(parser)
     
-    parser.add_argument("--injection","--injection-file",
-        type=str, required=True,
-        help="The bilby injection json file to be used")
+    parser.add_argument("--injection-file","--injection",
+        type=str, required=True, help="The bilby injection json file to be used")
     parser.add_argument("-o", "--outdir", type=str, default="outdir", 
         help="Path to the output directory")
     parser.add_argument("--analysis-file", type=str, required=True,
         help="The analysis bash script to be replicated")
     parser.add_argument("--lightcurves-per-job", type=int, default=100,
         help="Number of light curves per job")
-    parser.add_argument("--prior-file", type=str, 
-        help="The prior file from which to generate injections")
+    ### Dummy for intermediate setup until we decide on whether to abandon or extend these routines
+    parser.add_argument("--simple-setup", default=True, choices=[True])
     return parser
 
 def parsing_and_logging(parser_func, args= None):
@@ -427,7 +445,7 @@ def parsing_and_logging(parser_func, args= None):
             models_home=args.svd_path if args.svd_path not in [None, ""] else None
         )
 
-    utils.setup_logger(outdir=args.outdir, label=args.label)
-    utils.check_directory_exists_and_if_not_mkdir(args.outdir)
+    setup_logger(outdir=args.outdir, label=args.label)
+    os.makedirs(args.outdir, exist_ok=True)
     print('Setting up logger and storage directory')
     return args

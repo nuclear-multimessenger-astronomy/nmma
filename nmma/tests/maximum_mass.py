@@ -30,7 +30,7 @@ def args():
 def cleanup_outdir(args):
     yield
     if os.path.exists(args.outdir):
-        shutil.rmtree(args.outdir)
+        shutil.rmtree(args.outdir, ignore_errors=True)
 
 def test_maximum_mass_resampling(args):
     

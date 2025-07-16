@@ -1,20 +1,13 @@
 
-import bilby_pipe
-from nmma.joint.base_parsing import StoreBoolean, nonestr
+from nmma.joint.base_parsing import StoreBoolean, nonestr, nonefloat
 
 def gw_parsing(parser):
     gw_input_parser = parser.add_argument_group(
         title="GW input arguments", description="Specify GW inputs"
     )
-    gw_input_parser.add(
-        "--with-gw",
-        action=StoreBoolean,
-        default=True,
-        help="Flag for sampling over GW parameters (default:True)",
-    )
 
     ## Multibanding kwargs
-    gw_input_parser.add("--reference-chirp-mass", type=bilby_pipe.utils.nonefloat, 
+    gw_input_parser.add("--reference-chirp-mass", type=nonefloat, 
         help="The reference chirp mass for multibanding gw likelihood.")
 
     ## Relative Binning kwargs
@@ -29,10 +22,6 @@ def gw_parsing(parser):
 
 def gw_injection_parsing(parser):
     """Parser for the gw injection arguments."""
-    parser.add_argument("--compute-snr", action=StoreBoolean, default=False,
-        help="Flag to compute the SNR of the injections (default: False)")
-    parser.add_argument("--snr-threshold", type=float, default=8.0,
-        help="SNR threshold for the injections (default: 8.0)")
     parser.add_argument("--gw-detectors", type=str, default="ET,CE",
         help="Comma-separated list of GW detectors to use (default: ET,CE)")
     parser.add_argument("--waveform-arguments", type=nonestr,

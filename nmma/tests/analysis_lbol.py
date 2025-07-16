@@ -16,7 +16,7 @@ def args():
         em_model="Arnett_modified",
         outdir="outdir",
         label="lbol_test",
-        em_trigger_time=60168.79041667,
+        trigger_time=60168.79041667,
         data='example_files/lbol/ztf23bqun/23bqun_bbdata.csv',
         prior="example_files/lbol/ztf23bqun/Arnett_modified.priors",
         em_tmin=0.005,

@@ -31,7 +31,7 @@ In order to not only sample on gravitational-wave data, we provide further elect
 
 **Including EOS information**
 
-NMMA can include nuclear information by either using pre-computed equations of state (EOSs) with the `with-tabulated-eos` flag or by sampling over appropriate parameters on the fly (`with-eos`), employing a corresponding emulator that maps these parameters to an EoS. In order to include a set of EOSs precomputed EOSs, each EOS.dat file needs to include information on Mass, Radius and Tidal deformability. For the example shown in the `config.ini` file below, we see `Neos = 5000`, meaning that we include 5000 EOS.dat files each containing information on mass, radius and tidal deformability. We also see that a constraint from NICER measurements has been folded in and thus the `eos-weight` reflects this in a weighting. The EOS set should be sorted according to this weighting in order to reduce runtime for the sampling on the EOSs. 
+NMMA can include nuclear information by either using pre-computed equations of state (EOSs) or by sampling over appropriate parameters on the fly, employing a corresponding emulator that maps these parameters to an EoS. In order to include a set of EOSs precomputed EOSs, each EOS.dat file needs to include information on Mass, Radius and Tidal deformability. For the example shown in the `config.ini` file below, we see `Neos = 5000`, meaning that we include 5000 EOS.dat files each containing information on mass, radius and tidal deformability. We also see that a constraint from NICER measurements has been folded in and thus the `eos-weight` reflects this in a weighting. The EOS set should be sorted according to this weighting in order to reduce runtime for the sampling on the EOSs. 
 
 **Running the config.ini generation**
 
@@ -110,8 +110,7 @@ In order to prepare the joint inference, a `config.ini` file is required which s
     ################################################################################
     ## EOS arguments
     ################################################################################
-    
-    with-tabulated-eos=True 
+     
     eos-data=eos/with_NICER_J0740/EOS_024_uniform_5k_sorted
     Neos=5000
     eos-weight=eos/with_NICER_J0740/EOS_sorted_weight.dat

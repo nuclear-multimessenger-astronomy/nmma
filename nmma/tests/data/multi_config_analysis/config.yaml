@@ -9,9 +9,8 @@ Me2017_1:
   em-error-budget: 1
   nlive: 40
   Ebv-max: 0
-  injection: ${WORKING_DIR}/data/multi_config_analysis/injection.json
+  injection-file: ${WORKING_DIR}/data/multi_config_analysis/injection.json
   injection-num: 0
-  injection-outfile: ${WORKING_DIR}/outdir_1/lc.csv
   generation-seed: 42
   filters: ztfg,ztfr,ztfi
   remove-nondetections: True
@@ -27,9 +26,8 @@ Me2017_2:
   em-error-budget: 1
   nlive: 40
   Ebv-max: 0
-  injection: ${WORKING_DIR}/data/multi_config_analysis/injection.json
+  injection-file: ${WORKING_DIR}/data/multi_config_analysis/injection.json
   injection-num: 0
-  injection-outfile: ${WORKING_DIR}/outdir_2/lc.csv
   generation-seed: 42
   filters: ztfg,ztfr,ztfi
   remove-nondetections: True

@@ -16,12 +16,12 @@ DATA_DIR = os.path.join(WORKING_DIR, "data")
 def cleanup_outdir(args):
     yield
     if os.path.exists(args.outdir):
-        shutil.rmtree(args.outdir)
+        shutil.rmtree(args.outdir, ignore_errors=True)
 
 
 @pytest.fixture(scope="module")
 def args():
-    args = em_parsing.parsing_and_logging(em_parsing.em_analysis_parser, [])
+    args = em_parsing.parsing_and_logging(em_parsing.multi_wavelength_analysis_parser, [])
     non_default_args = dict(
         em_model="Bu2019nsbh",
         interpolation_type="tensorflow",
@@ -36,7 +36,7 @@ def args():
         Ebv_max=0.0,
         em_error_budget=0,
         nlive=64,
-        injection=f"{DATA_DIR}/Bu2019lm_injection.json",
+        injection_file=f"{DATA_DIR}/Bu2019lm_injection.json",
         injection_outfile="outdir/lc.csv",
         plot=True,
     )
@@ -56,14 +56,19 @@ def test_analysis_systematics_without_time(args):
     args.systematics_file = f"{DATA_DIR}/systematics_without_time.yaml"
     analysis.main(args)
 
+def test_analysis_systematics_with_time_and_filters(args):
+
+    args.filters = "ztfr,sdssu,2massks"
+    args.systematics_file = f"{DATA_DIR}/systematics_with_time_combined_filters.yaml"
+    analysis.main(args)
 
 def test_analysis_tensorflow(args):
-
+    args.systematics_file = None
+    args.filters = "ztfr"
     analysis.main(args)
 
 
 def test_analysis_sklearn_gp(args):
-    args.systematics_file = None
     args.interpolation_type = "sklearn_gp"
     analysis.main(args)
 
@@ -76,7 +81,7 @@ def test_nn_analysis(args):
     args.em_tstep = 0.25
     args.filters = "ztfg,ztfr,ztfi"
     args.local_only = False
-    args.injection = f"{DATA_DIR}/Ka2017_injection.json"
+    args.injection_file = f"{DATA_DIR}/Ka2017_injection.json"
     analysis.main(args)
 
 
