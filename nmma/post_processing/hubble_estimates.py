@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 import scipy.stats
-import bilby
+
 from tqdm import tqdm
-import json
+
+from ..joint.utils import read_injection_file
 from ..joint.constants import c_kms
 from ..joint.conversion import reweight_to_flat_mass_prior
 from ..joint.base_parsing import nmma_base_parsing
@@ -137,12 +138,7 @@ def main():
         raise ValueError("Input for detectable or number of injection is required")
     
     # read the injection table
-    with open(args.injection, 'r') as f:
-        injection_dict = json.load(
-            f, object_hook=bilby.core.utils.decode_bilby_json
-        )
-    injection_df = injection_dict["injections"]
-
+    injection_df = read_injection_file(args)
     # setup the seed
     rng = np.random.default_rng(args.seed)
     args.rng = rng

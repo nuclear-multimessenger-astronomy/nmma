@@ -1,45 +1,24 @@
 import os
-import json
 import numpy as np
-from astropy import time
 import h5py
-import healpy as hp
 import matplotlib.pyplot as plt
 
-import bilby
-import bilby.core
 from gwpy.table import Table
 from ligo.skymap import bayestar, distance
 from ligo.skymap.io import read_sky_map
 
-from nmma.em.lightcurve_generation import create_light_curve_data
-from nmma.em import em_parsing as emp
-from nmma.em.model import  create_light_curve_model_from_args
+from .lightcurve_generation import create_light_curve_data
+from . import io, utils, em_parsing as emp
+from .model import  create_light_curve_model_from_args, create_injection_model
+from .plotting_utils import lc_plot_with_histogram
 
-from nmma.em import io 
-from nmma.em.plotting_utils import lc_plot_with_histogram
-from .utils import setup_sample_times, DEFAULT_FILTERS
-
-from nmma.joint.conversion import (MultimessengerConversion, 
+from ..joint.conversion import (MultimessengerConversion, 
                                    mass_ratio_to_eta,
                                    component_masses_to_mass_quantities,
                                    chirp_mass_and_eta_to_component_masses)
+from ..joint.utils import read_injection_file, set_filename
 
-from nmma.eos.eos_processing import load_tabulated_macro_eos_set_to_dict
-
-def read_trigger_time(parameters, args=None):
-    try:
-        tc_gps = time.Time(parameters["geocent_time_x"], format="gps")
-    except KeyError:
-        try:
-            tc_gps = time.Time(parameters["geocent_time"], format="gps")
-        except KeyError:
-            try:
-                tc_gps = time.Time(args.gps, format="gps")
-            except AttributeError:
-                raise AttributeError("Need either geocent_time or geocent_time_x")
-    parameters["em_trigger_time"] = tc_gps.mjd
-    return parameters
+from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict
 
 def get_all_gw_quantities(data_out):
     try:
@@ -71,14 +50,14 @@ def get_all_gw_quantities(data_out):
 
 def call_lc_validation (args=None):
     args = emp.parsing_and_logging(emp.lc_validation_parser, args)
-    return validate_lightcurve(data=args.data,filters=args.filters,min_obs=args.min_obs,cutoff_time=args.cutoff_time,verbose=args.verbose)
+    return validate_lightcurve(data_file=args.light_curve_data,filters=args.filters,min_obs=args.min_obs,cutoff_time=args.cutoff_time,verbose=args.verbose)
 
-def validate_lightcurve(data,filters=None,min_obs=3,cutoff_time=0,verbose=False):
+def validate_lightcurve(data_file,filters=None,min_obs=3,cutoff_time=0,verbose=False):
     """
     Evaluates whether the lightcurve has the requisite user-defined number of observations in the filters provided within the defined time window from the first observation. In the case where one wants to check that at least one filter has the requisite number of observations, the function should be called multiple times with different filter arguments.
 
     Parameters:
-        data (str): Path to the data file in [nmma-compliant format (.dat, .json, etc.)
+        data_file (str): Path to the data file in nmma-compliant format (.dat, .json, etc.)
         filters (str): Comma separated list of filters to validate against. If not provided, all filters in the data will be used.
         min_obs (int): Minimum number of observations required in each filter before cutoff time.
         cutoff_time (float): Cutoff time (relative to the first data point) that the minimum observations must be in. If not provided, the entire lightcurve will be evaluated
@@ -87,7 +66,7 @@ def validate_lightcurve(data,filters=None,min_obs=3,cutoff_time=0,verbose=False)
     Returns:
         bool: True if the lightcurve meets the minimum number of observations in the defined time window, False otherwise.
     """
-    data = io.loadEvent(data)
+    data = io.load_em_observations(data_file, format='observations')
 
     ## determine filters to consider
     if filters:
@@ -96,21 +75,18 @@ def validate_lightcurve(data,filters=None,min_obs=3,cutoff_time=0,verbose=False)
         filters_to_check = list(data.keys())
 
     ## determine time window to consider
-    min_time = np.min([np.min(array[:,0]) for array in data.values()])
-    max_time = min_time + cutoff_time if cutoff_time > 0 else np.max([np.max(array[:,0]) for array in data.values()])
+    min_time = np.min([np.min(filt_dict['time']) for filt_dict in data.values()])
+    max_time = min_time + cutoff_time if cutoff_time > 0 else np.max([np.max(filt_dict['time']) for filt_dict in data.values()])
 
     ## evaluate lightcurve for each filter
     for filter in filters_to_check:
-        if filter not in DEFAULT_FILTERS:
+        if filter not in utils.DEFAULT_FILTERS:
             raise ValueError(f"Filter {filter} not in supported filter list")
         elif filter not in data.keys():
             print(f"{filter} not present in data file, cannot validate") if verbose else None
             return False
-        filter_data_indices = np.where(data[filter][:,0] <= max_time)[0]
-        filter_data = [data[filter][i] for i in filter_data_indices]
-        
-        ## evaluate the number of detections
-        num_detections = sum(1 for value in filter_data if np.isfinite(value[2]) and value[2] != 99)
+        filter_idcs = (data[filter]['time']<= max_time)
+        num_detections = np.sum(np.isfinite(data[filter]['mag_error'][filter_idcs]))
         if num_detections < min_obs:
             print(f"{filter} filter has {num_detections} detections, less than the required {min_obs}") if verbose else None
             return False
@@ -127,11 +103,12 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
 
     rng = np.random.default_rng(args.generation_seed)
     args.mag_error_scale = 0
-    light_curve_model = create_light_curve_model_from_args(args.em_model, args, args.filters)
+    light_curve_model = create_light_curve_model_from_args(args.em_model, args)
     
 
     ## read eos and gw data
-    EOS_data, weights, Neos = load_tabulated_macro_eos_set_to_dict(args.eos_dir, args.eos_weights)
+    EOS_data, weights, Neos = load_tabulated_macro_eos_set_to_dict(args.eos_data, args.eos_weights)
+    args.Neos = Neos
 
     if args.template_file is not None:
         try:
@@ -152,8 +129,7 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         data_out = Table.read(args.coinc_file, format="ligolw", tablename="sngl_inspiral")
         data_out["m1"], data_out["m2"] = data_out["mass1"], data_out["mass2"]
         skymap = read_sky_map(args.skymap, moc=True, distances=True)
-        order = hp.nside2order(512)
-        skymap = bayestar.rasterize(skymap, order)
+        skymap = bayestar.rasterize(skymap, order=9)
         dist_mean, dist_std = distance.parameters_to_marginal_moments(
             skymap["PROB"], skymap["DISTMU"], skymap["DISTSIGMA"]
         )
@@ -170,17 +146,17 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     idys = rng.choice(np.arange(len(data_out["m1"])), args.Nmarg,
         p=data_out["weight"] / np.sum(data_out["weight"]) )
 
-    mag_ds, matter = {}, {}
+    mag_ds, matter = [], []
     for ii in range(args.Nmarg):
 
         outdir = os.path.join(args.outdir, "%d" % ii)
         os.makedirs(outdir, exist_ok=True)
 
-        injection_outfile = os.path.join(outdir, "lc.dat")
+        lightcurve_outfile = os.path.join(outdir, "lc.dat")
         matter_outfile = os.path.join(outdir, "matter.dat")
-        if os.path.isfile(injection_outfile) and os.path.isfile(matter_outfile):
-            mag_ds[ii] = np.loadtxt(injection_outfile)
-            matter[ii] = np.loadtxt(matter_outfile)
+        if os.path.isfile(lightcurve_outfile) and os.path.isfile(matter_outfile):
+            mag_ds.append(io.read_lc_from_csv(lightcurve_outfile, args, format='model'))
+            matter.append(np.loadtxt(matter_outfile))
             continue
 
         idx, idy = int(idxs[ii]), int(idys[ii])
@@ -217,9 +193,9 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         params.update({ "alpha"         : alpha,
                         "log10_alpha"   : log10_alpha, 
                         "ratio_zeta"    : zeta})
-        args.with_eos = True
-        args.eos_data = args.eos_dir
-        conversion = MultimessengerConversion(args, messengers=['gw', 'em'])
+        
+        conversion = MultimessengerConversion(args, 
+                messengers=['gw', 'em'], ana_modifiers=['tabulated_eos'])
         complete_parameters, _ = conversion.convert_to_multimessenger_parameters(params)
 
         log10_mej_dyn = complete_parameters["log10_mej_dyn"].item()
@@ -230,25 +206,25 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
             else:
                 fid.write("0 0 0\n")
         # initialize light curve model
-        complete_parameters = read_trigger_time(complete_parameters, args)
-        sample_times = setup_sample_times(args)
+        complete_parameters['trigger_time'] = utils.read_trigger_time(complete_parameters, args)
+        sample_times = utils.setup_sample_times(args)
         data = create_light_curve_data(
-            complete_parameters, args, light_curve_model, sample_times
+            complete_parameters, args, light_curve_model, sample_times, rng=rng,
         )
 
         filters = args.filters.split(",")
 
-        io.write_lightcurve_file(injection_outfile, data, filters)
+        io.write_lc_to_csv(lightcurve_outfile, data, 'model')
 
-        mag_ds[ii] = np.loadtxt(injection_outfile)
-        matter[ii] = np.loadtxt(matter_outfile)
+        mag_ds.append(io.read_lc_from_csv(lightcurve_outfile, args, format='model'))
+        matter.append( np.loadtxt(matter_outfile))
 
     if args.plot:
         NS, dyn, wind = [], [], []
-        for jj, key in enumerate(matter.keys()):
-            NS.append(matter[key][0])
-            dyn.append(matter[key][1])
-            wind.append(matter[key][2])
+        for matter_data in  matter:
+            NS.append(matter_data[0])
+            dyn.append(matter_data[1])
+            wind.append(matter_data[2])
 
         print("Fraction of samples with NS: %.5f" % (np.sum(NS) / len(NS)))
 
@@ -269,93 +245,104 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         plt.close()
 
         plotpath= os.path.join(args.outdir, "lc.pdf")
-        plot_dict = {filt: np.vstack([lc_data[:, i+1] for lc_data in mag_ds.values()]) for i, filt in enumerate(filters)}
+        plot_dict = {filt: np.vstack(
+                        [lc_data[filt]['mag'] for lc_data in mag_ds])
+                        for filt in filters}
+        times = next(iter(mag_ds[0].values()))['time']
         if args.absolute:
             ylim = getattr(args, 'ylim', [-12, -18])
         else:
             ylim = getattr(args, 'ylim', [24, 15])
-        lc_plot_with_histogram(filters, plot_dict, sample_times, save_path= plotpath, ylim = ylim, fontsize=30)
+        lc_plot_with_histogram(filters, plot_dict, times, plotpath, ylim=ylim, fontsize=30)
 
 
 def lcs_from_injection_parameters(args=None):
     args = emp.parsing_and_logging(emp.lightcurve_parser, args)
     
     # initialize light curve model
-    filters = getattr(args, 'filters', None)
-    light_curve_model = create_light_curve_model_from_args(args.em_model, args, filters)
+    light_curve_model = create_light_curve_model_from_args(args.em_model, args)
     # lightcurve model will set them to usable list
     filters = light_curve_model.filters
 
     # read injection file
-    with open(args.injection, "r") as f:
-        injection_dict = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
-
-    ## io setup
-    if args.outfile_type == "json":
-        ext = "json"
-        reading_function = io.return_from_json
-        saving_function  = io.write_to_json
-    elif args.outfile_type == "csv":
-        ext = "dat"
-        reading_function =  io.read_lightcurve_file
-        saving_function  = io.write_lightcurve_file
-    injection_outfile = getattr(args, 'injection_outfile', None)
-    if injection_outfile is None:
-        injection_outfile = args.label
-
-    rng = np.random.default_rng(args.generation_seed)
-    sample_times = setup_sample_times(args)
-    injection_df = injection_dict["injections"]
-    # save simulation_id from observing scenarios data
-    # we save lighcurve for each event with its initial simulation ID
-    # from observing scenarios
-    simulation_id = injection_df["simulation_id"]
-    mag_ds = {}
-
-    for index, row in injection_df.iterrows():
-        ## setup file
-        injection_outfile = os.path.join(
-            args.outdir, f"{injection_outfile}_{simulation_id[index]}.{ext}"
-        )
-        if os.path.isfile(injection_outfile):
-            try:
-                mag_ds[index] = reading_function(injection_outfile)
-                continue
-
-            except ValueError:
-                raise ValueError(f"The previous run generated light curves with unreadable content. Please remove all output files in .{ext} format then retry.")
-
-        ## do injection!
-        injection_parameters = row.to_dict()
-        injection_parameters = read_trigger_time(injection_parameters, args)
-
-
-        data = create_light_curve_data(
-            injection_parameters,
-            args,
-            light_curve_model=light_curve_model,
-            sample_times=sample_times,
-            keep_infinite_data=True,
-            rng = rng
-        )
-        print("Injection generated")
-
-        #store and retrieve to double check
-        saving_function(injection_outfile, data, filters)
-        mag_ds[index] = reading_function(injection_outfile)
+    injection_df = read_injection_file(args)
+    mag_ds = create_multiple_injections(injection_df, args, light_curve_model)
 
     if args.plot:
         plotpath= os.path.join(args.outdir, f"injection_{args.em_model}_{args.label}_lc.pdf")
-        plot_data_dict = {}
-        for filt in filters:
-            plot_data_filt = []
-            for lc_data in mag_ds.values():
-                data_vec = np.array(lc_data[filt])
-                if data_vec.ndim == 2:
-                    plot_data_filt.append(data_vec[:, 1].tolist())
-                else:
-                    plot_data_filt.append(data_vec.tolist())
-            plot_data_dict[filt] = np.vstack(plot_data_filt)
+        plot_dict = {filt: np.vstack([lc_data[filt]['mag'] 
+                        for lc_data in mag_ds.values()]) for filt in filters}
+        first_lc_dict = next(iter(mag_ds.values()))
+        times = next(iter(first_lc_dict.values()))['time']
 
         lc_plot_with_histogram(
-            filters, plot_data_dict, sample_times=sample_times, save_path=plotpath, xlim=args.xlim, ylim=args.ylim, colorbar= True, ylabel_kwargs = dict(fontsize=30, rotation=90, labelpad=8))
+            filters, plot_dict, times,  plotpath, 
+            xlim=args.xlim, ylim=args.ylim, colorbar= True, 
+            ylabel_kwargs = dict(fontsize=30, rotation=90, labelpad=8))
+
+def create_multiple_injections(injection_df, args, light_curve_model=None, format = 'model'):
+    mag_ds = {}
+
+    rng = np.random.default_rng(args.generation_seed)
+    for index, row in injection_df.iterrows():
+        mag_ds[index] = make_injection_lightcurve_from_parameters(
+            row.to_dict(), args, light_curve_model, rng, format)
+    return mag_ds
+
+
+def make_injection_lightcurve_from_parameters(
+    injection_parameters, args, light_curve_model=None, rng=None, format='model'
+):
+    injection_outfile = set_filename(args.label, args, 
+                                     f"_lc_{int(injection_parameters['simulation_id'])}")
+
+    if os.path.isfile(injection_outfile):
+        try:
+            return io.load_em_observations(injection_outfile, format=format)
+
+        except ValueError:
+            raise ValueError(f"The previous run generated light curves with unreadable content for {injection_outfile}. Consider removing all output files in this format, format then retry.")
+
+    data, _ = make_injection(injection_parameters, args, injection_model = light_curve_model, rng=rng, keep_infinite_data=True)
+
+    if injection_outfile:
+        #store and retrieve to double check
+        io.write_em_observations(injection_outfile, data, format=format)
+        return io.load_em_observations(injection_outfile, format=format)
+    else:
+        return data
+
+
+def make_injection(injection_parameters, args, filters = None, injection_model = None,
+                   rng=None, keep_infinite_data=False):
+    
+
+    injection_parameters["trigger_time"] = utils.read_trigger_time(injection_parameters, args)
+    
+    if args.ignore_timeshift:
+        injection_parameters.pop('timeshift', None)
+
+    injection_parameters["trigger_time"] += injection_parameters.get("timeshift",0)
+
+    if args.prompt_collapse:
+        injection_parameters["log10_mej_wind"] = -3.0
+
+    # sanity check for eject masses
+    for key in ["log10_mej_dyn", "log10_mej_wind"]:
+        if key in injection_parameters and not np.isfinite(injection_parameters[key]):
+            injection_parameters[key] = -3.0
+
+    if injection_model is None:
+        print("Creating injection light curve model")
+        injection_model = create_injection_model(args, filters)
+
+    data = create_light_curve_data(
+        injection_parameters,
+        args,
+        light_curve_model=injection_model,
+        keep_infinite_data=keep_infinite_data,
+        rng = rng
+    )
+    print("Injection generated")
+
+    return data, injection_parameters 

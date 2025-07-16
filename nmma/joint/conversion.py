@@ -149,6 +149,17 @@ def reweight_to_flat_mass_prior(df):
     df_new = df.sample(frac=0.3, weights=jacobian)
     return df_new
 
+
+def convert_mtot_mni(paramms):
+
+    for par in ["mni", "mtot", "mrp"]:
+        if par not in paramms:
+            paramms[par] = 10**paramms[f"log10_{par}"]
+
+    paramms["mni_c"] = paramms["mni"] / paramms["mtot"]
+    paramms["mrp_c"] = (paramms["xmix"]*(paramms["mtot"]-paramms["mni"])-paramms["mrp"])
+    return paramms
+
 ############################## EOS-related conversions ####################################
 def lambda_to_compactness(lambda_i):
     "Function to link tidal deformability to compactness based on quasi-universal relation"
@@ -159,7 +170,7 @@ def mass_and_compactness_to_radius(mass, comp):
     ### returns 0 if compactness is greater than 0.5, i.e. black hole
     return np.where(comp<0.5, mass / comp * geom_msun_km, 0.0)
 
-def radii_from_qur(converted_parameters, added_keys, local_parameters= {}):
+def radii_from_qur(converted_parameters, added_keys):
     mass_1_source = converted_parameters["mass_1_source"]
     mass_2_source = converted_parameters["mass_2_source"]    
     lambda_1 = converted_parameters["lambda_1"]
@@ -183,9 +194,10 @@ def radii_from_qur(converted_parameters, added_keys, local_parameters= {}):
     )
 
     added_keys += ["radius_1", "radius_2", "R_16"]
-    return converted_parameters, added_keys, local_parameters
+    # we return empty dict for array-like local_parameters 
+    return converted_parameters, added_keys, {}
 
-def macro_props_from_eos(eos_data, converted_parameters, added_keys, local_parameters={}):
+def macro_props_from_eos(eos_data, converted_parameters, added_keys):
     eos_keys = ["TOV_mass", "TOV_radius", "lambda_1", "lambda_2",
                 "radius_1", "radius_2", "R_14", "R_16"]
     added_keys += eos_keys
@@ -194,9 +206,7 @@ def macro_props_from_eos(eos_data, converted_parameters, added_keys, local_param
     m2_source = np.atleast_1d(converted_parameters["mass_2_source"])
     if len(eos_data)==1:
         radii, masses, lambdas = eos_data[0]
-        local_parameters['radii']   = radii
-        local_parameters['masses']  = masses
-        local_parameters['lambdas'] = lambdas
+        local_parameters = {'radii': radii, 'masses': masses, 'lambdas': lambdas}
         for key, val_array in zip(eos_keys, 
         EOS2Parameters(radii, masses, lambdas, m1_source, m2_source)
         ):
@@ -229,6 +239,7 @@ def macro_props_from_eos(eos_data, converted_parameters, added_keys, local_param
             lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list
         ]):
             converted_parameters[key] = np.array(_list)
+        local_parameters = {}
         local_parameters['radii']   = np.array(rad_list)
         local_parameters['masses']  = np.array(mass_list)
         local_parameters['lambdas'] = np.array(lam_list)
@@ -569,32 +580,6 @@ class BNSEjectaFitting(object):
         converted_ejecta = np.stack((log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_E0_MSUN + np.log10(msun_to_ergs) ))
 
         return  np.where(np.isfinite(converted_ejecta), converted_ejecta, -np.inf)
-        # converted_parameters["log10_mej_dyn"] = log10_mej_dyn
-        # converted_parameters["log10_mej_wind"] = log10_mej_wind
-        # converted_parameters["log10_mej"] = np.log10(total_ejeta_mass)
-        # converted_parameters["log10_E0"] =  log10_E0_MSUN + np.log10(msun_to_ergs) 
- 
-
-        # if (
-        #     isinstance(compactness_1, (list, tuple, pd.core.series.Series, np.ndarray))
-        #     and len(compactness_1) > 1
-        # ):
-        #     for key in self.mass_fitting_keys:
-        #         nan_index = np.where((~np.isfinite(converted_parameters[key])))[0]
-        #         try:
-        #             converted_parameters[key][nan_index] = -np.inf
-        #         except:
-        #             ## this should only be the case for parameter conversion of a result object, using a pandas df.
-        #             converted_parameters.loc[nan_index, key] = -np.inf
-
-        # else:
-        #     for key in self.mass_fitting_keys:
-        #         ##correct for NaNs
-        #         if not np.isfinite(converted_parameters[key] ):
-        #             converted_parameters[key] = -np.inf
-                    
-        #         else:
-        #             converted_parameters[key] = float(converted_parameters[key])
 
 
     def ejecta_parameter_conversion(self, converted_parameters, added_keys): 
@@ -628,14 +613,19 @@ class MultimessengerConversion(object):
             self.tov_emulator = setup_eos_generator(args)
             return self.eos_from_emulator
         
-        elif 'eos' in self.modifiers:
+        elif 'tabulated_eos' in self.modifiers:
             # Case 2a: precomputed eos data is loaded to ram
             if args.eos_to_ram:
-                EOSdata = [None]*args.Neos
-                for j in range(args.Neos):
-                    EOSdata[j] = np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T
-                self.EOSdata=np.array(EOSdata)
-                return self.eos_from_ram
+                try:
+                    eos_data = [None]*args.Neos
+                    for j in range(args.Neos):
+                        eos_data[j] = np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T
+                    self.eos_data=np.array(eos_data)
+                    return self.eos_from_ram
+                except:
+                    self.eos_data = np.array([np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T])
+                    return self.single_eos_from_ram
+
         
             # Case 2b: eos is loaded directly from file
             else:
@@ -646,30 +636,30 @@ class MultimessengerConversion(object):
             return radii_from_qur 
         
 
-    def eos_direct_load(self, converted_parameters, added_keys, local_parameters ={}):
+    def eos_direct_load(self, converted_parameters, added_keys):
         try:
             EOSID = np.array(converted_parameters["EOS"]).astype(int)
             eos_data =np.array([np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID])
         except:
             #In case we only use one eos, e.g. for injection
             eos_data = np.array([np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T])
-        return macro_props_from_eos(eos_data, converted_parameters, added_keys, local_parameters)
+        return macro_props_from_eos(eos_data, converted_parameters, added_keys)
 
-    def eos_from_ram(self, converted_parameters, added_keys, local_parameters ={}):
-        eos_data = self.EOSdata[np.array(converted_parameters["EOS"]).astype(int)]
-
+    def eos_from_ram(self, converted_parameters, added_keys):
+        eos_data = self.eos_data[np.array(converted_parameters["EOS"]).astype(int)]
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
     
-    def eos_from_emulator(self, converted_parameters, added_keys, local_parameters ={}):
+    def single_eos_from_ram(self, converted_parameters, added_keys):
+        return macro_props_from_eos(self.eos_data, converted_parameters, added_keys)
+    
+    def eos_from_emulator(self, converted_parameters, added_keys):
         eos_data = self.tov_emulator.generate_macro_eos(converted_parameters)
-
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
 
     def convert_to_multimessenger_parameters(self, parameters, return_internal=False):
         converted_parameters = parameters.copy()
         original_keys = list(converted_parameters.keys())
         added_keys = []
-        local_parameters = {}
 
         if "Hubble" in self.modifiers:
             converted_parameters, added_keys = Hubble_constant_to_distance(
@@ -687,7 +677,7 @@ class MultimessengerConversion(object):
         )
 
         ####EOS/ tidal treatment
-        converted_parameters, added_keys, local_parameters = self.macro_eos_conversion(converted_parameters, added_keys, local_parameters)
+        converted_parameters, added_keys, local_parameters = self.macro_eos_conversion(converted_parameters, added_keys)
 
             
         if "em" in self.messengers:
@@ -708,7 +698,7 @@ class MultimessengerConversion(object):
         return converted_parameters, added_keys
     
 
-    def ejecta_parameter_conversion(self, parameters, added_keys):
+    def ejecta_parameter_conversion(self, parameters, added_keys = None):
         try:
             #heavier object is a NS
             if parameters['radius_1'] > 0.:
@@ -721,7 +711,7 @@ class MultimessengerConversion(object):
                 ejecta_parameters = self.BBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters)
         except ValueError:
             #ValueError occurs when trying to obtain truth values of arrays 
-            # -> evaluate many points at once otchose conditional ejecta_fitting
+            # -> evaluate many points at once and chose conditional ejecta_fitting
             ejecta_parameters = np.where(parameters["radius_1"]>0.,   #heavier object is a NS
                 self.BNSejectaFitting.vals_only_ejecta_parameter_conversion(parameters),
                 np.where(parameters["radius_2"]>0., ## elif component 2 is a NS
@@ -734,8 +724,12 @@ class MultimessengerConversion(object):
         for key, val in zip(self.BNSejectaFitting.mass_fitting_keys,
                 ejecta_parameters):
             parameters[key] = val
-        added_keys = added_keys + self.BNSejectaFitting.mass_fitting_keys
-        return parameters, added_keys
+        try:
+            added_keys = added_keys + self.BNSejectaFitting.mass_fitting_keys
+            return parameters, added_keys
+        except TypeError:
+            # added_keys is None, i.e. not passed
+            return parameters
 
     def identity_conversion(self, parameters):
         return parameters, []

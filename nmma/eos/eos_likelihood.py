@@ -4,7 +4,11 @@ from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_
 import numpy as np
 from scipy.special import logsumexp
 from scipy.stats import norm, gaussian_kde
+from sklearn.neighbors import KernelDensity
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 import json
+from bilby.core.prior import Interped
 from bilby_pipe.utils import convert_string_to_dict, convert_string_to_list
 
 
@@ -131,7 +135,6 @@ class JointEoSConstraint(object):
 
         return np.squeeze(logl)
     
-
     def log_micro(self):
         ###FIXME!!!
         '''
@@ -153,16 +156,14 @@ class MassConstraint(object):
         self.mass = measured_mass
         self.error = measure_error
         self.type = 'macro'
-        if name:
-            self.name=name
-        if arxiv_ref:
-            self.arxiv_ref= arxiv_ref
+        self.name= name if name else "Mass Constraint"
+        self.arxiv_ref = arxiv_ref if arxiv_ref else None
         self.lognorm_method = lognorm_method
 
     
     def __repr__(self):
         out = f'{self.__class__.__name__} of {self.mass}+-{self.error} M_sun'
-        if self.name:
+        if self.name != "Mass Constraint":
             out = f'{out} based on {self.name}'
         if self.arxiv_ref:
             out = f'{out} (see arxiv:{self.arxiv_ref})'
@@ -170,6 +171,19 @@ class MassConstraint(object):
     
     def log_likelihood(self, parameters, local_parameters=None):
         return self.lognorm_method(parameters['TOV_mass'], loc=self.mass, scale=self.error)
+    
+    def plot(self, ax, resolution = 100, **kwargs):
+        """Plot the mass constraint on the given figure."""
+        y_min, y_max = ax.get_ylim()
+        x_min, x_max = ax.get_xlim()
+        line = ax.hlines(self.mass, x_min, x_max, linestyle='--', linewidth=1.5, label=self.name)
+        cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white", line.get_color()])
+        M_grid = np.linspace(y_min, y_max,num=resolution)
+        shade_profile = norm.pdf(M_grid, loc=self.mass, scale=self.error)
+        shading_matrix = np.repeat(shade_profile[:, np.newaxis], resolution, axis=1)
+        ax.imshow(shading_matrix, aspect='auto', cmap=cmap, alpha=0.5,
+                  extent=[x_min, x_max, y_min, y_max], origin='lower')
+        return ax
     
 class LowerMTOVConstraint(MassConstraint):
     '''Constraint that an EOS supports at least a certain TOV mass(within Gaussian uncertainty)'''
@@ -240,12 +254,15 @@ class MassRadiusConstraint(object):
         else:
             raise ValueError('Must provide data for masses and radii as arrays or file from which to load')
         
-        self.KDE = gaussian_kde((self.radius_estimate, self.mass_estimate))
-        self.test_masses= np.linspace(start=1., stop=2.5, num=150 )
-        if name:
-            self.name=name
+        # self.KDE = gaussian_kde((self.radius_estimate, self.mass_estimate))
+        self.KDE = KernelDensity(kernel='gaussian', bandwidth="scott").fit((self.radius_estimate, self.mass_estimate))
+        self.test_masses= np.linspace(start=1., stop=2.5, num=150 ) # 1 to 2.5 Msun
+
+        self.name = name if name else "Mass-Radius Constraint"
         if arxiv_ref:
             self.arxiv_ref= arxiv_ref
+
+        self.rng = np.random.default_rng()
 
     
     def __repr__(self):
@@ -260,7 +277,27 @@ class MassRadiusConstraint(object):
         ## interpolate radii along equally spaced mass grid up to MTov
         test_mass_range=self.test_masses[self.test_masses<parameters['TOV_mass']]
         test_radii=np.interp(test_mass_range, local_parameters['masses'], local_parameters['radii'])
-        return logsumexp(self.KDE((test_radii, test_mass_range)))
+        # return logsumexp(self.KDE((test_radii, test_mass_range)))
+        return logsumexp(self.KDE.score_samples((test_radii, test_mass_range)))
+    
+    def plot(self, ax, resolution = 100, **kwargs):
+        """Plot the mass-radius constraint on the given figure."""
+        x_lim = ax.get_xlim()
+        y_lim = ax.get_ylim()
+        show_x, show_y = np.meshgrid(
+            np.linspace(*x_lim, resolution), np.linspace(*y_lim, resolution))
+        test_data = np.column_stack((show_x.flatten(), show_y.flatten()))
+        test_scores = self.KDE.score_samples(test_data)
+        test_scores = np.exp(test_scores).reshape(resolution, resolution)
+        level_90 = np.percentile(test_scores, 90)
+        
+        # just for legend and color cycle
+        dummy_line = ax.plot([], [], label=self.name, linewidth=2) 
+        colour = dummy_line[0].get_color()
+        cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white",colour])
+
+        ax.contour(show_x, show_y, test_scores, levels=[level_90], colors=[colour], linewidths=2, label = "Contour")  
+        ax.imshow(test_scores, aspect= 'auto', cmap = cmap, extent = [*x_lim, *y_lim], origin = 'lower')
 
 class PulsarConstraint(LowerMTOVConstraint):
     '''legacy synonym for general LowerMTOVConstraint'''
@@ -391,7 +428,6 @@ def EOSConstraints2Prior(macro_eos_path, out_path, Constraint):
         log normalization constant for the EOS prior
     """
 
-    from bilby.core.prior import Interped
     
     logLs, eos_files =weights_for_tabulated_eos_from_constraints(
         macro_constraints=Constraint, 
@@ -409,3 +445,17 @@ def EOSConstraints2Prior(macro_eos_path, out_path, Constraint):
     prior = Interped(xx, yy, minimum=0, maximum=Neos, name='EOS')
 
     return prior, logNorm
+
+def setup_tabulated_eos_priors(args, priors, logger=None):
+    if logger:    
+        logger.info("Sampling over precomputed EOSs")
+    xx = np.arange(0, args.Neos + 1)
+    if args.eos_weight:
+        eos_weight = np.loadtxt(args.eos_weight)
+        yy = np.concatenate((eos_weight, [eos_weight[-1]]))
+    else: 
+        yy = np.ones_like(xx)/len(xx)
+    eos_prior = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
+    priors["EOS"] = eos_prior
+    return priors
+

@@ -234,3 +234,13 @@ def load_tabulated_macro_eos_set_to_dict(eos_data, weights=None, Neos=None):
             EOS_data[EOSIdx+1]["weight"] = weights[EOSIdx]
     
     return EOS_data, weights, Neos
+
+
+#FIXME this should be used by conversion!
+def load_tabulated_macro_eos_set_to_list(eos_data, weights=None, Neos=None):
+    eos_files, Neos = load_eos_files(eos_data, Neos)
+    weights = load_weights(weights)
+    
+    EOS_data = [np.loadtxt(eos_file, usecols=[1,0, 2], unpack=True) for eos_file in eos_files]
+    
+    return EOS_data, weights, Neos
