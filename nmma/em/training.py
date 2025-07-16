@@ -14,7 +14,7 @@ from ..utils.models import get_models_home, get_model
 
 from . import model_parameters
 from .model import SVDLightCurveModel
-from .io import read_photometry_files, read_spectroscopy_files
+from .io import read_training_data
 from .em_parsing import parsing_and_logging, svd_training_parser, svd_model_benchmark_parser
 from .plotting_utils import visualise_model_performance, chi2_hists_from_dict
 
@@ -548,7 +548,7 @@ def create_svdmodel():
 
     args = parsing_and_logging(svd_training_parser)
     svd_filenames = find_svd_files( args.data_path, args.ignore_bolometric )
-    read_data = read_training_data(svd_filenames, args.format, args.data_type, args)
+    read_data = prepare_training_data(svd_filenames, args.format, args.data_type, args)
     training_data, parameters = create_svd_data( args.em_model,read_data)
     
     # filts = next(iter(training_data.values()))["lambda"] # for spectroscopy
@@ -618,8 +618,8 @@ def create_benchmark(
     interpolation_type="tensorflow",
     data_time_unit="days",
     svd_mag_ncoeff=10,
-    tmin=0.0,
-    tmax=14.0,
+    tmin=None,
+    tmax=None,
     filters=None,
     ncpus=1,
     outdir="benchmark_output",
@@ -645,9 +645,9 @@ def create_benchmark(
     svd_mag_ncoeff : int, optional
         Number of coefficients to use for the SVD model. Default is 10.
     tmin : float, optional
-        Minimum time to consider for the benchmark. Default is 0.0.
+        Minimum time to consider for the benchmark. Default uses model_times.
     tmax : float, optional
-        Maximum time to consider for the benchmark. Default is 14.0.
+        Maximum time to consider for the benchmark. Default uses model_times.
     filters : list, optional
         List of filters to use for the benchmark. If None, it will be determined from the data.
     ncpus : int, optional
@@ -667,7 +667,7 @@ def create_benchmark(
         ignore_bolometric = True
     
     svd_filenames = find_svd_files(data_path, ignore_bolometric )
-    read_data = read_training_data(svd_filenames, format)
+    read_data = prepare_training_data(svd_filenames, format)
     grid_training_data, parameters = create_svd_data(em_model,read_data)
 
     filts = setup_filters(filters, grid_training_data, parameters)
@@ -681,9 +681,13 @@ def create_benchmark(
         filters=filts,
         local_only=local_only,
     )
-
+    if tmin is None:
+        tmin = light_curve_model.model_times[0]
+    if tmax is None:
+        tmax = light_curve_model.model_times[-1]
     def chi2_func(grid_entry):
         grid_t = np.array(grid_entry["t"])/ time_scale_factor
+
         use_times = (grid_t > tmin) * (grid_t < tmax)
 
         # fetch the grid parameters
@@ -769,26 +773,9 @@ def find_svd_files(data_path, ignore_bolometric):
         raise ValueError("Need at least one file to interpolate.")
     return filenames
 
-
-def read_training_data(filenames, format, data_type = "photometry", args=None):
-
-    # read the grid data
-    if data_type == "photometry":
-        try:
-            data = read_photometry_files(filenames, format=format)
-        except IndexError:
-            raise IndexError(
-                "If there are bolometric light curves in your --data-path, try setting --ignore-bolometric"
-            )
-
-    elif data_type == "spectroscopy":
-        data = read_spectroscopy_files(
-            filenames, wavelength_min=args.lmin, wavelength_max=args.lmax, smooth=True
-        )
-    else:
-        raise ValueError("data-type should be photometry or spectroscopy")
-
-    return interpolate_nans(data)
+def prepare_training_data( data_path, format="bulla", data_type="photometry", args = None):
+    prelim_data = read_training_data(data_path, format, data_type, args)
+    return interpolate_nans(prelim_data)
 
 def create_svd_data(em_model, data):
     # create the SVD training data
@@ -818,6 +805,7 @@ def setup_filters(filters, training_data, parameters):
 
     if len(filts) == 0:
         raise ValueError("Need at least one valid filter.")
+    return filts
     
 def setup_time_conversion(data_time_unit="days"):
     """Set up the time conversion factor based on the data_time_unit."""
@@ -886,12 +874,8 @@ def load_api_gp_model(gp):
     predictor = gp["predictor"]
 
     return GaussianProcess(
-        x,
-        y,
-        LL,
-        predictor,
-        kernel,
+        x, y, LL,
+        predictor, kernel,
         hypercube_rescale=hypercube_rescale,
-        param_names=param_names,
-        metadata=metadata,
+        param_names=param_names, metadata=metadata,
     )

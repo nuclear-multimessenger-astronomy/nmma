@@ -22,18 +22,21 @@ matplotlib.rcParams.update(params)
 ################# MAIN PLOTS #################
 ##############################################
 def basic_em_analysis_plot(
-        transient, filters_to_plot, mags_to_plot, 
-        sub_model_plot_props, sample_times, xlim, ylim, save_path,
+        transient, mags_to_plot, error_dict, chi2_dict, mismatches,
+        sub_model_plot_props, xlim, ylim, save_path,
         ncol = 2):
 
 
     xlim = check_limit(xlim)
     ylim = check_limit(ylim)
 
-    fig, axes = analysis_plot_geometry(filters_to_plot, ncol=ncol)
-    colors = plt.cm.Spectral(np.linspace(0, 1, len(filters_to_plot)))[::-1]
-    for cnt, filt in enumerate(filters_to_plot):
-        
+    time = mags_to_plot.pop("time")
+    filter_names = list(mags_to_plot.keys())
+
+    fig, axes = analysis_plot_geometry(filter_names, ncol=ncol)
+    colors = plt.cm.Spectral(np.linspace(0, 1, len(filter_names)))[::-1]
+    for cnt, filt in enumerate(filter_names):
+
         # summary plot
         row, col = divmod(cnt, ncol)
         ax_sum = axes[row, col]
@@ -46,34 +49,28 @@ def basic_em_analysis_plot(
         # configuring ax_sum
         ax_sum.set_ylabel("AB magnitude", rotation=90)
         ax_delta.set_ylabel(r"$\Delta (\sigma)$")
-        if cnt == len(filters_to_plot)-1:
+        if cnt == len(filter_names)-1:
             ax_delta.set_xlabel("Time [days]")
         else:
             ax_delta.set_xticklabels([])
 
-        t = transient.light_curve_times[filt]
-        y = transient.light_curve_mags[filt]
-        sigma_y = transient.light_curve_uncertainties[filt]
-        mag_plot = mags_to_plot[cnt]
-        ax_sum, detections = plot_observations(ax_sum, t, y, sigma_y, color=colors[cnt])
-        # calculating the chi2
-        mag_per_data = np.interp(t[detections],sample_times, mag_plot)
-        diff_per_data = mag_per_data - y[detections]
-        error_budget = transient.compute_em_err(filt, t[detections])
-        sigma_per_data = np.sqrt((sigma_y[detections]**2 + error_budget**2))
-        chi2_per_data = (diff_per_data/sigma_per_data)**2
-        chi2_total = np.sum(chi2_per_data)
-        N_data = len(t[detections])
+        # plot the observations
+        ax_sum, det_times = plot_observations(ax_sum, transient, colors[cnt], filter=filt)
 
+        # plot the mismatch between the model and the data
+        diff_per_data, sigma_per_data = mismatches[filt]
+        ax_delta.axhline(0, linestyle='--', color='k')
+        ax_delta.scatter(det_times, diff_per_data, # / sigma_per_data,  # FIXME: Bug?
+                         color=colors[cnt])
 
         # plot the best-fit lc with errors
-        ax_sum.plot(sample_times, mag_plot,
-            color='coral', linewidth=3, linestyle="--")
-        
+        mag_plot = mags_to_plot[filt]
+        error_budget = error_dict[filt]
         label = 'combined' if sub_model_plot_props is not None else ""
 
-        error_budget = transient.compute_em_err(filt, sample_times)
-        ax_sum.fill_between(sample_times,
+        ax_sum.plot(time, mag_plot,
+            color='coral', linewidth=3, linestyle="--")
+        ax_sum.fill_between(time,
             mag_plot + error_budget,
             mag_plot - error_budget,
             facecolor='coral',
@@ -96,29 +93,26 @@ def basic_em_analysis_plot(
                     label=model_name,
                 )
 
-        ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
+        ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_dict[filt], 2)}$')
         ax_sum.set_xlim(xlim)
         ax_sum.set_ylim(ylim)
+        # ax_delta.set_xlim(xlim)
         
-        # plot the mismatch between the model and the data
-        ax_delta.scatter(t[detections], diff_per_data / sigma_per_data, color=colors[cnt])
-        ax_delta.axhline(0, linestyle='--', color='k')
-        ax_delta.set_xlim(xlim)
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches='tight')
     plt.close()
 
-def bolometric_lc_plot(data_times, y, sigma_y, lbol_dict, save_path, color = "coral"):
+def bolometric_lc_plot(transient, lbol_dict, save_path, color = "coral"):
     matplotlib.rcParams.update(
         {'font.size': 12,
         'text.usetex': True,
         'font.family': 'Times New Roman'}
     )
     fig, ax = plt.subplots(1, 1)
-    ax, _ = plot_observations(ax, data_times, y, sigma_y, markersize=12)
+    ax, _ = plot_observations(ax, transient, markersize=12)
 
     ### plot the bestfit model
-    ax.plot(lbol_dict['bestfit_sample_times'], lbol_dict['lbol'],
+    ax.plot(lbol_dict['time'], lbol_dict['lbol'],
             color=color, linewidth=3, linestyle="--")
 
     ax.set_ylabel("L [erg / s]")
@@ -143,7 +137,8 @@ def visualise_model_performance(training_data, training_model, light_curve_model
 
     if data_type == "photometry":
         mag = light_curve_model.generate_lightcurve(sample_times, data)
-        lc_comparison_plot(mag_dict=mag, training_data=training["data"], filters= filters, sample_times=sample_times, save_path=plotName, ylabel_kwargs=dict( fontsize=30, rotation=0, labelpad=14))
+        lc_comparison_plot(mag, training["data"], filters, sample_times, plotName, 
+                           ylabel_kwargs=dict( fontsize=30, rotation=0, labelpad=14))
 
     elif data_type == "spectroscopy":
         spec = light_curve_model.generate_spectra(
@@ -320,14 +315,21 @@ def check_limit(lim):
         lim = [float(val) for val in lim.split(",")]
     assert len(lim) == 2, f"{lim} is no valid plot-limit." 
     return lim
-
-def plot_observations(ax, obs_times, obs_mags, obs_unc, color="k",**kwargs):
+    
+def plot_observations(ax, transient, color="k",**kwargs):
+    obs_times, obs_lc, obs_unc = transient.light_curve_times, transient.light_curves, transient.light_curve_uncertainties
+    if 'filter' in kwargs:
+        filt = kwargs.pop('filter')
+        obs_lc = obs_lc[filt]
+        obs_unc = obs_unc[filt]
+        obs_times = obs_times[filt]
+    # obs_times+= transient.trigger_time 
     detections = np.isfinite(obs_unc) ## does not include nans or infs
-    ax.errorbar(obs_times[detections], obs_mags[detections], obs_unc[detections], fmt="o", color =color, **kwargs)
+    ax.errorbar(obs_times[detections], obs_lc[detections], obs_unc[detections], fmt="o", color =color, **kwargs)
 
     non_detections = np.isinf(obs_unc) ## does only include +-inf, not nans
-    ax.errorbar(obs_times[non_detections], obs_mags[non_detections], fmt="v", color=color, **kwargs)
-    return ax, detections
+    ax.errorbar(obs_times[non_detections], obs_lc[non_detections], fmt="v", color=color, **kwargs)
+    return ax, obs_times[detections]
 
 def analysis_plot_geometry(filters_to_plot, ncol=2):
     # NOTE Should this be the preferred geometry for the plots?
