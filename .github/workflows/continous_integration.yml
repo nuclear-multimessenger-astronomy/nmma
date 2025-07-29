@@ -65,9 +65,13 @@ jobs:
             libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev
             texlive texlive-latex-extra texlive-fonts-recommended
             dvipng cm-super python3-mpi4py
-
           execute_install_scripts: true
 
+          
+      - name: Install dependencies (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libblas3 libblas-dev
 
       - name: Install Python dependencies
         run: |
