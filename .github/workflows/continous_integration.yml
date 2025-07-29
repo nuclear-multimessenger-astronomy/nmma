@@ -58,9 +58,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-2-
 
-      - uses: awalsh128/cache-apt-pkgs-action@latest
+      - uses: awalsh128/cache-apt-pkgs-action@1.4.3
         with:
-          packages: openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super python3-mpi4py
+          packages: >
+            gfortran build-essential openmpi-bin libopenmpi-dev
+            libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev
+            texlive texlive-latex-extra texlive-fonts-recommended
+            dvipng cm-super python3-mpi4py
+
           execute_install_scripts: true
 
 
