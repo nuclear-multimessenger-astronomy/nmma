@@ -57,7 +57,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-2-
 
-      - uses: awalsh128/cache-apt-pkgs-action@v1.4.3
+      - name: apt caching
+        uses: awalsh128/cache-apt-pkgs-action@v1.4.3
         with:
           packages: gfortran texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super 
           execute_install_scripts: true
