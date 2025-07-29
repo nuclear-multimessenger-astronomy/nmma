@@ -2,7 +2,7 @@ name: Unit Test nmma [ubuntu]
 
 on:
   push:
-    branches: [main, fix-apt-cache]
+    branches: [main]
     paths-ignore:
       - "doc/**"
   pull_request:
@@ -43,7 +43,6 @@ jobs:
           key: svdmodels-${{ hashFiles('**/LICENSE') }}
           restore-keys: svdmodels-
 
-
       - name: Get pip cache dir
         id: pip-cache
         run: |
@@ -60,11 +59,9 @@ jobs:
 
       - uses: awalsh128/cache-apt-pkgs-action@v1.4.3
         with:
-          packages: >
-            gfortran texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super 
+          packages: gfortran texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super 
           execute_install_scripts: true
 
-          
       - name: Install dependencies (Ubuntu)
         run: |
           sudo apt-get update
