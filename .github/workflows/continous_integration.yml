@@ -43,14 +43,6 @@ jobs:
           key: svdmodels-${{ hashFiles('**/LICENSE') }}
           restore-keys: svdmodels-
 
-      - name: Restore APT cache
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/*.yml') }}
-          restore-keys: |
-            apt-cache-${{ runner.os }}-
-
 
       - name: Get pip cache dir
         id: pip-cache
@@ -66,14 +58,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-2-
 
-      - name: Update APT and install packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            openmpi-bin libopenmpi-dev gfortran build-essential \
-            libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev \
-            texlive texlive-latex-extra texlive-fonts-recommended \
-            dvipng cm-super python3-mpi4py
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: openmpi-bin libopenmpi-dev gfortran build-essential libblas3 libblas-dev liblapack3 liblapack-dev libatlas-base-dev texlive texlive-latex-extra texlive-fonts-recommended dvipng cm-super python3-mpi4py
+          execute_install_scripts: true
+
 
       - name: Install Python dependencies
         run: |
@@ -124,10 +113,3 @@ jobs:
         with:
           path: ${{ steps.pip-cache.outputs.dir }}
           key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
-
-      - name: Save APT cache
-        uses: actions/cache@v4
-        if: always()
-        with:
-          path: /var/cache/apt/archives
-          key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/*.yml') }}
