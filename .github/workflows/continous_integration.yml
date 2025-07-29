@@ -2,7 +2,7 @@ name: Unit Test nmma [ubuntu]
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix-apt-cache]
     paths-ignore:
       - "doc/**"
   pull_request:
@@ -58,7 +58,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-2-
 
-      - uses: awalsh128/cache-apt-pkgs-action@1.4.3
+      - uses: awalsh128/cache-apt-pkgs-action@v1.4.3
         with:
           packages: >
             gfortran build-essential openmpi-bin libopenmpi-dev
