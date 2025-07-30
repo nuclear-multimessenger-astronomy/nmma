@@ -4,15 +4,9 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-from .resnet import ResNet
+from resnet import ResNet
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-bands = ['ztfg', 'ztfr', 'ztfi']
-detection_limit = 22.0
-num_repeats = 50
-num_channels = 3
-num_points = 121
 
 class VICRegLoss(nn.Module):
     ''' 
@@ -58,7 +52,8 @@ class ConvResidualBlock(nn.Module):
                  activation=F.relu, 
                  dropout_probability=0.1, 
                  use_batch_norm=True, 
-                 zero_initialization=True):
+                 zero_initialization=True
+    ):
         '''
         Inputs:
             channels: number of separate dimensions, here it is photometric bands
@@ -104,7 +99,7 @@ class ConvResidualNet(nn.Module):
                  activation=F.relu, 
                  dropout_probability=0.1, 
                  use_batch_norm=True,
-                ):
+    ):
         '''
         Inputs:
             in_channels: starting number of channels, ie number of photometric bands
@@ -148,21 +143,28 @@ class SimilarityEmbedding(nn.Module):
                  num_blocks=4, 
                  kernel_size=5, 
                  num_dim_final=10, 
+                 expander_dim=150,
                  activation=torch.tanh,
-                 num_channels=num_channels,
-                 num_points=num_points
-                ):
+                 num_channels=3,
+                 num_points=121,
+    ):
+        self.expander_dim = expander_dim
         super(SimilarityEmbedding, self).__init__()
         self.layer_norm = nn.LayerNorm([num_channels, num_points])
         self.num_hidden_layers_f = num_hidden_layers_f
         self.num_hidden_layers_h = num_hidden_layers_h
-        self.layers_f = ResNet(num_ifos=[3,None], layers=[2,2], kernel_size=kernel_size, context_dim=100)
+        self.layers_f = ResNet(
+            num_ifos=[3,None], 
+            layers=[2,2], 
+            kernel_size=kernel_size, 
+            context_dim=100
+        )
         self.contraction_layer = nn.Linear(in_features=100, out_features=num_dim)
-        # self.layers_f = ConvResidualNet(in_channels=num_channels, out_channels=1, hidden_channels=20, num_blocks=num_blocks, kernel_size=kernel_size)
-        # self.contraction_layer = nn.Linear(in_features=in_features, out_features=num_dim)
-        self.expander_layer = nn.Linear(num_dim, 20)
-        self.layers_h = nn.ModuleList([nn.Linear(20, 20) for _ in range(num_hidden_layers_h)])
-        self.final_layer = nn.Linear(20, num_dim_final)
+        self.expander_layer = nn.Linear(num_dim, self.expander_dim)
+        self.layers_h = nn.ModuleList(
+            [nn.Linear(self.expander_dim, self.expander_dim) for _ in range(num_hidden_layers_h)]
+        )
+        self.final_layer = nn.Linear(self.expander_dim, num_dim_final)
         self.activation = activation
         
     def forward(self, x):
@@ -185,7 +187,7 @@ def train_one_epoch_se(epoch_index,
                        verbose,
                        vicreg_loss, 
                        **vicreg_kwargs, 
-                       ):
+):
     '''
     Training function
     Inputs: 
@@ -240,7 +242,8 @@ def val_one_epoch_se(epoch_index,
                      data_loader, 
                      similarity_embedding,
                      vicreg_loss,
-                     **vicreg_kwargs):
+                     **vicreg_kwargs
+):
     '''
     Validation training function
     Inputs: 
