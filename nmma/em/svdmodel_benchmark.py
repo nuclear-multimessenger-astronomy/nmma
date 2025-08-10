@@ -9,13 +9,14 @@ import json
 from .model import SVDLightCurveModel
 from .io import read_photometry_files
 from . import model_parameters
+from .utils import running_in_ci
 
 import matplotlib
 import matplotlib.pyplot as plt
 
 matplotlib.use("Agg")
 matplotlib.rcParams.update(
-    {"font.size": 16, "text.usetex": True, "font.family": "Times New Roman"}
+    {"font.size": 16, "text.usetex": running_in_ci(), "font.family": "Times New Roman"}
 )
 
 

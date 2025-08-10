@@ -10,6 +10,7 @@ import seaborn
 
 import matplotlib
 import matplotlib.pyplot as plt
+from .utils import running_in_ci
 
 matplotlib.use("agg")
 
@@ -27,7 +28,7 @@ params = {
     "legend.fontsize": 18,
     "xtick.labelsize": 18,
     "ytick.labelsize": 18,
-    "text.usetex": True,
+    "text.usetex": running_in_ci(),
     "font.family": "Times New Roman",
     "figure.figsize": fig_size,
 }
