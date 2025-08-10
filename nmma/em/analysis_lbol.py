@@ -368,7 +368,7 @@ def analysis(args):
 
         matplotlib.rcParams.update(
             {'font.size': 12,
-             'text.usetex': running_in_ci(),
+             'text.usetex': not running_in_ci(),
              'font.family': 'Times New Roman'}
         )
 

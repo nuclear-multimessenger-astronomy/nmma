@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 matplotlib.use("Agg")
 matplotlib.rcParams.update(
-    {"font.size": 16, "text.usetex": running_in_ci(), "font.family": "Times New Roman"}
+    {"font.size": 16, "text.usetex": not running_in_ci(), "font.family": "Times New Roman"}
 )
 
 

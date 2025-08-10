@@ -398,7 +398,7 @@ def main(args=None):
             "legend.fontsize": 42,
             "xtick.labelsize": 42,
             "ytick.labelsize": 42,
-            "text.usetex": running_in_ci(),
+            "text.usetex": not running_in_ci(),
             "font.family": "Times New Roman",
             "figure.figsize": [18, 25],
         }

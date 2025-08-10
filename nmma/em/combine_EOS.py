@@ -28,7 +28,7 @@ params = {
     "legend.fontsize": 18,
     "xtick.labelsize": 18,
     "ytick.labelsize": 18,
-    "text.usetex": running_in_ci(),
+    "text.usetex": not running_in_ci(),
     "font.family": "Times New Roman",
     "figure.figsize": fig_size,
 }
