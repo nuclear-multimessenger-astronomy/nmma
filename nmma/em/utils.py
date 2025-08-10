@@ -2,6 +2,7 @@ import copy
 
 import json
 import numpy as np
+from numpy.exceptions import VisibleDeprecationWarning
 import os
 import pandas as pd
 import scipy.interpolate as interp
@@ -45,7 +46,7 @@ except ImportError:
 
 import warnings
 
-warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
+warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
 # Define default filters variable for import in other parts of the code
 DEFAULT_FILTERS = [
@@ -1899,3 +1900,14 @@ def lightcurve_HoNa(t, mass, velocities, opacities, n):
     
     # Return results
     return L, T, r.to(astropy.units.cm)
+
+
+def running_in_ci():
+    """
+    Check if the code is running in a GitHub Actions.
+    
+    Returns:
+    --------
+        bool: True if running in CI, False otherwise.
+    """
+    return os.environ.get("CI") == "true"

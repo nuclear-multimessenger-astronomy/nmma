@@ -11,7 +11,7 @@ import bilby.core
 from .model import create_light_curve_model_from_args
 from .injection import create_light_curve_data
 from .io import read_lightcurve_file
-from .utils import NumpyEncoder
+from .utils import NumpyEncoder, running_in_ci
 from ..utils.models import refresh_models_list
 
 
@@ -392,13 +392,13 @@ def main(args=None):
         import matplotlib
 
         matplotlib.use("agg")
+        matplotlib.rcParams['text.usetex'] = not running_in_ci()
         params = {
             "backend": "pdf",
             "axes.labelsize": 42,
             "legend.fontsize": 42,
             "xtick.labelsize": 42,
             "ytick.labelsize": 42,
-            "text.usetex": True,
             "font.family": "Times New Roman",
             "figure.figsize": [18, 25],
         }

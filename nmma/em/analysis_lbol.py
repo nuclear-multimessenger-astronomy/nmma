@@ -18,8 +18,10 @@ from bilby.core.likelihood import ZeroLikelihood
 from .likelihood import BolometricLightCurve
 from .model_lbol import SimpleBolometricLightCurveModel
 from .prior import create_prior_from_args
+from .utils import running_in_ci
 
 matplotlib.use("agg")
+matplotlib.rcParams['text.usetex'] = not running_in_ci()
 
 
 def get_parser(**kwargs):
@@ -367,7 +369,6 @@ def analysis(args):
 
         matplotlib.rcParams.update(
             {'font.size': 12,
-             'text.usetex': True,
              'font.family': 'Times New Roman'}
         )
 

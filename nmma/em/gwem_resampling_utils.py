@@ -7,6 +7,7 @@ from bilby.gw.prior import PriorDict
 from bilby.core.prior import Uniform
 
 from ..joint.conversion import BNSEjectaFitting, NSBHEjectaFitting
+from .utils import running_in_ci
 from pymultinest.solve import Solver
 
 
@@ -75,7 +76,8 @@ def corner_plot(posterior_samples, solution, outdir, withNSBH):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import corner
-    matplotlib.rcParams.update({'font.size': 16, 'text.usetex': True, 'font.family': 'Times New Roman'})
+    matplotlib.rcParams['text.usetex'] = not running_in_ci()
+    matplotlib.rcParams.update({'font.size': 16, 'font.family': 'Times New Roman'})
     kwargs = dict(bins=50, smooth=1.3, label_kwargs=dict(fontsize=16), show_titles=True,
                   title_kwargs=dict(fontsize=16), color='#0072C1',
                   truth_color='tab:orange', quantiles=[0.05, 0.95],

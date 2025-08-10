@@ -2,7 +2,7 @@ name: Website Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
@@ -10,47 +10,47 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.9]
+        python-version: [3.12]
 
     steps:
-    - uses: actions/checkout@v3
-    - uses: mpi4py/setup-mpi@v1
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Get pip cache dir
-      id: pip-cache
-      run: |
-        python -m pip install --upgrade pip setuptools wheel
-        echo "::set-output name=dir::$(pip cache dir)"
-    - name: pip cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-2-
-    - name: Install dependencies
-      run: |
-        #sudo apt-get install gfortran swig libhdf5-serial-dev libmpich-dev
-        python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
-        python -m pip install coverage cpp-coveralls flake8 pytest
-        python -m pip install .[doc]
+      - uses: actions/checkout@v3
+      - uses: mpi4py/setup-mpi@v1
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          echo "::set-output name=dir::$(pip cache dir)"
+      - name: pip cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-2-
+      - name: Install dependencies
+        run: |
+          #sudo apt-get install gfortran swig libhdf5-serial-dev libmpich-dev
+          python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
+          python -m pip install coverage cpp-coveralls flake8 pytest
+          python -m pip install .[doc]
 
-    - name: Make dependencies
-      env:
-        SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.SPHINX_GITHUB_CHANGELOG_TOKEN }}
-      run: |
-        cd doc && make html; cd ../
-        touch doc/_build/html/.nojekyll
+      - name: Make dependencies
+        env:
+          SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.SPHINX_GITHUB_CHANGELOG_TOKEN }}
+        run: |
+          cd doc && make html; cd ../
+          touch doc/_build/html/.nojekyll
 
-    - name: Deploy to GitHub Pages
-      if: success() && github.repository_owner == 'nuclear-multimessenger-astronomy'
-      uses: crazy-max/ghaction-github-pages@v2
-      with:
-        target_branch: gh-pages
-        build_dir: doc/_build/html/
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.SPHINX_GITHUB_CHANGELOG_TOKEN }}
+      - name: Deploy to GitHub Pages
+        if: success() && github.repository_owner == 'nuclear-multimessenger-astronomy'
+        uses: crazy-max/ghaction-github-pages@v2
+        with:
+          target_branch: gh-pages
+          build_dir: doc/_build/html/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.SPHINX_GITHUB_CHANGELOG_TOKEN }}
