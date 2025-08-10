@@ -1,5 +1,5 @@
 future
-bilby>=2.1.1
+bilby>=2.4.1
 bilby_pipe==1.5.0
 colorcet
 numpy>=1.9
