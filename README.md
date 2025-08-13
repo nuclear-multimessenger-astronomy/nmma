@@ -71,6 +71,20 @@ If you are using the systematics error, please also cite the paper [Data-driven 
 }
 ```
 
+If you are using likelihood free inference, please also cite the paper [Rapid parameter estimation for kilonovae using likelihood-free inference](https://www.arxiv.org/abs/2408.06947). The BibTeX entry for the paper is:
+```bibtex
+@article{Desai:2024hlp,
+    author = "Desai, Malina and Chatterjee, Deep and Jhawar, Sahil and Harris, Philip and Katsavounidis, Erik and Coughlin, Michael",
+    title = "{Kilonova Light Curve Parameter Estimation Using Likelihood-Free Inference}",
+    eprint = "2408.06947",
+    archivePrefix = "arXiv",
+    primaryClass = "astro-ph.IM",
+    doi = "10.1093/mnras/staf1045",
+    month = "8",
+    year = "2024"
+}
+```
+
 ### Acknowledgments
 If you benefited from participating in our community, we ask that you please acknowledge the Nuclear Multi-Messenger Astronomy collaboration, and particular individuals who helped you, in any publications.
 Please use the following text for this acknowledgment:
