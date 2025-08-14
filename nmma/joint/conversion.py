@@ -176,7 +176,7 @@ class NSBHEjectaFitting(object):
             * (1.0 - 2.0 * compactness_2)
             / compactness_2
         )
-        mdyn += -a2 * np.power(mass_ratio_invert, n2) * (risco/mass_1_source) + a4
+        mdyn += -a2 * np.power(mass_ratio_invert, n2) * risco + a4
         mdyn *= baryon_mass_2
 
         mdyn = np.maximum(0.0, mdyn)
