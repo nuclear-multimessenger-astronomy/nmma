@@ -187,7 +187,7 @@ class NSBHEjectaFitting(object):
 
         mass_1_source = converted_parameters["mass_1_source"]
         mass_2_source = converted_parameters["mass_2_source"]
-        total_mass_source = mass_1_source + mass_1_source
+        total_mass_source = mass_1_source + mass_2_source
 
         radius_2 = converted_parameters["radius_2"]
         compactness_2 = mass_2_source * lal.MRSUN_SI / (radius_2 * 1e3)
