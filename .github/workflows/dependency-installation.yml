@@ -39,12 +39,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y openmpi-bin libopenmpi-dev
+          pip install --upgrade pip setuptools wheel
+
 
       - name: Install Homebrew packages
         if: matrix.os == 'macos-latest'
         run: |
           brew install openmpi hdf5
           conda install ligo-segments python-ligo-lw
+          pip install --upgrade pip setuptools wheel
+
 
       - name: Install NMMA (base)
         run: |
