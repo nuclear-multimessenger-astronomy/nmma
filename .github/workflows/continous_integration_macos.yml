@@ -110,7 +110,7 @@ jobs:
         run: |
           python -m coverage run --source nmma -m pytest nmma/tests/*.py
       - name: Run Coveralls
-        if: ${{ success() }}
+        if: ${{ success() && matrix.python-version != '3.13' }}
         run: |
           coveralls --service=github
         env:

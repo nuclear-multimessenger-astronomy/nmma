@@ -94,7 +94,7 @@ jobs:
           DYLD_LIBRARY_PATH: ${{ env.DYLD_LIBRARY_PATH }}
 
       - name: Run Coveralls
-        if: ${{ success() }}
+        if: ${{ success() && matrix.python-version != '3.13' }}
         run: |
           coveralls --service=github
         env:
