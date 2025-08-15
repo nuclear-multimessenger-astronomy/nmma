@@ -9,13 +9,14 @@ authors = [
 ]
 description = "A nuclear physics multi-messenger Bayesian inference library"
 readme = "README.md"
-requires-python = ">=3.10, <3.13"
+requires-python = ">=3.10, <3.14"
 license = {text = "GPLv3"}
 classifiers = [
     "Programming Language :: Python :: 3",
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
     'Intended Audience :: Science/Research',
     'Intended Audience :: End Users/Desktop',
     'Intended Audience :: Developers',
