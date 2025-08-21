@@ -665,13 +665,12 @@ class FiestaKilonovaModel(FiestaModel):
     """
     def __init__(self, parameter_conversion=None, model="Bu2025_CVAE", filters=None, surrogate_dir=None, **kwargs):
         from fiesta.inference.lightcurve_model import BullaLightcurveModel
-        kwargs.update(dict( name=model, filters=filters, directory=surrogate_dir,))
+        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,)
         try:
-            fiesta_model = BullaLightcurveModel(**kwargs)
+            fiesta_model = BullaLightcurveModel(**fiesta_kwargs)
         except OSError:
-            kwargs['surrogate_dir'] = f'{surrogate_dir}/KN/{model}/model'
-            fiesta_model = BullaLightcurveModel(**kwargs)
-            
+            fiesta_kwargs['directory'] = f'{surrogate_dir}/KN/{model}/model'
+            fiesta_model = BullaLightcurveModel(**fiesta_kwargs)
 
         super().__init__(fiesta_model, parameter_conversion, filters, sample_times=kwargs.get('sample_times', None))
 
@@ -1291,6 +1290,7 @@ class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
 def lc_model_class_from_str(class_names):
     transient_class_map = {
         "svd"           : SVDLightCurveModel,
+        "fiesta_kn"     : FiestaKilonovaModel,
         "fiesta_grb"    : FiestaGRBModel,
         "grb"           : GRBLightCurveModel,
         "host_galaxy"   : HostGalaxyLightCurveModel,
@@ -1302,6 +1302,8 @@ def lc_model_class_from_str(class_names):
         "supernova_grb" : SupernovaGRBLightCurveModel,
         "supernova_shock":SupernovaShockCoolingLightCurveModel,
     }
+    if class_names is None:
+        raise AttributeError("No EM transient class specified, please provide a valid class name or list of names.")
     if len(class_names) ==1:
         class_names = class_names[0].lower().split(",")
     ##FIXME get more robust handling of aliases and typos
@@ -1413,7 +1415,6 @@ def create_injection_model(args, filters=None):
     for arg, val in injection_dict.items():
             arg = arg.lstrip('--').replace('-','_').replace("injection_", "")
             setattr(injection_args, arg, val)
-
 
     # step 3: identify the model type and create the model
     lc_model = identify_model_type(injection_args)

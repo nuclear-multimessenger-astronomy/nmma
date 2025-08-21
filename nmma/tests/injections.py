@@ -214,21 +214,21 @@ def test_validate_lightcurves():
     ## initialize args, check a file that is known to have 3 observations in the ztf g filter and 1 in the ztf r filter. All detections occur within 9 days of the original observation.
     args = Namespace(
         data_file='example_files/candidate_data/ZTF20abwysqy.dat',
-        filters="ztfg",
+        filters=["ztfg"],
         min_obs=3,
         cutoff_time=0,
         verbose=True,
     )
     assert lch.validate_lightcurve(**vars(args)) == True, "Test for 3 observations in the ztf g filter failed"
 
-    args.filters = "ztfr"
+    args.filters = ["ztfr"]
     args.min_obs = 1
     assert lch.validate_lightcurve(**vars(args)) == True, "Test for 1 observation in the ztf r filter failed"
 
-    args.filters = "ztfg,ztfr"
+    args.filters = ["ztfg", "ztfr"]
     assert lch.validate_lightcurve(**vars(args)) == True, "Test for  passing multiple filters failed"
 
-    args.filters = ""
+    args.filters = None
     args.min_obs = 0
     assert lch.validate_lightcurve(**vars(args)) == True, "Test for automatic filter selection failed"
 

@@ -8,7 +8,7 @@ from nmma.eos.eos_parsing import eos_parsing, tabulated_eos_parsing
 from nmma.gw.gw_parsing import gw_parsing
 
 
-from ... import __version__  # noqa: E402
+from .. import __version__  # noqa: E402
 from numpy import inf
 logger = bilby.core.utils.logger
 

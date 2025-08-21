@@ -61,8 +61,9 @@ DEFAULT_FILTERS = [
 def set_filters(args):
     filters = None  # default value
     if args.filters:
-        if isinstance(args.filters, str):
-            filters = list(filters)
+        filters = args.filters
+        if isinstance(filters, str):
+            filters = filters.split(",")
         # do some cleaning for dirty command-line input
         filters = [ f.replace(" ", "").split(",") for f in filters]
         filters = [f for sublist in filters for f in sublist if f] # flatten the list

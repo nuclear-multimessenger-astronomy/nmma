@@ -1,5 +1,5 @@
 
-from nmma.joint.base_parsing import StoreBoolean, nonestr, nonefloat
+from nmma.joint.base_parsing import nonestr, nonefloat
 
 def gw_parsing(parser):
     gw_input_parser = parser.add_argument_group(

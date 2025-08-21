@@ -474,7 +474,10 @@ def parsing_and_logging(parser_func, args= None):
     if getattr(args, 'refresh_model_list', False):
         refresh_models_list(args.svd_path)
 
-    setup_logger(outdir=args.outdir, label=args.label)
-    os.makedirs(args.outdir, exist_ok=True)
-    print('Setting up logger and storage directory')
+    try:
+        setup_logger(outdir=args.outdir, label=args.label)
+        os.makedirs(args.outdir, exist_ok=True)
+        print('Setting up logger and storage directory')
+    except Exception as e:
+        pass
     return args

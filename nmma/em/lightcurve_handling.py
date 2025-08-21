@@ -10,7 +10,7 @@ from ligo.skymap import bayestar, distance
 from ligo.skymap.io import read_sky_map
 import sncosmo
 from astropy import units as u
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
 
 from .lightcurve_generation import create_light_curve_data

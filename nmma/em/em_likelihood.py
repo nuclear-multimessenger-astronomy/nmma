@@ -2,6 +2,7 @@ from __future__ import division
 import numpy as np
 from scipy.stats import norm, truncnorm
 from ast import literal_eval
+from astropy.time import Time
 import warnings
 warnings.filterwarnings("error", category=RuntimeWarning)
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
@@ -21,7 +22,12 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     lc_model = model.identify_model_type(args)
     light_curve_model = model.create_light_curve_model_from_args(lc_model, args, filters)
 
-
+    try:
+        trigger_time = Time(args.trigger_time).mjd
+    except ValueError:
+        trigger_time = Time(args.trigger_time, format=getattr(args, "time_format", "mjd")).mjd
+    except ArithmeticError:
+        trigger_time = None
 
     em_kwargs = initialisation_args_from_signature_and_namespace(
         EMTransientLikelihood, args, ['em_', 'kilonova_']
@@ -32,6 +38,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
         light_curve_model=light_curve_model,light_curve_data=light_curve_data,
         priors = priors, filters=filters,
         error_budget=args.em_error_budget,
+        trigger_time = trigger_time
     )
     return em_kwargs | em_likelihood_kwargs
 
