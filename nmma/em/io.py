@@ -1,12 +1,14 @@
 import json
-from argparse import Namespace
-import astropy
+import os
+import argparse
+from astropy.table import Table
 from astropy.time import Time
 import h5py
 import numpy as np
 import pandas as pd
 from bilby.core.utils import decode_bilby_json
 import scipy.signal
+
 # from sncosmo.bandpasses import _BANDPASSES
 
 
@@ -38,7 +40,7 @@ def load_em_observations(filename, args=None, format='observations'):
     Returns:
     - data (dict): Dictionary containing the lightcurve data from the file. The keys are generally 't' and each of the filters in the file as well as their accompanying error values.
     """
-    if isinstance(filename, Namespace):
+    if isinstance(filename, argparse.Namespace):
         args = filename
         filename = args.light_curve_data
     
@@ -81,7 +83,10 @@ def read_lc_from_csv(filename, args, format):
             for line in lines:
                 lineSplit = line.split(" ")
                 lineSplit = list(filter(None, lineSplit))
-                mjd = Time(lineSplit[0], format=getattr(args, "time_format", "mjd")).mjd
+                try:
+                    mjd = Time(lineSplit[0]).mjd
+                except ValueError:
+                    mjd = Time(lineSplit[0], format=getattr(args, "time_format", "mjd")).mjd
                 filt = lineSplit[1]
                 mag = float(lineSplit[2])
                 dmag = float(lineSplit[3])
@@ -138,18 +143,66 @@ def write_lc_to_csv(outfile, data, format= "observations"):
         np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error", comments="#")
         
     elif format == "model":
-        # Lightcurve as issued by model
+        # Lightcurve as issued by model, with or without errors
         mags, errs = [], []
         for filt, sub_dict in data.items():
             mags.append(sub_dict['mag'])
-            errs.append(sub_dict['mag_error'])
+            if not np.all(np.isnan(sub_dict['mag_error'])):
+                errs.append(sub_dict['mag_error'])
         time = sub_dict['time']
         out_data = np.column_stack((time, *mags, *errs))
-        header = "time " + " ".join([filt for filt in data.keys()] + " ".join([filt + "_error" for filt in data.keys()]) )
-        np.savetxt(outfile, out_data, fmt="%.5f " + " ".join(["%.3f"] * len(mags) * 2), delimiter=" ", header=header, comments="#")
+        header = "time " 
+        header += " ".join([filt for filt in data.keys()]) 
+        header += " ".join([filt + "_error" for filt in data.keys() if not np.all(np.isnan(data[filt]['mag_error']))])
+        np.savetxt(outfile, out_data, fmt="%.5f " + " ".join(["%.3f"] * (len(mags) + len(errs))), delimiter=" ", header=header, comments="#")
 
+    elif format in "bolometric":
+        # Bolometric lightcurve
+        time = data['time']
+        lbol = data['lbol']
+        out_data = np.column_stack((time, lbol))
+        np.savetxt( outfile, out_data, fmt="%.3f %.5e", delimiter=" ", header="t[days] Lbol[erg/s]" )
 
+def convert_skyportal_lcs(filepath=None):
+    if filepath is None:
+        p = argparse.ArgumentParser()
+        p.add_argument("--filepath",type=str,nargs="*",
+        help="path to lightcurve files" )
+        filepath = p.parse_args().filepath
+    if isinstance(filepath, str):
+        filepathes = [filepath]
+    elif isinstance(filepath, list):
+        filepathes = filepath
+    else:
+        raise ValueError("Invalid filepath")
 
+    for f in filepathes:
+        if not f.startswith("/"):
+            f = os.path.join(os.getcwd(), f)
+        try:
+            data = Table.read(f, format="ascii.csv")
+            # output the data in the format desired by NMMA:
+            # remove rows where mag and magerr are missing, or not float, or negative
+            data = data[
+                np.isfinite(data["mag"])
+                & np.isfinite(data["magerr"])
+                & (data["mag"] > 0)
+                & (data["magerr"] > 0)
+            ]
+        except Exception as e:
+            print(f"input data {f} is not in the expected format {e}")
+
+        try: 
+            out_data = [
+                [Time(row["mjd"], format="mjd").isot, row["filter"], row["mag"], row["magerr"]]
+                for row in data]
+            base, ext = os.path.splitext(f)
+            outfile = base + ".dat"
+            np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error")
+            print(f"Wrote reformatted lightcurve to {outfile}")
+        except Exception as e:
+            print(f"failed to format data in {f} {e}")
+    
 
 def read_training_data(filenames, format, data_type = "photometry", args=None):
 
@@ -326,7 +379,7 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
             f = h5py.File(filename, "r")
             keys = list(f.keys())
             for key in keys:
-                df = astropy.table.Table(f[key]).to_pandas()
+                df = Table(f[key]).to_pandas()
                 df.rename(
                     columns={
                         "2MASS_J": "2massj",
