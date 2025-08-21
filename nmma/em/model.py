@@ -358,7 +358,7 @@ class FiestaModel(LightCurveModelContainer):
             filters = fiesta_model.filters
         if sample_times is not None:
             print('Warning: sample_times are not used in FiestaModel, ignoring.')
-        super().__init__(fiesta_model.name, parameter_conversion, fiesta_model.parameter_names, filters)
+        super().__init__(fiesta_model.name, parameter_conversion, filters, fiesta_model.parameter_names)
         
     
     def setup_model_times(self):
@@ -663,7 +663,7 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    def __init__(self, parameter_conversion=None, model="Bu2025_CVAE", filters=None, surrogate_dir=None, **kwargs):
+    def __init__(self, parameter_conversion=None, model="Bu2025_lc", filters=None, surrogate_dir=None, **kwargs):
         from fiesta.inference.lightcurve_model import BullaLightcurveModel
         fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,)
         try:
@@ -701,14 +701,14 @@ class FiestaGRBModel(FiestaModel):
     """
     def __init__(self, parameter_conversion=None, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **kwargs):
         from fiesta.inference.lightcurve_model import AfterglowFlux
-        kwargs.update(dict( name=model, filters=filters, directory=surrogate_dir))
+        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,)
         try:
-            self.fiesta_model = AfterglowFlux(**kwargs)
+            fiesta_model = AfterglowFlux(**fiesta_kwargs)
         except OSError:
-            kwargs['surrogate_dir'] = f'{surrogate_dir}/GRB/{model}/model'
-            self.fiesta_model = AfterglowFlux(**kwargs)
+            fiesta_kwargs['directory'] = f'{surrogate_dir}/GRB/{model}/model'
+            fiesta_model = AfterglowFlux(**fiesta_kwargs)
 
-        super().__init__(model, parameter_conversion, filters, model_parameters= self.fiesta_model.parameter_names, sample_times=kwargs.get('sample_times', None))
+        super().__init__(fiesta_model, parameter_conversion, filters, sample_times=kwargs.get('sample_times', None))
     
     def em_parameter_setup(self, parameters):
         new_parameters =super().em_parameter_setup(parameters)

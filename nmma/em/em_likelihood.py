@@ -21,11 +21,10 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     ## setup the light curve model for this transient class and filters
     lc_model = model.identify_model_type(args)
     light_curve_model = model.create_light_curve_model_from_args(lc_model, args, filters)
-
     try:
         trigger_time = Time(args.trigger_time).mjd
     except ValueError:
-        trigger_time = Time(args.trigger_time, format=getattr(args, "time_format", "mjd")).mjd
+        trigger_time = Time(args.trigger_time, format=getattr(args, "time_format", "gps")).mjd
     except ArithmeticError:
         trigger_time = None
 

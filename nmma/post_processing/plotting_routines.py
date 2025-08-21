@@ -103,21 +103,6 @@ def setup_corner_plot(posterior_samples, *messengers, limits = None, plot_keys =
     color = plot_kwargs.pop('color', next(nmma_colors))
     fig = corner_plot(plot_samples, plot_labels, limits, fig=fig, truths= truths, color = color, titles=titles, **plot_kwargs)
 
-    if em_transient is not None:
-        # Define the outer position for the inset (in figure fraction)
-        inset_position = [0.68, 0.35, 0.3, 0.6]  # [left, bottom, width, height]
-
-        # Create a container axes that we won't use directly (just for positioning)
-        inset_container = fig.add_axes(inset_position)
-        # inset_container.set_visible(False)  # Hide the outer box
-
-
-        # Create a GridSpec inside the container
-        gs = gridspec.GridSpecFromSubplotSpec(
-            m, 1, subplot_spec=inset_container.get_subplotspec(), hspace=0.1
-        )
-
-
     # allow joint legend
     if 'label' in plot_kwargs:
         fig.legends.clear()
