@@ -8,7 +8,7 @@ from sklearn.neighbors import KernelDensity
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import json
-from bilby.core.prior import Interped
+from bilby.core.prior import Interped, Categorical
 from bilby_pipe.utils import convert_string_to_dict, convert_string_to_list
 
 
@@ -449,13 +449,12 @@ def EOSConstraints2Prior(macro_eos_path, out_path, Constraint):
 def setup_tabulated_eos_priors(args, priors, logger=None):
     if logger:    
         logger.info("Sampling over precomputed EOSs")
-    xx = np.arange(0, args.Neos + 1)
     if args.eos_weight:
+        xx = np.arange(0, args.Neos + 1)
         eos_weight = np.loadtxt(args.eos_weight)
         yy = np.concatenate((eos_weight, [eos_weight[-1]]))
+        priors["EOS"] = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
     else: 
-        yy = np.ones_like(xx)/len(xx)
-    eos_prior = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
-    priors["EOS"] = eos_prior
+        priors["EOS"] = Categorical(args.Neos, name="EOS")
     return priors
 

@@ -69,7 +69,7 @@ def cleanup_outdir(args):
     yield
     if os.path.exists(args.outdir):
         shutil.rmtree(args.outdir, ignore_errors=True)
-    
+
 def test_injection_creation(args):
     
     inj_model = model.create_light_curve_model_from_args(args.em_model, args)   

@@ -1,10 +1,10 @@
-from nmma.joint.base_parsing import StoreBoolean, nonestr
+from nmma.joint.base_parsing import nonestr
 
 def tabulated_eos_parsing(parser):
     tab_eos_input_parser = parser.add_argument_group(
         title="Tabulated EOS input arguments", description="Specify tabulated EOS inputs" )
     
-    tab_eos_input_parser.add( "--eos-to-ram", action=StoreBoolean, default=False,
+    tab_eos_input_parser.add( "--eos-to-ram", action='store_true',
         help="Depending on cluster architecture, it can be faster to load all EOS files directly to RAM")
     tab_eos_input_parser.add("--eos-data",  help="Path to the EOS directory" )
     tab_eos_input_parser.add("--Neos", type=int, help="Number of EOSs to be used")

@@ -5,7 +5,7 @@ from glob import glob
 import pickle
 
 import numpy as np
-from bilby.core.result import  Result
+from bilby.core.result import Result
 from bilby.core.sampler.base_sampler import _SamplingContainer
 from bilby.core.sampler.dynesty import DynestySetupError, _set_sampling_kwargs
 from bilby.core.sampler.dynesty_utils import (
@@ -18,13 +18,12 @@ from bilby.core.sampler.dynesty_utils import (
 from bilby.core.utils import logger
 from bilby.core.prior import PriorDict, Constraint
 
-from bilby_pipe.utils import convert_string_to_list
 import dynesty
 
 from ...joint.joint_likelihood import setup_nmma_likelihood
 from ...joint.conversion import MultimessengerConversion
 from ...joint.base import adjust_hubble_prior
-from ...joint.utils import reorder_loglikelihoods, rejection_sample, fetch_bestfit
+from ...joint.utils import reorder_loglikelihoods, rejection_sample, read_bestfit_from_posterior
 from ...em.analysis import post_process_bestfit
 from ...em.prior import extinction_prior
 from ...eos.plotting_routines import plot_eos_vs_constraints
@@ -63,7 +62,7 @@ class MainRun(object):
         self.maxmcmc = maxmcmc
         self.nact = nact
         self.naccept = naccept
-        self.proposals = convert_string_to_list(proposals)
+        self.proposals = proposals
         self.nlive = nlive
         self.periodic = periodic
         self.reflective = reflective
@@ -574,7 +573,7 @@ class WorkerRun(object):
         print(result)
         if self.args.plot:
             result.plot_corner()
-            bestfit_params = fetch_bestfit(self.args)
+            bestfit_params = read_bestfit_from_posterior(self.args)
             for i, msg in enumerate(self.messengers):
                 sub_model = self.likelihood.sub_likelihoods[i].sub_model
                 if msg == 'em':

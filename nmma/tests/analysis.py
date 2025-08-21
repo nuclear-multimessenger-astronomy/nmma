@@ -58,7 +58,7 @@ def test_analysis_systematics_without_time(args):
 
 def test_analysis_systematics_with_time_and_filters(args):
 
-    args.filters = "ztfr,sdssu,2massks"
+    args.filters = ["ztfr", "sdssu", "2massks"]
     args.systematics_file = f"{DATA_DIR}/systematics_with_time_combined_filters.yaml"
     analysis.main(args)
 
@@ -79,7 +79,7 @@ def test_nn_analysis(args):
     args.sampler = "neuralnet"
     args.prior = "priors/Ka2017.prior"
     args.em_tstep = 0.25
-    args.filters = "ztfg,ztfr,ztfi"
+    args.filters = ["ztfg", "ztfr", "ztfi"]
     args.local_only = False
     args.injection_file = f"{DATA_DIR}/Ka2017_injection.json"
     analysis.main(args)

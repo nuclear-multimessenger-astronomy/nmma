@@ -1,32 +1,22 @@
 from argparse import Namespace
-import bilby.core
 import numpy as np
-import json
 import os
 import shutil
 
-from nmma.em.model import (
-    SimpleKilonovaLightCurveModel,
-    SupernovaLightCurveModel,
-    ShockCoolingLightCurveModel,
-    GRBLightCurveModel,
-    SVDLightCurveModel,
-)
-
 from ..em import em_parsing, lightcurve_handling as lch
 from ..em.io import load_em_observations
+from ..em.model import get_lc_model_from_modelname
+from ..joint.utils import read_injection_file
 from ..joint import injection_handling, base_parsing, joint_parsing
 
 
-def lightcurveInjectionTest(model_name, model_lightcurve_function):
+def lightcurveInjectionTest(model_name):
     """
     compares the creation of a lightcurve injection from command line with light_curve_generation and through calling the relevant function directly
     Parameters:
     -----------
     - model_name: string
     Name of model prior to test (e.g. 'nugent-hyper'). Must be included in ./priors/ directory
-    - model_lightcurve_function: function
-    One of the nmma.em.model functions (e.g. nmma.em.model.SupernovaLightCurveModel) that corresponds to the associated model name
     """
     print("running lightcurve injection test for ", model_name)
     print(
@@ -114,7 +104,8 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             filters="sdssu",
             outdir=output_directory,
             interpolation_type="sklearn_gp",
-            em_error=0.0,
+            injection_error_budget=0.0,
+            ignore_timeshift = True,
         )
         args.__dict__.update(non_default_args)
 
@@ -129,31 +120,7 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
 
         return load_em_observations(command_line_lightcurve_file)
 
-    def get_parameters_from_injection_file(injection_file):
-        """
-        read the parameters from the injection file
-        Parameters:
-        ------------
-        - injection_file: string
-        path to the injection file created by create_injection_from_command_line
-
-        Returns:
-        ----------
-        - injection_dictionary: dictionary
-        Dictionary of parameters from injection file
-        """
-        assert os.path.exists(injection_file), "injection file does not exist"
-        with open(injection_file, "r") as f:
-            injection = json.load(f, object_hook=bilby.core.utils.decode_bilby_json)
-        injection_content = injection["injections"]
-        injection_dictionary = {
-            key: index[0] for key, index in injection_content.items()
-        }
-        return injection_dictionary
-
-    def create_lightcurve_from_function(
-        model_name, injection_file, model_lightcurve_function
-    ):
+    def create_lightcurve_from_function(model_name, injection_file):
         """
         create lightcurve using associated LightcurveModel function
         Parameters:
@@ -162,29 +129,28 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         name of model prior to test (e.g. 'nugent-hyper'). Must be included in ./priors/ directory
         - injection_file: string
         path to injection file
-        - model_lightcurve_function: function
-        associated nmma LightcurveModel function
-
         Returns:
         ----------
         - lightcurve_from_function: dictionary
         dictionary of lightcurve generated via functions
         """
         assert os.path.exists(injection_file), "injection file does not exist"
-        lightcurve_parameters = get_parameters_from_injection_file(injection_file)
-        time_series = np.arange(0.01, 20.0 + 0.5, 0.5)
+        injection_dict = read_injection_file(injection_file)
+        lightcurve_parameters = {k:v[0] for k, v in injection_dict.items()}
         init_kwargs = dict(
             model=model_name,
             filters=["sdssu"],
+            sample_times = np.arange(0.01, 20.0 + 0.5, 0.5)
         )
         if model_name == "Ka2017":
             init_kwargs['interpolation_type'] = "sklearn_gp"
-        lightcurve_model = model_lightcurve_function(**init_kwargs)
+        model_class = get_lc_model_from_modelname(model_name)
+        lightcurve_model = model_class(**init_kwargs)
         obs_times, lightcurve_from_function = lightcurve_model.gen_detector_lc(
-            sample_times=time_series, parameters=lightcurve_parameters
+            lightcurve_parameters,
         )
         #lightcurve_from_function["t"] = obs_times
-
+ 
         return lightcurve_from_function
 
     def compare_lightcurves(lightcurve_from_function, lightcurve_from_command_line):
@@ -212,8 +178,8 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
             cli_mags = lightcurve_from_command_line[filter_name]['mag']
             gen_mags = lightcurve_from_function[filter_name]
             assert all(np.isclose(
-                cli_mags[~np.isnan(gen_mags)],
-                gen_mags[~np.isnan(cli_mags)],
+                cli_mags[~np.isnan(cli_mags)],
+                gen_mags[~np.isnan(gen_mags)],
                 rtol=1e-3)), f"lightcurve tolerance for {filter_name} exceeded"
 
     def cleanup_files():
@@ -222,14 +188,12 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         """
         shutil.rmtree(test_directory, ignore_errors=True)
         assert not os.path.exists(test_directory), "test directory has not been deleted"
-    
+   
     injection_file = create_injection_from_command_line(model_name)
     command_line_lightcurve_dictionary = create_lightcurve_from_command_line(
-        model_name, injection_file
-    )
+                                            model_name, injection_file )
     function_lightcurve_dictionary = create_lightcurve_from_function(
-        model_name, injection_file, model_lightcurve_function
-    )
+                                            model_name, injection_file )
 
     compare_lightcurves(
         function_lightcurve_dictionary, command_line_lightcurve_dictionary
@@ -240,16 +204,9 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
 
 
 def test_injections():
-    lightcurve_models = {
-        "nugent-hyper": SupernovaLightCurveModel,
-        "salt2": SupernovaLightCurveModel,
-        "Me2017": SimpleKilonovaLightCurveModel,
-        "Piro2021": ShockCoolingLightCurveModel,
-        "TrPi2018": GRBLightCurveModel,
-        "Ka2017": SVDLightCurveModel,
-    }
-    for model_name, model_lightcurve_function in lightcurve_models.items():
-        lightcurveInjectionTest(model_name, model_lightcurve_function)
+    for model_name in ["nugent-hyper", "salt2", "Me2017",
+                        "Piro2021", "TrPi2018", "Ka2017"]:
+        lightcurveInjectionTest(model_name)
 
 def test_validate_lightcurves():
     print("validate_lightcurve test")

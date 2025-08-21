@@ -179,3 +179,9 @@ def read_saved_state(resume_file):
         logger.info(f"Resume file {resume_file} does not exist.")
         return False, 0
 
+
+def checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot=False):
+    write_current_state(sampler, resume_file, sampling_time )
+    write_sample_dump(sampler, samples_file, run.sampling_keys, run.rstate)
+    if checkpoint_plot:
+        plot_current_state(sampler, run.sampling_keys, run.outdir, run.label)

@@ -9,9 +9,7 @@ import datetime
 import time
 import signal
 
-import bilby
 import numpy as np
-from bilby.core.utils import logger
 from nestcheck import data_processing
 from pandas import DataFrame
 
@@ -21,11 +19,7 @@ from .. import pb_utils
 from ..multi_parsing import create_nmma_analysis_parser, parse_analysis_args
 from .analysis_run import MainRun, WorkerRun
 
-def checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot=False):
-    pb_utils.write_current_state(sampler, resume_file, sampling_time )
-    pb_utils.write_sample_dump(sampler, samples_file, run.sampling_keys, run.rstate)
-    if checkpoint_plot:
-        pb_utils.plot_current_state(sampler, run.sampling_keys, run.outdir, run.label)
+from bilby.core.utils import logger
 
 def analysis_runner(
     data_dump,
@@ -77,8 +71,7 @@ def analysis_runner(
     # Otherwise emulators retrace on each evaluation.
     global worker_run
     worker_run = WorkerRun(
-        data_dump,
-        bilby_zero_likelihood_mode= bilby_zero_likelihood_mode
+        data_dump, bilby_zero_likelihood_mode
     )
     t0 = datetime.datetime.now()
     sampling_time = 0
@@ -161,7 +154,7 @@ def analysis_runner(
                 logger.info("Received SIGTERM, writing checkpoint and exiting.")
                 pool.abort()
                 ## no time for plotting when file_size becomes larger
-                checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot=False)
+                pb_utils.checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot=False)
                 logger.info("Exited gracefully.")
                 sys.exit(0)
 
@@ -198,7 +191,7 @@ def analysis_runner(
                     or it == max_its
                     or run_time > max_run_time
                 ):
-                    checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot)
+                    pb_utils.checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot)
                     if it == max_its:
                         exit_reason = 1
                         logger.info(
@@ -222,7 +215,7 @@ def analysis_runner(
                     pass
 
                 # Create a final checkpoint and set of plots
-                checkpointing( run, sampler, resume_file, samples_file.replace('.parquet','.dat'), sampling_time, checkpoint_plot)
+                pb_utils.checkpointing( run, sampler, resume_file, samples_file.replace('.parquet','.dat'), sampling_time, checkpoint_plot)
 
                 sampling_time += (datetime.datetime.now() - t0).total_seconds()
 
@@ -232,9 +225,7 @@ def analysis_runner(
                     logger.info("Creating nestcheck files")
                     ns_run = data_processing.process_dynesty_run(out)
                     nestcheck_path = os.path.join(run.outdir, "Nestcheck")
-                    bilby.core.utils.check_directory_exists_and_if_not_mkdir(
-                        nestcheck_path
-                    )
+                    os.makedirs(nestcheck_path, exist_ok=True)
                     nestcheck_result = f"{nestcheck_path}/{run.label}_nestcheck.pickle"
 
                     with open(nestcheck_result, "wb") as file_nest:
@@ -304,11 +295,9 @@ def nmma_analysis():
     This function is a wrapper around analysis_runner(),
     giving it a command line interface.
     """
-    cli_args = sys.argv[1:]
-
     # Parse command line arguments
     analysis_parser = create_nmma_analysis_parser(sampler="dynesty")
-    input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
+    input_args = parse_analysis_args(analysis_parser)
 
     # Run the analysis
     analysis_runner(**vars(input_args))

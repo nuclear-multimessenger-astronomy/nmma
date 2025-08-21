@@ -11,7 +11,6 @@ def mpi_barrier(comm):
         comm.Barrier()
 
 def refresh_models_list(models_home=None, source=None):
-
     if source is None:
         source = SOURCES[0]
     if source not in ["gitlab"]:

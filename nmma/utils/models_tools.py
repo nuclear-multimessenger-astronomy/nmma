@@ -24,7 +24,7 @@ SKIP_FILTERS = [
 
 
 def get_models_home(models_home=None) -> str:
-    if models_home is None:
+    if not models_home:
         models_home = environ.get("NMMA_MODELS", join("~", "nmma_models"))
     models_home = expanduser(models_home)
     if not exists(models_home):
