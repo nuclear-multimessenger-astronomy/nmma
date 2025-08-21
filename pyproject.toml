@@ -39,40 +39,27 @@ optional-dependencies.doc = { file = ["doc_requirements.txt"] }
 optional-dependencies.grb = { file = ["grb_requirements.txt"] }
 optional-dependencies.production = { file = ["production_requirements.txt"] }
 optional-dependencies.neuralnet = { file = ["ml_requirements.txt"] }
-optional-dependencies.sklearn = { file = ["sklearn_requirements.txt"] }
-optional-dependencies.tf = { file = ["tf_requirements.txt"] }
+optional-dependencies.training = { file = ["training_requirements.txt"] }
 optional-dependencies.sampler = { file = ["sampler_requirements.txt"] }
 
 [project.scripts]
-nmma-generation = "nmma.pbilby.generation:main_nmma"
-nmma-gw-generation = "nmma.pbilby.generation:main_nmma_gw"
-nmma-analysis = "nmma.pbilby.analysis:main_nmma"
-nmma-gw-analysis = "nmma.pbilby.analysis:main_nmma_gw"
+nmma-generation = "nmma.pbilby.generation:nmma_generation"
+nmma-analysis = "nmma.pbilby.analysis:nmma_analysis"
 lightcurve-analysis = "nmma.em.analysis:main"
-lightcurve-analysis-lbol = "nmma.em.analysis_lbol:main"
-lightcurve-analysis-condor = "nmma.em.analysis_condor:main"
-lightcurve-injection-summary = "nmma.em.injection_summary:main"
-lightcurve-injection-slurm-setup = "nmma.em.create_injection_slurm:main"
-lightcurve-injection-condor-setup = "nmma.em.create_injection_condor:main"
-lightcurve-manual = "nmma.em.manual:main"
-lightcurve-marginalization = "nmma.em.lightcurve_marginalization:main"
-combine-EOS = "nmma.em.combine_EOS:main"
-create-lightcurve-slurm = "nmma.em.create_lightcurves_slurm:main"
-create-lightcurve-condor = "nmma.em.create_lightcurves_condor:main"
-create-svdmodel = "nmma.em.create_svdmodel:main"
-svdmodel-benchmark = "nmma.em.svdmodel_benchmark:main"
-plot-svdmodel-benchmarks = "tools.plot_svdmodel_benchmarks:main"
+lightcurve-analysis-lbol = "nmma.em.analysis:lbol_main"
+lightcurve-injection-slurm-setup = "nmma.em.slurm_handling:main"
+combine-EOS = "nmma.post_processing.ns_characteristics:main"
+create-lightcurve-slurm = "nmma.em.slurm_handling:lc_creation"
+create-svdmodel = "nmma.em.training:create_svdmodel"
+svdmodel-benchmark = "nmma.em.training:benchmark"
+plot-svdmodel-benchmarks = "nmma.em.training:plot_benchmarks_cli"
 svdmodel-download = "nmma.utils.models:main"
-lightcurve-generation = "nmma.em.create_lightcurves:main"
-lightcurve-detection = "nmma.em.detect_lightcurves:main"
-lightcurve-validation = "nmma.em.validate_lightcurve:main"
-nmma-create-injection = "nmma.eos.create_injection:main"
-gwem-resampling = "nmma.em.gwem_resampling:main"
-gwem-resampling-condor = "nmma.em.gwem_resampling_condor:main"
-gwem-Hubble-estimate = "nmma.em.gwem_Hubble_estimate:main"
-maximum-mass-constraint = "nmma.joint.maximum_mass_constraint:main"
-convert-skyportal-lcs = "tools.convert_skyportal_lcs:main"
-resample-grid = "tools.resample_grid:main"
+lightcurve-generation = "nmma.em.lightcurve_handling:lcs_from_injection_parameters"
+nmma-create-injection = "nmma.joint.injection_handling:main"
+gwem-resampling = "nmma.post_processing.resampling:main_resampling"
+gwem-Hubble-estimate = "nmma.post_processing.hubble_estimates:main"
+convert-skyportal-lcs = "nmma.em.io:convert_skyportal_lcs"
+resample-grid = "nmma.em.lightcurve_handling:resample_lightcurve_grid"
 multi-config-analysis = "nmma.em.multi_config_analysis:main"
 
 [project.urls]
@@ -124,9 +111,11 @@ profile = "black"
 
 [tool.pytest.ini_options]
 addopts = "--verbose -r s"
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "session"
 
 [tool.bumpver]
-current_version = "0.2.2"
+current_version = "1.0.0"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
 commit_message = "bump version {old_version} -> {new_version}"
 commit = true

@@ -24,7 +24,7 @@ SKIP_FILTERS = [
 
 
 def get_models_home(models_home=None) -> str:
-    if models_home is None:
+    if not models_home:
         models_home = environ.get("NMMA_MODELS", join("~", "nmma_models"))
     models_home = expanduser(models_home)
     if not exists(models_home):
@@ -41,9 +41,11 @@ def download(file_info):
     url, filepath = file_info
     resp = requests.get(url, stream=True)
     total = int(resp.headers.get("content-length", 0))
-    chunk_size = 1024
+    chunk_size = 4096
     file_content = b""
-    with tqdm(
+
+    Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+    with open(filepath, "wb") as f, tqdm(
         total=total,
         unit="iB",
         unit_scale=True,
@@ -51,7 +53,7 @@ def download(file_info):
         desc=f"{str(filepath).split('/')[-1]}",
     ) as pbar:
         for chunk in resp.iter_content(chunk_size=chunk_size):
-            file_content += chunk
+            f.write(chunk)
             pbar.update(len(chunk))
 
     if len(file_content) != total:
@@ -59,13 +61,6 @@ def download(file_info):
             f"Downloaded file {filepath} is incomplete. "
             f"Only {len(file_content)} of {total} bytes were downloaded."
         )
-    if not exists(Path(filepath).parent):
-        try:
-            makedirs(Path(filepath).parent)
-        except Exception:
-            pass
-    with open(filepath, "wb") as f:
-        f.write(file_content)
 
     return filepath
 

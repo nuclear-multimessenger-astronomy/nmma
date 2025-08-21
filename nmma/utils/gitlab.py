@@ -214,6 +214,6 @@ def get_model(
                 max_workers=min(len(missing), max(cpu_count(), 8))
             ) as executor:
                 executor.map(download_and_decompress, missing)
-        mpi_barrier(comm)
+        # mpi_barrier(comm)  ## this leads to pending indefinitely as we have a second barrier in models.py
 
     return [str(f) for f in filepaths], filters + skipped_filters

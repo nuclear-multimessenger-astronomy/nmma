@@ -1,71 +1,226 @@
 import json
-import astropy
+import os
+import argparse
+from astropy.table import Table
 from astropy.time import Time
 import h5py
 import numpy as np
 import pandas as pd
-from scipy.interpolate import interpolate as interp
+from bilby.core.utils import decode_bilby_json
 import scipy.signal
-from sncosmo.bandpasses import _BANDPASSES
+
+# from sncosmo.bandpasses import _BANDPASSES
 
 
-def loadEvent(filename):
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def load_em_observations(filename, args=None, format='observations'):
     """
-    Reads in lightcurve data from a file and returns data in a dictionary format.
+    Reads in lightcurve data from a file and returns data in nmma standard format.
+
+    Available formats are
     
     Args:
-    - filename (str): Path to lightcurve file
-    
+    - filename (str): 
+        Path to lightcurve file
+    - args (Namespace, optional):
+        Namespace containing additional arguments, such as time format.
+        If not provided, the function will use the default time format 'mjd'.
+    - format (str): 
+        The format of the input file. This can be 'standard', 'observations' or 'model'.
+        'standard' uses the internal format of nmma lightcurve data as a dict in the form {filter_name: {'time': observation_times (list), 'mag': observed_magnitudes (list), 'mag_error': observed_errors (list)}}.
+        'observations' uses the format of observations as a text file with columns: time, filter, mag, mag_error and transforms them to a dict in the same format as 'standard'.
+        'model' uses the format of model lightcurves as a text file with columns: time, filter1, filter2, ..., filterN, filter1_error, ..., filterN_error and transforms them to a dict in the same format as 'standard'.
+
     Returns:
     - data (dict): Dictionary containing the lightcurve data from the file. The keys are generally 't' and each of the filters in the file as well as their accompanying error values.
     """
+    if isinstance(filename, argparse.Namespace):
+        args = filename
+        filename = args.light_curve_data
+    
     if filename.endswith(".json"):
-        with open(filename) as f:
-            data = json.load(f)
-            for key in data.keys():
-                data[key] = np.array(data[key])
+        data =  read_lc_from_json(filename)
+    
     else:
-        lines = [line.rstrip("\n") for line in open(filename)]
-        lines = filter(None, lines)
+        data =  read_lc_from_csv(filename, args, format=format)
+    return {filt: 
+            {k: np.array(vals) for k, vals in filt_dict.items()} 
+            for filt, filt_dict in data.items()}
 
-        sncosmo_filts = [val["name"] for val in _BANDPASSES.get_loaders_metadata()]
-        sncosmo_maps = {name: name.replace(":", "_") for name in sncosmo_filts}
 
-        data = {}
-        for line in lines:
-            lineSplit = line.split(" ")
-            lineSplit = list(filter(None, lineSplit))
-            mjd = Time(lineSplit[0], format="isot").mjd
-            filt = lineSplit[1]
+def read_lc_from_json(filename):
+    # we assume the json file is in the standard format
+    with open(filename, "r") as f:
+        data = json.load(f, object_hook=decode_bilby_json)
 
-            if filt in sncosmo_maps:
-                filt = sncosmo_maps[filt]
-
-            mag = float(lineSplit[2])
-            dmag = float(lineSplit[3])
-
-            if filt not in data:
-                data[filt] = np.empty((0, 3), float)
-            data[filt] = np.append(data[filt], np.array([[mjd, mag, dmag]]), axis=0)
+    # but we check - if given in 'model' format, we are ready to convert it
+    if "time" in data: # indicates model_format
+        new_data = {}
+        for key, value in data.items():
+            if key != "time" and not key.endswith("_error"):
+                new_data[key] = {
+                    "time": data["time"],
+                    "mag": value,
+                    "mag_error": data.get(f"{key}_error", np.zeros_like(data["time"]))
+                }
+        data = new_data
 
     return data
 
+def read_lc_from_csv(filename, args, format):
+    if "obs" in format:
+        with open(filename, "r") as f:
+            lines = [line.rstrip("\n") for line in f]
+            lines = filter(None, lines) #get non-empty lines
 
-def loadEventSpec(filename):
+            data = {}
+            for line in lines:
+                lineSplit = line.split(" ")
+                lineSplit = list(filter(None, lineSplit))
+                try:
+                    mjd = Time(lineSplit[0]).mjd
+                except ValueError:
+                    mjd = Time(lineSplit[0], format=getattr(args, "time_format", "mjd")).mjd
+                filt = lineSplit[1]
+                mag = float(lineSplit[2])
+                dmag = float(lineSplit[3])
 
-    data_out = np.loadtxt(filename)
-    spec = {}
+                try:
+                    data[filt]['time'].append(mjd)
+                    data[filt]['mag'].append(mag)
+                    data[filt]['mag_error'].append(dmag)
+                except KeyError:
+                    data[filt] = {'time': [mjd], 'mag': [mag], 'mag_error': [dmag]}
+        return data
 
-    spec["lambda"] = data_out[:, 0]  # Angstroms
-    spec["data"] = np.abs(data_out[:, 1])  # ergs/s/cm2./Angs
-    spec["error"] = np.zeros(spec["data"].shape)  # ergs/s/cm2./Angs
-    spec["error"][:-1] = np.abs(np.diff(spec["data"]))
-    spec["error"][-1] = spec["error"][-2]
-    idx = np.where(spec["error"] <= 0.5 * spec["data"])[0]
-    spec["error"][idx] = 0.5 * spec["data"][idx]
 
-    return spec
+    elif 'model' in format:
+        #FIXME 
+        # For model lightcurves, the format is a simple text file with columns:
+        # time, filter1, filter2, ..., filterN. filter1_error, ..., filterN_error are optional
+        try:
+            data = pd.read_csv(filename, delim_whitespace=True)
+        except:
+            data = pd.read_json(filename, orient = 'columns')
 
+        data = data.to_dict(orient="list")
+        time = data.pop("time")
+        data = {filt: {'time':time, 'mag': mag, 'mag_error': data.get(filt + "_error", np.zeros_like(time))} for filt, mag in data.items() if not filt.endswith("_error")}
+
+        return data
+    elif format == "standard":
+        raise ValueError("Standard format is not supported for reading from csv files. Please use json files instead.")
+
+def write_em_observations(filename, data, format='observations'):
+    # write json file in standard format or csv file, either in observations or model format
+    if filename.endswith(".json"):
+        write_lc_to_json(filename, data)
+    elif filename.endswith(".txt") or filename.endswith(".dat"):
+        write_lc_to_csv(filename, data, format=format)
+
+def write_lc_to_json(injection_outfile, data):
+    with open(injection_outfile, "w") as f:
+        json.dump(data, f, cls=NumpyEncoder, indent=2)
+
+def write_lc_to_csv(outfile, data, format= "observations"):
+    if format == "observations":
+        all_times, all_filters, all_mags, all_errs = [], [], [], []
+        for filt, sub_dict in data.items():
+            all_times.extend(sub_dict['time'])
+            all_mags.extend(sub_dict['mag'])
+            all_errs.extend(sub_dict['mag_error'])
+            all_filters.extend([filt] * len(sub_dict['time']))
+        sort_indices = np.argsort(all_times)
+        out_data = [
+            [Time(all_times[i], format="mjd").mjd, all_filters[i], all_mags[i], all_errs[i]] 
+            for i in sort_indices]
+        np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error", comments="#")
+        
+    elif format == "model":
+        # Lightcurve as issued by model, with or without errors
+        mags, errs = [], []
+        for filt, sub_dict in data.items():
+            mags.append(sub_dict['mag'])
+            if not np.all(np.isnan(sub_dict['mag_error'])):
+                errs.append(sub_dict['mag_error'])
+        time = sub_dict['time']
+        out_data = np.column_stack((time, *mags, *errs))
+        header = "time " 
+        header += " ".join([filt for filt in data.keys()]) 
+        header += " ".join([filt + "_error" for filt in data.keys() if not np.all(np.isnan(data[filt]['mag_error']))])
+        np.savetxt(outfile, out_data, fmt="%.5f " + " ".join(["%.3f"] * (len(mags) + len(errs))), delimiter=" ", header=header, comments="#")
+
+    elif format in "bolometric":
+        # Bolometric lightcurve
+        time = data['time']
+        lbol = data['lbol']
+        out_data = np.column_stack((time, lbol))
+        np.savetxt( outfile, out_data, fmt="%.3f %.5e", delimiter=" ", header="t[days] Lbol[erg/s]" )
+
+def convert_skyportal_lcs(filepath=None):
+    if filepath is None:
+        p = argparse.ArgumentParser()
+        p.add_argument("--filepath",type=str,nargs="*",
+        help="path to lightcurve files" )
+        filepath = p.parse_args().filepath
+    if isinstance(filepath, str):
+        filepathes = [filepath]
+    elif isinstance(filepath, list):
+        filepathes = filepath
+    else:
+        raise ValueError("Invalid filepath")
+
+    for f in filepathes:
+        if not f.startswith("/"):
+            f = os.path.join(os.getcwd(), f)
+        try:
+            data = Table.read(f, format="ascii.csv")
+            # output the data in the format desired by NMMA:
+            # remove rows where mag and magerr are missing, or not float, or negative
+            data = data[
+                np.isfinite(data["mag"])
+                & np.isfinite(data["magerr"])
+                & (data["mag"] > 0)
+                & (data["magerr"] > 0)
+            ]
+        except Exception as e:
+            print(f"input data {f} is not in the expected format {e}")
+
+        try: 
+            out_data = [
+                [Time(row["mjd"], format="mjd").isot, row["filter"], row["mag"], row["magerr"]]
+                for row in data]
+            base, ext = os.path.splitext(f)
+            outfile = base + ".dat"
+            np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error")
+            print(f"Wrote reformatted lightcurve to {outfile}")
+        except Exception as e:
+            print(f"failed to format data in {f} {e}")
+    
+
+def read_training_data(filenames, format, data_type = "photometry", args=None):
+
+    # read the grid data
+    if data_type == "photometry":
+        try:
+            return read_photometry_files(filenames, format=format)
+        except IndexError:
+            raise IndexError(
+                "If there are bolometric light curves in your --data-path, try setting --ignore-bolometric"
+            )
+
+    elif data_type == "spectroscopy":
+        return read_spectroscopy_files(
+            filenames, wavelength_min=args.lmin, wavelength_max=args.lmax, smooth=True
+        )
+    else:
+        raise ValueError("data-type should be photometry or spectroscopy")
 
 def read_spectroscopy_files(
     files, wavelength_min=3000.0, wavelength_max=10000.0, smooth=False
@@ -107,7 +262,7 @@ def read_spectroscopy_files(
     return data
 
 
-def read_photometry_files(files: list, filters: list = None, tt: np.array = np.linspace(0, 14, 100), datatype:str ="bulla") -> dict:
+def read_photometry_files(files: list, filters: list = None, tt: np.array = np.linspace(0, 14, 100), format:str ="bulla") -> dict:
     """
     Read in a list of photometry files with given filenames and process them in a dictionary
     
@@ -115,18 +270,18 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
         files (list): List of filenames with the photometry files.
         filters (list): List of photometry filters to be extracted.
         tt (np.array): Array containing the time grid at which photometry values are given.
-        datatype (str): Which model we are considering. Currently supports
+        format (str): Which model we are considering. Currently supports
         
     Returns:
         data: Dictionary with keys being the given filenames and values being dictionaries themselves, with keys 
         being t (time) and specified filters and values being the time grid, and values the time grid and lightcurves.
     """
     
-    # First, check whether given datatype is supported in this function
-    supported_datatypes = ["ztf", "bulla", "standard", "hdf5"]
-    if datatype not in supported_datatypes:
+    # First, check whether given format is supported in this function
+    supported_formats = ["ztf", "bulla", "standard", "hdf5"]
+    if format not in supported_formats:
         space = " "
-        raise ValueError(f"datatype {datatype} unknown. Currently supported datatypes are: {space.join(supported_datatypes)}")
+        raise ValueError(f"format {format} unknown. Currently supported formats are: {space.join(supported_formats)}")
 
     # Return value 
     data = {}
@@ -143,7 +298,7 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
         )
 
         # ZTF rest style file
-        if datatype == "ztf":
+        if format == "ztf":
             df = pd.read_csv(filename)
 
             if "mag" in df:
@@ -176,17 +331,12 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
                 idx = np.where(group[magerror_key] != 99.0)[0]
                 if len(idx) < 2:
                     continue
-                lc = interp.interp1d(
+                data[name][filt] = np.interp(tt,
                     group["jd"].iloc[idx] - jd_min,
-                    group[mag_key].iloc[idx],
-                    fill_value=np.nan,
-                    bounds_error=False,
-                    assume_sorted=True,
-                )
-                data[name][filt] = lc(tt)
+                    group[mag_key].iloc[idx],left=np.nan, right=np.nan )
         
-        # Bulla datatype
-        elif datatype == "bulla":
+        # Bulla format
+        elif format == "bulla":
             with open(filename, "r") as f:
                 header = list(filter(None, f.readline().rstrip().strip("#").split(" ")))
             df = pd.read_csv(
@@ -199,12 +349,9 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
             )
             df.rename(columns={"t[days]": "t"}, inplace=True)
             data[name] = df.to_dict(orient="series")
-            data[name] = {
-                k.replace(":", "_"): v.to_numpy() for k, v in data[name].items()
-            }
 
-        # Standard datatype
-        elif datatype == "standard":
+        # Standard format
+        elif format == "standard":
             mag_d = np.loadtxt(filename)
             mag_d_shape = mag_d.shape
 
@@ -227,12 +374,12 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
                 data[name]["R"] = mag_d[:, 13]
                 data[name]["I"] = mag_d[:, 14]
 
-        # HDF5 datatype
-        elif datatype == "hdf5":
+        # HDF5 format
+        elif format == "hdf5":
             f = h5py.File(filename, "r")
             keys = list(f.keys())
             for key in keys:
-                df = astropy.table.Table(f[key]).to_pandas()
+                df = Table(f[key]).to_pandas()
                 df.rename(
                     columns={
                         "2MASS_J": "2massj",
@@ -266,9 +413,9 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
                     inplace=True,
                 )
                 data[key] = df.to_dict(orient="series")
-                data[key] = {
-                    k.replace(":", "_"): v.to_numpy() for k, v in data[key].items()
-                }
+                # data[key] = {
+                #     k.replace(":", "_"): v.to_numpy() for k, v in data[key].items()
+                # }
 
         # Finally, extract the desired filters from all filters present in the data
         if filters is not None:
@@ -279,22 +426,18 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
     return data
 
 
-def read_lightcurve_file(filename: str) -> dict:
-    """
-    Function to read in lightcurve file and create a dictionary containing the time (in days) at which the lightcurves 
-    are evaluated and the corresponding values for different filters.
-    """
+#FIXME Legacy??? seems unused
+def loadEventSpec(filename):
 
-    with open(filename, "r") as f:
-        header = list(filter(None, f.readline().rstrip().strip("#").split(" ")))
-    df = pd.read_csv(
-        filename,
-        delimiter=" ",
-        comment="#",
-        header=None,
-        names=header,
-        index_col=False,
-    )
-    df.rename(columns={"t[days]": "t"}, inplace=True)
+    data_out = np.loadtxt(filename)
+    spec = {}
 
-    return df.to_dict(orient="series")
+    spec["lambda"] = data_out[:, 0]  # Angstroms
+    spec["data"] = np.abs(data_out[:, 1])  # ergs/s/cm2./Angs
+    spec["error"] = np.zeros(spec["data"].shape)  # ergs/s/cm2./Angs
+    spec["error"][:-1] = np.abs(np.diff(spec["data"]))
+    spec["error"][-1] = spec["error"][-2]
+    idx = np.where(spec["error"] <= 0.5 * spec["data"])[0]
+    spec["error"][idx] = 0.5 * spec["data"][idx]
+
+    return spec

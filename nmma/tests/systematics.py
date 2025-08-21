@@ -67,20 +67,20 @@ def test_validate_filters_invalid():
 def test_handle_withTime():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": [["bessellb", "bessellv"], "ztfr"]}
     result = handle_withTime(values)
-    assert "sys_err_bessellb___bessellv1" in result[0]
-    assert "sys_err_ztfr2" in result[3]
+    assert "em_syserr_bessellb___bessellv0" in result[0]
+    assert "em_syserr_ztfr1" in result[3]
 
 
 def test_handle_withoutTime():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0}
     result = handle_withoutTime(values)
     assert len(result) == 1
-    assert "sys_err = Uniform(minimum=0.0, maximum=1.0, name='sys_err', latex_label='sys_err', unit=None, boundary=None)" in result[0]
+    assert "em_syserr = Uniform(minimum=0.0, maximum=1.0, name='em_syserr', latex_label='em_syserr', unit=None, boundary=None)" in result[0]
 
 
 def test_main(sample_yaml_file):
     result = main(sample_yaml_file)
-    assert all("sys_err" in line for line in result)
+    assert all("em_syserr" in line for line in result)
 
 
 def test_main_invalid_yaml(tmp_path):
@@ -141,14 +141,14 @@ def test_handle_withTime_single_filter():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": ["ztfr"]}
     result = handle_withTime(values)
     assert len(result) == 2
-    assert all("sys_err_ztfr" in line for line in result)
+    assert all("em_syserr_ztfr" in line for line in result)
 
 
 def test_handle_withTime_all_filters():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [None]}
     result = handle_withTime(values)
     assert len(result) == 1
-    assert "sys_err_all1" in result[0]
+    assert "em_syserr_all0" in result[0]
 
 
 def test_main_withoutTime(tmp_path):
@@ -166,7 +166,7 @@ config:
     yaml_file.write_text(yaml_content)
     result = main(yaml_file)
     assert len(result) == 1
-    assert "sys_err = Uniform" in result[0]
+    assert "em_syserr = Uniform" in result[0]
 
 
 def test_main_empty_config(tmp_path):
@@ -188,7 +188,7 @@ def test_all_allowed_filters(filter_name):
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [filter_name]}
     result = handle_withTime(values)
     assert len(result) == 1
-    assert f"sys_err_{filter_name}1" in result[0]
+    assert f"em_syserr_{filter_name}0" in result[0]
 
 
 def test_load_yaml_file_not_found():

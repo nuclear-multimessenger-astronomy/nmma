@@ -1,49 +1,31 @@
-import copy
-
-import json
 import numpy as np
 import os
 import pandas as pd
 import scipy.interpolate as interp
-import scipy.signal
-import scipy.constants
+from ast import literal_eval
 import scipy.stats
-from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
+from astropy import time
 
 import sncosmo
-import dust_extinction.shapes as dustShp
+from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
 
-from astropy.cosmology import Planck18, z_at_value
-import astropy.units
-import astropy.constants
+import dust_extinction.shapes as dustShp
 
 import matplotlib
 import matplotlib.pyplot as plt
-from nmma.em.training import SVDTrainingModel
-
-try:
-    import afterglowpy
-
-    AFTERGLOWPY_INSTALLED = True
-except ImportError:
-    print("Install afterglowpy if you want to simulate afterglows.")
-    AFTERGLOWPY_INSTALLED = False
-
-try:
-    from wrapt_timeout_decorator import timeout
-except ImportError:
-    print("Install wrapt_timeout_decorator if you want timeout simulations.")
-
-    def timeout(*args, **kwargs):
-        def inner(func):
-            return func
-
-        return inner
 
 
 import warnings
 
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
+
+
+import astropy.units
+from nmma.joint.conversion import distance_modulus_nmma
+### some frequently used constants:
+from nmma.joint.constants import c_cgs, c_SI, eV_per_h_SI
+
+
 
 # Define default filters variable for import in other parts of the code
 DEFAULT_FILTERS = [
@@ -76,17 +58,117 @@ DEFAULT_FILTERS = [
     "ultrasat",
 ]
 
+def set_filters(args):
+    filters = None  # default value
+    if args.filters:
+        filters = args.filters
+        if isinstance(filters, str):
+            filters = filters.split(",")
+        # do some cleaning for dirty command-line input
+        filters = [ f.replace(" ", "").split(",") for f in filters]
+        filters = [f for sublist in filters for f in sublist if f] # flatten the list
+        if len(filters) == 0:
+            raise ValueError("Need at least one valid filter.")
+    elif hasattr(args, "rubin_ToO_type"):
+        if args.rubin_ToO_type == 'platinum':
+            filters = ["ps1::g","ps1::r","ps1::i","ps1::z","ps1::y"]
+        elif args.rubin_ToO_type == 'gold':
+            filters = ["ps1::g","ps1::r","ps1::i"]
+        elif args.rubin_ToO_type == 'gold_z':
+            filters = ["ps1::g","ps1::r","ps1::z"]
+        elif args.rubin_ToO_type == 'silver':
+            filters = ["ps1::g""ps1::i"]
+        elif args.rubin_ToO_type == 'silver_z':
+            filters = ["ps1::g","ps1::z"]
+    return filters
+
+def setup_sample_times(args):
+    "create an array of sample times used for generating EM model lightcurves from args"
+    tmin = args.em_tmin
+    tmax = args.em_tmax
+
+    if tmin is None and tmax is None:
+        return None         # Default, we normally let the model decide the time range
+    
+    # first check the legacy case of a transient with a fixed time step
+    if args.em_tstep:
+        return np.arange(tmin, tmax + args.em_tstep, args.em_tstep)
+    
+    # otherwise, create the array based on selected scale
+    if 'lin' in args.em_timescale:
+        return np.linspace(tmin, tmax, args.em_nsteps)
+    elif any(scale in args.em_timescale for scale in ['log', 'geo']):
+        return np.geomspace(tmin, tmax, args.em_nsteps)
+    else:
+        raise ValueError(
+            f"Unknown time scale {args.em_timescale}. "
+            "Please use 'lin(ear)' or 'log(arithmic)' / 'geo(metric)'."
+        )
+
+def create_detection_limit(args, filters, default_limit = np.inf):
+    if filters is None:
+        return {}
+    
+    elif getattr(args, 'detection_limit', None) is None:
+        if getattr(args,'rubin_ToO_type', None):
+            detection_limit = {'ps1::g':25.8,'ps1::r':25.5,'ps1::i':24.8,'ps1::z':24.1,'ps1::y':22.9}
+        else:
+            detection_limit = default_limit
+    else:
+        detection_limit = literal_eval(args.detection_limit)
+
+    return set_filter_associated_dict(detection_limit, filters, default_limit)
+
+def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
+    if isinstance(quantity, (int, float)):
+        # If a single value is provided, apply it to all filters
+        return {x: float(quantity) for x in filters}
+    
+    elif isinstance(quantity, (list, tuple)):
+        assert len(quantity) == len(filters), (
+            f" {quantity} must match the number of filters: {filters}."
+        )
+        return {x: float(y) for x, y in zip(filters, quantity) }
+    
+    elif isinstance(quantity, dict):
+        # If a dict is provided, ensure it has the correct filters
+        return {filt: float(quantity.get(filt, default_limit)) for filt in filters}
+
+
+def read_trigger_time(parameters=None, args=None):
+    if parameters is not None:
+        if "trigger_time" in parameters:
+            return parameters["trigger_time"]
+        elif "geocent_time_x" in parameters:
+            return time.Time( parameters["geocent_time_x"], format="gps").mjd
+        elif "geocent_time" in parameters:
+            return time.Time(parameters["geocent_time"], format="gps").mjd
+    if args is not None:
+        if args.trigger_time:
+            return time.Time(args.trigger_time, format= args.time_format).mjd
+        elif args.gps:
+            return time.Time( args.gps, format="gps").mjd
+    
+    else:
+        print("Neither trigger_time, geocent_time nor geocent_time_x provided")
+        return None
+
+def transform_to_app_mag_dict(mag_dict, params):
+    d_lum = params.get("luminosity_distance", 1e-5) ## assume 10 pc =1e-5 Mpc for abs_mag
+    distance_modulus = distance_modulus_nmma(d_lum)
+    for k in mag_dict.keys():
+        mag_dict[k] += distance_modulus
+    return mag_dict
+
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
-
-    speed_of_light_cm_s = scipy.constants.c * 100.0
 
     # Return the extinction factor (e ^ -0.4 * Ax) for the
     # Pei 1992 SMC model
 
     # Get model wavelength range
-    ext_range_nu_lo = dustShp.P92.x_range[0] * 1e4 * speed_of_light_cm_s
-    ext_range_nu_hi = min(cutoff_hi, dustShp.P92.x_range[1] * 1e4 * speed_of_light_cm_s)
+    ext_range_nu_lo = dustShp.P92.x_range[0] * 1e4 * c_cgs
+    ext_range_nu_hi = min(cutoff_hi, dustShp.P92.x_range[1] * 1e4 * c_cgs)
 
     # host-frame frequencies
     nu_host = nu * (1 + z)
@@ -95,7 +177,7 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
     opt = (nu_host >= ext_range_nu_lo) & (nu_host <= ext_range_nu_hi)
 
     # host-frame wavelengths
-    lam_host = (speed_of_light_cm_s / nu_host[opt]) * astropy.units.cm
+    lam_host = (c_cgs / nu_host[opt]) * astropy.units.cm
 
     # amplitudes have to be converted from B reference to V
     abav = dustShp.P92.AbAv
@@ -137,25 +219,6 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
     return ext
 
 
-def getRedShift(parameters):
-
-    if "redshift" in parameters:
-        z = parameters["redshift"]
-    else:
-        if parameters["luminosity_distance"] > 0:
-            z = z_at_value(
-                Planck18.luminosity_distance,
-                parameters["luminosity_distance"] * astropy.units.Mpc,
-                zmin=0.0,
-                zmax=2.0,
-            )
-            if hasattr(z, "value"):
-                z = z.value
-        else:
-            z = 0.0
-    return z
-
-
 def get_all_bandpass_metadata():
     """
     Retrieves and combines the metadata for all registered bandpasses and interpolators.
@@ -171,9 +234,14 @@ def get_all_bandpass_metadata():
 
     return combined_metadata
 
+def get_filter_name_mapping(observed_filters):
+    """
+    Creates a mapping of filter names between their observation channel signature and a corresponding model filter.
 
-def getFilteredMag(mag, filt):
-    unprocessed_filt = [
+    Returns:
+        dict: A dictionary mapping between observed and modelled filters.
+    """
+    unprocessed_filts = [
         "u",
         "g",
         "r",
@@ -189,100 +257,165 @@ def getFilteredMag(mag, filt):
         "radio-1.25GHz",
         "radio-6GHz",
         "radio-3GHz",
-        "sdss__u",
-        "sdss__g",
-        "sdss__r",
-        "sdss__i",
-        "sdss__z",
-        "swope2__y",
-        "swope2__J",
-        "swope2__H",
+        "sdss::u",
+        "sdss::g",
+        "sdss::r",
+        "sdss::i",
+        "sdss::z",
+        "swope2::y",
+        "swope2::J",
+        "swope2::H",
     ]
-    sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
-    sncosmo_maps = {
-        name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts
-    }
-    sncosmo_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
+    unprocessed_filts.extend([val["name"] for val in get_all_bandpass_metadata()])
+    filter_maps = {name:name for name in unprocessed_filts}
 
+    # FIXME: Left here as a reminder, to be removed 
+    # sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
+    # filter_maps.update({name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts})
+    # filter_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
+
+    #hardcoded filter names
+    filter_maps.update({
+        'B': 'g',
+        'R': 'z',
+        'F160W':'H',
+        'U': 'u',
+        'UVW2': 'u',
+        'UVW1': 'u',
+        'UVM2': 'u' 
+        })
+
+    direct_map = {}
+    averaging_map= {}
+
+    if isinstance(observed_filters, str):
+        # If a single filter is provided as a string, convert it to a list
+        observed_filters = [observed_filters]
+
+    for obs_filt in observed_filters:
+        if obs_filt in filter_maps:
+            direct_map[obs_filt] = filter_maps[obs_filt]
+        elif obs_filt.startswith("radio") or obs_filt.startswith("X-ray"):
+            direct_map[obs_filt] = obs_filt
+        else:
+            averaging_map[obs_filt] = map_observable_to_modelled_filters(obs_filt)
+        
+
+    return direct_map, averaging_map
+
+def map_observable_to_modelled_filters(obs_filter):
+    # NOTE: this is a hardcoded mapping of observable filters to modelled filters,
+    # needs to correspond to the filters in average_mags
+    map_dict = {'w':["g", "r", "i"],
+                'o': ["r", "i"],
+                }
+    for filt in ["c", "V", "F606W"]:
+        map_dict[filt] = ["g", "r"]
+    for filt in ["I", "F814W"]:
+        map_dict[filt] = ["z", "y"]
+    if obs_filter in map_dict:
+        return map_dict[obs_filter]
+    else:
+        raise ValueError(f"Unknown filter: {obs_filter}. Cannot be processed")
+
+def average_mags(mag, filt):
     # These average between filters is equivalent to
     # the geometric mean of the flux. These averages
     # are kind of justifiable because the spectral
     # commonly goes as F_\nu \propto \nu^\alpha,
     # where \nu is the frequency.
-    if filt in unprocessed_filt or filt.startswith(("radio", "X-ray")):
-        return mag[filt]
-    elif filt in sncosmo_maps:
-        return mag[sncosmo_maps[filt]]
-    elif filt == "w":
+    
+
+    ## NOTE: If editing, also update the corresponding part 
+    # in map_observable_to_modelled_filters
+    if filt == "w":
         return (mag["g"] + mag["r"] + mag["i"]) / 3.0
-    elif filt in ["U", "UVW2", "UVW1", "UVM2"]:
-        return mag["u"]
-    elif filt == "B":
-        return mag["g"]
     elif filt in ["c", "V", "F606W"]:
-        return (mag["g"] + mag["r"]) / 2.0
+        return(mag["g"] + mag["r"]) / 2.0
     elif filt == "o":
         return (mag["r"] + mag["i"]) / 2.0
-    elif filt == "R":
-        return mag["z"]
     elif filt in ["I", "F814W"]:
-        return (mag["z"] + mag["y"]) / 2.0
-    elif filt == "F160W":
-        return mag["H"]
+        return(mag["z"] + mag["y"]) / 2.0
     else:
         raise ValueError(f"Unknown filter: {filt}")
+    
+    
+    
+def get_filtered_mag(mag, filt):
+    direct_map, averaging_filters = get_filter_name_mapping(filt)
+    if filt in averaging_filters:
+        return average_mags(mag, filt)
+    else:
+        return mag[direct_map[filt]]
 
-
-def dataProcess(raw_data, filters, triggerTime, tmin, tmax):
-    processedData = copy.deepcopy(raw_data)
-    for filt in filters:
-        if filt not in processedData:
-            continue
-        time = processedData[filt][:, 0]
-        mag = processedData[filt][:, 1]
-        dmag = processedData[filt][:, 2]
-        # shift the time by the triggerTime
-        time -= triggerTime
-
-        # filter the out of range data
-        idx = np.where((time > tmin) * (time < tmax))[0]
-
-        data = np.vstack((time[idx], mag[idx], dmag[idx])).T
-        processedData[filt] = data
-
-    return processedData
-
-
-def interpolate_nans(data: dict) -> dict:
+def interpolate_nans(data_dict: dict) -> dict:
     """
     Interpolates the NaN values in a photometric data.
 
     Args:
-        data (dict): Dictionary containing photometric data. The keys correspond to the filenames
+        data_dict (dict): Dictionary containing photometric data. The keys correspond to the filenames
         of the data. The values are dictionaries of which the keys correspond to time (t) or the filters considered.
         The corresponding values are the time grid (in days) and the magnitudes of the different filters.
     """
 
     # Iterate over all the data files
-    for name in data.keys():
+    for name, sub_dict in data_dict.items():
         # For each file, iterate over the time or the filters present
-        for d in data[name].keys():
+        for key, val in sub_dict.items():
             # Skip over the time grid and filters which have no NaN values
-            if d == "t":
+            if key == "t":
+                time_array = val
                 continue
-            if not any(np.isnan(data[name][d])):
+            if not any(np.isnan(val)):
                 continue
 
-            # Find indices where the data is not NaN for interpolation values
-            ii = np.where(~np.isnan(data[name][d]))[0]
-            if len(ii) > 1:
-                f = interp.interp1d(
-                    data[name]["t"][ii], data[name][d][ii], fill_value="extrapolate"
-                )
-                # Do the interpolation
-                data[name][d] = f(data[name]["t"])
+            interpolated_data = autocomplete_data(time_array, time_array, val)
+            ##interpolated_data contains only nans, if there were not at least 2 usable data points
+            if np.isnan(interpolated_data[0]):
+                continue
+            
+            data_dict[name][key] = interpolated_data
+                
 
-    return data
+    return data_dict
+
+def autocomplete_data(interp_points, ref_points, ref_data, extrapolate='linear', ref_value=np.inf):
+    """
+    Interpolates and extrapolates reference data to a 1-D array of arguments. This can be wide off!
+    This basically extends np.interp to ignore nans and provide simple extrapolations. 
+    """
+    
+    data_mask = np.isfinite(ref_data)
+    if np.sum(data_mask) < 2:
+        return np.full_like(interp_points, ref_value)
+    
+    fin_ref= np.asarray(ref_points)[data_mask]
+    fin_data=np.asarray(ref_data)[data_mask]
+    interp_points=np.atleast_1d(interp_points)
+
+    if isinstance(extrapolate, (float , int)):
+        interp_data = np.interp(interp_points, fin_ref, fin_data,
+                                 left=extrapolate, right=extrapolate)
+      
+    elif isinstance(extrapolate, str):
+        if extrapolate=='spline':
+            spline = interp.UnivariateSpline(fin_ref, fin_data, s=ref_value)
+            interp_data = spline(interp_points)
+
+        if extrapolate=='linear':
+            interp_data = np.interp(interp_points, fin_ref, fin_data)
+            x0, x1, xm, xn = fin_ref[ [0,1,-2,-1]]
+            y0, y1, ym, yn = fin_data[[0,1,-2,-1]]
+            lower_extrap_args= np.argwhere(interp_points<x0)
+            interp_data[lower_extrap_args] = y0 + (y1-y0)/(x1-x0)*(interp_points[lower_extrap_args]-x0)
+            upper_extrap_args = np.argwhere(interp_points>xn)
+            interp_data[upper_extrap_args] = yn + (yn-ym)/(xn-xm)*(interp_points[upper_extrap_args]-xn)
+        ## TODO Allow more sophisticated treatment of extrapolation
+    
+    else:
+        interp_data = np.interp(interp_points, fin_ref, fin_data,
+                                 left=extrapolate[0], right=extrapolate[-1])   
+    return interp_data
 
 
 def get_default_filts_lambdas(filters=None):
@@ -313,10 +446,8 @@ def get_default_filts_lambdas(filters=None):
         [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
     )
     lambdas_bessel = 1e-10 * np.array([3605.07, 4413.08, 5512.12, 6585.91, 8059.88])
-    lambdas_radio = scipy.constants.c / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray = scipy.constants.c / (
-        np.array([1e3, 5e3]) * scipy.constants.eV / scipy.constants.h
-    )
+    lambdas_radio = c_SI / np.array([1.25e9, 3e9, 5.5e9, 6e9])
+    lambdas_Xray  = c_SI /(np.array([1e3, 5e3]) * eV_per_h_SI)
 
     lambdas = np.concatenate(
         [lambdas_sloan, lambdas_bessel, lambdas_radio, lambdas_Xray]
@@ -324,19 +455,11 @@ def get_default_filts_lambdas(filters=None):
 
     bandpasses = []
     for val in get_all_bandpass_metadata():
-        if val["name"] in [
-            "ultrasat",
-            "megacampsf::u",
-            "megacampsf::g",
-            "megacampsf::r",
-            "megacampsf::i",
-            "megacampsf::z",
-            "megacampsf::y",
-        ]:
+        try:
+            bandpass = sncosmo.get_bandpass(val["name"])
+        except:
             bandpass = sncosmo.get_bandpass(val["name"], 3)
             bandpass.name = bandpass.name.split()[0]
-        else:
-            bandpass = sncosmo.get_bandpass(val["name"])
 
         bandpasses.append(bandpass)
 
@@ -349,947 +472,63 @@ def get_default_filts_lambdas(filters=None):
 
         for filt in filters:
             if filt.startswith("radio") and filt not in filts:
-                # for additional radio filters that not in the list
-                # calculate the lambdas based on the filter name
-                # split the filter name
-                freq_string = filt.replace("radio-", "")
-                freq_unit = freq_string[-3:]
-                freq_val = float(freq_string.replace(freq_unit, ""))
-                # make use of the astropy.units to be more flexible
-                freq = astropy.units.Quantity(freq_val, unit=freq_unit)
-                freq = freq.to("Hz").value
+                # for additional radio filters that are not in the list
+                freq = extract_unit(filt, "radio", "Hz")
                 # adding to the list
                 filts_slice.append(filt)
-                lambdas_slice.append(scipy.constants.c / freq)
+                lambdas_slice.append(c_SI / freq)
             elif filt.startswith("X-ray-") and filt not in filts:
                 # for additional X-ray filters that not in the list
-                # calculate the lambdas based on the filter name
-                # split the filter name
-                energy_string = filt.replace("X-ray-", "")
-                energy_unit = energy_string[-3:]
-                energy_val = float(energy_string.replace(energy_unit, ""))
-                # make use of the astropy.units to be more flexible
-                energy = astropy.units.Quantity(energy_val, unit=energy_unit)
-                freq = energy.to("eV").value * scipy.constants.eV / scipy.constants.h
+                freq = extract_unit(filt, "X-ray", "eV") * eV_per_h_SI
                 # adding to the list
                 filts_slice.append(filt)
-                lambdas_slice.append(scipy.constants.c / freq)
+                lambdas_slice.append(c_SI / freq)
             else:
                 try:
                     ii = filts.index(filt)
                     filts_slice.append(filts[ii])
                     lambdas_slice.append(lambdas[ii])
                 except ValueError:
-                    ii = filts.index(filt.replace("_", ":"))
-                    filts_slice.append(filts[ii].replace(":", "_"))
-                    lambdas_slice.append(lambdas[ii])
+                    print(f"Warning: {filt} not found in filter list.")
+                    # ii = filts.index(filt.replace("_", ":"))
+                    # filts_slice.append(filts[ii].replace(":", "_"))
+                    # lambdas_slice.append(lambdas[ii])
 
         filts = filts_slice
         lambdas = np.array(lambdas_slice)
 
     return filts, lambdas
 
-
-def calc_lc(
-    tt: np.array,
-    param_list: np.array,
-    svd_mag_model: SVDTrainingModel = None,
-    svd_lbol_model: SVDTrainingModel = None,
-    mag_ncoeff: int = None,
-    lbol_ncoeff: int = None,
-    interpolation_type: str = "sklearn_gp",
-    filters: list = None,
-) -> "tuple[np.array, np.array, np.array]":
-    """
-    Computes the lightcurve from a surrogate model, given the model parameters.
-    Args:
-        tt (Array): Time grid on which to evaluate lightcurve
-        param_list (Array): Input parameters for the surrogate model
-        svd_mag_model (SVDTrainingModel): Trained surrogate model for mag
-        svd_lbol_model (SVDTrainingModel): Trained surrogate model for lbol
-        mag_ncoeff (int): Number of coefficients after SVD projection for mag
-        lbol_ncoeff (int): Number of coefficients after SVD projection for lbol
-        interpolation_type (str): String denoting which interpolation type is used for the surrogate model
-        filters (Array): List/array of filters at which we want to evaluate the model
-    """
-
-    mAB = {}
-
-    if filters is None:
-        filters = list(svd_mag_model.keys())
-    else:
-        # add null output for radio and X-ray filters
-        for filt in filters:
-            if filt.startswith(("radio", "X-ray")):
-                mAB[filt] = np.inf * np.ones(len(tt))
-
-    for jj, filt in enumerate(filters):
-        if filt in mAB:
-            continue
-
-        if mag_ncoeff:
-            n_coeff = min(mag_ncoeff, svd_mag_model[filt]["n_coeff"])
-        else:
-            n_coeff = svd_mag_model[filt]["n_coeff"]
-        # param_array = svd_mag_model[filt]["param_array"]
-        # cAmat = svd_mag_model[filt]["cAmat"]
-        VA = svd_mag_model[filt]["VA"]
-        param_mins = svd_mag_model[filt]["param_mins"]
-        param_maxs = svd_mag_model[filt]["param_maxs"]
-        mins = svd_mag_model[filt]["mins"]
-        maxs = svd_mag_model[filt]["maxs"]
-        tt_interp = svd_mag_model[filt]["tt"]
-
-        param_list_postprocess = np.array(param_list)
-        for i in range(len(param_mins)):
-            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
-                param_maxs[i] - param_mins[i]
-            )
-
-        if interpolation_type == "tensorflow":
-            model = svd_mag_model[filt]["model"]
-            cAproj = model(np.atleast_2d(param_list_postprocess)).numpy().T.flatten()
-            cAstd = np.ones((n_coeff,))
-        elif interpolation_type == "api_gp":
-            seed = 32
-            random_state = np.random.RandomState(seed)
-
-            gps = svd_mag_model[filt]["gps"]
-            cAproj = np.zeros((n_coeff,))
-            cAstd = np.zeros((n_coeff,))
-            for i in range(n_coeff):
-                gp = gps[i]
-                y_pred = gp.mean(np.atleast_2d(param_list_postprocess))
-                y_samples_test = gp.rvs(
-                    100,
-                    np.atleast_2d(param_list_postprocess),
-                    random_state=random_state,
-                )
-                y_90_lo_test, y_90_hi_test = np.percentile(
-                    y_samples_test, [5, 95], axis=1
-                )
-                cAproj[i] = y_pred
-                cAstd[i] = y_90_hi_test - y_90_lo_test
-        else:
-            gps = svd_mag_model[filt]["gps"]
-            if gps is None:
-                raise ValueError(
-                    f"Gaussian process model for filter {filt} unavailable."
-                )
-
-            cAproj = np.zeros((n_coeff,))
-            cAstd = np.zeros((n_coeff,))
-            for i in range(n_coeff):
-                gp = gps[i]
-                y_pred, sigma2_pred = gp.predict(
-                    np.atleast_2d(param_list_postprocess), return_std=True
-                )
-                cAproj[i] = np.squeeze(y_pred)
-                cAstd[i] = np.squeeze(sigma2_pred)
-
-        # coverrors = np.dot(VA[:, :n_coeff], np.dot(np.power(np.diag(cAstd[:n_coeff]), 2), VA[:, :n_coeff].T))
-        # errors = np.diag(coverrors)
-
-        mag_back = np.dot(VA[:, :n_coeff], cAproj)
-        mag_back = mag_back * (maxs - mins) + mins
-        # mag_back = scipy.signal.medfilt(mag_back, kernel_size=3)
-
-        ii = np.where((~np.isnan(mag_back)) * (tt_interp < 20.0))[0]
-        if len(ii) < 2:
-            maginterp = np.nan * np.ones(tt.shape)
-        else:
-            f = interp.interp1d(tt_interp[ii], mag_back[ii], fill_value="extrapolate")
-            maginterp = f(tt)
-        mAB[filt] = maginterp
-
-    if svd_lbol_model is not None:
-        if lbol_ncoeff:
-            n_coeff = min(lbol_ncoeff, svd_lbol_model["n_coeff"])
-        else:
-            n_coeff = svd_lbol_model["n_coeff"]
-        # param_array = svd_lbol_model["param_array"]
-        # cAmat = svd_lbol_model["cAmat"]
-        VA = svd_lbol_model["VA"]
-        param_mins = svd_lbol_model["param_mins"]
-        param_maxs = svd_lbol_model["param_maxs"]
-        mins = svd_lbol_model["mins"]
-        maxs = svd_lbol_model["maxs"]
-        gps = svd_lbol_model["gps"]
-        tt_interp = svd_lbol_model["tt"]
-
-        param_list_postprocess = np.array(param_list)
-        for i in range(len(param_mins)):
-            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
-                param_maxs[i] - param_mins[i]
-            )
-
-        if interpolation_type == "tensorflow":
-            model = svd_lbol_model["model"]
-            cAproj = model.predict(np.atleast_2d(param_list_postprocess)).T.flatten()
-            cAstd = np.ones((n_coeff,))
-        else:
-            cAproj = np.zeros((n_coeff,))
-            for i in range(n_coeff):
-                gp = gps[i]
-                y_pred, sigma2_pred = gp.predict(
-                    np.atleast_2d(param_list_postprocess), return_std=True
-                )
-                cAproj[i] = y_pred
-
-        lbol_back = np.dot(VA[:, :n_coeff], cAproj)
-        lbol_back = lbol_back * (maxs - mins) + mins
-        # lbol_back = scipy.signal.medfilt(lbol_back, kernel_size=3)
-
-        ii = np.where(~np.isnan(lbol_back))[0]
-        if len(ii) < 2:
-            lbolinterp = np.nan * np.ones(tt.shape)
-        else:
-            f = interp.interp1d(tt_interp[ii], lbol_back[ii], fill_value="extrapolate")
-            lbolinterp = 10 ** f(tt)
-        lbol = lbolinterp
-    else:
-        lbol = np.inf * np.ones(len(tt))
-
-    return np.squeeze(tt), np.squeeze(lbol), mAB
-
-
-def calc_spectra(tt, lambdaini, lambdamax, dlambda, param_list, svd_spec_model=None):
-
-    # lambdas = np.arange(lambdaini, lambdamax+dlambda, dlambda)
-    lambdas = np.arange(lambdaini, lambdamax, dlambda)
-
-    spec = np.zeros((len(lambdas), len(tt)))
-    for jj, lambda_d in enumerate(lambdas):
-        n_coeff = svd_spec_model[lambda_d]["n_coeff"]
-        # param_array = svd_spec_model[lambda_d]["param_array"]
-        # cAmat = svd_spec_model[lambda_d]["cAmat"]
-        # cAstd = svd_spec_model[lambda_d]["cAstd"]
-        VA = svd_spec_model[lambda_d]["VA"]
-        param_mins = svd_spec_model[lambda_d]["param_mins"]
-        param_maxs = svd_spec_model[lambda_d]["param_maxs"]
-        mins = svd_spec_model[lambda_d]["mins"]
-        maxs = svd_spec_model[lambda_d]["maxs"]
-        gps = svd_spec_model[lambda_d]["gps"]
-        tt_interp = svd_spec_model[lambda_d]["tt"]
-
-        param_list_postprocess = np.array(param_list)
-        for i in range(len(param_mins)):
-            param_list_postprocess[i] = (param_list_postprocess[i] - param_mins[i]) / (
-                param_maxs[i] - param_mins[i]
-            )
-
-        cAproj = np.zeros((n_coeff,))
-        for i in range(n_coeff):
-            gp = gps[i]
-            y_pred, sigma2_pred = gp.predict(
-                np.atleast_2d(param_list_postprocess), return_std=True
-            )
-            cAproj[i] = y_pred
-
-        spectra_back = np.dot(VA[:, :n_coeff], cAproj)
-        spectra_back = spectra_back * (maxs - mins) + mins
-        # spectra_back = scipy.signal.medfilt(spectra_back, kernel_size=3)
-
-        N = 3  # Filter order
-        Wn = 0.1  # Cutoff frequency
-        B, A = scipy.signal.butter(N, Wn, output="ba")
-        # spectra_back = scipy.signal.filtfilt(B, A, spectra_back)
-
-        ii = np.where(~np.isnan(spectra_back))[0]
-        if len(ii) < 2:
-            specinterp = np.nan * np.ones(tt.shape)
-        else:
-            f = interp.interp1d(
-                tt_interp[ii], spectra_back[ii], fill_value="extrapolate"
-            )
-            specinterp = 10 ** f(tt)
-        spec[jj, :] = specinterp
-
-    for jj, t in enumerate(tt):
-        spectra_back = np.log10(spec[:, jj])
-        spectra_back[~np.isfinite(spectra_back)] = -99.0
-        if t < 7.0:
-            spectra_back[1:-1] = scipy.signal.medfilt(spectra_back, kernel_size=5)[1:-1]
-        else:
-            spectra_back[1:-1] = scipy.signal.medfilt(spectra_back, kernel_size=5)[1:-1]
-        ii = np.where((spectra_back != 0) & ~np.isnan(spectra_back))[0]
-        if len(ii) < 2:
-            specinterp = np.nan * np.ones(lambdas.shape)
-        else:
-            f = interp.interp1d(lambdas[ii], spectra_back[ii], fill_value="extrapolate")
-            specinterp = 10 ** f(lambdas)
-        spec[:, jj] = specinterp
-
-    return np.squeeze(tt), np.squeeze(lambdas), spec
-
-
-@timeout(60)
-def fluxDensity(t, nu, **params):
-    if AFTERGLOWPY_INSTALLED:
-        mJy = afterglowpy.fluxDensity(t, nu, **params)
-    else:
-        raise ValueError("afterglowpy required for GRB afterglow")
-    return mJy
-
-
-def grb_lc(t_day, Ebv, param_dict, filters=None):
-    day = 86400.0  # in seconds
-    tStart = (np.amin(t_day)) * day
-    tStart = max(10 ** (-5) * day, tStart)
-    tEnd = (np.amax(t_day) + 1) * day
-    tnode = min(len(t_day), 201)
-    default_time = np.logspace(np.log10(tStart), np.log10(tEnd), base=10.0, num=tnode)
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nu_0s = scipy.constants.c / lambdas
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_0s, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_0s))
-
-    times = np.empty((len(default_time), len(filts)))
-    nus = np.empty((len(default_time), len(filts)))
-
-    times[:, :] = default_time[:, None]
-    for nu_idx, nu_0 in enumerate(nu_0s):
-        nus[:, nu_idx] = nu_0
-
-    # output flux density is in milliJansky
-    try:
-        mJys = fluxDensity(times, nus, **param_dict)
-
-    except TimeoutError:
-        return t_day, np.zeros(t_day.shape), {}
-
-    Jys = 1e-3 * mJys
-
-    if np.any(Jys <= 0.0):
-        return t_day, np.zeros(t_day.shape), {}
-
-    mag = {}
-    lbol = 1e43 * np.ones(t_day.shape)
-
-    for filt_idx, filt in enumerate(filts):
-
-        Jy = Jys[:, filt_idx] * ext[filt_idx]
-
-        # see https://en.wikipedia.org/wiki/AB_magnitude
-        mag_d = -48.6 + -1 * np.log10(Jy / 1e23) * 2.5
-
-        ii = np.where(np.isfinite(mag_d))[0]
-        if len(ii) >= 2:
-            f = interp.interp1d(
-                default_time[ii] / day, mag_d[ii], fill_value="extrapolate"
-            )
-            maginterp = f(t_day)
-        else:
-            maginterp = np.nan * np.ones(t_day.shape)
-            lbol = np.zeros(t_day.shape)
-
-        mag[filt] = maginterp
-
-    return t_day, lbol, mag
-
-
-def sn_lc(
-    tt,
-    z,
-    Ebv,
-    abs_mag=-19.35,
-    regularize_band="bessellv",
-    regularize_system="vega",
-    model_name="nugent-hyper",
-    parameters={},
-    filters=None,
-):
-
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nus = scipy.constants.c / (1e-10 * lambdas)
-
-    model = sncosmo.Model(source=model_name)
-    if model_name in ["salt2", "salt3"]:
-        model.set(
-            z=z,
-            t0=np.median(tt),
-            x0=parameters["x0"],
-            x1=parameters["x1"],
-            c=parameters["c"],
-        )
-    else:
-        model.set(z=z)
-
-    # regularize the absolute magnitude
-    abs_mag -= Planck18.distmod(z).value
-    model.set_source_peakabsmag(
-        abs_mag, regularize_band, regularize_system, cosmo=Planck18
-    )
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nus, Ebv, z)
-    else:
-        ext = np.ones(len(nus))
-
-    mag = {}
-    lbol = 1e43 * np.ones(tt.shape)
-
-    for filt_idx, (filt, lambda_A) in enumerate(zip(filts, lambdas)):
-        # convert back to AA
-        lambda_AA = 1e10 * lambda_A
-        if lambda_AA < model.minwave() or lambda_AA > model.maxwave():
-            mag[filt] = np.inf * np.ones(tt.shape)
-        else:
-            try:
-                # the output is in ergs / s / cm^2 / Angstrom
-                flux = model.flux(tt, [lambda_AA]) * ext[filt_idx]
-                # see https://en.wikipedia.org/wiki/AB_magnitude
-                flux_jy = 3.34e4 * np.power(lambda_AA, 2.0) * flux
-                mag_per_filt = -2.5 * np.log10(flux_jy) + 8.9
-                mag[filt] = mag_per_filt[:, 0]
-            except Exception:
-                mag[filt] = np.ones(tt.shape) * np.nan
-                lbol = np.zeros(tt.shape)
-
-    return tt, lbol, mag
-
-
-def sc_lc(t_day, param_dict, filters=None):
-
-    day = 86400.0  # in seconds
-    t = t_day * day
-
-    # fetch parameter values
-    Me = 10 ** param_dict["log10_Menv"] * astropy.constants.M_sun.cgs.value
-    Renv = 10 ** param_dict["log10_Renv"]
-    Ee = 10 ** param_dict["log10_Ee"]
-    Ebv = param_dict["Ebv"]
-    z = param_dict["z"]
-
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nu_obs = scipy.constants.c / lambdas
-    nu_host = nu_obs * (1 + z)
-    t /= 1 + z
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
-
-    # define relevant constants
-    c = astropy.constants.c.cgs.value
-    h = astropy.constants.h.cgs.value
-    kb = astropy.constants.k_B.cgs.value
-    sb = astropy.constants.sigma_sb.cgs.value
-    D = 10 * astropy.constants.pc.cgs.value
-    n = 10
-    delta = 1.1
-    K = (n - 3) * (3 - delta) / (4 * np.pi * (n - delta))  # K = 0.119
-    kappa = 0.2
-    vt = np.sqrt(((n - 5) * (5 - delta) / ((n - 3) * (3 - delta))) * (2 * Ee / Me))
-    td = np.sqrt((3 * kappa * K * Me) / ((n - 1) * vt * c))
-
-    # evalute the model, lbol first
-    prefactor = np.pi * (n - 1) / (3 * (n - 5)) * c * Renv * vt * vt / kappa
-    L_early = prefactor * np.power(td / t, 4 / (n - 2))
-    L_late = prefactor * np.exp(-0.5 * (t * t / td / td - 1))
-    lbol = np.zeros(len(t))
-    # stiching the two regime
-    lbol[t < td] = L_early[t < td]
-    lbol[t >= td] = L_late[t >= td]
-
-    # evalute the mAB per filter
-    tph = np.sqrt(3 * kappa * K * Me / (2 * (n - 1) * vt * vt))
-    R_early = np.power(tph / t, 2 / (n - 1)) * vt * t
-    R_late = (
-        np.power((delta - 1) / (n - 1) * ((t / td) ** 2 - 1) + 1, -1 / (delta + 1))
-        * vt
-        * t
-    )
-    Rs = np.zeros(len(t))
-    Rs[t < td] = R_early[t < td]
-    Rs[t >= td] = R_late[t >= td]
-
-    sigmaT4 = lbol / (4 * np.pi * Rs * Rs)
-    T = np.power(sigmaT4 / sb, 0.25)
-    T[T == 0.0] = np.nan
-    one_over_T = 1.0 / T
-    one_over_T[~np.isfinite(one_over_T)] = np.inf
-
-    mag = {}
-    for idx, filt in enumerate(filts):
-        nu_of_filt = nu_host[idx]
-        ext_per_filt = ext[idx]
-        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F = (
-            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-            * exp
-            / (1 - exp)
-            * Rs
-            * Rs
-            / D
-            / D
-        )
-        F *= ext_per_filt
-        F *= 1 + z
-        mAB = np.ones(len(F))
-        mAB *= np.inf
-        mAB[F > 0] = -2.5 * np.log10(F[F > 0]) - 48.6
-        mag[filt] = mAB
-
-        # make sure there are at least two valid data point for interpolation
-        if len(np.where(np.isfinite(mAB))[0]) < 2:
-            mag[filt] = np.ones(t_day.shape) * np.nan
-
-    return t_day, lbol, mag
-
-
-def metzger_lc(t_day, param_dict, filters=None):
-
-    # convert time from day to second
-    day = 86400.0  # in seconds
-    t = t_day * day
-    tprec = len(t)
-
-    if len(np.where(t == 0)[0]) > 0:
-        raise ValueError("For Me2017, start later than t=0")
-
-    # define constants
-    c = astropy.constants.c.cgs.value
-    h = astropy.constants.h.cgs.value
-    kb = astropy.constants.k_B.cgs.value
-    Msun = astropy.constants.M_sun.cgs.value
-    sigSB = astropy.constants.sigma_sb.cgs.value
-    arad = 4 * sigSB / c
-    Mpc = astropy.constants.pc.cgs.value * 1e6
-
-    # fetch parameters
-    M0 = 10 ** param_dict["log10_mej"] * Msun  # total ejecta mass
-    v0 = 10 ** param_dict["log10_vej"] * c  # minimum escape velocity
-    beta = param_dict["beta"]
-    kappa_r = 10 ** param_dict["log10_kappa_r"]
-    z = param_dict["z"]
-    Ebv = param_dict["Ebv"]
-    D = 1e-5 * Mpc  # 10pc
-
-    # define additional parameters
-    E0 = 0.5 * M0 * v0 * v0  # initial thermal energy of bulk
-    Mn = 1e-8 * Msun  # mass cut for free neutrons
-    Ye = 0.1  # electron fraction
-    Xn0max = 1 - 2 * Ye  # initial neutron mass fraction in outermost layers
-
-    # define mass / velocity array of the outer ejecta, comprised half of the mass
-    mmin = np.log(1e-8)
-    mmax = np.log(M0 / Msun)
-    mprec = 300
-    m = np.arange(mprec) * (mmax - mmin) / (mprec - 1) + mmin
-    m = np.exp(m)
-
-    vm = v0 * np.power(m * Msun / M0, -1.0 / beta)
-    vm[vm > c] = c
-
-    # define thermalization efficiency rom Barnes+16
-    ca3 = 1.3
-    cb3 = 0.2
-    cd3 = 1.1
-
-    ca2 = 8.2
-    cb2 = 1.2
-    cd2 = 1.52
-
-    ca = 0.56
-    cb = 0.17
-    cd = 0.74
-    eth = np.exp(-ca * t_day) + np.log(1.0 + 2 * cb * (t_day ** (cd))) / (
-        2 * cb * t_day ** (cd)
-    )
-    eth *= 0.36
-    eth2 = np.exp(-ca2 * t_day) + np.log(1.0 + 2 * cb2 * (t_day ** (cd2))) / (
-        2 * cb2 * t_day ** (cd2)
-    )
-    eth2 *= 0.36
-    eth3 = np.exp(-ca3 * t_day) + np.log(1.0 + 2 * cb3 * (t_day ** (cd3))) / (
-        2 * cb3 * t_day ** (cd3)
-    )
-    eth3 *= 0.36
-
-    # define radioactive heating rates
-    Xn0 = Xn0max * 2 * np.arctan(Mn / m / Msun) / np.pi  # neutron mass fraction
-    Xr = 1.0 - Xn0  # r-process fraction
-
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nu_obs = scipy.constants.c / lambdas
-    nu_host = nu_obs * (1 + z)
-    t /= 1 + z
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
-
-    # define arrays in mass layer and time
-    Xn = np.zeros((mprec, tprec))
-    edotn = np.zeros((mprec, tprec))
-    edotr = np.zeros((mprec, tprec))
-    edot = np.zeros((mprec, tprec))
-    kappa = np.zeros((mprec, tprec))
-    kappan = np.zeros((mprec, tprec))
-    kappar = np.zeros((mprec, tprec))
-
-    # define specific heating rates and opacity of each mass layer
-    t0 = 1.3
-    sig = 0.11
-
-    tarray = np.tile(t, (mprec, 1))
-    Xn0array = np.tile(Xn0, (tprec, 1)).T
-    Xrarray = np.tile(Xr, (tprec, 1)).T
-    etharray = np.tile(eth, (mprec, 1))
-    Xn = Xn0array * np.exp(-tarray / 900.0)
-    edotn = 3.2e14 * Xn
-    edotr = (
-        4.0e18
-        * Xrarray
-        * (0.5 - (1.0 / np.pi) * np.arctan((tarray - t0) / sig)) ** (1.3)
-        * etharray
-    )
-    edotr = 2.1e10 * etharray * ((tarray / day) ** (-1.3))
-    edot = edotn + edotr
-    kappan = 0.4 * (1.0 - Xn - Xrarray)
-    kappar = kappa_r * Xrarray
-    kappa = kappan + kappar
-
-    # define total r-process heating of inner layer
-    Lr = M0 * 4e18 * (0.5 - (1.0 / np.pi) * np.arctan((t - t0) / sig)) ** (1.3) * eth
-    Lr = Lr / 1e20
-    Lr = Lr / 1e20
-
-    # *** define arrays by mass layer/time arrays ***
-    ene = np.zeros((mprec, tprec))
-    lum = np.zeros((mprec, tprec))
-    tdiff = np.zeros((mprec, tprec))
-    tau = np.zeros((mprec, tprec))
-    # properties of photosphere
-    Rphoto = np.zeros((tprec,))
-    vphoto = np.zeros((tprec,))
-    mphoto = np.zeros((tprec,))
-    kappaphoto = np.zeros((tprec,))
-    Lsd = np.zeros((tprec,))
-
-    # *** define arrays for total ejecta (1 zone = deepest layer) ***
-    # thermal energy
-    E = np.zeros((tprec,))
-    # kinetic energy
-    Ek = np.zeros((tprec,))
-    # velocity
-    v = np.zeros((tprec,))
-    R = np.zeros((tprec,))
-    taues = np.zeros((tprec,))
-    Lrad = np.zeros((tprec,))
-    temp = np.zeros((tprec,))
-    # setting initial conditions
-    E[0] = E0 / 1e20
-    E[0] = E[0] / 1e20
-    Ek[0] = E0 / 1e20
-    Ek[0] = Ek[0] / 1e20
-    v[0] = v0
-    R[0] = t[0] * v[0]
-
-    dt = t[1:] - t[:-1]
-    dm = m[1:] - m[:-1]
-
-    for j in range(tprec - 1):
-        # one zone calculation
-
-        if E[j] < 0.0:
-            E[j] = np.abs(E[j])
-        temp[j] = 1e10 * (3 * E[j] / (arad * 4 * np.pi * R[j] ** (3))) ** (0.25)
-        if temp[j] > 4000.0:
-            kappaoz = kappa_r
-        if temp[j] < 4000.0:
-            kappaoz = kappa_r * (temp[j] / 4000.0) ** (5.5)
-        kappaoz = kappa_r
-        LPdV = E[j] * v[j] / R[j]
-        tdiff0 = 3 * kappaoz * M0 / (4 * np.pi * c * v[j] * t[j])
-        tlc0 = R[j] / c
-        tdiff0 = tdiff0 + tlc0
-        Lrad[j] = E[j] / tdiff0
-        Ek[j + 1] = Ek[j] + LPdV * dt[j]
-        v[j + 1] = 1e20 * (2 * Ek[j] / M0) ** (0.5)
-        E[j + 1] = (Lr[j] + Lsd[j] - LPdV - Lrad[j]) * dt[j] + E[j]
-        R[j + 1] = v[j + 1] * dt[j] + R[j]
-        taues[j + 1] = M0 * 0.4 / (4 * R[j + 1] ** 2)
-
-        templayer = (
-            3 * ene[:-1, j] * dm * Msun / (arad * 4 * np.pi * (t[j] * vm[:-1]) ** 3)
-        )
-
-        if np.isnan(templayer).any():
-            templayer = np.nan_to_num(templayer)
-            templayer = abs(templayer) ** 0.25
-        else:
-            templayer = abs(templayer) ** (0.25)
-
-        kappa_correction = np.ones(templayer.shape)
-        kappa_correction[templayer > 4000.0] = 1.0
-        kappa_correction[templayer < 4000.0] = templayer[
-            templayer < 4000.0
-        ] / 4000.0 ** (5.5)
-        kappa_correction[:] = 1
-
-        tdiff[:-1, j] = (
-            0.08
-            * kappa[:-1, j]
-            * m[:-1]
-            * Msun
-            * 3
-            * kappa_correction
-            / (vm[:-1] * c * t[j] * beta)
-        )
-        tau[:-1, j] = (
-            m[:-1] * Msun * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
-        )
-        lum[:-1, j] = ene[:-1, j] / (tdiff[:-1, j] + t[j] * (vm[:-1] / c))
-        ene[:-1, j + 1] = (edot[:-1, j] - (ene[:-1, j] / t[j]) - lum[:-1, j]) * dt[
-            j
-        ] + ene[:-1, j]
-        lum[:-1, j] = lum[:-1, j] * dm * Msun
-
-        tau[mprec - 1, j] = tau[mprec - 2, j]
-        # photosphere
-        pig = np.argmin(np.abs(tau[:, j] - 1))
-        vphoto[j] = vm[pig]
-        Rphoto[j] = vphoto[j] * t[j]
-        mphoto[j] = m[pig]
-        kappaphoto[j] = kappa[pig, j]
-
-    Ltotm = np.sum(lum, axis=0)
-    Ltotm = Ltotm / 1e20
-    Ltotm = Ltotm / 1e20
-
-    Ltot = np.abs(Ltotm)
-    lbol = Ltotm * 1e40
-
-    Tobs = 1e10 * (Ltot / (4 * np.pi * Rphoto**2 * sigSB)) ** (0.25)
-
-    ii = np.where(~np.isnan(Tobs) & (Tobs > 0))[0]
-    f = interp.interp1d(t_day[ii], Tobs[ii], fill_value="extrapolate")
-    Tobs = f(t_day)
-
-    Tobs[Tobs == 0.0] = np.nan
-    one_over_T = 1.0 / Tobs
-    one_over_T[~np.isfinite(one_over_T)] = np.inf
-
-    mag = {}
-    for idx, filt in enumerate(filts):
-        nu_of_filt = nu_host[idx]
-        ext_per_filt = ext[idx]
-        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F = (
-            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-            * exp
-            / (1 - exp)
-            * Rphoto
-            * Rphoto
-            / D
-            / D
-        )
-        F *= ext_per_filt
-        F *= 1 + z
-        mAB = np.ones(len(F))
-        mAB *= np.inf
-        mAB[F > 0] = -2.5 * np.log10(F[F > 0]) - 48.6
-        mag[filt] = mAB
-
-    return t_day, lbol, mag
-
-
-def blackbody_constant_temperature(t_day, param_dict, filters=None):
-    # prevent the output message flooded by these warning messages
-    old = np.seterr()
-    np.seterr(invalid="ignore")
-    np.seterr(divide="ignore")
-
-    # convert time from day to second
-    day = 86400.0  # in seconds
-    t = t_day * day
-
-    # define constants
-    c = astropy.constants.c.cgs.value
-    h = astropy.constants.h.cgs.value
-    kb = astropy.constants.k_B.cgs.value
-    sigSB = astropy.constants.sigma_sb.cgs.value
-    Mpc = astropy.constants.pc.cgs.value * 1e6
-
-    # fetch parameters
-    bb_luminosity = param_dict[
-        "bb_luminosity"
-    ]  # blackboady's total luminosity in erg/s
-    temperature = param_dict["temperature"]  # blackbody's temperature in K
-    z = param_dict["z"]
-    Ebv = param_dict["Ebv"]
-    D = 1e-5 * Mpc  # 10pc
-
-    # parameter conversion
-    one_over_T = 1.0 / temperature
-    bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
-    # get the default filters and wavelength
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nu_obs = scipy.constants.c / lambdas
-    nu_host = nu_obs * (1 + z)
-    t /= 1 + z
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
-
-    mag = {}
-    for idx, filt in enumerate(filts):
-        nu_of_filt = nu_host[idx]
-        ext_per_filt = ext[idx]
-        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F_bb = (
-            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-            * exp
-            / (1 - exp)
-            * bb_radius
-            * bb_radius
-            / D
-            / D
-        )
-
-        F_bb *= ext_per_filt
-        F_bb *= 1 + z
-        mAB = np.ones(len(t_day))
-        mAB *= -2.5 * np.log10(F_bb) - 48.6
-        mag[filt] = mAB
-
-    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
-
-    np.seterr(**old)
-
-    return t_day, lbol, mag
-
-
-def synchrotron_powerlaw(t_day, param_dict, filters=None):
-    # prevent the output message flooded by these warning messages
-    old = np.seterr()
-    np.seterr(invalid="ignore")
-    np.seterr(divide="ignore")
-
-    beta = param_dict["beta_freq"]  # frequency index
-    alpha = param_dict["alpha_time"]  # time index
-    F_ref = param_dict["F_ref"]  # in mJy for t=1day and nu=1Hz
-    Ebv = param_dict["Ebv"]
-
-    # get the default filters and wavelength
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-
-    nu_obs = scipy.constants.c / lambdas
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
-
-    mag = {}
-    for idx, filt in enumerate(filts):
-        nu_of_filt = nu_obs[idx]
-        ext_per_filt = ext[idx]
-        F_pl = F_ref * np.power(nu_of_filt, -beta) * np.power(t_day, -alpha)
-        F_pl *= ext_per_filt
-        mAB = np.ones(len(t_day))
-        mAB *= -2.5 * np.log10(F_pl) + 16.4  # convert flux in mJy to AB magnitude
-        mag[filt] = mAB
-
-    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
-
-    np.seterr(**old)
-
-    return t_day, lbol, mag
-
-
-def powerlaw_blackbody_constant_temperature_lc(t_day, param_dict, filters=None):
-
-    # prevent the output message flooded by these warning messages
-    old = np.seterr()
-    np.seterr(invalid="ignore")
-    np.seterr(divide="ignore")
-
-    # convert time from day to second
-    day = 86400.0  # in seconds
-    t = t_day * day
-
-    # define constants
-    c = astropy.constants.c.cgs.value
-    h = astropy.constants.h.cgs.value
-    kb = astropy.constants.k_B.cgs.value
-    sigSB = astropy.constants.sigma_sb.cgs.value
-    Mpc = astropy.constants.pc.cgs.value * 1e6
-
-    # fetch parameters
-    bb_luminosity = param_dict["bb_luminosity"]  # blackboady's total luminosity
-    temperature = param_dict["temperature"]  # for the blackbody radiation
-    beta = param_dict["beta"]  # for the power-law
-    powerlaw_mag = param_dict["powerlaw_mag"]
-    powerlaw_filt_ref = "g"
-    z = param_dict["z"]
-    Ebv = param_dict["Ebv"]
-    D = 1e-5 * Mpc  # 10pc
-
-    # parameter conversion
-    one_over_T = 1.0 / temperature
-    bb_radius = np.sqrt(bb_luminosity / 4 / np.pi / sigSB) * one_over_T * one_over_T
-    # get the default filters and wavelength
-    filts, lambdas = get_default_filts_lambdas(filters=filters)
-    # calculate the powerlaw prefactor (with the reference filter)
-    nu_ref = scipy.constants.c / lambdas[filts == powerlaw_filt_ref]
-    powerlaw_prefactor = np.power(nu_ref, beta) * np.power(
-        10, -0.4 * (powerlaw_mag + 48.6)
-    )
-
-    nu_obs = scipy.constants.c / lambdas
-    nu_host = nu_obs * (1 + z)
-    t /= 1 + z
-
-    if Ebv != 0.0:
-        ext = extinctionFactorP92SMC(nu_obs, Ebv, param_dict["z"])
-    else:
-        ext = np.ones(len(nu_obs))
-
-    mag = {}
-    for idx, filt in enumerate(filts):
-        nu_of_filt = nu_host[idx]
-        ext_per_filt = ext[idx]
-        exp = np.exp(-h * nu_of_filt * one_over_T / kb)
-        F_bb = (
-            (2.0 * (h * nu_of_filt) * (nu_of_filt / c) ** 2)
-            * exp
-            / (1 - exp)
-            * bb_radius
-            * bb_radius
-            / D
-            / D
-        )
-        F_pl = powerlaw_prefactor * np.power(nu_of_filt, -beta)
-
-        F = F_bb + F_pl  # adding the two contributions
-
-        F *= ext_per_filt
-        F *= 1 + z
-        mAB = np.ones(len(t_day))
-        mAB *= -2.5 * np.log10(F) - 48.6
-        mag[filt] = mAB
-
-    lbol = 1e43 * np.ones(t_day.shape)  # some dummy value
-
-    np.seterr(**old)
-
-    return t_day, lbol, mag
-
+def extract_unit(filter_string, indicator, target_unit):
+    # calculate the lambdas based on the filter name
+    # split the filter name
+    filter_string = filter_string.replace(f"{indicator}-", "")
+    filt_unit = filter_string[-3:]
+    filt_val = float(filter_string.replace(filt_unit, ""))
+    # make use of the astropy.units to be more flexible
+    quantity = astropy.units.Quantity(filt_val, unit=filt_unit)
+    return quantity.to(target_unit).value
+
+
+def flux_to_ABmag(flux, unit='cgs', residual_mag = None):
+    """ see https://en.wikipedia.org/wiki/AB_magnitude """
+    if unit=='cgs':
+        residual_magnitude =  - 48.6
+    elif unit == 'Jy':
+        residual_magnitude = 8.9
+    elif unit == 'mJy':
+        residual_magnitude = 16.4
+    ## explicit value takes preference over default units
+    if residual_mag:
+        residual_magnitude = residual_mag
+
+    suff_flux = np.argwhere(flux> 0)
+    if len(suff_flux)< 2:
+        return np.full_like(flux, np.nan)
+    mAB = np.full_like(flux, np.inf)
+
+    mAB[suff_flux] = -2.5 * np.log10(flux[suff_flux]) + residual_magnitude
+    return mAB
 
 def estimate_mag_err(uncer_params, df):
     df["mag_err"] = df.apply(
@@ -1312,20 +551,6 @@ def estimate_mag_err(uncer_params, df):
 
     return df
 
-
-def check_default_attr(args, attr, default=False):
-
-    if hasattr(args, attr):
-        return getattr(args, attr)
-    else:
-        return default
-
-
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
 
 
 # The following LANL File readers are taken from Eve Chase's cocteau package

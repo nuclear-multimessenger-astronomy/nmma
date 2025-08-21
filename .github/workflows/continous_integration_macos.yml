@@ -1,0 +1,164 @@
+name: Unit Test nmma [MacOS]
+
+on:
+  push:
+    branches:
+      - main
+      - direct_eos_sampling
+    paths-ignore:
+      - "doc/**"
+  pull_request:
+    branches:
+      - main
+      - direct_eos_sampling
+    paths-ignore:
+      - "doc/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: "macos-latest"
+    defaults:
+      run:
+        shell: bash -el {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout branch being tested
+        uses: actions/checkout@v4
+
+      - name: Set up Python with Conda ${{ matrix.python-version }}
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: "arm64"
+          miniforge-version: latest
+          use-mamba: true
+          mamba-version: "*"
+          activate-environment: nmma_env
+          channels: defaults
+
+      - name: Restore SVD models from cache
+        uses: actions/cache/restore@v4
+        with:
+          path: svdmodels
+          key: svdmodels-${{ hashFiles('**/LICENSE') }}
+          restore-keys: svdmodels-
+
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+      - name: Restore pip cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-2-
+      - name: Update Homebrew
+        run: |
+          brew update --auto-update
+      - name: Restore Homebrew cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/openmpi--*
+            ~/Library/Caches/Homebrew/downloads/*--openmpi-*
+            ~/Library/Caches/Homebrew/hdf5--*
+            ~/Library/Caches/Homebrew/downloads/*--hdf5-*
+            ~/Library/Caches/Homebrew/gcc--*
+            ~/Library/Caches/Homebrew/downloads/*--gcc-*
+            ~/Library/Caches/Homebrew/openblas--*
+            ~/Library/Caches/Homebrew/downloads/*--openblas-*
+            ~/Library/Caches/Homebrew/lapack--*
+            ~/Library/Caches/Homebrew/downloads/*--lapack-*
+            ~/Library/Caches/Homebrew/basictex--*
+            ~/Library/Caches/Homebrew/downloads/*--basictex-*
+            ~/Library/Caches/Homebrew/cmake--*
+            ~/Library/Caches/Homebrew/downloads/*--cmake-*
+          key: brew-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: brew-
+
+      - name: Install Homebrew dependencies
+        run: |
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack basictex cmake
+          eval "$(/usr/libexec/path_helper)"
+          sudo tlmgr update --self
+          sudo tlmgr install collection-latex
+          sudo tlmgr install collection-fontsrecommended
+          sudo tlmgr install dvipng
+          sudo tlmgr install cm-super
+          sudo tlmgr install type1cm
+      - name: Install dependencies (macOS)
+        run: |
+          conda install -c conda-forge pyfftw c-compiler ligo-segments python-ligo-lw
+          echo "FC=$(which gfortran-14)" >> $GITHUB_ENV
+          echo "CC=$(which gcc)" >> $GITHUB_ENV
+          echo "CXX=$(which g++)" >> $GITHUB_ENV
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
+          python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib coveralls
+          python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r training_requirements.txt
+          python -m pip install .
+          git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake .. && make && cd ../..
+          pwd
+      - name: Export Libraries
+        run: |
+          echo "LD_LIBRARY_PATH=$HOME/work/nmma/nmma/MultiNest/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=$HOME/work/nmma/nmma/MultiNest/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude docs
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude docs,versioneer.py,nmma/_version.py,nmma/tests,nmma/*/__init__.py
+      - name: Test with pytest
+        run: |
+          python -m coverage run --source nmma -m pytest nmma/tests/*.py
+      - name: Run Coveralls
+        if: ${{ success() }}
+        run: |
+          coveralls --service=github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save SVD models cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: svdmodels
+          key: svdmodels-${{ hashFiles('**/LICENSE') }}
+
+      - name: Save pip cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+
+      - name: Save Homebrew cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/openmpi--*
+            ~/Library/Caches/Homebrew/downloads/*--openmpi-*
+            ~/Library/Caches/Homebrew/hdf5--*
+            ~/Library/Caches/Homebrew/downloads/*--hdf5-*
+            ~/Library/Caches/Homebrew/gcc--*
+            ~/Library/Caches/Homebrew/downloads/*--gcc-*
+            ~/Library/Caches/Homebrew/openblas--*
+            ~/Library/Caches/Homebrew/downloads/*--openblas-*
+            ~/Library/Caches/Homebrew/lapack--*
+            ~/Library/Caches/Homebrew/downloads/*--lapack-*
+            ~/Library/Caches/Homebrew/basictex--*
+            ~/Library/Caches/Homebrew/downloads/*--basictex-*
+            ~/Library/Caches/Homebrew/cmake--*
+            ~/Library/Caches/Homebrew/downloads/*--cmake-*
+          key: brew-${{ hashFiles('**/pyproject.toml') }}

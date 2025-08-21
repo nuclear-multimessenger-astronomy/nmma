@@ -66,7 +66,6 @@ An example is shown below:
     ## EOS arguments
     ################################################################################
 
-    with-eos=True
     eos-data=./eos/eos_sorted
     Neos=15000
     eos-weight=./eos/EOS_sorted_weight.dat

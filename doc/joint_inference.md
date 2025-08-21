@@ -2,11 +2,11 @@
 
 A joint inference on gravitational-wave and electromagnetic signals requires NMMA to run on a supercomputer cluster because large memory space are required and need to be shared across many CPU cores. Here, we consider a full joint inference on the binary neutron star merger observed on 17th August 2017. 
 
-In order to run a multi-messenger inference, we need to follow to main steps:
+In order to run a multi-messenger inference, we need to follow two main steps:
 
 	nmma-generation config.ini
 
-Perform the analysis or parameter estimation using:
+will setup all required directories and perform some data checks. We can then call the analysis or parameter estimation:
 
     nmma-analysis --data-dump <name_of_analysis>_data_dump.pickle
 
@@ -14,7 +14,7 @@ First of all, we set up the `config.ini` file and provide all required data and 
 
 **Observational data**
 
-Firstly, all observational data is required that means observational data from single observed events:
+We can provide data obtained through different observing channels as related events:
 - GW170817,
 - GRB170817A,
 - AT2017gfo.
@@ -27,11 +27,11 @@ Moreover, a prior on all observed messengers is required and needs to be tailore
 
 **Electroamagnetic data and models**
 
-In order to not only sample on gravitational-wave data, we provide further electromagnetic signal related flags. The flag `with-grb=True` will turn on the sampling on a GRB data. As NMMA currently only includes one GRB model, this model does not need to be further specified. If `with-grb=False`, a joint inference of GW+KN data is possible, excluding the GRB part. With regard to the kilonova model, we need to provide a specific model under `kilonova-model`, its respective reduced model grid (if applicable) under `kilonova-model-svd` and a `kilonova-interpolation-type` which can be either `sklearn_gp` or `tensorflow`. The `light-curve-data` flag should include both GRB and kilonova data if a joint inference on GW-GRB-KN is desired (meaning use: `with-grb=True`) or should just include the kilonova data if a GW-KN inference is targeted (meaning use: `with-grb=False`). The kilonova start/end time and time steps apply to both the GRB and kilonova model which will generate light curves during the inference to match the observed data provided. 
+In order to not only sample on gravitational-wave data, we provide further electromagnetic signal related flags. The flag `em-transient-class=kilonova_grb` will allow sampling on combined kilonova and GRB data. As NMMA currently only includes one GRB model, this model does not need to be further specified. If no EM transient class is specified, a kilonova model is assumed and will trigger joint inference of GW+KN data, excluding the GRB part. With regard to the kilonova model, we need to provide a specific model under `em-model`, its respective reduced model grid (if applicable) under `svd-path` and a `interpolation-type`. The `light-curve-data` flag should include both GRB and kilonova data if a joint inference on GW-GRB-KN is desired or should just include the kilonova data if a GW-KN inference is targeted. The kilonova start/end time and time steps apply to both the GRB and kilonova model which will generate light curves during the inference to match the observed data provided. 
 
 **Including EOS information**
 
-NMMA enables to include nuclear information by using equations-of-state (EOS) and sample over the EOS during the inference. In order to include a set of EOSs, each EOS.dat file needs to include information on Mass, Radius and Tidal deformability. For the example shown in the `config.ini` file below, we see that `Neos = 5000` meaning that we include 5000 EOS.dat files each containing information on mass, radius and tidal deformability. We also see that a constraint from NICER measurements has been folded in and thus the `eos-weight` reflects this in a weighting. The EOS set should be sorted according to this weighting in order to reduce runtime for the sampling on the EOSs. 
+NMMA can include nuclear information by either using pre-computed equations of state (EOSs) or by sampling over appropriate parameters on the fly, employing a corresponding emulator that maps these parameters to an EoS. In order to include a set of EOSs precomputed EOSs, each EOS.dat file needs to include information on Mass, Radius and Tidal deformability. For the example shown in the `config.ini` file below, we see `Neos = 5000`, meaning that we include 5000 EOS.dat files each containing information on mass, radius and tidal deformability. We also see that a constraint from NICER measurements has been folded in and thus the `eos-weight` reflects this in a weighting. The EOS set should be sorted according to this weighting in order to reduce runtime for the sampling on the EOSs. 
 
 **Running the config.ini generation**
 
@@ -93,26 +93,24 @@ In order to prepare the joint inference, a `config.ini` file is required which s
     ## EM arguments
     ################################################################################
         
-    binary-type=BNS
     light-curve-data=data/AT2017gfo-GRB170817A/AT2017gfo_GRB170817A.dat
+    em-transient-class = kilonova_grb
     kilonova-model=Bu2019lm
-    kilonova-model-svd=data/AT2017gfo-GRB170817A/svdmodels_reduced
+    svd-path=data/AT2017gfo-GRB170817A/svdmodels_reduced
     svd-mag-ncoeff=10
     svd-lbol-ncoeff=10
-    kilonova-trigger-time=57982.5285236896
-    kilonova-tmin=0.1
-    kilonova-tmax=950
-    kilonova-error=1
-    kilonova-tstep=0.1
-    kilonova-interpolation-type=sklearn_gp
+    em-trigger-time=57982.5285236896
+    em-tmin=0.1
+    em-tmax=950
+    em-error=1
+    em-tstep=0.1
+    em-interpolation-type=sklearn_gp
     grb-resolution=12
-    with-grb=True
     
     ################################################################################
     ## EOS arguments
     ################################################################################
-    
-    with-eos=True 
+     
     eos-data=eos/with_NICER_J0740/EOS_024_uniform_5k_sorted
     Neos=5000
     eos-weight=eos/with_NICER_J0740/EOS_sorted_weight.dat

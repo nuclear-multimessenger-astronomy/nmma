@@ -11,7 +11,6 @@ def mpi_barrier(comm):
         comm.Barrier()
 
 def refresh_models_list(models_home=None, source=None):
-
     if source is None:
         source = SOURCES[0]
     if source not in ["gitlab"]:
@@ -80,7 +79,15 @@ def get_model(
                     download_if_missing=download_if_missing,
                     filters_only=filters_only,
                 )
+            else:
+                files, filters = None, None
+
             mpi_barrier(comm)
+
+            if mpi_enabled and comm:
+                files = comm.bcast(files, root=0)
+                filters = comm.bcast(filters, root=0)
+
             break
         except Exception as e:
             print(f"Error while getting model from {source}: {str(e)}")
