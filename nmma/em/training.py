@@ -1,4 +1,5 @@
 import json
+import sys
 import os
 import copy
 import inspect
@@ -12,11 +13,10 @@ from .utils import autocomplete_data, interpolate_nans, setup_sample_times
 from ..utils.models import get_models_home, get_model  
 
 
-from . import model_parameters
+from . import model_parameters, plotting_utils as pu
 from .model import SVDLightCurveModel
 from .io import read_training_data
-from .em_parsing import parsing_and_logging, svd_training_parser, svd_model_benchmark_parser
-from .plotting_utils import visualise_model_performance, chi2_hists_from_dict
+from .em_parsing import parsing_and_logging, svd_training_parser, svd_model_benchmark_parser, benchmark_plots_parser
 
 
 
@@ -600,7 +600,7 @@ def create_svdmodel():
         local_only=True,
     )
     if training_model.plot:
-        visualise_model_performance(
+        pu.visualise_model_performance(
             training_data, training_model, light_curve_model, args.data_type
         )
         
@@ -663,8 +663,6 @@ def create_benchmark(
     """
     #### get the grid data file path
     # Implicitly set default ignore_bolometric as True for backward compatibility
-    if ignore_bolometric is None:
-        ignore_bolometric = True
     
     svd_filenames = find_svd_files(data_path, ignore_bolometric )
     read_data = prepare_training_data(svd_filenames, format)
@@ -685,6 +683,7 @@ def create_benchmark(
         tmin = light_curve_model.model_times[0]
     if tmax is None:
         tmax = light_curve_model.model_times[-1]
+
     def chi2_func(grid_entry):
         grid_t = np.array(grid_entry["t"])/ time_scale_factor
 
@@ -724,23 +723,46 @@ def create_benchmark(
     os.makedirs(outpath, exist_ok=True)
 
     percentiles = [0, 25, 50, 75, 100]
-    results_dct = { em_model: {
-            filt:[np.round(np.percentile(chi2_array_by_filt[filt], val), 2) 
-                            for val in percentiles] 
-            for filt in filts
-        } }
+
+    filts_dict = {filt:[np.round(np.percentile(chi2_array_by_filt[filt], val), 2) 
+                            for val in percentiles]
+                for filt in filts}
+
     outfile = f"{outpath}/benchmark_chi2_percentiles_{'_'.join(map(str, percentiles))}.json"
     with open(outfile, "w") as f:
         # save json file with filter-by-filter details
-        json.dump(results_dct, f, indent=2)
+        json.dump({em_model: filts_dict}, f, indent=2)
     print(f"Saved file containing reduced chi2 percentiles at {outfile}.")
     print(f"Stats below are reduced chi2 distribution percentiles \
-           {percentiles} for each filter:" )
-    print(results_dct[em_model])
+           {percentiles} for each filter:")
+    print(filts_dict)
 
     if plot:
-        chi2_hists_from_dict(chi2_array_by_filt, outpath)
+        pu.chi2_hists_from_dict(chi2_array_by_filt, outpath)
+        pu.plot_benchmark_percentiles(em_model, filts_dict, outpath)
 
+def plot_many_benchmarks(outdir, search_pattern):
+    """
+    make barplots of 25th, 50th and 75th percentiles of reduced chi2 distributions for trained models
+
+    :param outdir: Path to the output directory (str)
+    :param search_pattern: indicate a common pattern of targets in the outdir, default is "*"
+
+    """
+    if not outdir.startswith("/"):
+        outdir = os.path.join(os.getcwd(), outdir)
+    search_path = os.path.join(outdir, search_pattern, "*.json")
+    json_files = glob(search_path)
+
+    for file in json_files:
+        with open(file) as f:
+            benchmark_dict = json.load(f)
+        model, model_benchmarks = benchmark_dict.items()
+        pu.plot_benchmark_percentiles(model, model_benchmarks, outdir)
+
+def plot_benchmarks_cli():
+    args = benchmark_plots_parser()
+    plot_many_benchmarks(args.outdir, args.search_pattern)
 
 def axial_symmetry(training_data):
 

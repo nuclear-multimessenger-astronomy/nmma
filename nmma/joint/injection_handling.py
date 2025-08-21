@@ -10,7 +10,7 @@ import multiprocessing
 
 from .base_parsing import nmma_base_parsing, process_multi_condition_string
 from .joint_parsing import injection_parsing
-from .utils import set_filename, rejection_sample
+from .utils import set_filename, rejection_sample, read_injection_file
 from .conversion import MultimessengerConversion
 from ..em import utils, lightcurve_handling as lch
 from ..em.model import create_injection_model
@@ -247,10 +247,7 @@ class NMMAInjectionCreator(InjectionCreator):
 
             # load the injection json file
             if gw_injection_file.endswith(".json"):
-                with open(gw_injection_file, "rb") as f:
-                    injection_data = json.load(f)
-                    datadict = injection_data["injections"]["content"]
-                    dataframe_from_file = pd.DataFrame.from_dict(datadict)
+                dataframe_from_file = read_injection_file(gw_injection_file)
             else:
                 # legacy formats preferably not used anymore
                 # complement given gw-injection in nmma-style

@@ -183,6 +183,33 @@ def chi2_hists_from_dict(chi2_dict, outpath):
         plt.savefig(f"{outpath}/{filt}.pdf", bbox_inches="tight")
         plt.close()
 
+def plot_benchmark_percentiles( model, model_benchmarks, outdir):
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        filts = list(model_benchmarks.keys())
+        filter_benchmarks = list(model_benchmarks.values())
+
+        pctls_25 = [x[1] for x in filter_benchmarks]
+        pctls_50 = [x[2] for x in filter_benchmarks]
+        pctls_75 = [x[3] for x in filter_benchmarks]
+        pctls_100= [x[4] for x in filter_benchmarks]
+        plt.tight_layout()
+        ax.bar(filts, pctls_75, label="<= 75th", color="red", hatch="\\")
+        ax.bar(filts, pctls_50, label="<= 50th", color="slategray")
+        ax.bar(filts, pctls_25, label="<= 25th", color="blue", hatch="/")
+        ax.set_ylim(0, 1.1 * np.max(pctls_75))
+        ax.tick_params(axis="x", labelrotation=75)
+        ax.set_xlabel("Filter")
+        ax.set_ylabel(r"Reduced $\chi^{2}$")
+        ax.legend(
+            title=f"Percentile\n (max $\chi^{2}$ = {np.round(np.max(pctls_100),1)})",  # noqa
+            loc=2,
+        )
+        ax.set_title(f"{model} benchmark percentiles")
+        plt.subplots_adjust(bottom=0.2, top=0.9, left=0.1, right=0.95)
+
+        fig.savefig(f"{outdir}/benchmark_percentiles_{model}.pdf", bbox_inches="tight")
+
 ###################################################
 ################# PLOT STRUCTURES #################
 ###################################################

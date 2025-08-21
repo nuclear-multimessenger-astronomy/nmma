@@ -19,7 +19,7 @@ from . import io, model, utils
 from .plotting_utils import basic_em_analysis_plot, bolometric_lc_plot
 from .em_parsing import parsing_and_logging, multi_wavelength_analysis_parser, bolometric_parser
 from ..joint.conversion import convert_mtot_mni
-from ..joint.utils import read_injection_file, set_filename, fetch_bestfit
+from ..joint.utils import read_injection_file, set_filename, read_bestfit_from_posterior
 matplotlib.use("agg")
 
 def data_from_injection(args, filters, detection_limit):
@@ -73,14 +73,11 @@ def em_only_sampling(likelihood, priors, args):
     print(sampler_kwargs)
 
     # check if it is running with reactive sampler
-    if args.reactive_sampling:
-        if args.sampler != "ultranest":
-            print("Reactive sampling is only available in ultranest")
-        else:
-            print("Running with reactive-sampling in ultranest")
-            nlive = None
-    else:
-        nlive = args.nlive
+    nlive = None if args.reactive_sampling else args.nlive
+    if nlive is None and args.sampler != "ultranest":
+        raise ValueError("reactive sampling is only available for ultranest, "
+                         "please set nlive or use ultranest sampler")
+
 
     if args.skip_sampling:
         print("Sampling for 1 iteration and plotting checkpointed results.")
@@ -188,8 +185,6 @@ def bestfit_lightcurve(transient, bestfit_params, sample_times=None):
     if not isinstance(obs_lightcurve, dict): # bolometric model, have to turn it into a dict
         obs_lightcurve = {'lbol': obs_lightcurve}
     obs_lightcurve["time"] = observable_times
-
-
     return obs_lightcurve
        
 def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
@@ -261,7 +256,7 @@ def bolometric_analysis(args):
 
     if args.bestfit or args.plot:
         transient = likelihood.sub_model
-        bestfit_params = fetch_bestfit(args)
+        bestfit_params = read_bestfit_from_posterior(args)
         lbol_dict  = bestfit_lightcurve(transient, bestfit_params)
 
         bolometric_lc_plot(transient, lbol_dict,
@@ -351,7 +346,7 @@ def analysis(args):
         result.plot_corner()
 
     if args.bestfit or args.plot:
-        bestfit_params = fetch_bestfit(args)
+        bestfit_params = read_bestfit_from_posterior(args)
         post_process_bestfit(bestfit_params, likelihood.sub_model, args)
 
 def nnanalysis(args):

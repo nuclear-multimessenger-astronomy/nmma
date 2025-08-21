@@ -47,10 +47,15 @@ def get_redshift(parameters):
         ## zeros like the first input of parameters, independent of size and keys
         return np.zeros_like(next(iter(parameters.values()))) 
 
-def Hubble_constant_to_distance(parameters, added_keys, cosmology= default_cosmology):
-    # Hubble constant is supposed to be km/s/Mpc
+def cosmology_to_distance(parameters, added_keys, cosmology= default_cosmology):
+    cosmo_parameters = {}
+    if "Hubble_constant" in parameters:
+        cosmo_parameters["H0"] = parameters["Hubble_constant"]
+    if "Omega_matter" in parameters:
+        cosmo_parameters["Om0"] = parameters["Omega_matter"]
+    ## Maybe extend for an even wilder cosmology?
     try:
-        alt_cosmo = cosmology.clone(H0= parameters["Hubble_constant"] )
+        alt_cosmo = cosmology.clone(**cosmo_parameters)
         if "luminosity_distance" in parameters:
             # if luminosity distance is available, we assume it is in Mpc
             parameters["redshift"] = luminosity_distance_to_redshift(
@@ -63,8 +68,10 @@ def Hubble_constant_to_distance(parameters, added_keys, cosmology= default_cosmo
             raise KeyError("Either redshift or luminosity_distance must be in parameters")
 
     except ValueError:
-        # if H0 is an array cloning raises a ValueError
-        alt_cosmos = [cosmology.clone(H0= H0) for H0 in parameters["Hubble_constant"]]  
+        # if H0 is an array, .clone raises a ValueError
+        # in that case we turn a dict with len-n values into a len-n list of dicts with single values
+        cosmo_dicts = [dict(zip(cosmo_parameters.keys(), vals)) for vals in zip(*cosmo_parameters.values())]
+        alt_cosmos = [cosmology.clone(**cosmo_dict) for cosmo_dict in cosmo_dicts]
 
         if 'luminosity_distance' in parameters:
             # if luminosity distance is available, we assume it is in Mpc
@@ -662,7 +669,7 @@ class MultimessengerConversion(object):
         added_keys = []
 
         if "Hubble" in self.modifiers:
-            converted_parameters, added_keys = Hubble_constant_to_distance(
+            converted_parameters, added_keys = cosmology_to_distance(
             converted_parameters, added_keys, cosmology=self.cosmology
         )
         if "gw" in self.messengers:

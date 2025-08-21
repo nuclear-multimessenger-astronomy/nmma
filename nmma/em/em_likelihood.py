@@ -2,7 +2,8 @@ from __future__ import division
 import numpy as np
 from scipy.stats import norm, truncnorm
 from ast import literal_eval
-
+import warnings
+warnings.filterwarnings("error", category=RuntimeWarning)
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
 from . import model, utils, systematics
 
@@ -12,7 +13,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     #Prerequisites
     ## get lc_data and filters
     light_curve_data= data_dump["light_curve_data"]
-    filters=args.filters
+    filters = utils.set_filters(args)
     if not filters:
         filters = list(light_curve_data.keys())
 
@@ -169,9 +170,11 @@ class BaseEMTransient(object):
     def band_log_likelihood(self, expected_lc):
         raise NotImplementedError("This method should be implemented in the subclass")
 
-    def truncated_gaussian(self, m_det, m_err, m_est, lim):
-        a, b = (-np.inf - m_est) / m_err, (lim - m_est) / m_err
-        return truncnorm.logpdf(m_det, a, b, loc=m_est, scale=m_err)
+    def truncated_gaussian(self, m_det, loc, scale, upper_lim):
+
+        a = -np.inf # no lower bound of truncation
+        b = (upper_lim - loc) / scale # upper bound in number of std-deviations
+        return truncnorm.logpdf(m_det, a, b, loc=loc, scale=scale)
 
 
     def chisquare_gaussianlog_from_lc_data(self, est_mag, data_mag, data_sigma, upperlim_sigma, lim=np.inf):
@@ -182,12 +185,10 @@ class BaseEMTransient(object):
 
         # evaluate the chisquare
         if finiteIdx.sum() >= 1:
-            minus_chisquare = np.sum(
-                self.truncated_gaussian(data_mag[finiteIdx], data_sigma[finiteIdx],
-                                est_mag[finiteIdx], lim)
-                    )
-            
-            ## santiy check:if the chisquare is ill-behaved, 
+            minus_chisquare = np.sum(self.truncated_gaussian(data_mag[finiteIdx], 
+                loc=est_mag[finiteIdx], scale=data_sigma[finiteIdx], upper_lim=lim))
+
+            ## santiy check:if the chisquare is ill-behaved,
             # we explicitly catch it as Bool in band_log_likelihood
             if np.isnan(minus_chisquare):
                 sanity_check_passed = False 

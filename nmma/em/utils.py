@@ -61,8 +61,11 @@ DEFAULT_FILTERS = [
 def set_filters(args):
     filters = None  # default value
     if args.filters:
-        filters = args.filters.replace(" ", "")  # remove all whitespace
-        filters = filters.split(",")
+        if isinstance(args.filters, str):
+            filters = list(filters)
+        # do some cleaning for dirty command-line input
+        filters = [ f.replace(" ", "").split(",") for f in filters]
+        filters = [f for sublist in filters for f in sublist if f] # flatten the list
         if len(filters) == 0:
             raise ValueError("Need at least one valid filter.")
     elif hasattr(args, "rubin_ToO_type"):

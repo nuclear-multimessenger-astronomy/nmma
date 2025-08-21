@@ -13,7 +13,7 @@ from . import lightcurve_generation as lc_gen
 
 from nmma.joint.base import initialisation_args_from_signature_and_namespace
 from nmma.joint.constants import default_cosmology, c_SI
-from nmma.joint.conversion import observation_angle_conversion, get_redshift, Hubble_constant_to_distance, distance_modulus_nmma
+from nmma.joint.conversion import observation_angle_conversion, get_redshift, cosmology_to_distance, distance_modulus_nmma
 from nmma.utils.models import get_models_home, get_model
 
 ln10 = np.log(10)
@@ -301,7 +301,7 @@ class LightCurveModelContainer(object):
         model_lc = self.generate_lightcurve(sample_times, parameters)
 
         # redshift has been set in em_parameter_setup
-        # timeshift is a detector-frame correction parameter #FIXME: True?
+        # timeshift is a detector-frame correction parameter
         observable_times = sample_times * (1 + self.redshift) + self.timeshift
 
         return self.combine_detector_data(model_lc, observable_times)
@@ -323,9 +323,9 @@ class LightCurveModelContainer(object):
             use_mask = np.isfinite(mags)
             if np.sum(use_mask) >=2: 
 
-                apparent_magnitude = mags[use_mask] + self.distmod + redshift_correction
+                apparent_magnitude = mags + self.distmod + redshift_correction
                 # apparent_magnitude = utils.autocomplete_data(
-                    # observable_times,  observable_times[use_mask], apparent_magnitude)
+                #      observable_times,  observable_times[use_mask], apparent_magnitude[use_mask])
             else: #no meaningful inter-/extrapolation possible
                 apparent_magnitude =  np.full_like(self.model_times, np.inf)
             lc_data[filt] = apparent_magnitude
@@ -1288,7 +1288,7 @@ class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
             SupernovaLightCurveModel(parameter_conversion, filters)
         ])
 
-def lc_model_class_from_str(class_name):
+def lc_model_class_from_str(class_names):
     transient_class_map = {
         "svd"           : SVDLightCurveModel,
         "fiesta_grb"    : FiestaGRBModel,
@@ -1302,12 +1302,13 @@ def lc_model_class_from_str(class_name):
         "supernova_grb" : SupernovaGRBLightCurveModel,
         "supernova_shock":SupernovaShockCoolingLightCurveModel,
     }
-    class_names = class_name.lower().split(",")
+    if len(class_names) ==1:
+        class_names = class_names[0].lower().split(",")
     ##FIXME get more robust handling of aliases and typos
     try:
         classes = [transient_class_map[cn.strip()] for cn in class_names]
     except KeyError:
-        raise KeyError(f"EM transient classes must be in {transient_class_map.keys()}, but was {class_name}")
+        raise KeyError(f"EM transient classes must be in {transient_class_map.keys()}, but was {class_names}")
     return classes
 
 def get_lc_model_from_modelname(model_name):
@@ -1332,7 +1333,7 @@ def single_model_from_args(model_class, model_name, args,
                            filters, prefixes = ['grb_', 'em_']):
     # parameter conversion as used in EM-only sector
     if getattr(args, 'Hubble', False):
-        parameter_conversion = Hubble_constant_to_distance 
+        parameter_conversion = cosmology_to_distance 
     else:
         parameter_conversion = None
 

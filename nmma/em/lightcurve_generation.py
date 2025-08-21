@@ -12,7 +12,7 @@ import sncosmo
 
 from .utils import (
     estimate_mag_err, autocomplete_data, flux_to_ABmag, 
-    create_detection_limit
+    create_detection_limit, set_filters
 )
 
 try:
@@ -839,10 +839,7 @@ def create_light_curve_data(
     rng= None
 ):
     
-    if args.filters:
-        filters = args.filters.split(",")
-    else:
-        filters = None
+    filters = set_filters(args)
 
     detection_limit = create_detection_limit(args, filters)
     trigger_time = injection_parameters.get("trigger_time", 0.)
@@ -853,7 +850,6 @@ def create_light_curve_data(
     ## use extra data
     ztf_sampling = getattr(args, "ztf_sampling", False)
     rubin_ToO = getattr(args, "rubin_ToO_type", False)
-   
     if getattr(args, 'absolute', False):
         # create lightcurve_data
         if sample_times is None:

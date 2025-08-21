@@ -1,77 +1,55 @@
 import corner
+import os
 import numpy as np
 import pandas as pd
-import json
-import h5py
-import os
-
 import matplotlib
 import seaborn
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-fig_width_pt = 750.0  # Get this from LaTeX using \showthe\columnwidth
-inches_per_pt = 1.0 / 72.27  # Convert pt to inch
-golden_mean = (np.sqrt(5) - 1.0) / 2.0  # Aesthetic ratio
-fig_width = fig_width_pt * inches_per_pt  # width in inches
-fig_height = 0.9 * fig_width * golden_mean  # height in inches
-fig_size = [fig_width, fig_height]
-params = {
-    "backend": "pdf",
-    "axes.labelsize": 18,
-    "legend.fontsize": 18,
-    "xtick.labelsize": 18,
-    "ytick.labelsize": 18,
-    "text.usetex": True,
-    "font.family": "Times New Roman",
-    "figure.figsize": fig_size,
-}
-matplotlib.rcParams.update(params)
+from matplotlib import gridspec, pyplot as plt
+from ast import literal_eval
+import itertools
 
 from ..joint.conversion import chirp_mass_and_eta_to_component_masses, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities
+from ..joint import utils,  j_plotting_utils as jpu, base_parsing
+from.parser import corner_plot_parser
+color_array = jpu.fig_setup()
+nmma_colors = itertools.cycle(color_array)
 
 
-def corner_plot(plot_samples, labels, limits, outdir, fig = None, save=False, **kwargs):
+def plot_multi_corner(args, key_selection=None):
 
-    matplotlib.rcParams.update({'font.size': 16, 'text.usetex': True, 'font.family': 'Times New Roman'})
-    default_kwargs = dict(bins=50, smooth=1.3, label_kwargs=dict(fontsize=16), show_titles=True,
-                  title_kwargs=dict(fontsize=16), color='#0072C1',
-                  truth_color='tab:orange', quantiles=[0.05, 0.5, 0.95],
-                  levels=(0.10, 0.32, 0.68, 0.95), median_line=True, title_fmt=".2f",
-                  plot_density=False, plot_datapoints=False, fill_contours=True,
-                  max_n_ticks=4, hist_kwargs={'density': True})
-    default_kwargs.update(kwargs) 
-    # plt.figure(1)
-    fig = corner.corner(plot_samples, labels=labels, range=limits, fig = fig, **default_kwargs)
-    if save:
-        plt.savefig(f'{outdir}/{save}.pdf', bbox_inches='tight')
-    return fig
+    if args.injection_json is not None:
+        truths = utils.read_injection_file(args.injection_json)
+        truths = truths.iloc[args.injection_num].to_dict()
+        truths = np.array([truths[k] for k in plot_keys])
+        if args.verbose:
+            print("\nLoaded Injection:")
+            print(f"Truths from injection: {truths}")
+    elif args.bestfit_params is not None:
+        truths = utils.read_bestfit_from_json(args.bestfit_json, plot_keys, args.verbose)
+    else:
+        truths = None
 
-def get_posteriors(posterior_samples, outdir = None):
-    """
-    Load posterior samples from a file or DataFrame.
-    """
-    if isinstance(posterior_samples, str):
-        if not os.path.isfile(posterior_samples):
-            posterior_samples = os.path.join(outdir, posterior_samples)
-        format_str = posterior_samples.split('.')[-1]
-        if format_str in ['csv', 'txt', 'dat']:
-            posterior_samples = pd.read_csv(posterior_samples, sep='\s+', header=0)
-        elif format_str == 'json':
-            with open(posterior_samples, 'r') as f:
-                samples_dict = json.load(f)
-            posterior_samples = pd.DataFrame(samples_dict['posterior']['content'])
-        elif format_str == 'hdf5':
-            with h5py.File(posterior_samples, 'r') as f:
-                posterior_group = f['posterior']
-                posterior_samples = pd.DataFrame({key: np.array(posterior_group[key]) for key in posterior_group.keys()})
-        else:
-            raise ValueError("Unsupported file format, must be csv, txt, dat, json or hdf5")
-    return posterior_samples
+    plot_kwargs = literal_eval(args.kwargs)
+    quantiles = [0.16, 0.5, 0.84]
+    fig = None
+    labels = [lab for lab in args.label_name] if args.label_name is not None else [f for f in args.posterior_files]
+    for i, f in enumerate(args.posterior_files):
+        plot_keys, plot_labels = jpu.plotting_parameters_from_priors(args.prior, keys=key_selection).items()
+        fig = setup_corner_plot(f, [], label =labels[i], truths = truths, fig=fig, 
+                quantiles=quantiles, plot_keys=plot_keys, default_labels = plot_labels, **plot_kwargs)
 
-def setup_corner_plot(posterior_samples, outdir, messengers,plot_keys = None, fig = None, injection=None, post_dir = None, **plot_kwargs):
-    if post_dir is None:
-        post_dir = outdir
-    posterior_samples = get_posteriors(posterior_samples, post_dir)
+    filename, ext = os.path.splitext(args.output)
+    if not ext:
+        filename = os.path.join(os.getcwd(), f"{filename}.png")
+    fig.savefig(filename, bbox_inches="tight", dpi=300)
+    print("\nSaved corner plot:", filename)
+
+
+def setup_corner_plot(posterior_samples, *messengers, limits = None, plot_keys = None, fig = None, 
+                      injection=None, post_dir = None, em_transient= False, default_labels=None, **plot_kwargs):
+    #load samples
+    posterior_samples = utils.get_posteriors(posterior_samples, post_dir)
+    # find what we could plot
     plottable_keys, labels = [], []
     for std_messenger, sample_func in zip(
         ['gw', 'eos', 'kn', 'grb'], 
@@ -83,50 +61,87 @@ def setup_corner_plot(posterior_samples, outdir, messengers,plot_keys = None, fi
             labels += new_labels
 
     if plot_keys is None:
-        plot_keys = plottable_keys
-    plot_samples, plot_labels, limits = [], [], []
-    for key in plot_keys:
-        if key in plottable_keys:
-            plot_samples.append(posterior_samples[key].to_numpy())
-            plot_labels.append(labels[plottable_keys.index(key)])
-            limits.append((np.amin(posterior_samples[key]), np.amax(posterior_samples[key])))
-        else:
-            try:
-                plot_samples.append(posterior_samples[key].to_numpy())
-                plot_labels.append(key)
-                limits.append((np.amin(posterior_samples[key]), np.amax(posterior_samples[key])))
-            except KeyError:
-                plot_samples.append(np.full(posterior_samples.shape[0], np.nan))
-                print(f"key {key} was not found in the posterior samples; Inserting empty plot.")
-                plot_labels.append('')
-                limits.append((0, 1))
+        plot_keys = plottable_keys # show all we can
+    if limits is None:
+        limits = [(np.inf, -np.inf) for key in plot_keys] # will adjust more permissively later
+
+    # find what to actually plot
+    plot_samples, plot_labels, titles = [], [], []
+    for i, k in enumerate(plot_keys):
+        try: # we have data to show
+            show_data = posterior_samples[k].to_numpy()
+            plot_samples.append(show_data)
+            titles.append(utils.sig_lims(show_data, plot_kwargs.get('quantiles', None)))
+
+            cur_min, cur_max = limits[i]
+            limits[i] = (min(cur_min, np.amin(show_data)), max(cur_max, np.amax(show_data)))
+
+            lab = k
+            if k in plottable_keys:
+                lab = labels[plottable_keys.index(k)]
+            elif default_labels is not None:
+                lab = default_labels[i]
+            else: lab = k
+            plot_labels.append(lab )
+        except KeyError:
+            print(f"key {k} was not found in the posterior samples; Inserting dummy plot.")
+            cur_min, cur_max = limits[i]
+            if cur_min > cur_max: # meaning no data seen so far, so we have to take chances
+                cur_min, cur_max = 1e42, -1e42# just set crazy limits that we can still work on.
+                limits[i] = (cur_min, cur_max) 
+            # some dummy values that should remain out of frame
+            plot_samples.append(np.linspace(100*cur_max, 1001*cur_max, posterior_samples.shape[0]))
+            plot_labels.append('')
+            titles.append('')
     plot_samples = np.column_stack(plot_samples)
-    # plot_samples = np.column_stack([posterior_samples[key].to_numpy() for key in plot_keys])
+    
     if injection is not None:
         truths = [injection.get(key, None) for key in plot_keys]
     else:
         truths = None
     # limits = ((np.amin(posterior_samples[k]), np.amax(posterior_samples[k])) for k in plot_keys)
+    color = plot_kwargs.pop('color', next(nmma_colors))
+    fig = corner_plot(plot_samples, plot_labels, limits, fig=fig, truths= truths, color = color, titles=titles, **plot_kwargs)
 
-    fig = corner_plot(plot_samples, plot_labels, limits, outdir, fig=fig, truths= truths, **plot_kwargs)
+    if em_transient is not None:
+        # Define the outer position for the inset (in figure fraction)
+        inset_position = [0.68, 0.35, 0.3, 0.6]  # [left, bottom, width, height]
+
+        # Create a container axes that we won't use directly (just for positioning)
+        inset_container = fig.add_axes(inset_position)
+        # inset_container.set_visible(False)  # Hide the outer box
+
+
+        # Create a GridSpec inside the container
+        gs = gridspec.GridSpecFromSubplotSpec(
+            m, 1, subplot_spec=inset_container.get_subplotspec(), hspace=0.1
+        )
+
+
+    # allow joint legend
     if 'label' in plot_kwargs:
         fig.legends.clear()
-        fig.axes[0].plot([], [], label = plot_kwargs['label'], color= plot_kwargs['color'])
-        # fig.legend(loc ="upper right", frameon=False, fontsize=40)
-    #      ,
-    #     handles=[
-    #         mlines.Line2D([], [], color=colors[i], label=sample_labels[i])
-    #         for i in range(n)
-    #     ],
-    #     fontsize=20, frameon=False,
-    #     bbox_to_anchor=(1, ndim), loc="upper right"
-    # )
-    #     if 'color' in plot_kwargs:
-    #         label = mlines.Line2D([], [], color=plot_kwargs['color'], label=plot_kwargs['label'])
-    #     else:
-    #         label = mlines.Line2D([], [], label=plot_kwargs['label'])
-    #     plt.legend(bbox_to_anchor=(0., 1.0, 1., .0), loc=4)
+        fig.axes[0].plot([], [], label = plot_kwargs['label'], color= color)
+        fig.legend()
+    return fig, limits
+
+
+def corner_plot(plot_samples, labels, limits, fig = None, save=False, **kwargs):
+
+    matplotlib.rcParams.update({'font.size': 16, 'text.usetex': True, 'font.family': 'Times New Roman'})
+    default_kwargs = dict(bins=50, smooth=1.3, label_kwargs=dict(fontsize=16), show_titles=True,
+                  title_kwargs=dict(fontsize=16), color = color_array[0], #color='#0072C1',
+                  truth_color='tab:orange', quantiles=[0.05, 0.5, 0.95],
+                  levels=(0.10, 0.32, 0.68, 0.95), median_line=True, title_fmt=".2f",
+                  plot_density=False, plot_datapoints=False, fill_contours=True,
+                  max_n_ticks=4, hist_kwargs={'density': True})
+    default_kwargs.update(kwargs) 
+    # plt.figure(1)
+    fig = corner.corner(plot_samples, labels=labels, range=limits, fig = fig, **default_kwargs)
+    if save:
+        plt.savefig(save, bbox_inches='tight')
     return fig
+
 
 def get_gw_posterior_samples(posterior_samples):
     """
@@ -182,11 +197,8 @@ def get_grb_posterior_samples(posterior_samples):
     labels = [r'$\epsilon$', r'$\log_{10}(E_{0})$', r'$\theta_{c}$', r'$\theta_{w}$',r'$\alpha_{w}$', r'$\log_{10}(n_{0})$', r'$p$', r'$\log_{10}(\epsilon_{e})$', r'$\log_{10}(\epsilon_{B})$']
     return posterior_samples, plot_keys, labels
 
-def eos_only_corner_plot(posterior_samples, outdir):
-    return setup_corner_plot(posterior_samples, outdir, messengers='eos')
-    
-def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH): 
-        
+def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
+
     mc = posterior_samples['chirp_mass'].to_numpy()
     invq = posterior_samples['mass_ratio'].to_numpy()
     alpha = posterior_samples['alpha'].to_numpy()
@@ -268,3 +280,7 @@ def plot_R14_trend(args):
     fig.tight_layout()
     # fig.subplots_adjust(hspace=0.1)
     plt.savefig(f"{args.outdir}/R14_trend_GW_EM_{args.label}.pdf", bbox_inches="tight")
+
+if __name__ == "__main__":
+    args = base_parsing.nmma_base_parsing(corner_plot_parser)
+    plot_multi_corner(args)
