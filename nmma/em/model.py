@@ -369,7 +369,7 @@ class FiestaModel(LightCurveModelContainer):
             try:
                 prior = priors[key]
                 param_info = self.fiesta_model.parameter_distributions[key]
-                if (prior.minimum > param_info[0]) or (prior.maximum < param_info[1]):
+                if (prior.minimum < param_info[0]) or (prior.maximum > param_info[1]):
                     raise ValueError(f"Parameter {key} has bounds {param_info}, but prior was {prior}.")
 
             except KeyError:
@@ -386,7 +386,7 @@ class FiestaModel(LightCurveModelContainer):
         new_parameters = self.em_parameter_setup(parameters)
         
         if not self.sanity_checks(new_parameters):
-            return {}
+            return self.fiesta_model.times, {}
 
         # generate the light curve using fiesta
         time_range, mag = self.fiesta_model.predict(parameters)
@@ -663,14 +663,17 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    def __init__(self, parameter_conversion=None, model="Bu2025_lc", filters=None, surrogate_dir=None, **kwargs):
-        from fiesta.inference.lightcurve_model import BullaLightcurveModel
+    def __init__(self, parameter_conversion=None, model="Bu2025_MLP", filters=None, surrogate_dir=None, **kwargs):
+        if model.endswith("_lc"):
+            from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
+        else:
+            from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
         fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,)
         try:
-            fiesta_model = BullaLightcurveModel(**fiesta_kwargs)
+            fiesta_model = BullaSurrogate(**fiesta_kwargs)
         except OSError:
             fiesta_kwargs['directory'] = f'{surrogate_dir}/KN/{model}/model'
-            fiesta_model = BullaLightcurveModel(**fiesta_kwargs)
+            fiesta_model = BullaSurrogate(**fiesta_kwargs)
 
         super().__init__(fiesta_model, parameter_conversion, filters, sample_times=kwargs.get('sample_times', None))
 
@@ -1141,7 +1144,7 @@ class CombinedLightCurveModelContainer(object):
             if not lc:
                 # if the model returns False/empty, it means that the model
                 # could not generate a light curve for the given parameters
-                return lc
+                return ref_times, lc
             else:
                 lc_per_model.append(lc)
                 time_per_model.append(ref_times)

@@ -148,7 +148,8 @@ class BaseEMTransient(object):
         return f"{self.__class__.__name__} (light_curve_model={self.light_curve_model})"
                
     def sanity_check_passed(self, model_lc):
-        if model_lc is None:
+        time, model_lc = model_lc
+        if not model_lc:
             if self.verbose:
                 print(f"Model light curve generation failed for {self.parameters}"\
                       "returning -inf log_likelihood")

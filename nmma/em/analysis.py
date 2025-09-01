@@ -234,7 +234,7 @@ def bolometric_analysis(args):
     # load the bolometric data
     data = pd.read_csv(args.light_curve_data)
     light_curve_model = model.SimpleBolometricLightCurveModel(
-        model = args.em_model,
+        model = args.em_model, # FIXME this could cause issues because model is the module import from .
         sample_times = utils.setup_sample_times(args),  ## usually None, defaults to model_times
         )
 
@@ -269,15 +269,25 @@ def analysis(args):
     detection_limit = utils.create_detection_limit(args, filters)
 
     # create the data if an injection set is given
-    if args.injection_file:
+
+    if args.injection_file is not None:
         data, injection_parameters = data_from_injection(args, filters, detection_limit)
         trigger_time = injection_parameters['trigger_time']
         
     else:
         # load observational data
         data = io.load_em_observations(args, format='observations')
-
         trigger_time = utils.read_trigger_time(None,args)
+        
+        # this is a bit hacky here, but otherwise the em-tmin and em-tmax arguments will not be used
+        # maybe another place is better suited for this, but atm this is what I need
+        data_filts = list(data.keys()).copy()
+        for key in data_filts:
+            mask = ((data[key]["time"]-trigger_time) >= args.em_tmin) & ((data[key]["time"]-trigger_time) <= args.em_tmax)
+            if np.sum(mask)==0:
+                del data[key]
+            else:
+                data[key] = {"time": data[key]["time"][mask], "mag": data[key]["mag"][mask], "mag_error": data[key]["mag_error"][mask]}
 
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
@@ -343,6 +353,7 @@ def analysis(args):
                         if key in injection_parameters}
         result.plot_corner(parameters=injection)
     else:
+        breakpoint()
         result.plot_corner()
 
     if args.bestfit or args.plot:
