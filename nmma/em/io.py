@@ -38,11 +38,14 @@ def load_em_observations(filename, args=None, format='observations'):
         'model' uses the format of model lightcurves as a text file with columns: time, filter1, filter2, ..., filterN, filter1_error, ..., filterN_error and transforms them to a dict in the same format as 'standard'.
 
     Returns:
-    - data (dict): Dictionary containing the lightcurve data from the file. The keys are generally 't' and each of the filters in the file as well as their accompanying error values.
+    - data (dict): Dictionary containing the lightcurve data from the file. The keys are generally 'time' and each of the filters in the file as well as their accompanying error values.
     """
     if isinstance(filename, argparse.Namespace):
         args = filename
         filename = args.light_curve_data
+    
+    if filename is None:
+        raise ValueError("No filename provided for lightcurve data.")
     
     if filename.endswith(".json"):
         data =  read_lc_from_json(filename)
