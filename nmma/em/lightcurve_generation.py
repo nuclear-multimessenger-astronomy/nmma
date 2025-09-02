@@ -39,9 +39,9 @@ seconds_a_day = 86400.0
 abs_mag_dist_factor = D**2
 
 def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared = abs_mag_dist_factor):
-    exp = np.exp(h * nu * inv_temp / kb)
+    exponent = np.clip(h * nu * inv_temp / kb, None, 700)  # to avoid overflow in exp
     bb_factor = 2.* h/ c_cgs**2
-    return bb_factor * nu**3 /(exp-1) * R_photo * R_photo / dist_squared
+    return bb_factor * nu**3 /np.expm1(exponent) * R_photo * R_photo / dist_squared
 
 def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add = lambda x: 0.):
     mag = {}

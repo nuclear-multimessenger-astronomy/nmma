@@ -134,7 +134,6 @@ def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
         # If a dict is provided, ensure it has the correct filters
         return {filt: float(quantity.get(filt, default_limit)) for filt in filters}
 
-
 def read_trigger_time(parameters=None, args=None):
     if parameters is not None:
         if "trigger_time" in parameters:
@@ -144,14 +143,96 @@ def read_trigger_time(parameters=None, args=None):
         elif "geocent_time" in parameters:
             return time.Time(parameters["geocent_time"], format="gps").mjd
     if args is not None:
-        if args.trigger_time:
-            return time.Time(args.trigger_time, format= args.time_format).mjd
-        elif args.gps:
+        if hasattr(args, "gps") and args.gps:
             return time.Time( args.gps, format="gps").mjd
+        elif args.trigger_time:
+            try:
+                trigger_time=  time.Time(args.trigger_time, format='mjd')
+                print('trigger time:', trigger_time.datetime)  # this fails if not a valid time
+                return trigger_time.mjd
+            except ValueError:
+                trigger_time= time.Time(args.trigger_time, 
+                                format=getattr(args, "time_format", "gps"))
+                print('trigger time:', trigger_time.datetime)  # this fails if not a valid time
+                return trigger_time.mjd
+            
+
+    print("Neither trigger_time, geocent_time nor geocent_time_x provided")
+    return None
+
+def setup_filtered_lc_data(light_curve_data, trigger_time=None):
+    """Set up the light curve data for the EM transient
+
+    Parameters
+    ----------
+    light_curve_data: dict
+        Dictionary of light curve data, with keys as filters and values as arrays of time, magnitude, and uncertainty
+    trigger_time: float, optional
+        Time of the kilonova trigger in Modified Julian Day. If not provided, the minimum time in the data will be used
+
+    """
+
+    lc_times = {}
+    lc_mags = {}
+    lc_uncertainties = {}
+
+    min_time = np.inf
+    max_time = -np.inf
+    for filt, sub_dict in light_curve_data.items():
+        lc_mags[filt] = np.array(sub_dict['mag'])
+        lc_uncertainties[filt] = np.array(sub_dict['mag_error'])
+        lc_times[filt] = np.array(sub_dict['time'])
+        min_time = np.minimum(min_time, np.min(sub_dict['time']))
+        max_time = np.maximum(max_time, np.max(sub_dict['time']))
+
+    if trigger_time is None:
+        trigger_time = min_time
+        print(f"no trigger_time set, using inferred {trigger_time}")
     
-    else:
-        print("Neither trigger_time, geocent_time nor geocent_time_x provided")
-        return None
+    lc_times = {filt: lc_times[filt] - trigger_time for filt in lc_times}
+
+    return (lc_times, lc_mags, lc_uncertainties, trigger_time)
+
+def setup_bolometric_lc_data(light_curve_data, trigger_time=None):
+    data_time = light_curve_data['phase'].to_numpy()
+    if trigger_time is None:
+        trigger_time = np.min(data_time)
+    return (data_time - trigger_time,
+            light_curve_data['Lbb'].to_numpy(),
+            light_curve_data['Lbb_unc'].to_numpy(),
+            trigger_time)
+
+
+def check_time_consistency(light_curve_data, light_curve_model, args):
+    (lc_times, lc_mags, lc_uncertainties, trigger_time) = light_curve_data
+    if args.cutoff_time:
+        for filt in lc_times:
+            valid_idx = lc_times[filt] <= args.cutoff_time
+            lc_times[filt] = lc_times[filt][valid_idx]
+            lc_mags[filt] = lc_mags[filt][valid_idx]
+            lc_uncertainties[filt] = lc_uncertainties[filt][valid_idx]
+        light_curve_data = (lc_times, lc_mags, lc_uncertainties, trigger_time)
+
+    min_time, max_time = np.min([np.min(lc_times[filt]) for filt in lc_times]), np.max([np.max(lc_times[filt]) for filt in lc_times])
+    min_model_time, max_model_time = light_curve_model.model_times[[0, -1]]
+
+    if min_time<0:
+        raise ValueError(
+            f"trigger_time is {-min_time} days later than earliest data time. "
+            "Please provide a valid trigger time." )
+    elif min_time < min_model_time:
+        print(f"Warning: Model is only valid {min_model_time} days after trigger, but first data point is at {min_time} days."
+            "This can lead to unexpected behaviour, but may be intended subject to your timeshift and redshift priors.")
+   
+    
+    if (max_time > max_model_time) and args.cutoff_time:
+        print(f"Warning: max_time {max_time} is later than latest model time {max_model_time}. "
+              "This can lead to unexpected behaviour, but may be intended subject to your timeshift and redshift priors.")
+    elif max_time > max_model_time:
+        raise ValueError(f"Last observation at {max_time}d is later than the model's validity limit {max_model_time} days. "
+              "Set --cutoff-time to a value <= {max_model_time} days or check the trigger time.")
+    
+    return light_curve_data
 
 def transform_to_app_mag_dict(mag_dict, params):
     d_lum = params.get("luminosity_distance", 1e-5) ## assume 10 pc =1e-5 Mpc for abs_mag
