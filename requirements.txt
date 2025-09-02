@@ -12,8 +12,10 @@ pymultinest
 sncosmo
 dust_extinction
 arviz
-p_tqdm
 tornado
 notebook
 ligo.skymap
 healpy
+scikit-learn
+keras>=3.0
+tensorflow-cpu>=2.19

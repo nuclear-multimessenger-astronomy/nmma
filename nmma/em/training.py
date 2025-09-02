@@ -1,9 +1,9 @@
 import json
-import sys
 import os
 import copy
 import inspect
 from glob import glob
+from tqdm.contrib.concurrent import process_map 
 import joblib
 import warnings
 import matplotlib.pyplot as plt
@@ -443,9 +443,7 @@ class SklearnGPTrainingModel(BaseTrainingModel):
             return gp
 
         if self.ncpus > 1:
-            from p_tqdm import p_map
-
-            gps = p_map(gp_func, cAmat[: self.n_coeff, :], num_cpus=self.ncpus)
+            gps = process_map(gp_func, cAmat[: self.n_coeff, :], num_cpus=self.ncpus)
         else:
             gps = []
             for i in range(self.n_coeff):
@@ -710,8 +708,7 @@ def create_benchmark(
     if ncpus == 1:
         chi2_dict_array = [ chi2_func(entry) for entry in grid_entries ]
     else:
-        from p_tqdm import p_map
-        chi2_dict_array = p_map( chi2_func, grid_entries,  num_cpus=ncpus )
+        chi2_dict_array = process_map( chi2_func, grid_entries,  max_workers=ncpus )
 
     chi2_array_by_filt = { filt: 
         [dict_entry[filt] for dict_entry in chi2_dict_array]
