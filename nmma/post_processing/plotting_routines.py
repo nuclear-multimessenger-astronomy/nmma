@@ -17,24 +17,24 @@ nmma_colors = itertools.cycle(color_array)
 
 def plot_multi_corner(args, key_selection=None):
 
-    if args.injection_json is not None:
-        truths = utils.read_injection_file(args.injection_json)
-        truths = truths.iloc[args.injection_num].to_dict()
-        truths = np.array([truths[k] for k in plot_keys])
-        if args.verbose:
-            print("\nLoaded Injection:")
-            print(f"Truths from injection: {truths}")
-    elif args.bestfit_params is not None:
-        truths = utils.read_bestfit_from_json(args.bestfit_json, plot_keys, args.verbose)
-    else:
-        truths = None
-
     plot_kwargs = literal_eval(args.kwargs)
     quantiles = [0.16, 0.5, 0.84]
     fig = None
     labels = [lab for lab in args.label_name] if args.label_name is not None else [f for f in args.posterior_files]
     for i, f in enumerate(args.posterior_files):
         plot_keys, plot_labels = jpu.plotting_parameters_from_priors(args.prior, keys=key_selection).items()
+        if args.injection_json is not None:
+            truths = utils.read_injection_file(args.injection_json)
+            truths = truths.iloc[args.injection_num].to_dict()
+            truths = np.array([truths[k] for k in plot_keys])
+            if args.verbose:
+                print("\nLoaded Injection:")
+                print(f"Truths from injection: {truths}")
+        elif args.bestfit_params is not None:
+            truths = utils.read_bestfit_from_json(args.bestfit_json, plot_keys, args.verbose)
+        else:
+            truths = None
+            
         fig = setup_corner_plot(f, [], label =labels[i], truths = truths, fig=fig, 
                 quantiles=quantiles, plot_keys=plot_keys, default_labels = plot_labels, **plot_kwargs)
 
