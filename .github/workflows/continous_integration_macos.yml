@@ -84,7 +84,7 @@ jobs:
 
       - name: Install Homebrew dependencies
         run: |
-          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack cmake
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack
           eval "$(/usr/libexec/path_helper)"
       - name: Install dependencies (macOS)
         run: |
