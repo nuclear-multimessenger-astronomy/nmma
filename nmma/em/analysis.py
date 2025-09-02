@@ -62,7 +62,7 @@ def set_analysis_filters(filters, data):
     print(f"Running with filters {filters_to_analyze}")
     return filters_to_analyze
 
-def em_only_sampling(likelihood, priors, args):
+def em_only_sampling(likelihood, priors, args, injection_parameters=None):
 
     if args.bilby_zero_likelihood_mode:
         likelihood = ZeroLikelihood(likelihood)
@@ -87,6 +87,7 @@ def em_only_sampling(likelihood, priors, args):
             sampler_kwargs["niter"] = 1
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
+
     result = bilby.run_sampler(
         likelihood,
         priors,
@@ -98,22 +99,30 @@ def em_only_sampling(likelihood, priors, args):
         soft_init=args.soft_init,
         queue_size=args.cpus,
         check_point_delta_t=3600,
+        save=False,
         **sampler_kwargs,
     )
+
     # check if it is running under mpi
     try:
         from mpi4py import MPI
 
         rank = MPI.COMM_WORLD.Get_rank()
-        if rank == 0:
-            pass
-        else:
-            return
-
+        if rank != 0:
+            exit()
     except ImportError:
         pass
+
+    result.save_to_file()
     result.save_posterior_samples()
-    return result
+
+    if injection_parameters: 
+        var_columns = {col for col in result.posterior 
+                       if len(result.posterior[col].unique()) > 1}
+        injection_parameters = {k: v for k, v in injection_parameters.items()
+                        if k in var_columns}
+        
+    result.plot_corner(injection_parameters)
 
 def post_process_bestfit(bestfit_params, transient, args, result=None):
     best_mags = bestfit_lightcurve(transient, bestfit_params)
@@ -204,9 +213,13 @@ def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
                 mag[finite_idx],
                 sigma_y[finite_idx],
             )
-
+            
             offset = (y_det - np.interp(t_det,model_data["time"], model_data[filt])) ** 2
-            total_unc = sigma_y_det**2 + model_error[filt]**2
+            try:
+                errors = np.interp(t_det,model_data["time"], model_error[filt])
+            except ValueError:
+                errors = model_error[filt] 
+            total_unc = sigma_y_det**2 + errors**2
             chi2_per_filt = np.sum(offset / total_unc)
             # store the data
             chi2 += chi2_per_filt
@@ -215,7 +228,7 @@ def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
             chi2_dict[filt] = float(chi2_per_filt / n_finite)
 
             if verbose:
-                print(f"the {filt} data being analyzed is: ", t, y, sigma_y)
+                print(f"the {filt} data being analyzed is: ", t, mag, sigma_y)
                 print(f"for {filt} the length of the detections array is: ", n_finite, "increasing the dof to", dof)
 
     chi2_dict["total"] = chi2 / dof if dof > 0 else np.inf
@@ -233,10 +246,12 @@ def bolometric_analysis(args):
 
     # load the bolometric data
     data = pd.read_csv(args.light_curve_data)
-    light_curve_model = model.SimpleBolometricLightCurveModel(
-        model = args.em_model,
-        sample_times = utils.setup_sample_times(args),  ## usually None, defaults to model_times
-        )
+    trigger_time = utils.read_trigger_time(None,args)
+    light_curve_data = utils.setup_bolometric_lc_data(data, trigger_time)
+
+    light_curve_model = model.SimpleBolometricLightCurveModel(None, args.em_model,
+        sample_times=utils.setup_sample_times(args),  ## usually None, defaults to model_times
+    )
 
     # setup the prior
     priors = create_prior_from_args(args)
@@ -244,15 +259,13 @@ def bolometric_analysis(args):
     # setup the likelihood
     likelihood_kwargs = dict(
         light_curve_model=light_curve_model,
-        light_curve_data=data,
+        light_curve_data=light_curve_data,
         priors=priors,
         error_budget=args.error_budget,
         verbose=args.verbose,
     )
     likelihood = EMTransientLikelihood(**likelihood_kwargs)
-    result = em_only_sampling(likelihood, priors, args)
-
-    result.plot_corner()
+    em_only_sampling(likelihood, priors, args)
 
     if args.bestfit or args.plot:
         transient = likelihood.sub_model
@@ -267,23 +280,25 @@ def bolometric_analysis(args):
 def analysis(args):
     filters = utils.set_filters(args)
     detection_limit = utils.create_detection_limit(args, filters)
-
-    # create the data if an injection set is given
-    if args.injection_file:
-        data, injection_parameters = data_from_injection(args, filters, detection_limit)
-        trigger_time = injection_parameters['trigger_time']
         
-    else:
+    try:
         # load observational data
         data = io.load_em_observations(args, format='observations')
-
         trigger_time = utils.read_trigger_time(None,args)
+        injection_parameters = None
+
+    except ValueError:
+        # try to work with injection data instead
+        data, injection_parameters = data_from_injection(args, filters, detection_limit)
+        trigger_time = injection_parameters['trigger_time']
+    except FileNotFoundError:
+        # If the injection file is not found, raise an error
+        raise FileNotFoundError("Injection file not found.")
 
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
 
     # initialize light curve model
-
     print("Creating light curve model for inference")
     lc_model_type = model.identify_model_type(args)
     light_curve_model = model.create_light_curve_model_from_args(
@@ -294,33 +309,7 @@ def analysis(args):
     except AttributeError:
         model_names = [sub_model.model for sub_model in light_curve_model.models]
 
-    
-    # setup the prior
-    if any(model in ['AnBa2022_linear', 'AnBa2022_log'] for model in model_names):
-        param_conv = convert_mtot_mni
-    # elif to be extended...
-    else:
-        param_conv = None
-    priors = create_prior_from_args(args, param_conv = param_conv)
-
-    # setup the likelihood
-    likelihood_kwargs = dict(
-        light_curve_model=light_curve_model,
-        filters=filters_to_analyze,
-        light_curve_data=data,
-        priors=priors,
-        trigger_time=trigger_time,
-        error_budget=args.em_error_budget,
-        verbose=args.verbose,
-        detection_limit=detection_limit,
-        systematics_file=args.systematics_file
-    )
-
-    likelihood = EMTransientLikelihood(**likelihood_kwargs)
-
-    result = em_only_sampling(likelihood, priors, args)
-    
-    if args.injection_file:
+    if injection_parameters is not None:
         injlist_all = ["luminosity_distance"]
         for model_name in model_names:
             add_params = model.model_parameters_dict[model_name]
@@ -333,17 +322,35 @@ def analysis(args):
                 except:
                     pass
             injlist_all += add_params
-        ## A set with all the different parameters under analysis
-        injlist_all = set(injlist_all)
-        # A set of all parameters we do not vary in our analysis
-        constant_columns = {col for col in result.posterior if len(result.posterior[col].unique()) == 1}
-        var_inj_params = injlist_all - constant_columns
-        injection = {key: injection_parameters[key] 
-                        for key in var_inj_params 
-                        if key in injection_parameters}
-        result.plot_corner(parameters=injection)
+        injection_parameters = {k: v for k, v in injection_parameters.items() 
+                                if k in injlist_all}
+    
+    # setup the prior
+    if any(model in ['AnBa2022_linear', 'AnBa2022_log'] for model in model_names):
+        param_conv = convert_mtot_mni
+    # elif to be extended...
     else:
-        result.plot_corner()
+        param_conv = None
+    priors = create_prior_from_args(args, param_conv = param_conv)
+
+    light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
+    light_curve_data = utils.check_time_consistency(light_curve_data, light_curve_model, args)
+    # setup the likelihood
+    likelihood_kwargs = dict(
+        light_curve_model=light_curve_model,
+        filters=filters_to_analyze,
+        light_curve_data=light_curve_data,
+        priors=priors,
+        trigger_time=trigger_time,
+        error_budget=args.em_error_budget,
+        verbose=args.verbose,
+        detection_limit=detection_limit,
+        systematics_file=args.systematics_file
+    )
+
+    likelihood = EMTransientLikelihood(**likelihood_kwargs)
+
+    em_only_sampling(likelihood, priors, args, injection_parameters)
 
     if args.bestfit or args.plot:
         bestfit_params = read_bestfit_from_posterior(args)

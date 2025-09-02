@@ -80,7 +80,7 @@ def basic_em_analysis_plot(
 
         if sub_model_plot_props is not None:
             ## plot additional lcs for each sub_model
-            for model_name, prop_dict in sub_model_plot_props:
+            for model_name, prop_dict in sub_model_plot_props.items():
                 mag_plot = prop_dict['plot_mags'][cnt]
                 plot_times = prop_dict['plot_times'][cnt]
                 ax_sum.plot(plot_times, mag_plot,
