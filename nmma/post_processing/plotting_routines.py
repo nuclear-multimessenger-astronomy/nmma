@@ -113,7 +113,8 @@ def setup_corner_plot(posterior_samples, *messengers, limits = None, plot_keys =
 
 def corner_plot(plot_samples, labels, limits, fig = None, save=False, **kwargs):
 
-    matplotlib.rcParams.update({'font.size': 16, 'text.usetex': True, 'font.family': 'Times New Roman'})
+    matplotlib.rcParams.update({'font.size': 16, 'font.family': 'Times New Roman'})
+    matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
     default_kwargs = dict(bins=50, smooth=1.3, label_kwargs=dict(fontsize=16), show_titles=True,
                   title_kwargs=dict(fontsize=16), color = color_array[0], #color='#0072C1',
                   truth_color='tab:orange', quantiles=[0.05, 0.5, 0.95],

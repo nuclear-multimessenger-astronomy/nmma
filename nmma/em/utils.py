@@ -16,8 +16,9 @@ import matplotlib.pyplot as plt
 
 
 import warnings
+from numpy.exceptions import VisibleDeprecationWarning
 
-warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
+warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
 
 import astropy.units

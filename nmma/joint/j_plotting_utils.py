@@ -2,6 +2,7 @@
 from bilby.core.prior import PriorDict, DeltaFunction
 import numpy as np
 import matplotlib
+import os
 matplotlib.use("Agg")
 
 def fig_setup():
@@ -17,7 +18,6 @@ def fig_setup():
         "legend.fontsize": 18,
         "xtick.labelsize": 18,
         "ytick.labelsize": 18,
-        "text.usetex": True,
         "font.family": "Times New Roman",
         "figure.figsize": fig_size,
         "mathtext.fontset": "stix",
@@ -25,8 +25,6 @@ def fig_setup():
 
     ## Alt choice
     # params = {
-    #     # latex
-    #     "text.usetex": True,
     #     # fonts
     #     "mathtext.fontset": "stix",
     #     "font.serif": "Computer Modern",
@@ -45,6 +43,7 @@ def fig_setup():
     #     "legend.fontsize": 20,
     # }
     matplotlib.rcParams.update(params)
+    matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
 
     return  [
         "#22ADFC", # blue

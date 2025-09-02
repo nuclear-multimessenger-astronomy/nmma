@@ -11,12 +11,12 @@ params = {
     "legend.fontsize": 42,
     "xtick.labelsize": 42,
     "ytick.labelsize": 42,
-    "text.usetex": True,
     "font.family": "Times New Roman",
     "figure.figsize": [18, 25],
     "font.size": 16,
 }
 matplotlib.rcParams.update(params)
+matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
 
 ##############################################
 ################# MAIN PLOTS #################
@@ -105,8 +105,8 @@ def basic_em_analysis_plot(
 def bolometric_lc_plot(transient, lbol_dict, save_path, color = "coral"):
     matplotlib.rcParams.update(
         {'font.size': 12,
-        'text.usetex': True,
-        'font.family': 'Times New Roman'}
+        # 'font.family': 'Times New Roman'
+        }
     )
     fig, ax = plt.subplots(1, 1)
     ax, _ = plot_observations(ax, transient, markersize=12)
@@ -172,7 +172,7 @@ def visualise_model_performance(training_data, training_model, light_curve_model
 
 def chi2_hists_from_dict(chi2_dict, outpath):
     matplotlib.rcParams.update(
-        {"font.size": 16, "text.usetex": True, "font.family": "Times New Roman"}
+        {"font.size": 16, "font.family": "Times New Roman"}
     )
     for filt, chi2_array in chi2_dict.items():
         plt.figure()
