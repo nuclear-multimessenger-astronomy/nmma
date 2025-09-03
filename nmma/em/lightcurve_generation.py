@@ -288,46 +288,17 @@ def host_lc(sample_times, parameters, filters, host_mag):
     return mag
 
 ## supernova model
-def sn_lc(
-    sample_times_stretched,
-    parameters,
-    cosmology,
-    abs_mag=-19.35,
-    regularize_band="bessellv",
-    regularize_system="vega",
-    model_name="nugent-hyper",
-    filters=None,
-    lambdas=None,
-):
-    z= parameters['redshift']
-    model = sncosmo.Model(source=model_name)
-    if model_name in ["salt2", "salt3"]:
-        model.set(
-            z=z,
-            t0=np.median(sample_times_stretched),
-            x0=parameters["x0"],
-            x1=parameters["x1"],
-            c=parameters["c"],
-        )
-    else:
-        model.set(z=z)
-
-    # regularize the absolute magnitude
-    abs_mag -= cosmology.distmod(z).value
-    model.set_source_peakabsmag(
-        abs_mag, regularize_band, regularize_system, cosmo=cosmology
-    )
-
+def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
     mag = {}
 
     for filt, lambda_A in zip(filters, lambdas):
         # convert back to AA
         lambda_AA = 1e10 * lambda_A
-        if lambda_AA < model.minwave() or lambda_AA > model.maxwave():
+        if lambda_AA < sn_model.minwave() or lambda_AA > sn_model.maxwave():
             mag[filt] = np.full_like(sample_times_stretched,np.inf) 
         else:
             try:
-                flux = model.flux(sample_times_stretched, [lambda_AA])[:, 0]
+                flux = sn_model.flux(sample_times_stretched, [lambda_AA])[:, 0]
                 # see https://en.wikipedia.org/wiki/AB_magnitude
                 flux_jy = 3.34e4 * np.power(lambda_AA, 2.0) * flux
                 mag[filt] = flux_to_ABmag(flux_jy, unit='Jy')

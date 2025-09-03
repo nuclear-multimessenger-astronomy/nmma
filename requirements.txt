@@ -14,6 +14,7 @@ dust_extinction
 arviz
 tornado
 notebook
+toml
 ligo.skymap
 healpy
 scikit-learn
