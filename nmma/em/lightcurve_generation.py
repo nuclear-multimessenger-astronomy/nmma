@@ -293,32 +293,17 @@ def host_lc(sample_times, parameters, filters, host_mag):
 def sn_lc(
     sample_times_stretched,
     parameters,
-    cosmology,
-    abs_mag=-19.35,
-    regularize_band="bessellv",
-    regularize_system="vega",
     model_name="nugent-hyper",
     filters=None,
     lambdas=None,
 ):
-    z= parameters['redshift']
+    
     model = sncosmo.Model(source=model_name)
-    if model_name in ["salt2", "salt3"]:
-        model.set(
-            z=z,
-            t0=np.median(sample_times_stretched),
-            x0=parameters["x0"],
-            x1=parameters["x1"],
-            c=parameters["c"],
-        )
-    else:
-        model.set(z=z)
 
-    # regularize the absolute magnitude
-    abs_mag -= cosmology.distmod(z).value
-    model.set_source_peakabsmag(
-        abs_mag, regularize_band, regularize_system, cosmo=cosmology
-    )
+    input_dict = {}
+    for p in model.param_names:
+        input_dict[p] = parameters.get(p, model.get(p))
+    model.set(**input_dict)
 
     mag = {}
 
@@ -335,7 +320,6 @@ def sn_lc(
                 mag[filt] = flux_to_ABmag(flux_jy, unit='Jy')
             except Exception:
                 return {}
-
     return mag
 
 ## shock-cooling lightcurve
@@ -386,10 +370,7 @@ def sc_lc(lbol, Rs, nu_host, filters):
     one_over_T = 1.0 / T
     one_over_T[~np.isfinite(one_over_T)] = np.inf
 
-    try:
-        result = mag_dict_for_blackbody(filters, one_over_T, Rs, nu_host)
-    except:
-        breakpoint()
+    result = mag_dict_for_blackbody(filters, one_over_T, Rs, nu_host)
 
     return mag_dict_for_blackbody(filters, one_over_T, Rs, nu_host)
 

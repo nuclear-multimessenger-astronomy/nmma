@@ -5,6 +5,7 @@ from copy import copy
 import joblib
 import numpy as np
 from scipy.special import logsumexp
+import sncosmo
 from sncosmo.models import _SOURCES
 from bilby_pipe.utils import convert_string_to_dict
 
@@ -63,9 +64,9 @@ model_parameters_dict = {
     "AnBa2022_log": ["log10_mtot", "log10_mni", "vej", "log10_mrp", "xmix"],
     "AnBa2022_linear": ["mtot", "mni", "vej", "mrp", "xmix"],
     "salt2": ["x0", "x1", "c"],
-    "nugent-hyper": ["supernova_mag_boost", "supernova_mag_stretch"],
     # for Sr2023, the following array is not used
     "Sr2023": ["a_AG", "alpha_AG", "f_nu_host"],
+    ## surrogate KN models
     "Bu2022Ye": [
         "log10_mej_dyn",
         "vej_dyn",
@@ -955,24 +956,33 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         model_parameters=None,
         cosmology=default_cosmology
     ):
+        model_parameters = sncosmo.Model(model).param_names
         super().__init__(model, parameter_conversion, filters, model_parameters, sample_times)
         self.cosmology = cosmology
+    
+    def em_parameter_setup(self, parameters):
+        new_parameters = super().em_parameter_setup(parameters)
+
+        new_parameters["supernova_mag_stretch"] = parameters.get('supernova_mag_stretch', 1.)
+ 
+        new_parameters["t0"] = new_parameters.get("t0", self.timeshift)
+        new_parameters["z"] = new_parameters.get("z", self.redshift)
+
+        return new_parameters
 
     def generate_lightcurve(self, sample_times, parameters):
         em_param_dict = self.em_parameter_setup(parameters)
         
-        stretch = em_param_dict.get("supernova_mag_stretch", 1.)
+        stretch = em_param_dict["supernova_mag_stretch"]
 
         mag = lc_gen.sn_lc(
-            sample_times / stretch,
-            em_param_dict,
-            cosmology=self.cosmology,
+            sample_times_stretched=sample_times / stretch,
+            parameters=em_param_dict,
             model_name=self.model,
+            lambdas=self.lambdas,
             filters=self.default_filts,
-            lambdas=self.lambdas
         )
-        mag_boost = em_param_dict.get("supernova_mag_boost", 0.0)
-        return {filt: filt_mag + mag_boost for filt, filt_mag in mag.items()}
+        return {filt: filt_mag for filt, filt_mag in mag.items()}
     
 
 class ShockCoolingLightCurveModel(LightCurveModelContainer):
