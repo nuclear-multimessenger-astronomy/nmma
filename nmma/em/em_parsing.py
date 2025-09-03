@@ -102,10 +102,10 @@ def em_model_parsing(parser):
         help="Number of eigenvalues to be taken for mag evaluation (default: 10)")
     em_model_parser.add_argument("--svd-lbol-ncoeff", type=int, default=10,
         help="Number of eigenvalues to be taken for lbol evaluation (default: 10)")
-    em_model_parser.add_argument( "--xlim", default="0,14", nargs="*",
-        help="Start and end time for light curve plot (default: 0-14)")
-    em_model_parser.add_argument("--ylim", default="22,16", nargs="*",
-        help="Upper and lower magnitude limit for light curve plot (default: 22,16)")
+    em_model_parser.add_argument( "--xlim", nargs="*",
+        help="Start and end time for light curve plot (default: None, which ajdusts to the data points)")
+    em_model_parser.add_argument("--ylim", nargs="*",
+        help="Upper and lower magnitude limit for light curve plot (default: None, which adjusts to the data points)")
 
     return parser
 

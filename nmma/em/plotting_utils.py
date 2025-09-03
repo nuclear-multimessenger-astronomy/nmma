@@ -7,14 +7,7 @@ import os
 matplotlib.use("agg")
 params = {
     "backend": "pdf",
-    "axes.labelsize": 42,
-    "legend.fontsize": 42,
-    "xtick.labelsize": 42,
-    "ytick.labelsize": 42,
-    "text.usetex": True,
-    "font.family": "Times New Roman",
     "figure.figsize": [18, 25],
-    "font.size": 16,
 }
 matplotlib.rcParams.update(params)
 
@@ -26,12 +19,20 @@ def basic_em_analysis_plot(
         sub_model_plot_props, xlim, ylim, save_path,
         ncol = 2):
 
-
-    xlim = check_limit(xlim)
-    ylim = check_limit(ylim)
-
     time = mags_to_plot.pop("time")
     filter_names = list(mags_to_plot.keys())
+
+    if xlim is not None:
+        xlim = check_limit(xlim)
+    
+    else: 
+        xlim = get_time_limits_from_obs_data(transient)
+
+    if ylim is not None:
+        ylim = check_limit(ylim)
+    
+    else:
+        ylim = get_mag_limits_from_obs_data(transient, filter_names)
 
     fig, axes = analysis_plot_geometry(filter_names, ncol=ncol)
     colors = plt.cm.Spectral(np.linspace(0, 1, len(filter_names)))[::-1]
@@ -80,9 +81,9 @@ def basic_em_analysis_plot(
 
         if sub_model_plot_props is not None:
             ## plot additional lcs for each sub_model
-            for model_name, prop_dict in sub_model_plot_props:
+            for model_name, prop_dict in sub_model_plot_props.items():
                 mag_plot = prop_dict['plot_mags'][cnt]
-                plot_times = prop_dict['plot_times'][cnt]
+                plot_times = prop_dict['plot_times']
                 ax_sum.plot(plot_times, mag_plot,
                     color='coral', linewidth=3, linestyle="--")
                 ax_sum.fill_between(plot_times,
@@ -94,9 +95,13 @@ def basic_em_analysis_plot(
                 )
 
         ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_dict[filt], 2)}$')
+
         ax_sum.set_xlim(xlim)
-        ax_sum.set_ylim(ylim)
-        # ax_delta.set_xlim(xlim)
+        ax_sum.set_xscale("log")
+        ax_sum.set_ylim(ylim[filt])
+
+        ax_delta.set_xlim(xlim)
+        ax_sum.set_xscale("log") 
         
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches='tight')
@@ -386,4 +391,26 @@ def analysis_plot_geometry(filters_to_plot, ncol=2):
     if len(filters_to_plot) % 2:
         axes[-1, -1].axis('off')
     return fig, axes
+
+
+def get_time_limits_from_obs_data(transient):
+    """
+    A function that goes through the lc data and finds the time range that encompasses all data points.
+    """
+    
+    xmin = np.min([t_arr.min() for t_arr in transient.light_curve_times.values()])    
+    xmax = np.max([t_arr.max() for t_arr in transient.light_curve_times.values()])    
+
+    return (0.8*xmin, 1.2*xmax)
+
+def get_mag_limits_from_obs_data(transient, filter_names):
+    """
+    A function that goes through the lc data and finds the magnitude range for each filter.
+    """
+
+    ylim = {}
+    for filt in filter_names:
+        ylim[filt] = (1.2*transient.light_curves[filt].max(), 0.8*transient.light_curves[filt].min())
+
+    return ylim
 
