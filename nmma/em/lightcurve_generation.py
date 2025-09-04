@@ -39,11 +39,9 @@ seconds_a_day = 86400.0
 abs_mag_dist_factor = D**2
 
 def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared = abs_mag_dist_factor):
-    exponent = h * nu * inv_temp / kb
-    exponent = np.clip(exponent, None, 709) # here to prevent overflow
-    exp_factor_minus1 = np.expm1(exponent) # np.expm1 more accurate sometimes than np.exp()-1
+    exponent = np.clip(h * nu * inv_temp / kb, None, 700)  # to avoid overflow in exp
     bb_factor = 2.* h/ c_cgs**2
-    return bb_factor * nu**3 /exp_factor_minus1 * R_photo * R_photo / dist_squared
+    return bb_factor * nu**3 /np.expm1(exponent) * R_photo * R_photo / dist_squared
 
 def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add = lambda x: 0.):
     mag = {}
@@ -290,31 +288,17 @@ def host_lc(sample_times, parameters, filters, host_mag):
     return mag
 
 ## supernova model
-def sn_lc(
-    sample_times_stretched,
-    parameters,
-    model_name="nugent-hyper",
-    filters=None,
-    lambdas=None,
-):
-    
-    model = sncosmo.Model(source=model_name)
-
-    input_dict = {}
-    for p in model.param_names:
-        input_dict[p] = parameters.get(p, model.get(p))
-    model.set(**input_dict)
-
+def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
     mag = {}
 
     for filt, lambda_A in zip(filters, lambdas):
         # convert back to AA
         lambda_AA = 1e10 * lambda_A
-        if lambda_AA < model.minwave() or lambda_AA > model.maxwave():
+        if lambda_AA < sn_model.minwave() or lambda_AA > sn_model.maxwave():
             mag[filt] = np.full_like(sample_times_stretched,np.inf) 
         else:
             try:
-                flux = model.flux(sample_times_stretched, [lambda_AA])[:, 0]
+                flux = sn_model.flux(sample_times_stretched, [lambda_AA])[:, 0]
                 # see https://en.wikipedia.org/wiki/AB_magnitude
                 flux_jy = 3.34e4 * np.power(lambda_AA, 2.0) * flux
                 mag[filt] = flux_to_ABmag(flux_jy, unit='Jy')

@@ -402,9 +402,10 @@ class FiestaModel(LightCurveModelContainer):
     
     
     def generate_lightcurve(self, sample_times, parameters):
-        """Generate a light curve for given parameter as observable in detector frame."""
+        """Generate a light curve for given parameter as observable in detector frame.
+            NOTE: You should almost always prefer gen_detector_lc!"""
+        
         obs_times, obs_mags = self.gen_detector_lc(parameters)
-        # NOTE: we should almost always prefer gen_detector_lc!
         
         # obs_times were redshift corrected; have to reverse this:
         source_times = (obs_times - self.timeshift) / (1+self.redshift)
@@ -953,18 +954,18 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         model="nugent-hyper",
         filters=None,
         sample_times=None,
-        model_parameters=None,
-        cosmology=default_cosmology
-    ):
-        model_parameters = sncosmo.Model(model).param_names
+        model_parameters=None
+    ):  
+        self.sn_model = sncosmo.Model(source=model)
+        if model_parameters is not None:
+            print("Warning: model_parameters are ignored for SupernovaLightCurveModel, using sncosmo defaults.")
+        model_parameters = self.sn_model.param_names
         super().__init__(model, parameter_conversion, filters, model_parameters, sample_times)
-        self.cosmology = cosmology
-    
+
     def em_parameter_setup(self, parameters):
         new_parameters = super().em_parameter_setup(parameters)
 
         new_parameters["supernova_mag_stretch"] = parameters.get('supernova_mag_stretch', 1.)
- 
         new_parameters["t0"] = new_parameters.get("t0", self.timeshift)
         new_parameters["z"] = new_parameters.get("z", self.redshift)
 
@@ -972,16 +973,15 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
 
     def generate_lightcurve(self, sample_times, parameters):
         em_param_dict = self.em_parameter_setup(parameters)
-        
+
+        # FIXME: This should probably be removed, use sncosmo parameters instead
         stretch = em_param_dict["supernova_mag_stretch"]
 
-        mag = lc_gen.sn_lc(
-            sample_times_stretched=sample_times / stretch,
-            parameters=em_param_dict,
-            model_name=self.model,
-            lambdas=self.lambdas,
-            filters=self.default_filts,
-        )
+        lc_pars = {p: em_param_dict.get(p, self.sn_model.get(p)) for p in self.model_parameters}
+        self.sn_model.set(**lc_pars)
+        mag = lc_gen.sn_lc(sample_times / stretch, self.sn_model, 
+                           self.default_filts, self.lambdas)
+        
         return {filt: filt_mag for filt, filt_mag in mag.items()}
     
 
@@ -1154,7 +1154,7 @@ class CombinedLightCurveModelContainer(object):
             if not lc:
                 # if the model returns False/empty, it means that the model
                 # could not generate a light curve for the given parameters
-                return ref_times, lc
+                return (ref_times, lc)
             else:
                 lc_per_model.append(lc)
                 time_per_model.append(ref_times)

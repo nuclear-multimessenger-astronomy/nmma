@@ -23,6 +23,9 @@ def em_time_parsing(parser):
         "Default: log, further options: linear, geometric")
     em_time_parser.add( "--em-tstep","--dt", type=nonefloat, default=None, 
         help="Time step (in days) for light curve initial evaluation, will overwrite nsteps. Legacy option kept for backward compatibility", )
+    em_time_parser.add("--cutoff-time", type=float,
+        help="Cutoff time in days (relative to the trigger time) to which the light curve data will be cut.",
+    )
     return parser
 
 def basic_em_only_parsing(parser):
@@ -103,8 +106,8 @@ def em_model_parsing(parser):
     em_model_parser.add_argument("--svd-lbol-ncoeff", type=int, default=10,
         help="Number of eigenvalues to be taken for lbol evaluation (default: 10)")
     em_model_parser.add_argument( "--xlim", nargs="*",
-        help="Start and end time for light curve plot (default: None, which ajdusts to the data points)")
-    em_model_parser.add_argument("--ylim", nargs="*",
+        help="Start and end time for light curve plot (default: None, which adjusts to the data points)")
+    em_model_parser.add_argument("--ylim",  nargs="*",
         help="Upper and lower magnitude limit for light curve plot (default: None, which adjusts to the data points)")
 
     return parser
@@ -342,8 +345,7 @@ def lc_validation_parser(parser):
     parser.add_argument("--min-obs", default=3, type=int,
         help="Minimum number of observations required in each filter.",
     )
-    parser.add_argument(
-        "--cutoff-time", default=0., type=float,
+    parser.add_argument("--cutoff-time", default=0., type=float,
         help="Cutoff time (relative to the first data point) that the minimum observations must be in. If not provided, the entire lightcurve will be evaluated",
     )
     return parser

@@ -1,10 +1,10 @@
 future
-bilby>=2.1.1
+bilby>=2.4.1
 bilby_pipe>=1.4.0
 schwimmbad
 colorcet
-numpy>=1.9
-matplotlib>=3.0
+numpy>=2.0
+matplotlib>=3.8
 scipy>=1.10
 pandas>=2.0
 astropy>=6.0
@@ -12,8 +12,11 @@ pymultinest
 sncosmo
 dust_extinction
 arviz
-p_tqdm
 tornado
 notebook
+toml
 ligo.skymap
 healpy
+scikit-learn
+keras>=3.0
+tensorflow-cpu>=2.19

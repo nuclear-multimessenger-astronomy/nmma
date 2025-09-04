@@ -437,32 +437,32 @@ def validate_lightcurve(data_file,filters=None,min_obs=3,cutoff_time=0,verbose=F
     """
     data = io.load_em_observations(data_file, format='observations')
 
-    ## determine filters to consider
-    if filters is None:
-        filters = list(data.keys())
+    # Determine filters to consider
+    filters = filters or list(data.keys())
 
-    ## determine time window to consider
+    # Time window
     min_time = np.min([np.min(filt_dict['time']) for filt_dict in data.values()])
     max_time = min_time + cutoff_time if cutoff_time > 0 else np.max([np.max(filt_dict['time']) for filt_dict in data.values()])
 
-    ## evaluate lightcurve for each filter
-    for filter in filters:
-        if filter not in utils.DEFAULT_FILTERS:
-            raise ValueError(f"Filter {filter} not in supported filter list")
-        elif filter not in data.keys():
-            print(f"{filter} not present in data file, cannot validate") if verbose else None
+    # Validate each filter
+    for filt in filters:
+        #FIXME this seems an unpractical restriction
+        if filt not in utils.DEFAULT_FILTERS:
+            raise ValueError(f"Unsupported filter: {filt}")
+        if filt not in data:
+            if verbose:
+                print(f"{filt} not in data file")
             return False
-        filter_idcs = (data[filter]['time']<= max_time)
-        num_detections = np.sum(np.isfinite(data[filter]['mag_error'][filter_idcs]))
-        if num_detections < min_obs:
-            print(f"{filter} filter has {num_detections} detections, less than the required {min_obs}") if verbose else None
+        mask = data[filt]['time'] <= max_time
+        detections = np.sum(np.isfinite(data[filt]['mag_error'][mask]))
+        if detections < min_obs:
+            if verbose:
+                print(f"{filt}: only {detections} detections, required: {min_obs}")
             return False
-        else:
-            continue
-    print(f"Lightcurve has at least {min_obs} detections in the filters within the first {max_time-min_time} days") if verbose else None
+    if verbose:
+        print(f"Lightcurve meets minimum {min_obs} detections in all filters within {max_time-min_time:.2f} days")
 
     return True
-
 
 def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     """Routine to generate a marginalized set of light curves from a set of GW samples. These need to be parsed as template-files, h5-file or coincidence files."""

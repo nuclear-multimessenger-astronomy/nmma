@@ -7,9 +7,15 @@ import os
 matplotlib.use("agg")
 params = {
     "backend": "pdf",
+    "axes.labelsize": 42,
+    "legend.fontsize": 42,
+    "xtick.labelsize": 42,
+    "ytick.labelsize": 42,
+    "font.family": "Times New Roman",
     "figure.figsize": [18, 25],
 }
 matplotlib.rcParams.update(params)
+matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
 
 ##############################################
 ################# MAIN PLOTS #################
@@ -22,17 +28,16 @@ def basic_em_analysis_plot(
     time = mags_to_plot.pop("time")
     filter_names = list(mags_to_plot.keys())
 
-    if xlim is not None:
-        xlim = check_limit(xlim)
-    
-    else: 
+    if xlim is None:
         xlim = get_time_limits_from_obs_data(transient)
-
-    if ylim is not None:
-        ylim = check_limit(ylim)
-    
     else:
+        xlim = check_limit(xlim)
+
+    if ylim is None:
         ylim = get_mag_limits_from_obs_data(transient, filter_names)
+    else:
+        shared_ylim = check_limit(ylim)
+        ylim = {filt: shared_ylim for filt in filter_names}
 
     fig, axes = analysis_plot_geometry(filter_names, ncol=ncol)
     colors = plt.cm.Spectral(np.linspace(0, 1, len(filter_names)))[::-1]
@@ -95,13 +100,10 @@ def basic_em_analysis_plot(
                 )
 
         ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_dict[filt], 2)}$')
-
-        ax_sum.set_xlim(xlim)
-        ax_sum.set_xscale("log")
         ax_sum.set_ylim(ylim[filt])
-
+        ax_sum.set_xlim(xlim)
         ax_delta.set_xlim(xlim)
-        ax_sum.set_xscale("log") 
+        ax_sum.set_xscale('log')
         
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches='tight')
@@ -110,8 +112,8 @@ def basic_em_analysis_plot(
 def bolometric_lc_plot(transient, lbol_dict, save_path, color = "coral"):
     matplotlib.rcParams.update(
         {'font.size': 12,
-        'text.usetex': True,
-        'font.family': 'Times New Roman'}
+        # 'font.family': 'Times New Roman'
+        }
     )
     fig, ax = plt.subplots(1, 1)
     ax, _ = plot_observations(ax, transient, markersize=12)
@@ -177,7 +179,7 @@ def visualise_model_performance(training_data, training_model, light_curve_model
 
 def chi2_hists_from_dict(chi2_dict, outpath):
     matplotlib.rcParams.update(
-        {"font.size": 16, "text.usetex": True, "font.family": "Times New Roman"}
+        {"font.size": 16, "font.family": "Times New Roman"}
     )
     for filt, chi2_array in chi2_dict.items():
         plt.figure()
@@ -347,7 +349,28 @@ def check_limit(lim):
         lim = [float(val) for val in lim.split(",")]
     assert len(lim) == 2, f"{lim} is no valid plot-limit." 
     return lim
-    
+
+def get_time_limits_from_obs_data(transient):
+    """
+    A function that goes through the lc data and finds the time range that encompasses all data points.
+    """
+
+    xmin = np.min([t_arr.min() for t_arr in transient.light_curve_times.values()])
+    xmax = np.max([t_arr.max() for t_arr in transient.light_curve_times.values()])
+
+    return (0.8*xmin, 1.2*xmax)
+
+def get_mag_limits_from_obs_data(transient, filter_names):
+    """
+    A function that goes through the lc data and finds the magnitude range for each filter.
+    """
+
+    ylim = {}
+    for filt in filter_names:
+        ylim[filt] = (1.2*transient.light_curves[filt].max(), 0.8*transient.light_curves[filt].min())
+
+    return ylim
+
 def plot_observations(ax, transient, color="k",**kwargs):
     obs_times, obs_lc, obs_unc = transient.light_curve_times, transient.light_curves, transient.light_curve_uncertainties
     if 'filter' in kwargs:

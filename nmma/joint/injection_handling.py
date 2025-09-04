@@ -221,7 +221,7 @@ class NMMAInjectionCreator(InjectionCreator):
             # replace the failed samples with new samples from the prior
             try:
                 assert len(redraw_from_prior) >= self.n_fail
-            except:
+            except NameError:
                 # unless we first need to get new samples from the prior 
                 # because the number of failed samples is larger 
                 # than the number of unused new samples
