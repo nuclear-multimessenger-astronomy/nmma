@@ -1,5 +1,8 @@
 import argparse
 import os
+
+import numpy as np
+
 from ..utils.models import refresh_models_list
 from .utils import DEFAULT_FILTERS
 from bilby.core.utils import setup_logger
@@ -23,9 +26,11 @@ def em_time_parsing(parser):
         "Default: log, further options: linear, geometric")
     em_time_parser.add( "--em-tstep","--dt", type=nonefloat, default=None, 
         help="Time step (in days) for light curve initial evaluation, will overwrite nsteps. Legacy option kept for backward compatibility", )
-    em_time_parser.add("--cutoff-time", type=float,
-        help="Cutoff time in days (relative to the trigger time) to which the light curve data will be cut.",
+    em_time_parser.add_argument("--data-tmax", default=np.inf, type=float,
+        help="Cutoff time (relative to the trigger time) after which data points will not be considered. If not provided, the entire lightcurve will be evaluated",
     )
+    em_time_parser.add_argument("--data-tmin", default=0., type=float,
+        help="Cutoff time (relative to the trigger time) before which data points will note be considered. If not provided, the default is 0.")
     return parser
 
 def basic_em_only_parsing(parser):
@@ -344,9 +349,6 @@ def lc_validation_parser(parser):
     )
     parser.add_argument("--min-obs", default=3, type=int,
         help="Minimum number of observations required in each filter.",
-    )
-    parser.add_argument("--cutoff-time", default=0., type=float,
-        help="Cutoff time (relative to the first data point) that the minimum observations must be in. If not provided, the entire lightcurve will be evaluated",
     )
     return parser
 

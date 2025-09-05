@@ -201,7 +201,10 @@ def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
     dof = 0.0
     chi2_dict = {}
     mismatches = {}
-    for filt, mag  in transient.light_curves.items():
+    for filt  in model_data.keys():
+        if filt=="time":
+            continue
+        mag = transient.light_curves[filt]
         t = transient.light_curve_times[filt]
         sigma_y = transient.light_curve_uncertainties[filt]
         # only the detection data are needed
@@ -285,8 +288,8 @@ def analysis(args):
         # load observational data
         data = io.load_em_observations(args, format='observations')
         trigger_time = utils.read_trigger_time(None,args)
+        data = utils.cut_data_to_time_range(data, args, trigger_time)
         injection_parameters = None
-
     except ValueError:
         # try to work with injection data instead
         data, injection_parameters = data_from_injection(args, filters, detection_limit)
@@ -334,7 +337,7 @@ def analysis(args):
     priors = create_prior_from_args(args, param_conv = param_conv)
 
     light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
-    light_curve_data = utils.check_time_consistency(light_curve_data, light_curve_model, args)
+    utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
     # setup the likelihood
     likelihood_kwargs = dict(
         light_curve_model=light_curve_model,

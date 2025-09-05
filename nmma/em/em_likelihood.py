@@ -54,8 +54,6 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
     detection_limit: float or dict, default: np.inf
-    trigger_time: float, default: None
-        Time of the em trigger in Modified Julian Day, by default earliest time in the light curve data
     error_budget: Any (default:1)
         Additionally introduced statistical error on the light curve data,
         so as to keep the systematic error under control. This will only be used if the parameters-dict does not containt a 'em_syserr' sampling parameter.
@@ -230,8 +228,6 @@ class MultiFilterTransient(BasicEMTransient):
     filters: list, str
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
-    trigger_time: float
-        Time of the kilonova trigger in Modified Julian Day
     error_budget: float (default: 1.0)
         Additionally introduced statistical error on the light curve data,
         so as to keep the systematic error in control

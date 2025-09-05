@@ -960,6 +960,9 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         if model_parameters is not None:
             print("Warning: model_parameters are ignored for SupernovaLightCurveModel, using sncosmo defaults.")
         model_parameters = self.sn_model.param_names
+
+        if sample_times is None:
+            sample_times = np.linspace(self.sn_model.mintime(), self.sn_model.maxtime(), 400)
         super().__init__(model, parameter_conversion, filters, model_parameters, sample_times)
 
     def em_parameter_setup(self, parameters):

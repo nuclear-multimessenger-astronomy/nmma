@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
 
 import astropy.units
-from nmma.joint.conversion import distance_modulus_nmma
+from nmma.joint.conversion import distance_modulus_nmma, luminosity_distance_to_redshift
 ### some frequently used constants:
 from nmma.joint.constants import c_cgs, c_SI, eV_per_h_SI
 
@@ -156,12 +156,30 @@ def read_trigger_time(parameters=None, args=None):
                                 format=getattr(args, "time_format", "gps"))
                 print('trigger time:', trigger_time.datetime)  # this fails if not a valid time
                 return trigger_time.mjd
-            
+        
+        else:
+            raise ValueError("Neither trigger_time, geocent_time nor geocent_time_x provided. This is a required argument. If you don't know the exact trigger time, use a free timeshift prior instead.")
 
-    print("Neither trigger_time, geocent_time nor geocent_time_x provided")
-    return None
+def cut_data_to_time_range(data, args, trigger_time):
+    
+    tmin = getattr(args, "data_tmin", 0.)
+    tmax = getattr(args, "data_tmax", np.inf)
 
-def setup_filtered_lc_data(light_curve_data, trigger_time=None):
+    filts = list(data.keys()).copy()
+       
+    for filt in filts:
+        detector_time = data[filt]["time"] - trigger_time
+        mask = (tmin <= detector_time) & (detector_time <= tmax)
+        
+        if not np.any(mask):
+            del data[filt]
+        else:
+            data[filt] = {'time': data[filt]["time"][mask], 'mag': data[filt]["mag"][mask], 'mag_error': data[filt]["mag_error"][mask]}
+
+    return data
+
+
+def setup_filtered_lc_data(light_curve_data, trigger_time):
     """Set up the light curve data for the EM transient
 
     Parameters
@@ -178,62 +196,69 @@ def setup_filtered_lc_data(light_curve_data, trigger_time=None):
     lc_uncertainties = {}
 
     min_time = np.inf
-    max_time = -np.inf
     for filt, sub_dict in light_curve_data.items():
         lc_mags[filt] = np.array(sub_dict['mag'])
         lc_uncertainties[filt] = np.array(sub_dict['mag_error'])
         lc_times[filt] = np.array(sub_dict['time'])
         min_time = np.minimum(min_time, np.min(sub_dict['time']))
-        max_time = np.maximum(max_time, np.max(sub_dict['time']))
-
-    if trigger_time is None:
-        trigger_time = min_time
-        print(f"no trigger_time set, using inferred {trigger_time}")
+    
+    if min_time<0:
+        raise ValueError(
+            f"trigger_time is {-min_time} days later than earliest data time. "
+            "Please provide a valid trigger time." )
     
     lc_times = {filt: lc_times[filt] - trigger_time for filt in lc_times}
 
     return (lc_times, lc_mags, lc_uncertainties, trigger_time)
 
-def setup_bolometric_lc_data(light_curve_data, trigger_time=None):
+def check_model_time_consistency(light_curve_data, light_curve_model, priors):
+
+    (lc_times, lc_mags, lc_uncertainties, trigger_time) = light_curve_data
+    
+    data_tmin = np.min([lc_times[key].min() for key in lc_times.keys()])
+    data_tmax = np.max([lc_times[key].max() for key in lc_times.keys()])
+    
+    # get minimal / maximal redshift from prior
+    if "redshift" in priors:
+        zmin, zmax = priors['redshift'].minimum, priors['redshift'].maximum    
+    elif "luminosity_distance" in priors:
+        if "Hubble_constant" in priors:
+            new_parameters, _ = light_curve_model.parameter_conversion({"Hubble_constant": priors["Hubble_constant"].minimum, 
+                                                                        "luminosity_distance": priors["luminosity_distance"].minimum}, [])
+            zmin = new_parameters["redshift"]
+            new_parameters, _ = light_curve_model.parameter_conversion({"Hubble_constant": priors["Hubble_constant"].maximum, 
+                                                                        "luminosity_distance": priors["luminosity_distance"].maximum}, [])
+            zmax = new_parameters["redshift"]
+        else:
+            zmin = luminosity_distance_to_redshift(priors["luminosity_distance"].minimum)
+            zmax = luminosity_distance_to_redshift(priors["luminosity_distance"].maximum)
+
+
+    
+    # get minimal / maximal timeshift from prior
+    t0_min, t0_max = priors['timeshift'].minimum, priors["timeshift"].maximum
+
+    # Get model time range in detector frame
+    t_source_min, t_source_max = light_curve_model.model_times[[0, -1]]
+    
+    t_obs_start_max = (1+zmax) * t_source_min + t0_max
+    t_obs_end_min = (1+zmin) * t_source_max + t0_min
+    
+    # check model compatability 
+    if data_tmin < t_obs_start_max:
+        raise ValueError(f"First data point is at {data_tmin} days, but with your timeshift and redshift settings, the model time in detector frame can start as late as {t_obs_start_max}.") 
+    if t_obs_end_min < data_tmax:
+        raise ValueError(f"Last data point is at {data_tmax} days, but with your timeshift and redshift settings, the model time in detector frame can end as early as {t_obs_end_min}.")
+
+
+
+def setup_bolometric_lc_data(light_curve_data, trigger_time):
     data_time = light_curve_data['phase'].to_numpy()
-    if trigger_time is None:
-        trigger_time = np.min(data_time)
     return (data_time - trigger_time,
             light_curve_data['Lbb'].to_numpy(),
             light_curve_data['Lbb_unc'].to_numpy(),
             trigger_time)
 
-
-def check_time_consistency(light_curve_data, light_curve_model, args):
-    (lc_times, lc_mags, lc_uncertainties, trigger_time) = light_curve_data
-    if args.cutoff_time:
-        for filt in lc_times:
-            valid_idx = lc_times[filt] <= args.cutoff_time
-            lc_times[filt] = lc_times[filt][valid_idx]
-            lc_mags[filt] = lc_mags[filt][valid_idx]
-            lc_uncertainties[filt] = lc_uncertainties[filt][valid_idx]
-        light_curve_data = (lc_times, lc_mags, lc_uncertainties, trigger_time)
-
-    min_time, max_time = np.min([np.min(lc_times[filt]) for filt in lc_times]), np.max([np.max(lc_times[filt]) for filt in lc_times])
-    min_model_time, max_model_time = light_curve_model.model_times[[0, -1]]
-
-    if min_time<0:
-        raise ValueError(
-            f"trigger_time is {-min_time} days later than earliest data time. "
-            "Please provide a valid trigger time." )
-    elif min_time < min_model_time:
-        print(f"Warning: Model is only valid {min_model_time} days after trigger, but first data point is at {min_time} days."
-            "This can lead to unexpected behaviour, but may be intended subject to your timeshift and redshift priors.")
-   
-    
-    if (max_time > max_model_time) and args.cutoff_time:
-        print(f"Warning: max_time {max_time} is later than latest model time {max_model_time}. "
-              "This can lead to unexpected behaviour, but may be intended subject to your timeshift and redshift priors.")
-    elif max_time > max_model_time:
-        raise ValueError(f"Last observation at {max_time}d is later than the model's validity limit {max_model_time} days. "
-              "Set --cutoff-time to a value <= {max_model_time} days or check the trigger time.")
-    
-    return light_curve_data
 
 def transform_to_app_mag_dict(mag_dict, params):
     d_lum = params.get("luminosity_distance", 1e-5) ## assume 10 pc =1e-5 Mpc for abs_mag
