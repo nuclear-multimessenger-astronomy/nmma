@@ -217,7 +217,7 @@ def macro_props_from_eos(eos_data, converted_parameters, added_keys):
         for key, val_array in zip(eos_keys, 
         EOS2Parameters(radii, masses, lambdas, m1_source, m2_source)
         ):
-            converted_parameters[key] = val_array.item()
+            converted_parameters[key] = val_array
     else:
         ### assuming TOV mass and radius are the last entries of the respective arrays
         TOV_mass_list, TOV_radius_list, R_14_list, R_16_list = [], [], [], []

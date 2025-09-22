@@ -206,10 +206,10 @@ class NMMAInjectionCreator(InjectionCreator):
         for test_routine in self.test_routines:
             # run the test routine on the test_df
             # this will modify the dataframe in place
-            test_df = test_routine(test_df)
+            test_routine(test_df)
         
         dataframe.loc[test_df.index, 'tests_passed'] = test_df['tests_passed']
-        self.fail_mask =~dataframe['tests_passed']
+        self.fail_mask = ~ dataframe['tests_passed'].astype(bool)
         self.n_fail = self.fail_mask.sum()
         return dataframe
     
@@ -452,6 +452,9 @@ def generate_injection(args = None):
     
     injection_creator = NMMAInjectionCreator(args)
     injection_creator.generate_injection_file()
+
+def main(args=None):
+    generate_injection(args)
 
 
 # Use the routine by executing the script directly
