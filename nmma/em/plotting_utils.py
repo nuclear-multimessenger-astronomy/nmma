@@ -7,11 +7,6 @@ import os
 matplotlib.use("agg")
 params = {
     "backend": "pdf",
-    "axes.labelsize": 42,
-    "legend.fontsize": 42,
-    "xtick.labelsize": 42,
-    "ytick.labelsize": 42,
-    "font.family": "Times New Roman",
     "figure.figsize": [18, 25],
 }
 matplotlib.rcParams.update(params)
@@ -63,11 +58,18 @@ def basic_em_analysis_plot(
         # plot the observations
         ax_sum, det_times = plot_observations(ax_sum, transient, colors[cnt], filter=filt)
 
-        # plot the mismatch between the model and the data
-        diff_per_data, sigma_per_data = mismatches[filt]
-        ax_delta.axhline(0, linestyle='--', color='k')
-        ax_delta.scatter(det_times, diff_per_data, # / sigma_per_data,  # FIXME: Bug?
-                         color=colors[cnt])
+        if det_times.size>0:
+
+            # plot the mismatch between the model and the data
+            diff_per_data, sigma_per_data = mismatches[filt]
+            ax_delta.axhline(0, linestyle='--', color='k')
+            ax_delta.scatter(det_times, diff_per_data, # / sigma_per_data,  # FIXME: Bug?
+                             color=colors[cnt])
+            
+            ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_dict[filt], 2)}$')
+        
+        else:
+            ax_sum.set_title(f'{filt}')
 
         # plot the best-fit lc with errors
         mag_plot = mags_to_plot[filt]
@@ -99,7 +101,6 @@ def basic_em_analysis_plot(
                     label=model_name,
                 )
 
-        ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_dict[filt], 2)}$')
         ax_sum.set_ylim(ylim[filt])
         ax_sum.set_xlim(xlim)
         ax_delta.set_xlim(xlim)

@@ -173,9 +173,16 @@ def post_process_bestfit(bestfit_params, transient, args, result=None):
             for i, sub_model in enumerate(sub_models):
                 sub_model_plot_props[sub_model.model] ={
                     'color': model_colors[i], 
-                    'plot_mags' : [utils.get_filtered_mag(mag_all[i], filt) for filt in filters_to_plot],
                     'plot_times': obs_times[i]
                 }
+                plot_mags = []
+                for filt in filters_to_plot:
+                    try:
+                        plot_mags.append(utils.get_filtered_mag(mag_all[i], filt))
+                    except KeyError:
+                        plot_mags.append(np.full_like(obs_times[i], np.nan))
+
+                sub_model_plot_props[sub_model.model]['plot_mags'] = plot_mags
         else: sub_model_plot_props = None
 
         
