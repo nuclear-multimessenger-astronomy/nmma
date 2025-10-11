@@ -646,7 +646,7 @@ class MultimessengerConversion(object):
     def eos_direct_load(self, converted_parameters, added_keys):
         try:
             EOSID = np.array(converted_parameters["EOS"]).astype(int)
-            eos_data =np.array([np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID])
+            eos_data = [np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID]
         except:
             #In case we only use one eos, e.g. for injection
             eos_data = np.array([np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T])
