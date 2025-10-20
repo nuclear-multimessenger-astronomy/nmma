@@ -145,6 +145,7 @@ def post_process_bestfit(bestfit_params, transient, args, result=None):
             bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
         bestfit_to_write["Magnitudes"] = {filt: best_mags[filt].tolist() 
                                           for filt in transient.observed_filters}
+        bestfit_to_write["obs_times"] = best_mags["time"].tolist()
         bestfit_to_write["chi2_per_dof"] = chi2_dict["total"]
         bestfit_to_write["chi2_dict"] = chi2_dict
         bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")

@@ -339,11 +339,11 @@ def sc_bol_lc(sample_times, param_dict, compute_Rs):
     # else setup for evalution in filters
     tph = np.sqrt(3*kappa*K*Me / (2*(n-1) *vt*vt))
     R_early = np.power(tph / t, 2 / (n - 1)) * vt * t
-    R_late = (np.power(1+ (delta-1)/(n-1) * ((t/td)**2 - 1) , -1/(delta+1))
+    R_late = (np.power(1+ (delta-1)/(n-1) * ((t/tph)**2 - 1) , -1/(delta-1))
         * vt * t )
     Rs = np.zeros_like(t)
-    Rs[t < td] = R_early[t < td]
-    Rs[t >= td] = R_late[t >= td]
+    Rs[t < tph] = R_early[t < tph]
+    Rs[t >= tph] = R_late[t >= tph]
     return lbol, Rs
 
 def sc_lc(lbol, Rs, nu_host, filters): 
@@ -355,8 +355,8 @@ def sc_lc(lbol, Rs, nu_host, filters):
     one_over_T[~np.isfinite(one_over_T)] = np.inf
 
     result = mag_dict_for_blackbody(filters, one_over_T, Rs, nu_host)
-
-    return mag_dict_for_blackbody(filters, one_over_T, Rs, nu_host)
+    
+    return result
 
 ## semi-analytical models for kilonovae
 
