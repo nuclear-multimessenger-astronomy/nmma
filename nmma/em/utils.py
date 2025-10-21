@@ -4,7 +4,6 @@ import pandas as pd
 import scipy.interpolate as interp
 from ast import literal_eval
 import scipy.stats
-from astropy import time
 
 import sncosmo
 from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
@@ -135,30 +134,6 @@ def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
         # If a dict is provided, ensure it has the correct filters
         return {filt: float(quantity.get(filt, default_limit)) for filt in filters}
 
-def read_trigger_time(parameters=None, args=None):
-    if parameters is not None:
-        if "trigger_time" in parameters:
-            return parameters["trigger_time"]
-        elif "geocent_time_x" in parameters:
-            return time.Time( parameters["geocent_time_x"], format="gps").mjd
-        elif "geocent_time" in parameters:
-            return time.Time(parameters["geocent_time"], format="gps").mjd
-    if args is not None:
-        if hasattr(args, "gps") and args.gps:
-            return time.Time( args.gps, format="gps").mjd
-        elif args.trigger_time:
-            try:
-                trigger_time=  time.Time(args.trigger_time, format='mjd')
-                print('trigger time:', trigger_time.datetime)  # this fails if not a valid time
-                return trigger_time.mjd
-            except ValueError:
-                trigger_time= time.Time(args.trigger_time, 
-                                format=getattr(args, "time_format", "gps"))
-                print('trigger time:', trigger_time.datetime)  # this fails if not a valid time
-                return trigger_time.mjd
-        
-        else:
-            raise ValueError("Neither trigger_time, geocent_time nor geocent_time_x provided. This is a required argument. If you don't know the exact trigger time, use a free timeshift prior instead.")
 
 def cut_data_to_time_range(data, args, trigger_time):
     
@@ -223,12 +198,12 @@ def check_model_time_consistency(light_curve_data, light_curve_model, priors):
         zmin, zmax = priors['redshift'].minimum, priors['redshift'].maximum    
     elif "luminosity_distance" in priors:
         if "Hubble_constant" in priors:
-            new_parameters, _ = light_curve_model.parameter_conversion({"Hubble_constant": priors["Hubble_constant"].minimum, 
-                                                                        "luminosity_distance": priors["luminosity_distance"].minimum}, [])
-            zmin = new_parameters["redshift"]
-            new_parameters, _ = light_curve_model.parameter_conversion({"Hubble_constant": priors["Hubble_constant"].maximum, 
-                                                                        "luminosity_distance": priors["luminosity_distance"].maximum}, [])
-            zmax = new_parameters["redshift"]
+            min_pars = {par: priors[par].minimum for par in priors}
+            min_pars = priors.conversion_function(min_pars)
+            zmin = min_pars["redshift"]
+            max_pars = {par: priors[par].maximum for par in priors}
+            max_pars = priors.conversion_function(max_pars)
+            zmax = max_pars["redshift"]
         else:
             zmin = luminosity_distance_to_redshift(priors["luminosity_distance"].minimum)
             zmax = luminosity_distance_to_redshift(priors["luminosity_distance"].maximum)

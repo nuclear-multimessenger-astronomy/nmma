@@ -102,8 +102,10 @@ def setup_nmma_likelihood(data_dump, priors, args,messengers, logger, param_conv
     if "eos" in messengers:
         logger.info("Sampling over EOS generated on the fly")
         eos_kwargs = setup_eos_kwargs(data_dump, args, logger)
-        messenger_lhoods.append(EquationofStateLikelihood(priors,  **eos_kwargs))
-        likelihood_kwargs.update(eos_kwargs)
+        if eos_kwargs['constraint_dict']:
+            # only evaluate if specific constraints are given
+            messenger_lhoods.append(EquationofStateLikelihood(priors,  **eos_kwargs))
+            likelihood_kwargs.update(eos_kwargs)
 
     if "gw" in messengers:
         gw_kwargs = setup_gw_kwargs(data_dump, args, logger)

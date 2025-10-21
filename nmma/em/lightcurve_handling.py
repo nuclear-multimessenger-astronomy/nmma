@@ -24,7 +24,7 @@ from ..joint.conversion import (MultimessengerConversion,
                                    luminosity_distance_to_redshift,
                                    component_masses_to_mass_quantities,
                                    chirp_mass_and_eta_to_component_masses)
-from ..joint.utils import read_injection_file, set_filename
+from ..joint.utils import read_injection_file, set_filename, read_trigger_time
 
 from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict
 
@@ -90,7 +90,7 @@ def make_injection(injection_parameters, args, filters = None, injection_model =
                    rng=None, keep_infinite_data=False):
     
 
-    injection_parameters["trigger_time"] = utils.read_trigger_time(injection_parameters, args)
+    injection_parameters["trigger_time"] = read_trigger_time(injection_parameters, args)
     
     if args.ignore_timeshift:
         injection_parameters.pop('timeshift', None)
@@ -576,7 +576,7 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
             else:
                 fid.write("0 0 0\n")
         # initialize light curve model
-        complete_parameters['trigger_time'] = utils.read_trigger_time(complete_parameters, args)
+        complete_parameters['trigger_time'] = read_trigger_time(complete_parameters, args)
         sample_times = utils.setup_sample_times(args)
         data = create_light_curve_data(
             complete_parameters, args, light_curve_model, sample_times, rng=rng,

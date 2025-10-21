@@ -5,6 +5,39 @@ import numpy as np
 import pandas as pd
 from argparse import Namespace
 from bilby.core.utils import decode_bilby_json
+from astropy import time
+
+def read_trigger_time(parameters=None, args=None, out_format = 'mjd'):
+    trigger_time = None
+    if parameters is not None:
+        if "trigger_time" in parameters:
+            trigger_time = time.Time(parameters["trigger_time"] , format='mjd')
+        elif "geocent_time_x" in parameters:
+            trigger_time = time.Time(parameters["geocent_time_x"],format="gps")
+        elif "geocent_time" in parameters:
+            trigger_time = time.Time(parameters["geocent_time"] , format="gps")
+    if args is not None and trigger_time is None:
+        if hasattr(args, "gps") and args.gps:
+            return time.Time( args.gps, format="gps").mjd
+        elif args.trigger_time:
+            try:
+                trigger_time=  time.Time(args.trigger_time, format='mjd')
+                trigger_time.datetime # this fails if not a valid time
+            except ValueError:
+                format = getattr(args, "time_format", None)
+                if format is None:
+                    format = 'gps'
+                trigger_time= time.Time(args.trigger_time, format=format)
+                trigger_time  # this fails if not a valid time
+    
+    if out_format == 'mjd':
+        return trigger_time.mjd
+
+    elif out_format == 'gps':
+        return trigger_time.gps
+
+    print("Neither trigger_time, geocent_time nor geocent_time_x provided. This is a required argument. If you don't know the exact trigger time, use a free timeshift prior.")
+    return None
 
 def read_injection_file(file):
     #work for both file-str and Namespace

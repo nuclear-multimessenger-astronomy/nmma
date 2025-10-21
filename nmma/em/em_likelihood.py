@@ -6,6 +6,7 @@ from astropy.time import Time
 import warnings
 warnings.filterwarnings("error", category=RuntimeWarning)
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
+from ..joint.utils import read_trigger_time
 from . import model, utils, systematics
 
 
@@ -21,7 +22,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     ## setup the light curve model for this transient class and filters
     lc_model = model.identify_model_type(args)
     light_curve_model = model.create_light_curve_model_from_args(lc_model, args, filters)
-    trigger_time = utils.read_trigger_time(None, args)
+    trigger_time = read_trigger_time(None, args)
     light_curve_data = utils.setup_filtered_lc_data(light_curve_data, trigger_time)
     light_curve_data = utils.check_time_consistency(light_curve_data, light_curve_model, args)
 

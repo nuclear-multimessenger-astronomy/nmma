@@ -23,8 +23,9 @@ from . multi_parsing import create_nmma_generation_parser, parse_generation_args
 from ..em.io import load_em_observations
 from ..em.model import create_injection_model
 from ..em.lightcurve_generation import create_light_curve_data
-from ..eos.eos_likelihood import compose_eos_constraints
+from ..eos.eos_likelihood import compose_eos_constraints, setup_joint_eos_constraint
 from ..joint.constants import default_cosmology
+from ..joint.utils import read_trigger_time
 
 from .. import __version__
 
@@ -119,7 +120,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args):
 
         # nmma-defaults that might conflict with bilby/bilby_pipe defaults
-        args.cosmology = getattr(args, "cosmology", default_cosmology)
+        args.cosmology = getattr(args, "cosmology", default_cosmology.name)
 
         super().__init__(args, unknown_args)
         # Generic setup, ripped from bilby pipe
@@ -131,7 +132,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         # Run index arguments
         self.idx = args.idx
         self.generation_seed = args.generation_seed
-        self.trigger_time = args.trigger_time
+        self.trigger_time = read_trigger_time(None, args, 'gps')
 
         # Naming arguments
         self.outdir = args.outdir
@@ -164,18 +165,32 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self.plot_injection = args.plot_injection
 
 
-        
-        self.args = args
         self.sampler = "dynesty"
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
-
 
         # This is done before instantiating the likelihood so that it is the full prior
         self._priors=self._get_priors()
         self.priors.to_json(outdir=self.data_directory, label=self.label)
         self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
 
+        ### identify messengers, to be extended
+        messengers=[]
+        if args.emulator_metadata:
+            messengers.append("eos")
+        if args.em_model or args.em_transient_class:
+            messengers.append("em")
+        if args.detectors:
+            messengers.append("gw")
+
+        self.messengers = messengers
+
+        analysis_modifiers= []
+        if args.Hubble:
+            analysis_modifiers.append("Hubble")
+        if args.eos_data:
+            analysis_modifiers.append('tabulated_eos')
+        self.analysis_modifiers= analysis_modifiers
 
         self.create_data(args, unknown_args)
 
@@ -187,26 +202,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 unknown_command_line_args=unknown_args,
                 injection_parameters= self.injection_parameters,
         )
-
-        ### identify messengers, to be extended
-        messengers=[]
-        if getattr(args, "emulator_metadata", None):
-            messengers.append("eos")
-        if getattr(args, "em_model", False):
-            messengers.append("em")
-        if getattr(args, "waveform_approximant", None):
-            messengers.append("gw")
-
-        self.messengers = messengers
-
-        analysis_modifiers= []
-        if args.Hubble:
-            analysis_modifiers.append("Hubble")
-        if getattr(args, "eos_data", None):
-            analysis_modifiers.append('tabulated_eos')
-        self.analysis_modifiers= analysis_modifiers
-        
-
 
         self.save_data_dump()
 
@@ -242,7 +237,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 waveform_generator=self.gw_inputs.waveform_generator,
                 ifo_list=self.gw_inputs.interferometers,
             )
-        if "eos" in self.messengers:
+        if ("eos" in self.messengers):
             data_dump |= dict(
                 eos_constraint_dict=self.eos_constraint_dict
             )
@@ -260,11 +255,18 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         else: 
             self.injection_parameters=None
 
-        if getattr(args, "emulator_metadata", None):
             #FIXME add routine for eos model training!
+        if "eos" in self.messengers:
             self.eos_constraint_dict = compose_eos_constraints(args)
+        elif "tabulated_eos" in self.analysis_modifiers:
+            eos_constraint_dict = compose_eos_constraints(args)
+            if eos_constraint_dict:
+                constraint = setup_joint_eos_constraint(eos_constraint_dict)
+                args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weights(
+                    args.eos_data, args.outdir, args.eos_weight
+                )
 
-        if getattr(args, "em_model", False):
+        if "em" in self.messengers:
             if self.injection_parameters:
                 injection_model = create_injection_model(args)
                 self.light_curve_data = create_light_curve_data(
@@ -275,7 +277,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             ## Test-build the model already here to ensure that svd is properly loaded
             
 
-        if getattr(args, "waveform_approximant", None):
+        if "gw" in self.messengers:
             self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, unknown_args)
             #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
             args.gw_likelihood_type = self.gw_inputs.likelihood_type
@@ -287,6 +289,8 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
 
             if args.gw_likelihood_type == "ROQGravitationalWaveTransient":
                 self.gw_inputs.save_roq_weights()
+        
+        self.args = args
 
 
 def generate_runner(parser=None, **kwargs):

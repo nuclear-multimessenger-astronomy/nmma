@@ -18,8 +18,7 @@ from .prior import create_prior_from_args
 from . import io, model, utils  
 from .plotting_utils import basic_em_analysis_plot, bolometric_lc_plot
 from .em_parsing import parsing_and_logging, multi_wavelength_analysis_parser, bolometric_parser
-from ..joint.conversion import convert_mtot_mni
-from ..joint.utils import read_injection_file, set_filename, read_bestfit_from_posterior
+from ..joint.utils import read_injection_file, set_filename, read_bestfit_from_posterior, read_trigger_time
 matplotlib.use("agg")
 
 def data_from_injection(args, filters, detection_limit):
@@ -257,7 +256,7 @@ def bolometric_analysis(args):
 
     # load the bolometric data
     data = pd.read_csv(args.light_curve_data)
-    trigger_time = utils.read_trigger_time(None,args)
+    trigger_time = read_trigger_time(None,args)
     light_curve_data = utils.setup_bolometric_lc_data(data, trigger_time)
 
     light_curve_model = model.SimpleBolometricLightCurveModel(None, args.em_model,
@@ -265,7 +264,7 @@ def bolometric_analysis(args):
     )
 
     # setup the prior
-    priors = create_prior_from_args(args)
+    priors = create_prior_from_args(args, args.em_model)
 
     # setup the likelihood
     likelihood_kwargs = dict(
@@ -295,7 +294,7 @@ def analysis(args):
     try:
         # load observational data
         data = io.load_em_observations(args, format='observations')
-        trigger_time = utils.read_trigger_time(None,args)
+        trigger_time = read_trigger_time(None,args)
         data = utils.cut_data_to_time_range(data, args, trigger_time)
         injection_parameters = None
     except ValueError:
@@ -337,12 +336,7 @@ def analysis(args):
                                 if k in injlist_all}
     
     # setup the prior
-    if any(model in ['AnBa2022_linear', 'AnBa2022_log'] for model in model_names):
-        param_conv = convert_mtot_mni
-    # elif to be extended...
-    else:
-        param_conv = None
-    priors = create_prior_from_args(args, param_conv = param_conv)
+    priors = create_prior_from_args(args, model_names)
 
     light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
     utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
@@ -406,7 +400,7 @@ def nnanalysis(args):
     )
     
     # setup the prior
-    priors = create_prior_from_args(args)
+    priors = create_prior_from_args(args, args.em_model)
     
     # now that we have the kilonova light curve, we need to pad it with non-detections
     # this part is currently hard coded in terms of the times !!!! likely will need the most work

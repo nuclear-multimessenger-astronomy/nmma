@@ -43,9 +43,9 @@ class MainRun(object):
         label=None,
         periodic=None,
         reflective = None,
-        dynesty_sample="acceptance-walk",
+        sample="acceptance-walk",
         nlive=5,
-        dynesty_bound="live",
+        bound="live",
         walks=100,
         maxmcmc=5000,
         naccept=60,
@@ -88,8 +88,8 @@ class MainRun(object):
 
         self.init_sampler_kwargs = dict(
             nlive=nlive,
-            sample=dynesty_sample,
-            bound=dynesty_bound,
+            sample=sample,
+            bound=bound,
             walks=walks,
             facc=facc,
             first_update=dict(min_eff=min_eff, min_ncall=2 * nlive),
@@ -177,7 +177,7 @@ class MainRun(object):
 
     def get_nested_sampler(self, live_points, pool, pool_size):
         """
-        Returns the dynested nested sampler, getting most arguments
+        Returns the dynesty nested sampler, getting most arguments
         from the object's attributes
 
         Parameters

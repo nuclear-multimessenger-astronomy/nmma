@@ -44,12 +44,12 @@ def basic_em_only_parsing(parser):
 def basic_em_only_analysis_parsing(parser):
 
     parser.add_argument("--config", help="Name of the configuration file containing parameter values.")
-    parser.add_argument("--trigger-time", type=float,
+    parser.add_argument("--trigger-time", 
         help="Trigger time, format will be inferred but can be but can be explicitly adjusted with --time-format, not required if injection set is provided")
     parser.add_argument("--light-curve-data", "--data", help="Path to data in [time filter magnitude error] format, time format will be inferred, but can be explicitly adjusted with --time-format. If not given, will try to generate data from the injection file.")
     parser.add_argument("--time-format", 
         help="Time format of the light curve data, e.g. isot, mjd, see https://docs.astropy.org/en/stable/time/#time-format")
-    parser.add_argument("--prior", help="Path to the prior file")
+    parser.add_argument("--prior-file","--prior", help="Path to the prior file")
     parser.add_argument("--skip-sampling", action='store_true', 
         help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
     parser.add_argument("--bestfit", action='store_true',
@@ -63,6 +63,8 @@ def basic_em_only_analysis_parsing(parser):
     parser.add_argument("--cpus", type=int, default=1,
         help="Number of cores to be used, only needed for dynesty (default: 1)")
     parser.add_argument("-n","--nlive", type=int, default=2048, help="Number of live points (default: 2048)")
+    parser.add_argument("--cosmology", help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (default: Planck18)")
+
     parser.add_argument("--reactive-sampling", action='store_true',
         help="To use reactive sampling in ultranest (default: False)")
     return parser

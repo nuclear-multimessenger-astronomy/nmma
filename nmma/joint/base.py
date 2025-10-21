@@ -81,7 +81,9 @@ def initialisation_args_from_signature_and_namespace(_callable, namespace, prefi
         ## this checks if further parameters from args-Namespace are only used as shorthands in the class definition (e.g. tmin, tmax)
         for prefix in prefixes:
             if hasattr(namespace, prefix+key):
-                default_kwargs[key] = getattr(namespace, prefix+key)
+                kwarg = getattr(namespace, prefix+key)
+                if kwarg is not None:
+                    default_kwargs[key] = kwarg
                 break
     return default_kwargs
 

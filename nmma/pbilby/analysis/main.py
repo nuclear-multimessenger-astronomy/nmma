@@ -4,13 +4,11 @@ Module to run parallel bilby using MPI
 import json
 import os
 import sys
-import pickle
 import datetime
 import time
 import signal
 
 import numpy as np
-from nestcheck import data_processing
 from pandas import DataFrame
 
 from schwimmbad import MPIPool
@@ -25,9 +23,9 @@ def analysis_runner(
     data_dump,
     outdir=None,
     label=None,
-    dynesty_sample="acceptance-walk",
+    sample="acceptance-walk",
     nlive=5,
-    dynesty_bound="live",
+    bound="live",
     walks=100,
     proposals=None,
     maxmcmc=5000,
@@ -48,7 +46,6 @@ def analysis_runner(
     max_its=1e10,
     max_run_time=1e10,
     checkpoint_plot=False,
-    nestcheck=False,
     result_format="hdf5",
     **kwargs,
 ):
@@ -88,9 +85,9 @@ def analysis_runner(
                 label=label,
                 periodic=worker_run.periodic,
                 reflective=worker_run.reflective,
-                dynesty_sample=dynesty_sample,
+                sample=sample,
                 nlive=nlive,
-                dynesty_bound=dynesty_bound,
+                bound=bound,
                 walks=walks,
                 maxmcmc=maxmcmc,
                 nact=nact,
@@ -148,7 +145,8 @@ def analysis_runner(
 
             run_time = 0
             early_stop = False
-
+            
+            #FIXME
             ## graceful handling of preemptive shutdowns
             def handle_sigterm(signum, frame):
                 logger.info("Received SIGTERM, writing checkpoint and exiting.")
@@ -220,16 +218,6 @@ def analysis_runner(
                 sampling_time += (datetime.datetime.now() - t0).total_seconds()
 
                 out = sampler.results
-
-                if nestcheck is True:
-                    logger.info("Creating nestcheck files")
-                    ns_run = data_processing.process_dynesty_run(out)
-                    nestcheck_path = os.path.join(run.outdir, "Nestcheck")
-                    os.makedirs(nestcheck_path, exist_ok=True)
-                    nestcheck_result = f"{nestcheck_path}/{run.label}_nestcheck.pickle"
-
-                    with open(nestcheck_result, "wb") as file_nest:
-                        pickle.dump(ns_run, file_nest)
 
                 nested_samples = DataFrame(out.samples, columns=run.sampling_keys)
                 nested_samples["log_likelihood"] = out.logl
