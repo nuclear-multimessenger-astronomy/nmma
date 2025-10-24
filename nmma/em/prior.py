@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from bilby.core.prior import (
     Prior, DeltaFunction, Interped, ConditionalTruncatedGaussian,
     ConditionalPriorDict, PriorDict as _PriorDict)
+from bilby.gw import cosmology as bilby_cosmo
 from ligo.skymap import io, moc
 from ..joint.base import adjust_hubble_prior
 from ..joint.constants import default_cosmology
@@ -257,11 +258,14 @@ def create_prior_from_args(args, model_names=[]):
         conv_functions.append(convert_mtot_mni)
     # elif to be extended...
 
+    cosmo = getattr(args, 'cosmology', None)
+    if cosmo is None:
+        cosmo = default_cosmology
+    else:
+        cosmo = getattr(cosmology, cosmo)
+    bilby_cosmo.set_cosmology(cosmo)
+
     if getattr(args, 'Hubble', False):
-        if args.cosmology:
-            cosmo = getattr(cosmology, args.cosmology)
-        else:
-            cosmo = default_cosmology
             
         def Hubble_conversion(priors):
             params, _ = cosmology_to_distance(priors, [], cosmo)

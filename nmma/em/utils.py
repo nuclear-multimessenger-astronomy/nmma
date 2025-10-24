@@ -211,8 +211,10 @@ def check_model_time_consistency(light_curve_data, light_curve_model, priors):
 
     
     # get minimal / maximal timeshift from prior
-    t0_min, t0_max = priors['timeshift'].minimum, priors["timeshift"].maximum
-
+    try:
+        t0_min, t0_max = priors['timeshift'].minimum, priors["timeshift"].maximum
+    except KeyError:
+        t0_min, t0_max = 0.0, 0.0
     # Get model time range in detector frame
     t_source_min, t_source_max = light_curve_model.model_times[[0, -1]]
     
@@ -229,9 +231,10 @@ def check_model_time_consistency(light_curve_data, light_curve_model, priors):
 
 def setup_bolometric_lc_data(light_curve_data, trigger_time):
     data_time = light_curve_data['phase'].to_numpy()
-    return (data_time - trigger_time,
-            light_curve_data['Lbb'].to_numpy(),
-            light_curve_data['Lbb_unc'].to_numpy(),
+    sort_ids = np.argsort(data_time)
+    return (data_time[sort_ids] - trigger_time,
+            light_curve_data['Lbb'].to_numpy()[sort_ids],
+            light_curve_data['Lbb_unc'].to_numpy()[sort_ids],
             trigger_time)
 
 

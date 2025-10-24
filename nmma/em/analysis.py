@@ -259,7 +259,7 @@ def bolometric_analysis(args):
     trigger_time = read_trigger_time(None,args)
     light_curve_data = utils.setup_bolometric_lc_data(data, trigger_time)
 
-    light_curve_model = model.SimpleBolometricLightCurveModel(None, args.em_model,
+    light_curve_model = model.SimpleBolometricLightCurveModel(args.em_model,
         sample_times=utils.setup_sample_times(args),  ## usually None, defaults to model_times
     )
 
@@ -482,10 +482,7 @@ def multi_analysis_loop(args, analysis_function):
 
 def main(args=None):
     args = parsing_and_logging(multi_wavelength_analysis_parser, args)
-    if args.sampler == "neuralnet":
-        analysis_function = nnanalysis
-    else:
-        analysis_function = analysis
+    analysis_function = nnanalysis if args.sampler == "neuralnet" else analysis
     multi_analysis_loop(args, analysis_function)
     
 

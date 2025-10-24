@@ -933,7 +933,7 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         new_parameters = super().em_parameter_setup(parameters)
 
         new_parameters["supernova_mag_stretch"] = parameters.get('supernova_mag_stretch', 1.)
-        new_parameters["t0"] = new_parameters.get("t0", self.timeshift)
+        new_parameters["t0"] = new_parameters.get("t0", 0.)
         new_parameters["z"] = new_parameters.get("z", self.redshift)
 
         return new_parameters

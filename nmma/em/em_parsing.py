@@ -63,7 +63,7 @@ def basic_em_only_analysis_parsing(parser):
     parser.add_argument("--cpus", type=int, default=1,
         help="Number of cores to be used, only needed for dynesty (default: 1)")
     parser.add_argument("-n","--nlive", type=int, default=2048, help="Number of live points (default: 2048)")
-    parser.add_argument("--cosmology", help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (default: Planck18)")
+    parser.add_argument("--cosmology", help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)")
 
     parser.add_argument("--reactive-sampling", action='store_true',
         help="To use reactive sampling in ultranest (default: False)")
@@ -451,7 +451,7 @@ def multi_config_parser(parser):
 
     return parser
 
-def slurm_parser(parser):
+def slurm_lc_parser(parser):
     parser.description="Create lightcurve files from nmma injection file"
     parser = pipe_inj_parsing(parser)
     
@@ -467,6 +467,42 @@ def slurm_parser(parser):
     parser.add_argument("--simple-setup", default=True, choices=[True])
     return parser
 
+
+
+def slurm_analysis_parser(parser):
+    parser = multi_wavelength_analysis_parser(parser)
+    slurm_args = parser.add_argument_group(
+        title="Slurm arguments",
+        description="Arguments for running the lightcurve analysis on a Slurm HPC cluster",
+    )
+    # Slurm-specific arguments
+    slurm_args.add_argument("--Ncore", default=8, type=int,
+        help="number of cores for mpiexec")
+    slurm_args.add_argument("--base-dir", default=os.getcwd(),
+        help="base directory for the job")
+    slurm_args.add_argument("--job-name", default="lightcurve-analysis")
+    slurm_args.add_argument("--logs-dir-name", default="slurm_logs",
+        help="directory name for slurm logs")
+    slurm_args.add_argument("--cluster-name", default="Expanse",
+        help="Name of HPC cluster")
+    slurm_args.add_argument("--partition-type", default="shared",
+        help="Partition name to request for computing")
+    slurm_args.add_argument("--nodes", type=int, default=1,
+        help="Number of nodes to request for computing")
+    slurm_args.add_argument("--gpus", type=int, default=0,
+        help="Number of GPUs to request")
+    slurm_args.add_argument("--memory-GB", type=int, default=64,
+        help="Memory allocation to request for computing")
+    slurm_args.add_argument("--time", default="24:00:00",
+        help="Walltime for instance")
+    slurm_args.add_argument("--mail-type", default="NONE",
+        help="slurm mail type (e.g. NONE, FAIL, ALL)")
+    slurm_args.add_argument("--mail-user", help="contact email address")
+    slurm_args.add_argument("--python-env-name", default="nmma_env",
+        help="Name of python environment to activate")
+    slurm_args.add_argument("--script-name", default="slurm.sub")
+
+    return parser
 
 def parsing_and_logging(parser_func, args= None):
 

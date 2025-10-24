@@ -121,6 +121,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
 
         # nmma-defaults that might conflict with bilby/bilby_pipe defaults
         args.cosmology = getattr(args, "cosmology", default_cosmology.name)
+        self.cosmology = args.cosmology
 
         super().__init__(args, unknown_args)
         # Generic setup, ripped from bilby pipe

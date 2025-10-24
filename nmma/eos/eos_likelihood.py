@@ -8,10 +8,9 @@ from tqdm.contrib.concurrent import process_map
 import numpy as np
 from scipy.special import logsumexp
 from scipy.stats import norm, gaussian_kde
-import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
-from bilby.core.prior import Interped, Categorical
+from ..joint.base import NMMABaseLikelihood
+from bilby.core.prior import WeightedCategorical
     
 
 def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
@@ -74,13 +73,9 @@ def read_constraint_from_args(args, constraint_kind):
 def setup_tabulated_eos_priors(args, priors, logger=None):
     if logger:    
         logger.info("Sampling over precomputed EOSs")
-    if args.eos_weight:
-        xx = np.arange(0, args.Neos + 1)
-        eos_weight = np.loadtxt(args.eos_weight)
-        yy = np.concatenate((eos_weight, [eos_weight[-1]]))
-        priors["EOS"] = Interped(xx, yy, minimum=0, maximum=args.Neos, name="EOS")
-    else: 
-        priors["EOS"] = Categorical(args.Neos, name="EOS")
+    weights = np.loadtxt(args.eos_weight) if args.eos_weight else None
+    n_eos = args.Neos if args.Neos is not None else len(weights)
+    priors["EOS"] = WeightedCategorical(n_eos, weights, name="EOS")
     return priors
 
 def setup_eos_kwargs(data_dump, args, logger):
@@ -557,10 +552,7 @@ def EOSConstraints2Prior(macro_eos_path, out_path, Constraint):
     weights = np.exp(logLs - logNorm)
     sorted_weights = np.sort(weights)
     EOSSorting(eos_files, out_path, weights)
-    Neos= len(eos_files) 
-    xx = np.arange(0, Neos + 1)
-    yy = np.concatenate((sorted_weights, sorted_weights[-1]))
-    prior = Interped(xx, yy, minimum=0, maximum=Neos, name='EOS')
+    prior = WeightedCategorical(len(eos_files), sorted_weights, name='EOS')
 
     return prior, logNorm
 
