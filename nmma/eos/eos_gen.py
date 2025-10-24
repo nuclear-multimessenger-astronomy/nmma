@@ -65,7 +65,7 @@ def eos_from_nep (S0_val, L_val, nsat_val = 0.16,
 
 
 ######### legacy routine that should no longer be applied
-class EOS_with_CSE(object):
+class EOS_with_CSE:
     """
     Create and eos object with an array of (n, p, e) as the
     low-density tail. And extend the eos to higher density with

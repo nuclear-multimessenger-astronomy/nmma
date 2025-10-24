@@ -153,7 +153,7 @@ citation_dict = {
 
 }
 
-class LightCurveModelContainer(object):
+class LightCurveModelContainer:
     """A parent-class for light curve model objects to evaluate lightcurves
     across filters with a set of parameters given
 
@@ -1051,7 +1051,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         return mag
 
 
-class CombinedLightCurveModelContainer(object):
+class CombinedLightCurveModelContainer:
     """
     An object to evaluate the combined light curve from a set of parameters
     using multiple light curve models.

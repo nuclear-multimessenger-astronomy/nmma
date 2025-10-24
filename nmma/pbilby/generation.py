@@ -326,12 +326,6 @@ def generate_runner(parser=None, **kwargs):
 
     inputs = NMMADataGenerationInput(args, [])
 
-    logger.info(
-        "Setting up likelihood with marginalizations: "
-        f"distance={inputs.distance_marginalization}, "
-        f"time={inputs.time_marginalization}, "
-        f"phase={inputs.phase_marginalization}."
-    )
     logger.info(f"Setting sampling-seed={inputs.sampling_seed}")
     logger.info(f"prior-file save at {inputs.prior_file}")
     logger.info(

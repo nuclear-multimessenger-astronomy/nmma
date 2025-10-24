@@ -280,7 +280,7 @@ def EOS2Parameters(radius_val, mass_val, Lambda_val, m1_source, m2_source
         return ref*TOV_mass, ref*TOV_radius, lambda_1, lambda_2, radius_1, radius_2, ref*R_14, ref*R_16
 
 
-class BBHEjectaFitting(object):
+class BBHEjectaFitting:
     def __init__(self):
         self.mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
     def vals_only_ejecta_parameter_conversion(self, converted_parameters):
@@ -295,7 +295,7 @@ class BBHEjectaFitting(object):
         return converted_parameters, added_keys
     
 
-class NSBHEjectaFitting(object):
+class NSBHEjectaFitting:
     def __init__(self):
         self.proper_mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind"]
         self.uniform_mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
@@ -448,7 +448,7 @@ class NSBHEjectaFitting(object):
         return converted_parameters, added_keys
 
 
-class BNSEjectaFitting(object):
+class BNSEjectaFitting:
     def __init__(self):
         self.mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
@@ -594,7 +594,7 @@ class BNSEjectaFitting(object):
         return converted_parameters, added_keys
 
 
-class MultimessengerConversion(object):
+class MultimessengerConversion:
     def __init__(self, args, messengers, ana_modifiers =[], fixed_prior={}):
         self.messengers     = messengers
         self.modifiers      = ana_modifiers

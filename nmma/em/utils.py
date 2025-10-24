@@ -641,7 +641,7 @@ def estimate_mag_err(uncer_params, df):
 # The following LANL File readers are taken from Eve Chase's cocteau package
 
 
-class SpectraOverTime(object):
+class SpectraOverTime:
     """
     A collection of spectra at successive timesteps
     Written by Eve Chase.
@@ -665,7 +665,7 @@ class SpectraOverTime(object):
         self.num_angles = num_angles
 
 
-class Spectrum(object):
+class Spectrum:
     """
     Spectrum as a function of wavelength
     Written by Eve Chase.

@@ -125,8 +125,13 @@ def em_only_sampling(likelihood, priors, args, injection_parameters=None):
 
 def post_process_bestfit(bestfit_params, transient, args, result=None):
     best_mags = bestfit_lightcurve(transient, bestfit_params)
-    model_error = {filt: transient.compute_em_err(filt, best_mags["time"])
-                    for filt in best_mags.keys() if filt != "time"}
+    if hasattr(transient, 'systematics_filters'):
+        model_error = {filt: transient.filt_err_from_systematics_sampling(
+            transient.systematics_filters[filt], bestfit_params, best_mags["time"])
+                        for filt in best_mags.keys() if filt != "time"}
+    else: 
+        model_error = transient.compute_em_err(bestfit_params)
+
     # model may not necessarily work on observed filters:
     for filt in set(transient.observed_filters) - set(best_mags.keys()):
         best_mags[filt] =  utils.get_filtered_mag(best_mags, filt)

@@ -30,7 +30,7 @@ def setup_eos_generator(args):
     else:
         raise ValueError(f"Unknown eos model type: {eos_model_type}")
 
-class EoSGenerator(object):
+class EoSGenerator:
     def __init__(self, emulator_path, eos_parameters=None):
         
         # load the emulator

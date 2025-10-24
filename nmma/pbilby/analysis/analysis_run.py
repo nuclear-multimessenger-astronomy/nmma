@@ -30,7 +30,7 @@ from ...eos.plotting_routines import plot_eos_vs_constraints
 from ...eos.eos_likelihood import setup_tabulated_eos_priors
 
 
-class MainRun(object):
+class MainRun:
    
     def __init__(
         self,
@@ -341,7 +341,7 @@ class MainRun(object):
         result.samples_to_posterior(likelihood=worker_run.likelihood, priors=result.priors)
         return result
 
-class WorkerRun(object):
+class WorkerRun:
     """
     An object with methods to be called in parallelised tasks.
 
@@ -479,11 +479,10 @@ class WorkerRun(object):
         return self.priors.rescale(self.sampling_keys, u_array)
     
     def evaluate_constraints(self, out_sample):
-        prob = 1
         for key in self.priors:
-            if isinstance(self.priors[key], Constraint) and key in out_sample:
-                prob *= self.priors[key].prob(out_sample[key])
-        return prob
+            if isinstance(self.priors[key], Constraint) and key in out_sample and not self.priors[key].prob(out_sample[key]):
+                return False
+        return True
 
 
     def log_likelihood_function(self, v_array):
@@ -506,11 +505,9 @@ class WorkerRun(object):
         parameters = {key: v for key, v in zip(self.sampling_keys, v_array)}
         parameters.update(self.fixed_prior)
         parameters, local_parameters = self.parameter_conversion.convert_to_multimessenger_parameters(parameters, return_internal=True)
-        if self.evaluate_constraints(parameters) > 0:
-            self.likelihood.parameters = parameters
-            self.likelihood.local_parameters = local_parameters
+        if self.evaluate_constraints(parameters):
             return (
-                self.likelihood.sub_log_likelihood()
+                self.likelihood.sub_log_likelihood(parameters, local_parameters)
                 - self.likelihood.noise_log_likelihood()
             )
         else:

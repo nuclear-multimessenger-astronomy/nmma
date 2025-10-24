@@ -89,9 +89,9 @@ def setup_eos_kwargs(data_dump, args, logger):
    
 class EquationofStateLikelihood(NMMABaseLikelihood):
     def __init__(self, priors, constraint_dict, **kwargs):
-        sub_model =setup_joint_eos_constraint(constraint_dict)
+        constraint =setup_joint_eos_constraint(constraint_dict)
         # to be extended for more complex likelihood expressions
-        super().__init__(sub_model=sub_model, priors=priors, **kwargs)
+        super().__init__(constraint, priors, **kwargs)
 
 
 def setup_joint_eos_constraint(constraint_dict):
@@ -128,7 +128,7 @@ def setup_joint_eos_constraint(constraint_dict):
 
      
 
-class JointEoSConstraint(object):
+class JointEoSConstraint:
     def __init__(self, *constraints):
         self.constraints = constraints
         self.local_parameters = {}
@@ -141,13 +141,8 @@ class JointEoSConstraint(object):
         else:
             return f"{self.__class__.__name__} of {', '.join([cons.__repr__() for cons in self.constraints[:-1]])} and {self.constraints[-1].__repr__()}"
 
-    def log_likelihood(self):
-        logl = 0.
-
-        for constraint in self.constraints:
-            logl += constraint.log_likelihood(self.parameters, self.local_parameters)
-
-        return np.squeeze(logl)
+    def log_likelihood(self, parameters):
+        return sum([constraint.log_likelihood(parameters, self.local_parameters) for constraint in self.constraints])
     
     def tabulate_weights(self, macro_eos_path, outdir, weight_path=None, normalise=True):  
         """Given a directory of macroscopic EOSs and nmma.joint.Constraint,
@@ -212,13 +207,12 @@ class JointEoSConstraint(object):
     def eval_eos_file(self, eos_file):
         try:
             M, R, Lam = np.loadtxt(eos_file, usecols=[1, 0, 2], unpack=True)
-            self.parameters = {"TOV_mass": M[-1]}
             self.local_parameters = {"radii": R, "masses": M}
-            return self.log_likelihood()
+            return self.log_likelihood({"TOV_mass": M[-1]})
         except ValueError:
             return None
 
-class MassConstraint(object):
+class MassConstraint:
     def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, lognorm_method=None):
         self.mass = measured_mass
         self.error = measure_error
@@ -288,7 +282,7 @@ class UpperMTOVConstraint(MassConstraint):
         super().__init__(measured_mass, measure_error, name, arxiv_ref, lognorm_method=norm.logsf)
     
 
-class MassRadiusConstraint(object):
+class MassRadiusConstraint:
     '''Constraint that an EOS adheres to  certain mass-radius region'''
     def __init__(self, mass_array=None, radius_array=None, weights = None, file_path=None, name=None, arxiv_ref=None):
         """

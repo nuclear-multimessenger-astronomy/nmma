@@ -41,7 +41,7 @@ try:
 except ImportError:
     print("Install gaussian-process-api if you want to use it...")
 
-class BaseTrainingModel(object):
+class BaseTrainingModel:
     """A light curve training model object
 
     An object to train a light curve model across filters

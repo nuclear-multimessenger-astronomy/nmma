@@ -1,6 +1,7 @@
 import os
 import pytest
 import shutil
+import copy
 
 
 from ..em import analysis, em_parsing, slurm_handling
@@ -32,8 +33,8 @@ def args():
         bestfit=True,
         filters="ztfr",
         Ebv_max=0.0,
-        em_error_budget=0,
         nlive=64,
+        sampler="pymultinest",
         injection_file=f"{DATA_DIR}/Bu2019lm_injection.json",
         injection_outfile="outdir/lc.csv",
         plot=True,
@@ -42,6 +43,12 @@ def args():
         setattr(args, key, value)
 
     return args
+
+def test_with_Hubble(args):
+    test_args = copy.deepcopy(args)
+    test_args.prior_file = "priors/Bu2019lm_Hubble.prior"
+    test_args.Hubble = True
+    analysis.main(test_args)
 
 
 def test_analysis_systematics_with_time(args):

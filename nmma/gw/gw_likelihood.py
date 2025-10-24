@@ -4,9 +4,9 @@ from bilby_pipe.utils import convert_string_to_dict
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
 
-def setup_gw_kwargs(data_dump, args, logger, **kwargs):
+def setup_gw_likelihood(data_dump, args, logger, **kwargs):
     """
-    Setup the kwargs for the gravitational-wave likelihood.
+    Set up the gravitational-wave likelihood.
     We read some required args for the chosen gw-likelihood in this process.
     For multibanding, this includes:
         reference_chirp_mass: float, optional          
@@ -158,12 +158,10 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
 
     """
 
-    def __init__(self,priors, param_conv_func, interferometers,  
+    def __init__(self,priors, interferometers,  
                  waveform_generator, gw_likelihood_type='GravitationalWaveTransient', time_marginalization=False, distance_marginalization=False, phase_marginalization=False, distance_marginalization_lookup_table=None, jitter_time=True, reference_frame="sky", time_reference="geocenter", **kwargs):
 
-        if param_conv_func is None:
-            param_conv_func = self.identity_conversion
-        waveform_generator.parameter_conversion = param_conv_func
+        waveform_generator.parameter_conversion = self.identity_conversion
         waveform_generator.start_time = interferometers[0].time_array[0]
 
         # initialize the GW likelihood
@@ -182,7 +180,7 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
         )
 
         if gw_likelihood_type == 'GravitationalWaveTransient':
-            GWLikelihood = GravitationalWaveTransient(**gw_likelihood_kwargs)
+            gw_transient = GravitationalWaveTransient(**gw_likelihood_kwargs)
 
         elif gw_likelihood_type == 'ROQGravitationalWaveTransient':
             """Additional params:
@@ -193,20 +191,17 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
                 valid for the ROQ
             roq_scale_factor: float
                 The ROQ scale factor used."""
-            GWLikelihood = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
+            gw_transient = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         elif gw_likelihood_type == 'RelativeBinningGravitationalWaveTransient':
-            GWLikelihood = RelativeBinningGravitationalWaveTransient(**gw_likelihood_kwargs)
-            
+            gw_transient = RelativeBinningGravitationalWaveTransient(**gw_likelihood_kwargs)
+
         elif gw_likelihood_type == 'MBGravitationalWaveTransient':
-            GWLikelihood = MBGravitationalWaveTransient(**gw_likelihood_kwargs)
+            gw_transient = MBGravitationalWaveTransient(**gw_likelihood_kwargs)
         else:
             raise ValueError("Unknown GW Likelihood class {}")
 
-        super().__init__(sub_model=GWLikelihood, priors=priors, param_conv_func=param_conv_func)
-        self.time_marginalization = time_marginalization
-        self.phase_marginalization = phase_marginalization
-        self.distance_marginalization = distance_marginalization
+        super().__init__(gw_transient, priors)
 
 
     def noise_log_likelihood(self):

@@ -1,4 +1,5 @@
 import inspect
+from kiwisolver import Constraint
 import numpy as np
 import pandas as pd
 from bilby.core.likelihood import Likelihood
@@ -13,53 +14,41 @@ class NMMABaseLikelihood(Likelihood):
         The submodel to be used in each messenger. Must have a log_likelihood method.
     priors: dict
         The analysis priors, required for marginalization in some submodels
-    parameters: dict
-        The parameters to be used in the analysis
-    param_conversion_func: callable, None
-        Conversion function executed in the different subroutines. This should not be provided if a joint likelihood is used, as that one will handle the conversion for all submodels at once.
 
     """
 
-    def __init__(self,sub_model, priors = None, parameters = {}, param_conversion_func = None, **kwargs):
+    def __init__(self,sub_model, priors = None, **kwargs):
 
 
-        super().__init__(parameters=parameters)
+        super().__init__()
         self.sub_model = sub_model
-        if param_conversion_func is None:
-            self.sub_model.parameter_conversion = self.identity_conversion
-        else:
-            self.sub_model.parameter_conversion = param_conversion_func
-            
+        self.local_parameters = None
         if priors is not None:
             self.priors = priors
-        self.__sync_parameters()
 
     def __repr__(self):
         return self.__class__.__name__ + ' with ' + self.sub_model.__repr__()
 
-    def __sync_parameters(self):
-        self.sub_model.parameters = self.parameters
-        try:
-            self.sub_model.local_parameters = self.local_parameters
-        except AttributeError:
-            pass
-
     def identity_conversion(self, parameters):
         return parameters, []
 
-    def log_likelihood(self):
+    def log_likelihood(self, parameters):
         try:
-            if not self.priors.evaluate_constraints(self.parameters):
-                return np.nan_to_num(-np.inf)
+            out_sample = self.priors.conversion_function(parameters)
+            for key in self.priors:
+                if (isinstance(self.priors[key], Constraint) 
+                    and key in out_sample 
+                    and not self.priors[key].prob(out_sample[key]) ):
+                    return np.nan_to_num(-np.inf)
         except AttributeError:
             print('No priors found, could not evaluate constraints')
-            pass
+            out_sample = parameters
         
-        return self.sub_log_likelihood()
+        return self.sub_log_likelihood(out_sample)
     
-    def sub_log_likelihood(self):
-        self.__sync_parameters()
-        logL_model = self.sub_model.log_likelihood()
+    def sub_log_likelihood(self, parameters):
+        self.sub_model.local_parameters = self.local_parameters
+        logL_model = self.sub_model.log_likelihood(parameters)
         if not np.isfinite(logL_model):
             return np.nan_to_num(-np.inf)
 
