@@ -12,6 +12,26 @@ from .. import __version__  # noqa: E402
 from numpy import inf
 logger = bilby.core.utils.logger
 
+def _create_base_nmma_parser(sampler="dynesty"):
+    base_parser = argparse.ArgumentParser("base", add_help=False)
+
+    base_parser.add_argument("--version", action="version",
+        version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
+    )
+
+    if sampler in ["all", "dynesty"]:
+        base_parser = sampler_parsing(base_parser)
+        base_parser = dynesty_parsing(base_parser)
+
+    base_parser = em_settings_parsing(base_parser)
+    base_parser = base_analysis_parsing(base_parser)
+    base_parser = em_analysis_parsing(base_parser)
+    base_parser = gw_parsing(base_parser)
+    base_parser = tabulated_eos_parsing(base_parser)
+    base_parser = eos_parsing(base_parser)
+    base_parser = add_misc_settings(base_parser)
+
+    return base_parser
 
 def em_settings_parsing(parser):
     # general args
@@ -21,19 +41,35 @@ def em_settings_parsing(parser):
     em_input_parser.add("--light-curve-data", help="Path to the observed light curve data")
     return parser
 
- 
+
+def sampler_parsing(parser):
+    sampler_group = parser.add_argument_group(title = "Setting for the Sampler")
+
+    sampler_group.add_argument("--sampler", choices=["dynesty"], default="dynesty",
+        help="The parallelised sampler to use, defaults to dynesty")
+    sampler_group.add_argument( "-n", "--nlive", default=1000, type=int, help="Number of live points" )
+    sampler_group.add_argument("--dlogz", default=0.1, type=float,
+        help="Stopping criteria: remaining evidence, (default=0.1)" )
+    sampler_group.add_argument("--n-effective", default=inf, type=float,
+        help="Stopping criteria: effective number of samples, (default=inf)" )
+    sampler_group.add_argument("--bound","--dynesty-bound", default="live", 
+        help="Dynesty bounding method (default=live)" )
+    sampler_group.add_argument( "--sample", "--dynesty-sample", default="acceptance-walk",
+        help="sampling method (default=acceptance-walk). "
+            "Note, the dynesty rwalk method is overwritten by parallel bilby for an optimised version ")
+    return parser
+
 def dynesty_parsing(parser):
     dynesty_group = parser.add_argument_group(title="Dynesty Settings")
-    dynesty_group.add_argument( "-n", "--nlive", default=1000, type=int, help="Number of live points" )
-    dynesty_group.add_argument("--dlogz", default=0.1, type=float,
-        help="Stopping criteria: remaining evidence, (default=0.1)" )
-    dynesty_group.add_argument("--n-effective", default=inf, type=float,
-        help="Stopping criteria: effective number of samples, (default=inf)" )
-    dynesty_group.add_argument( "--dynesty-sample", default="acceptance-walk",
-        help="Dynesty sampling method (default=acceptance-walk). "
-            "Note, the dynesty rwalk method is overwritten by parallel bilby for an optimised version ")
-    dynesty_group.add_argument("--dynesty-bound", default="live", 
-        help="Dynesty bounding method (default=live)" )
+    dynesty_group.add_argument("--n-check-point", default=1000, type=int,
+        help="Steps to take before attempting checkpoint")
+    dynesty_group.add_argument("--max-its", default=10**10, type=int,
+        help="Maximum number of iterations to sample for (default=1.e10)")
+    dynesty_group.add_argument("--max-run-time", default=1.0e10, type=float,
+        help="Maximum time to run for (default=1.e10 s)")
+    dynesty_group.add_argument("--rejection-sample-posterior", action='store_false', help=(
+            "Whether to generate the posterior samples by rejection sampling the "
+            "nested samples or resampling with replacement" ) )
     dynesty_group.add_argument( "--walks", default=100, type=int,
         help="Minimum number of walks, defaults to 100" )
     dynesty_group.add_argument( "--proposals",  action="append", 
@@ -46,34 +82,12 @@ def dynesty_parsing(parser):
         help="The average number of accepted steps per MCMC chain, defaults to 60")
     dynesty_group.add_argument("--min-eff", default=10, type=float,
         help="The minimum efficiency at which to switch from uniform sampling.")
+    
+
     dynesty_group.add_argument("--facc", default=0.5, type=float,
         help="See dynesty.NestedSampler")
     dynesty_group.add_argument("--enlarge", default=1.5, type=float,
         help="See dynesty.NestedSampler")
-    dynesty_group.add_argument("--n-check-point", default=1000, type=int,
-        help="Steps to take before attempting checkpoint")
-    dynesty_group.add_argument("--max-its", default=10**10, type=int,
-        help="Maximum number of iterations to sample for (default=1.e10)")
-    dynesty_group.add_argument("--max-run-time", default=1.0e10, type=float,
-        help="Maximum time to run for (default=1.e10 s)")
-    dynesty_group.add_argument("--fast-mpi", action='store_true',
-        help="Fast MPI communication pattern (default=False)")
-    dynesty_group.add_argument("--mpi-timing", action='store_true',
-        help="Print MPI timing when finished (default=False)")
-    dynesty_group.add_argument("--mpi-timing-interval", default=0, type=int,
-        help="Interval to write timing snapshot to disk (default=0 -- disabled)")
-    dynesty_group.add_argument("--nestcheck", action='store_true',
-        help=(
-            "Save a 'nestcheck' pickle in the outdir (default=False). "
-            "This pickle stores a `nestcheck.data_processing.process_dynesty_run` "
-            "object, which can be used during post processing to compute the "
-            "implementation and bootstrap errors explained by Higson et al (2018) "
-            "in “Sampling Errors In Nested Sampling Parameter Estimation”."
-        ),
-    )
-    dynesty_group.add_argument("--rejection-sample-posterior", action='store_false', help=(
-            "Whether to generate the posterior samples by rejection sampling the "
-            "nested samples or resampling with replacement" ) )
     return parser
 
 
@@ -91,26 +105,16 @@ def add_misc_settings(parser):
     return parser
 
 
-def _create_base_nmma_parser(sampler="dynesty"):
-    base_parser = argparse.ArgumentParser("base", add_help=False)
+def run_parsing(parser):
+    run_group = parser.add_argument_group(title = "Setting for the Main run")
+    run_group.add_argument("--data-dump", 
+        help="The pickled data dump generated by nmma_generation" )
+    run_group.add_argument("--outdir", help="Outdir to overwrite input label" )
+    run_group.add_argument("--label", help="Label to overwrite input label" )
+    run_group.add_argument("--result-format", default="hdf5",
+        help="Format to save the result" )
 
-    base_parser.add_argument("--version", action="version",
-        version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
-    )
-
-    if sampler in ["all", "dynesty"]:
-        base_parser = dynesty_parsing(base_parser)
-
-    base_parser = em_settings_parsing(base_parser)
-    base_parser = base_analysis_parsing(base_parser)
-    base_parser = em_analysis_parsing(base_parser)
-    base_parser = gw_parsing(base_parser)
-    base_parser = tabulated_eos_parsing(base_parser)
-    base_parser = eos_parsing(base_parser)
-    base_parser = add_misc_settings(base_parser)
-
-    return base_parser
-
+    return parser
 
 def slurm_parsing(parser):
     slurm_group = parser.add_argument_group(title="Slurm Settings")
@@ -176,9 +180,10 @@ def _create_reduced_bilby_pipe_parser():
     for arg in bilby_pipe_arguments_to_ignore:
         remove_argument_from_parser(bilby_pipe_parser, arg)
 
-    bilby_pipe_parser.add_argument("--sampler", choices=["dynesty"], default="dynesty",
-        help="The parallelised sampler to use, defaults to dynesty")
     return bilby_pipe_parser
+
+
+
 
 def create_nmma_generation_parser():
     """Parser for nmma_generation"""
@@ -229,21 +234,13 @@ def parse_generation_args(parser, cli_args=[""], as_namespace=False):
     return vars(args)
 
 
+
+
 def create_nmma_analysis_parser(sampler="dynesty"):
     """Parser for nmma_analysis"""
     parser = _create_base_nmma_parser(sampler=sampler)
-
-    analysis_parser = argparse.ArgumentParser(prog="nmma_analysis", parents=[parser])
-    analysis_parser.add_argument("--data-dump", 
-        help="The pickled data dump generated by nmma_generation" )
-    analysis_parser.add_argument("--outdir", type=nonestr,
-        help="Outdir to overwrite input label" )
-    analysis_parser.add_argument("--label", type=nonestr, 
-        help="Label to overwrite input label" )
-    analysis_parser.add_argument("--result-format", default="hdf5",
-        help="Format to save the result" )
-    return analysis_parser
-
+    parser = run_parsing(parser)
+    return parser   
 
 
 def parse_analysis_args(parser, args=None):

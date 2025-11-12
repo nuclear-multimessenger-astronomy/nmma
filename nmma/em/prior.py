@@ -11,8 +11,13 @@ import matplotlib.pyplot as plt
 from bilby.core.prior import (
     Prior, DeltaFunction, Interped, ConditionalTruncatedGaussian,
     ConditionalPriorDict, PriorDict as _PriorDict)
+from bilby.gw import cosmology as bilby_cosmo
 from ligo.skymap import io, moc
 from ..joint.base import adjust_hubble_prior
+from ..joint.constants import default_cosmology
+from ..joint.conversion import cosmology_to_distance, convert_mtot_mni
+
+from astropy import cosmology
 
 from . import systematics
 
@@ -242,10 +247,38 @@ def extinction_prior(priors, args):
     return priors
 
 
-def create_prior_from_args(args, param_conv=None):
+def create_prior_from_args(args, model_names=[]):
+
+    if isinstance(model_names, str):
+        model_names = [model_names]
+        
+    conv_functions = []
+    # parameter conversion as used in EM-only sector
+    if any(model in ['AnBa2022_linear', 'AnBa2022_log'] for model in model_names):
+        conv_functions.append(convert_mtot_mni)
+    # elif to be extended...
+
+    cosmo = getattr(args, 'cosmology', None)
+    if cosmo is None:
+        cosmo = default_cosmology
+    else:
+        cosmo = getattr(cosmology, cosmo)
+    bilby_cosmo.set_cosmology(cosmo)
+
+    if getattr(args, 'Hubble', False):
+            
+        def Hubble_conversion(priors):
+            params, _ = cosmology_to_distance(priors, [], cosmo)
+            return params
+        conv_functions.append(Hubble_conversion)
+        
+    def param_conv(params):
+        for func in conv_functions:
+            params = func(params)
+        return params
 
     priors = _PriorDict(
-        args.prior, conversion_function=param_conv)
+        args.prior_file, conversion_function=param_conv)
     
     priors.convert_floats_to_delta_functions()    
     priors = adjust_hubble_prior(priors, args)

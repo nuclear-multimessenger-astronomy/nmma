@@ -1,4 +1,5 @@
 luminosity_distance = Uniform(minimum=1, maximum=200., name='luminosity_distance',latex_label='$D_L$')
+Hubble_constant = Uniform(name='H0', minimum=50., maximum=90., latex_label='$H_0$')
 KNphi = Uniform(name='KNphi', minimum=15., maximum=75., latex_label='$\Phi$')
 inclination_EM = Sine(name='inclination_EM', minimum=0., maximum=np.pi/2., latex_label='$\\iota$')
 timeshift = Uniform(minimum=-2.0, maximum=0.1, name='trigger_time',latex_label='$t_0$')

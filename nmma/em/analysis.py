@@ -18,8 +18,7 @@ from .prior import create_prior_from_args
 from . import io, model, utils  
 from .plotting_utils import basic_em_analysis_plot, bolometric_lc_plot
 from .em_parsing import parsing_and_logging, multi_wavelength_analysis_parser, bolometric_parser
-from ..joint.conversion import convert_mtot_mni
-from ..joint.utils import read_injection_file, set_filename, read_bestfit_from_posterior
+from ..joint.utils import read_injection_file, set_filename, read_bestfit_from_posterior, read_trigger_time
 matplotlib.use("agg")
 
 def data_from_injection(args, filters, detection_limit):
@@ -126,8 +125,13 @@ def em_only_sampling(likelihood, priors, args, injection_parameters=None):
 
 def post_process_bestfit(bestfit_params, transient, args, result=None):
     best_mags = bestfit_lightcurve(transient, bestfit_params)
-    model_error = {filt: transient.compute_em_err(filt, best_mags["time"])
-                    for filt in best_mags.keys() if filt != "time"}
+    if hasattr(transient, 'systematics_filters'):
+        model_error = {filt: transient.filt_err_from_systematics_sampling(
+            transient.systematics_filters[filt], bestfit_params, best_mags["time"])
+                        for filt in best_mags.keys() if filt != "time"}
+    else: 
+        model_error = transient.compute_em_err(bestfit_params)
+
     # model may not necessarily work on observed filters:
     for filt in set(transient.observed_filters) - set(best_mags.keys()):
         best_mags[filt] =  utils.get_filtered_mag(best_mags, filt)
@@ -145,6 +149,7 @@ def post_process_bestfit(bestfit_params, transient, args, result=None):
             bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
         bestfit_to_write["Magnitudes"] = {filt: best_mags[filt].tolist() 
                                           for filt in transient.observed_filters}
+        bestfit_to_write["obs_times"] = best_mags["time"].tolist()
         bestfit_to_write["chi2_per_dof"] = chi2_dict["total"]
         bestfit_to_write["chi2_dict"] = chi2_dict
         bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
@@ -256,15 +261,15 @@ def bolometric_analysis(args):
 
     # load the bolometric data
     data = pd.read_csv(args.light_curve_data)
-    trigger_time = utils.read_trigger_time(None,args)
+    trigger_time = read_trigger_time(None,args)
     light_curve_data = utils.setup_bolometric_lc_data(data, trigger_time)
 
-    light_curve_model = model.SimpleBolometricLightCurveModel(None, args.em_model,
+    light_curve_model = model.SimpleBolometricLightCurveModel(args.em_model,
         sample_times=utils.setup_sample_times(args),  ## usually None, defaults to model_times
     )
 
     # setup the prior
-    priors = create_prior_from_args(args)
+    priors = create_prior_from_args(args, args.em_model)
 
     # setup the likelihood
     likelihood_kwargs = dict(
@@ -294,7 +299,7 @@ def analysis(args):
     try:
         # load observational data
         data = io.load_em_observations(args, format='observations')
-        trigger_time = utils.read_trigger_time(None,args)
+        trigger_time = read_trigger_time(None,args)
         data = utils.cut_data_to_time_range(data, args, trigger_time)
         injection_parameters = None
     except ValueError:
@@ -336,12 +341,7 @@ def analysis(args):
                                 if k in injlist_all}
     
     # setup the prior
-    if any(model in ['AnBa2022_linear', 'AnBa2022_log'] for model in model_names):
-        param_conv = convert_mtot_mni
-    # elif to be extended...
-    else:
-        param_conv = None
-    priors = create_prior_from_args(args, param_conv = param_conv)
+    priors = create_prior_from_args(args, model_names)
 
     light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
     utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
@@ -405,7 +405,7 @@ def nnanalysis(args):
     )
     
     # setup the prior
-    priors = create_prior_from_args(args)
+    priors = create_prior_from_args(args, args.em_model)
     
     # now that we have the kilonova light curve, we need to pad it with non-detections
     # this part is currently hard coded in terms of the times !!!! likely will need the most work
@@ -487,10 +487,7 @@ def multi_analysis_loop(args, analysis_function):
 
 def main(args=None):
     args = parsing_and_logging(multi_wavelength_analysis_parser, args)
-    if args.sampler == "neuralnet":
-        analysis_function = nnanalysis
-    else:
-        analysis_function = analysis
+    analysis_function = nnanalysis if args.sampler == "neuralnet" else analysis
     multi_analysis_loop(args, analysis_function)
     
 

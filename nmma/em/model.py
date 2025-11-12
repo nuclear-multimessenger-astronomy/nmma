@@ -7,14 +7,14 @@ import numpy as np
 from scipy.special import logsumexp
 import sncosmo
 from sncosmo.models import _SOURCES
-from bilby_pipe.utils import convert_string_to_dict
+from ast import literal_eval
 
 from . import utils
 from . import lightcurve_generation as lc_gen
 
 from nmma.joint.base import initialisation_args_from_signature_and_namespace
-from nmma.joint.constants import default_cosmology, c_SI
-from nmma.joint.conversion import observation_angle_conversion, get_redshift, cosmology_to_distance, distance_modulus_nmma
+from nmma.joint.constants import c_SI
+from nmma.joint.conversion import observation_angle_conversion, get_redshift,  distance_modulus_nmma
 from nmma.utils.models import get_models_home, get_model
 
 ln10 = np.log(10)
@@ -153,7 +153,7 @@ citation_dict = {
 
 }
 
-class LightCurveModelContainer(object):
+class LightCurveModelContainer:
     """A parent-class for light curve model objects to evaluate lightcurves
     across filters with a set of parameters given
 
@@ -161,9 +161,6 @@ class LightCurveModelContainer(object):
     ----------
     model: str
         Name of the model
-    parameter_conversion: func
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     model_parameters: list, None
         list of alternative model parameters, if not specified default will be used.
     filters : List[str]
@@ -181,7 +178,6 @@ class LightCurveModelContainer(object):
 
     def __init__(
         self, model, 
-        parameter_conversion=None,
         filters=None,
         model_parameters=None,
         sample_times=None,
@@ -196,9 +192,6 @@ class LightCurveModelContainer(object):
             self.model_parameters = model_parameters
 
         self.model = model
-        if parameter_conversion is None:
-            parameter_conversion = lambda *x: x
-        self.parameter_conversion = parameter_conversion
 
         if isinstance(filters, str):
             filters = filters.split(',')
@@ -231,7 +224,6 @@ class LightCurveModelContainer(object):
         
     def em_parameter_setup(self, parameters):
         new_parameters = parameters.copy()
-        new_parameters, _ = self.parameter_conversion(new_parameters, [])
         new_parameters = observation_angle_conversion(new_parameters)
 
         param_dict = {}
@@ -339,16 +331,13 @@ class LightCurveModelContainer(object):
 
 
 class FiestaModel(LightCurveModelContainer):    
-    def __init__(self, fiesta_model, parameter_conversion, filters, sample_times = None):
+    def __init__(self, fiesta_model, filters, sample_times = None):
         """A light curve model object for evaluating light curves using fiesta.
 
         Parameters
         ----------
         fiesta_model: fiesta.inference.lightcurve_model.SurrogateModel
             The fiesta model to use.
-        parameter_conversion: func, optional
-            Function to convert from sampled parameters to parameters of the
-            light curve model. By default, no conversion takes place.
         filters: str or list of str, optional
             Filters to use for the light curve. Defaults to all trained filters.
         sample_times: array_like, optional
@@ -359,9 +348,9 @@ class FiestaModel(LightCurveModelContainer):
             filters = fiesta_model.filters
         if sample_times is not None:
             print('Warning: sample_times are not used in FiestaModel, ignoring.')
-        super().__init__(fiesta_model.name, parameter_conversion, filters, fiesta_model.parameter_names)
-        
-    
+        super().__init__(fiesta_model.name, filters, fiesta_model.parameter_names)
+
+
     def setup_model_times(self):
         return self.fiesta_model.times # default sample times for fiesta model
         
@@ -421,9 +410,6 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
 
     Parameters
     ----------
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     model: string, optional
         Name of the model. Can be either "Arnett" (default) or "Arnett_modified"
 
@@ -433,8 +419,8 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
         A light curve model object to evaluate the light curve
         from a set of parameters
     """
-    def __init__(self,  parameter_conversion=None, model="Arnett", sample_times=None):
-        super().__init__(model, parameter_conversion, sample_times=sample_times)
+    def __init__(self, model="Arnett", sample_times=None):
+        super().__init__(model, sample_times=sample_times)
         if model == "Arnett":
             self.lc_func = lc_gen.arnett_lc
         elif model == "Arnett_modified":
@@ -471,9 +457,6 @@ class SVDLightCurveModel(LightCurveModelContainer):
         Name of the model.
     svd_path: str, optional
         Path to the SVD directory.
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     svd_mag_ncoeff: int, optional
         Number of highest eigenvalues to be taken for magnitude's SVD evaluation.
     svd_lbol_ncoeff: int, optional
@@ -498,7 +481,6 @@ class SVDLightCurveModel(LightCurveModelContainer):
         self,
         model,
         svd_path=None,
-        parameter_conversion=None,
         svd_mag_ncoeff=None,
         svd_lbol_ncoeff=None,
         interpolation_type="keras",
@@ -538,7 +520,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
                 If possible, try removing the --local-only flag and rerun.")
         
         ## need to have read the model before identifying the model_times
-        super().__init__(core_model_name, parameter_conversion, filters, model_parameters, sample_times)
+        super().__init__(core_model_name, filters, model_parameters, sample_times)
 
         if self.filters is None:
             try:
@@ -649,9 +631,6 @@ class FiestaKilonovaModel(FiestaModel):
 
     Parameters
     ----------
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     model: str, optional
         Name of the model. Default is "Bu2025_CVAE".
     filters: list of str, optional
@@ -665,7 +644,7 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    def __init__(self, parameter_conversion=None, model="Bu2025_MLP", filters=None, surrogate_dir=None, **kwargs):
+    def __init__(self, model="Bu2025_MLP", filters=None, surrogate_dir=None, **kwargs):
         if model.endswith("_lc"):
             from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
         else:
@@ -677,7 +656,7 @@ class FiestaKilonovaModel(FiestaModel):
             fiesta_kwargs['directory'] = f'{surrogate_dir}/KN/{model}/model'
             fiesta_model = BullaSurrogate(**fiesta_kwargs)
 
-        super().__init__(fiesta_model, parameter_conversion, filters, sample_times=kwargs.get('sample_times', None))
+        super().__init__(fiesta_model, filters, sample_times=kwargs.get('sample_times', None))
 
 
 class FiestaGRBModel(FiestaModel):
@@ -688,9 +667,6 @@ class FiestaGRBModel(FiestaModel):
 
     Parameters
     ----------
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     model: str, optional
         Name of the model. Default is "afgpy_gaussian_CVAE".
     filters: list of str, optional
@@ -704,7 +680,7 @@ class FiestaGRBModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    def __init__(self, parameter_conversion=None, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **kwargs):
+    def __init__(self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **kwargs):
         from fiesta.inference.lightcurve_model import AfterglowFlux
         fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,)
         try:
@@ -713,8 +689,8 @@ class FiestaGRBModel(FiestaModel):
             fiesta_kwargs['directory'] = f'{surrogate_dir}/GRB/{model}/model'
             fiesta_model = AfterglowFlux(**fiesta_kwargs)
 
-        super().__init__(fiesta_model, parameter_conversion, filters, sample_times=kwargs.get('sample_times', None))
-    
+        super().__init__(fiesta_model, filters, sample_times=kwargs.get('sample_times', None))
+
     def em_parameter_setup(self, parameters):
         new_parameters =super().em_parameter_setup(parameters)
         try:
@@ -752,9 +728,6 @@ class GRBLightCurveModel(LightCurveModelContainer):
 
     Parameters
     ----------
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     model: str, optional
         Name of the model. Default is "TrPi2018".
     model_parameters: list, optional
@@ -774,7 +747,6 @@ class GRBLightCurveModel(LightCurveModelContainer):
     """
     def __init__(
         self,
-        parameter_conversion=None,
         model="TrPi2018",
         model_parameters = None,
         resolution=12,
@@ -782,7 +754,7 @@ class GRBLightCurveModel(LightCurveModelContainer):
         filters=None,
         sample_times=None,
     ):
-        super().__init__(model, parameter_conversion, filters, model_parameters, sample_times)
+        super().__init__(model, filters, model_parameters, sample_times)
         self.resolution = resolution
         self.jet_type = jet_type
         self.default_parameters = {"xi_N": 1.0, "d_L": 3.086e19, "jetType": jet_type, "specType": 0}  # d_L=10pc in cm
@@ -887,9 +859,6 @@ class HostGalaxyLightCurveModel(LightCurveModelContainer):
     ----------
     model: str, optional
         Name of the model. Default is "Sr2023".
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     filters: list of str, optional
         List of filters to create model for. Defaults to all available filters.
     host_mag: float or int, optional
@@ -906,14 +875,13 @@ class HostGalaxyLightCurveModel(LightCurveModelContainer):
     def __init__(
         self,
         model="Sr2023",
-        parameter_conversion=None,
         filters=None,
         sample_times=None,
         # host_mag is the magnitude of the host galaxy in the filters
         host_mag=23.9,  # value for case of arxiv:2303.12849
         model_parameters=None
     ):
-        super().__init__(model, parameter_conversion, filters, model_parameters, sample_times=sample_times)
+        super().__init__(model, filters, model_parameters, sample_times=sample_times)
         if isinstance(host_mag, (float, int)):
             self.host_mag = np.full_like(self.filters, host_mag)
 
@@ -932,9 +900,6 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
 
     Parameters
     ----------
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     model: str, optional
         Name of the model. Default is "nugent-hyper".
     filters: list of str, optional
@@ -950,7 +915,6 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
     """
     def __init__(
         self,
-        parameter_conversion=None,
         model="nugent-hyper",
         filters=None,
         sample_times=None,
@@ -962,14 +926,14 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         model_parameters = self.sn_model.param_names
 
         if sample_times is None:
-            sample_times = np.linspace(self.sn_model.mintime(), self.sn_model.maxtime(), 400)
-        super().__init__(model, parameter_conversion, filters, model_parameters, sample_times)
+            sample_times = np.linspace(self.sn_model.mintime(), self.sn_model.maxtime(), 200)
+        super().__init__(model, filters, model_parameters, sample_times)
 
     def em_parameter_setup(self, parameters):
         new_parameters = super().em_parameter_setup(parameters)
 
         new_parameters["supernova_mag_stretch"] = parameters.get('supernova_mag_stretch', 1.)
-        new_parameters["t0"] = new_parameters.get("t0", self.timeshift)
+        new_parameters["t0"] = new_parameters.get("t0", 0.)
         new_parameters["z"] = new_parameters.get("z", self.redshift)
 
         return new_parameters
@@ -990,8 +954,7 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
 
 class ShockCoolingLightCurveModel(LightCurveModelContainer):
     def __init__(
-        self, parameter_conversion=None, model="Piro2021", filters=None, 
-        model_parameters=None, sample_times=None
+        self, model="Piro2021", filters=None, model_parameters=None, sample_times=None
     ):
         """A light curve model object
 
@@ -999,9 +962,6 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
 
         Parameters
         ----------
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     model: str, optional
         Name of the model. Default is "Piro2021".
     filters: list of str, optional
@@ -1013,8 +973,7 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
             A light curve model object to evaluate the light curve
             from a set of parameters
         """
-        super().__init__(model, parameter_conversion, filters, 
-                         model_parameters, sample_times)
+        super().__init__(model, filters, model_parameters, sample_times)
 
     def setup_model_times(self):
         # model is suitable on the order of hours to a few days
@@ -1049,9 +1008,6 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
 
     Parameters
     ----------
-    parameter_conversion: func, optional
-        Function to convert from sampled parameters to parameters of the
-        light curve model. By default, no conversion takes place.
     model: str, optional
         Name of the model. Default is "Me2017".
     filters: list of str, optional
@@ -1064,9 +1020,9 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         from a set of parameters.
     """
     def __init__(
-        self, parameter_conversion=None, model="Me2017", filters=None, sample_times=None
+        self, model="Me2017", filters=None, sample_times=None
     ):
-        super().__init__(model, parameter_conversion, filters, sample_times=sample_times)
+        super().__init__(model, filters, sample_times=sample_times)
         lc_dict={
             "HoHa2020"      : lc_gen.HoNa_lc,
             "Me2017"        : lc_gen.eff_metzger_lc,
@@ -1095,7 +1051,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         return mag
 
 
-class CombinedLightCurveModelContainer(object):
+class CombinedLightCurveModelContainer:
     """
     An object to evaluate the combined light curve from a set of parameters
     using multiple light curve models.
@@ -1251,9 +1207,6 @@ class KilonovaGRBLightCurveModel(CombinedLightCurveModelContainer):
     ----------
     kilonova_kwargs : dict
         Dictionary of keyword arguments for the Kilonova light curve model.
-    parameter_conversion : callable, optional
-        Function for converting parameters between different representations.
-        If not provided, the default conversion from `kilonova_kwargs` will be used.
     grb_resolution : int, optional
         Resolution parameter for the GRB light curve model. Default is 12.
     jet_type : int, optional
@@ -1263,17 +1216,12 @@ class KilonovaGRBLightCurveModel(CombinedLightCurveModelContainer):
     def __init__(
         self,
         kilonova_kwargs,
-        parameter_conversion=None,
         grb_resolution=12,
         jet_type=0,
     ):  
-        ## FIXME in what context would this be meaningful?
-        self.parameter_conversion = kilonova_kwargs["parameter_conversion"]
-        kilonova_kwargs["parameter_conversion"] = parameter_conversion
 
         kn_model = SVDLightCurveModel(**kilonova_kwargs)
         grb_model = GRBLightCurveModel(
-            parameter_conversion,
             resolution=grb_resolution,
             jet_type=jet_type,
         )
@@ -1283,24 +1231,21 @@ class SupernovaGRBLightCurveModel(CombinedLightCurveModelContainer):
     def __init__(
         self,
         supernova_kwargs,
-        parameter_conversion=None,
         grb_resolution=12,
         jet_type=0,
     ):
         grb_model = GRBLightCurveModel(
-            parameter_conversion,
             resolution=grb_resolution,
             jet_type=jet_type,
         )
-        sn_model = SupernovaLightCurveModel( parameter_conversion = parameter_conversion, **supernova_kwargs
-        )
+        sn_model = SupernovaLightCurveModel(**supernova_kwargs)
         super().__init__([grb_model, sn_model])
 
 class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
-    def __init__(self, parameter_conversion=None, filters=None):
+    def __init__(self, filters=None):
         super().__init__([
-            ShockCoolingLightCurveModel(parameter_conversion, filters),
-            SupernovaLightCurveModel(parameter_conversion, filters)
+            ShockCoolingLightCurveModel(filters),
+            SupernovaLightCurveModel(filters)
         ])
 
 def lc_model_class_from_str(class_names):
@@ -1349,11 +1294,6 @@ def get_lc_model_from_modelname(model_name):
 
 def single_model_from_args(model_class, model_name, args, 
                            filters, prefixes = ['grb_', 'em_']):
-    # parameter conversion as used in EM-only sector
-    if getattr(args, 'Hubble', False):
-        parameter_conversion = cosmology_to_distance 
-    else:
-        parameter_conversion = None
 
     # populate model-args from default and parsed args
     default_model_args = initialisation_args_from_signature_and_namespace(
@@ -1362,7 +1302,6 @@ def single_model_from_args(model_class, model_name, args,
 
     # update explicit args
     model_args = default_model_args | dict(filters=filters,
-        parameter_conversion=parameter_conversion,
         sample_times=utils.setup_sample_times(args),
     )
     if model_name is not None: 
@@ -1384,7 +1323,10 @@ def create_light_curve_model_from_args(
     # case 2, we have transient classes, need to identify the corresponding models
     elif isinstance(em_transient, list):
         model_classes = em_transient
-        prel_model_names = args.em_model.split(",")
+        if isinstance(args.em_model, str):
+            prel_model_names = args.em_model.split(",")
+        else:
+            prel_model_names = []
         model_names = []
         for i, model_class in enumerate(model_classes):
             try:
@@ -1422,7 +1364,7 @@ def create_injection_model(args, filters=None):
             if val is None:
                 injection_dict = {}
             else:
-                injection_dict = convert_string_to_dict(val)
+                injection_dict = literal_eval(val)
         else:
             arg = arg.replace("injection_", "") # replace 'injection_' prefix if necessary
             setattr(injection_args, arg, val)

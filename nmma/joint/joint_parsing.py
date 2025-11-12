@@ -50,6 +50,9 @@ def injection_parsing(parser):
         "Can also be a dict of filters and magnitudes that each have to be reached." )
     parser.add_argument("--eos-file", type=str, 
         help="EOS file in (radius [km], mass [solar mass], lambda)." )
+    # FIXME this is potentially misleading when used in conjunction with full analysis
+    parser.add_argument("--cosmology", 
+        help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)")
     
 
     

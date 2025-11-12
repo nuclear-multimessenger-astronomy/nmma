@@ -1,4 +1,3 @@
-import json
 import numpy as np
 import pandas as pd
 
@@ -9,6 +8,7 @@ import multiprocessing
 
 
 from .base_parsing import nmma_base_parsing, process_multi_condition_string
+from .constants import default_cosmology
 from .joint_parsing import injection_parsing
 from .utils import set_filename, rejection_sample, read_injection_file
 from .conversion import MultimessengerConversion
@@ -24,17 +24,23 @@ class NMMAInjectionCreator(InjectionCreator):
         if isinstance(args.prior_dict, str):
             # convert string to dict
             args.prior_dict = convert_string_to_dict(args.prior_dict)
+
+        cosmo = getattr(args, 'cosmology', None)
+        if cosmo is None:
+            cosmo = default_cosmology
+        bilby.gw.cosmology.set_cosmology(cosmo)
         super().__init__(
             prior_file=args.prior_file,
             prior_dict=args.prior_dict,
             n_injection=args.n_injection,
-            default_prior="PriorDict",
+            default_prior="CBCPriorDict",
             trigger_time=getattr(args, "trigger_time", 0.),
             deltaT=args.deltaT,
             gpstimes=args.gps_file,
             duration=args.duration,
             post_trigger_duration=args.post_trigger_duration,
-            generation_seed=args.generation_seed
+            generation_seed=args.generation_seed,
+            cosmology=cosmo
         )
         self.rng = np.random.default_rng(self.generation_seed)
         for key, value in kwargs.items():

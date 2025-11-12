@@ -30,7 +30,7 @@ from ...eos.plotting_routines import plot_eos_vs_constraints
 from ...eos.eos_likelihood import setup_tabulated_eos_priors
 
 
-class MainRun(object):
+class MainRun:
    
     def __init__(
         self,
@@ -43,9 +43,9 @@ class MainRun(object):
         label=None,
         periodic=None,
         reflective = None,
-        dynesty_sample="acceptance-walk",
+        sample="acceptance-walk",
         nlive=5,
-        dynesty_bound="live",
+        bound="live",
         walks=100,
         maxmcmc=5000,
         naccept=60,
@@ -88,8 +88,8 @@ class MainRun(object):
 
         self.init_sampler_kwargs = dict(
             nlive=nlive,
-            sample=dynesty_sample,
-            bound=dynesty_bound,
+            sample=sample,
+            bound=bound,
             walks=walks,
             facc=facc,
             first_update=dict(min_eff=min_eff, min_ncall=2 * nlive),
@@ -177,7 +177,7 @@ class MainRun(object):
 
     def get_nested_sampler(self, live_points, pool, pool_size):
         """
-        Returns the dynested nested sampler, getting most arguments
+        Returns the dynesty nested sampler, getting most arguments
         from the object's attributes
 
         Parameters
@@ -341,7 +341,7 @@ class MainRun(object):
         result.samples_to_posterior(likelihood=worker_run.likelihood, priors=result.priors)
         return result
 
-class WorkerRun(object):
+class WorkerRun:
     """
     An object with methods to be called in parallelised tasks.
 
@@ -479,11 +479,10 @@ class WorkerRun(object):
         return self.priors.rescale(self.sampling_keys, u_array)
     
     def evaluate_constraints(self, out_sample):
-        prob = 1
         for key in self.priors:
-            if isinstance(self.priors[key], Constraint) and key in out_sample:
-                prob *= self.priors[key].prob(out_sample[key])
-        return prob
+            if isinstance(self.priors[key], Constraint) and key in out_sample and not self.priors[key].prob(out_sample[key]):
+                return False
+        return True
 
 
     def log_likelihood_function(self, v_array):
@@ -506,11 +505,9 @@ class WorkerRun(object):
         parameters = {key: v for key, v in zip(self.sampling_keys, v_array)}
         parameters.update(self.fixed_prior)
         parameters, local_parameters = self.parameter_conversion.convert_to_multimessenger_parameters(parameters, return_internal=True)
-        if self.evaluate_constraints(parameters) > 0:
-            self.likelihood.parameters = parameters
-            self.likelihood.local_parameters = local_parameters
+        if self.evaluate_constraints(parameters):
             return (
-                self.likelihood.sub_log_likelihood()
+                self.likelihood.sub_log_likelihood(parameters, local_parameters)
                 - self.likelihood.noise_log_likelihood()
             )
         else:

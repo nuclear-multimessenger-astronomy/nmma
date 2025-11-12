@@ -89,7 +89,10 @@ def read_lc_from_csv(filename, args, format):
                 try:
                     mjd = Time(lineSplit[0]).mjd
                 except ValueError:
-                    mjd = Time(lineSplit[0], format=getattr(args, "time_format", "mjd")).mjd
+                    format = getattr(args, "time_format", None)
+                    if format is None:
+                        format = 'mjd'
+                    mjd = Time(lineSplit[0], format=format).mjd
                 filt = lineSplit[1]
                 mag = float(lineSplit[2])
                 dmag = float(lineSplit[3])

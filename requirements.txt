@@ -1,5 +1,5 @@
 future
-bilby>=2.4.1
+bilby>=2.7.0
 bilby_pipe>=1.4.0
 schwimmbad
 colorcet

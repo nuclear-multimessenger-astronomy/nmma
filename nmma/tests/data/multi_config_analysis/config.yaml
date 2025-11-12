@@ -2,7 +2,7 @@ Me2017_1:
   em-model: Me2017
   outdir: ${WORKING_DIR}/outdir_1
   label: injection
-  prior: ${WORKING_DIR}/data/multi_config_analysis/Me2017.prior
+  prior-file: ${WORKING_DIR}/data/multi_config_analysis/Me2017.prior
   em-tmin: 0.1
   em-tmax: 5
   em-tstep: 0.5
@@ -10,8 +10,6 @@ Me2017_1:
   nlive: 40
   Ebv-max: 0
   injection-file: ${WORKING_DIR}/data/multi_config_analysis/injection.json
-  injection-num: 0
-  generation-seed: 42
   filters: ztfg,ztfr,ztfi
   remove-nondetections: True
 
@@ -19,7 +17,7 @@ Me2017_2:
   em-model: Me2017
   outdir: ${WORKING_DIR}/outdir_2
   label: injection
-  prior: ${WORKING_DIR}/data/multi_config_analysis/Me2017.prior
+  prior-file: ${WORKING_DIR}/data/multi_config_analysis/Me2017.prior
   em-tmin: 0.1
   em-tmax: 5
   em-tstep: 0.5
@@ -27,7 +25,5 @@ Me2017_2:
   nlive: 40
   Ebv-max: 0
   injection-file: ${WORKING_DIR}/data/multi_config_analysis/injection.json
-  injection-num: 0
-  generation-seed: 42
   filters: ztfg,ztfr,ztfi
   remove-nondetections: True

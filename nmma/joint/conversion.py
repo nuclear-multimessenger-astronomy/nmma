@@ -246,11 +246,7 @@ def macro_props_from_eos(eos_data, converted_parameters, added_keys):
             lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list
         ]):
             converted_parameters[key] = np.array(_list)
-        local_parameters = {}
-        local_parameters['radii']   = np.array(rad_list)
-        local_parameters['masses']  = np.array(mass_list)
-        local_parameters['lambdas'] = np.array(lam_list)
-
+        local_parameters = {'radii': rad_list, 'masses': mass_list, 'lambdas': lam_list}
 
     return converted_parameters, added_keys, local_parameters
 
@@ -284,7 +280,7 @@ def EOS2Parameters(radius_val, mass_val, Lambda_val, m1_source, m2_source
         return ref*TOV_mass, ref*TOV_radius, lambda_1, lambda_2, radius_1, radius_2, ref*R_14, ref*R_16
 
 
-class BBHEjectaFitting(object):
+class BBHEjectaFitting:
     def __init__(self):
         self.mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
     def vals_only_ejecta_parameter_conversion(self, converted_parameters):
@@ -299,7 +295,7 @@ class BBHEjectaFitting(object):
         return converted_parameters, added_keys
     
 
-class NSBHEjectaFitting(object):
+class NSBHEjectaFitting:
     def __init__(self):
         self.proper_mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind"]
         self.uniform_mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
@@ -452,7 +448,7 @@ class NSBHEjectaFitting(object):
         return converted_parameters, added_keys
 
 
-class BNSEjectaFitting(object):
+class BNSEjectaFitting:
     def __init__(self):
         self.mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
@@ -598,7 +594,7 @@ class BNSEjectaFitting(object):
         return converted_parameters, added_keys
 
 
-class MultimessengerConversion(object):
+class MultimessengerConversion:
     def __init__(self, args, messengers, ana_modifiers =[], fixed_prior={}):
         self.messengers     = messengers
         self.modifiers      = ana_modifiers
@@ -624,13 +620,10 @@ class MultimessengerConversion(object):
             # Case 2a: precomputed eos data is loaded to ram
             if args.eos_to_ram:
                 try:
-                    eos_data = [None]*args.Neos
-                    for j in range(args.Neos):
-                        eos_data[j] = np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T
-                    self.eos_data=np.array(eos_data)
+                    self.eos_data = [np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in range(args.Neos)]
                     return self.eos_from_ram
                 except:
-                    self.eos_data = np.array([np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T])
+                    self.eos_data = [np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T]
                     return self.single_eos_from_ram
 
         
@@ -645,15 +638,16 @@ class MultimessengerConversion(object):
 
     def eos_direct_load(self, converted_parameters, added_keys):
         try:
-            EOSID = np.array(converted_parameters["EOS"]).astype(int)
+            EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
             eos_data = [np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID]
         except:
             #In case we only use one eos, e.g. for injection
-            eos_data = np.array([np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T])
+            eos_data = [np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T]
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
 
     def eos_from_ram(self, converted_parameters, added_keys):
-        eos_data = self.eos_data[np.array(converted_parameters["EOS"]).astype(int)]
+        EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
+        eos_data = [self.eos_data[i] for i in EOSID]
         return macro_props_from_eos(eos_data, converted_parameters, added_keys)
     
     def single_eos_from_ram(self, converted_parameters, added_keys):
@@ -691,11 +685,11 @@ class MultimessengerConversion(object):
             converted_parameters, added_keys = self.ejecta_parameter_conversion(
                 converted_parameters, added_keys
             )
-
-            theta_jn = converted_parameters["theta_jn"]
-            converted_parameters["inclination_EM"] = np.minimum(theta_jn, np.pi - theta_jn)
-            converted_parameters["KNtheta"] = 180.0 / np.pi * converted_parameters["inclination_EM"]
-            added_keys = added_keys + ["KNtheta", "inclination_EM"]
+            if "inclination_EM" not in converted_parameters:
+                theta_jn = converted_parameters["theta_jn"]
+                converted_parameters["inclination_EM"] = np.minimum(theta_jn, np.pi - theta_jn)
+                converted_parameters["KNtheta"] = 180.0 / np.pi * converted_parameters["inclination_EM"]
+                added_keys = added_keys + ["KNtheta", "inclination_EM"]
     
         added_keys = [
             key for key in converted_parameters.keys() if key not in original_keys

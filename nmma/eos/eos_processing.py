@@ -2,20 +2,35 @@ import numpy as np
 from glob import glob
 import os
 import json
+import joblib
 from ast import literal_eval
 import keras as k
 
 def setup_eos_generator(args):
+    try:
+        with open(args.emulator_metadata, 'r') as f:
+            meta_dict = json.load(f)
+    except TypeError:
+        meta_dict = args.emulator_metadata
+    except FileNotFoundError:
+        meta_dict = literal_eval(args.emulator_metadata)
+
     eos_model_type = args.micro_eos_model.lower()
+    
     if eos_model_type == 'nep':
-        return NEPEoSGenerator(args.emulator_metadata)
+        return NEPEoSGenerator(meta_dict)
     elif eos_model_type == 'nep-5':
-        return NEP5EoSGenerator(args.emulator_metadata)
+        return NEP5EoSGenerator(meta_dict)
+    
+    elif eos_model_type == 'lec':
+        return LECEoSGenerator(meta_dict)
+    elif eos_model_type == 'lec-7':
+        return LEC7EoSGenerator(meta_dict)
     ## add more models
     else:
         raise ValueError(f"Unknown eos model type: {eos_model_type}")
 
-class EoSGenerator(object):
+class EoSGenerator:
     def __init__(self, emulator_path, eos_parameters=None):
         
         # load the emulator
@@ -61,9 +76,13 @@ class EoSGenerator(object):
         return self.adjust_format(predictions)
 
     def emulate_macro_eos(self, converted_parameters):
-        eos_params = np.array([converted_parameters[par] for par in self.eos_parameters]).T
-        eos_params = np.atleast_2d(eos_params)
+        eos_params = self.assemble_eos_params(converted_parameters)
         return self.predict(eos_params) 
+    
+    def assemble_eos_params(self, converted_parameters):
+        """Assemble the parameters for the EoS model into a 2D-array for the emulator"""
+        eos_params = np.array([converted_parameters[par] for par in self.eos_parameters]).T
+        return np.atleast_2d(eos_params)
 
     def adjust_format(self, predictions):
         """Adjust the format of the predictions to the expected format: A n-tuple of three 1-D arrays for radius, mass lambdas, respectively"""
@@ -77,20 +96,13 @@ class EoSGenerator(object):
 
 class NEPEoSGenerator(EoSGenerator):
     def __init__(self, metadata):
-        try:
-            with open(metadata, 'r') as f:
-                meta_dict = json.load(f)
-        except TypeError:
-            meta_dict = metadata
-        except FileNotFoundError:
-            meta_dict = literal_eval(metadata)
 
-        emulator_path = meta_dict['emulator_path']
-        if meta_dict.get('backend', False):
-            assert k.backend.backend() == meta_dict['backend'], f"Keras Backend mismatch: {k.backend.backend()} vs {meta_dict['backend']}. please set the environment variable KERAS_BACKEND to {meta_dict['backend']}"
-        super().__init__(emulator_path, meta_dict.get('eos_parameters', None))
+        emulator_path = metadata['emulator_path']
+        if metadata.get('backend', False):
+            assert k.backend.backend() == metadata['backend'], f"Keras Backend mismatch: {k.backend.backend()} vs {metadata['backend']}. please set the environment variable KERAS_BACKEND to {metadata['backend']}"
+        super().__init__(emulator_path, metadata.get('eos_parameters', None))
 
-        n_mass_samples = meta_dict.get('n_mass_samples', 40)
+        n_mass_samples = metadata.get('n_mass_samples', 40)
         self.set_mass_construction(n_mass_samples)  
     
     def set_mass_construction(self, n_mass_samples):
@@ -153,6 +165,61 @@ class NEP5EoSGenerator(NEPEoSGenerator):
     def identify_eos_parameters(self):
         return ['K_sat', 'L_sym', 'K_sym', '3n_sat', '5n_sat']
 
+class LECEoSGenerator(EoSGenerator):
+    def __init__(self, metadata):
+        self.feature_scaler = joblib.load(metadata['feature_scaler'])
+        self.lambda_scaler  = joblib.load(metadata['lambda_scaler'])
+        self.radius_scaler  = joblib.load(metadata['radius_scaler'])
+
+        self.mass_emulator  = joblib.load(metadata['mass_emulator'])
+        self.radius_emulator= joblib.load(metadata['radius_emulator'])
+        self.lambda_emulator= joblib.load(metadata['lambda_emulator'])
+
+        self.n_mass_samples = metadata.get('n_mass_samples', 30)
+        self.eos_parameters = self.identify_eos_parameters()
+        
+    def predict(self, converted_parameters):
+        # Scale the input features
+        scaled_features = self.feature_scaler.transform(converted_parameters)
+
+        # Make predictions using the emulators
+        mass_prediction = self.mass_emulator.predict(scaled_features)
+        radius_prediction = self.radius_emulator.predict(scaled_features)
+        lambda_prediction = self.lambda_emulator.predict(scaled_features)
+
+        # Inverse transform the predictions
+        radius_prediction = self.radius_scaler.inverse_transform(radius_prediction)
+        lambda_prediction = self.lambda_scaler.inverse_transform(lambda_prediction)
+
+        return (mass_prediction, radius_prediction, lambda_prediction)
+    
+
+    def assemble_eos_params(self, converted_parameters):
+        """Assemble the parameters for the EoS model into a 2D-array for the emulator"""
+        eos_params = np.array([
+            converted_parameters[par] + converted_parameters.get(f"{par}_shift", 0)
+            for par in self.eos_parameters
+        ]).T
+        return np.atleast_2d(eos_params)
+    
+    def equal_distance_masses(self, mtov):
+        "Get mass array(s) from 1 to mtov of length n_mass_samples"
+        mass_range= np.linspace(1, mtov, self.n_mass_samples, axis =-1)
+        try: 
+            mass_range = np.squeeze(mass_range, axis=1)
+        except ValueError:
+            pass
+        return mass_range
+    
+    def adjust_format(self, predictions):
+        mass_data, rad_data, lam_data = predictions
+        return np.stack([rad_data, mass_data, 10**lam_data], axis=1)
+    
+class LEC7EoSGenerator(LECEoSGenerator):
+    def identify_eos_parameters(self):
+        return ['d11', 'd22', 'd3', 'd4', 'd6', 'd7']
+    
+    
 
 def load_eos_files(eos_data, Neos):
     if isinstance(eos_data, str):

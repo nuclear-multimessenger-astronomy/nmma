@@ -45,10 +45,8 @@ def main(args=None):
                     exit()
                 key = key.replace("_", "-")
 
-                if isinstance(value, bool) and value:
-                    cmd.append(f"--{key}")
-                else:
-                    cmd.append(f"--{key}")
+                cmd.append(f"--{key}")
+                if value is not True:
                     cmd.append(str(value))
 
             if not args.parallel:

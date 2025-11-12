@@ -6,6 +6,7 @@ from astropy.time import Time
 import warnings
 warnings.filterwarnings("error", category=RuntimeWarning)
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
+from ..joint.utils import read_trigger_time
 from . import model, utils, systematics
 
 
@@ -21,7 +22,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     ## setup the light curve model for this transient class and filters
     lc_model = model.identify_model_type(args)
     light_curve_model = model.create_light_curve_model_from_args(lc_model, args, filters)
-    trigger_time = utils.read_trigger_time(None, args)
+    trigger_time = read_trigger_time(None, args)
     light_curve_data = utils.setup_filtered_lc_data(light_curve_data, trigger_time)
     light_curve_data = utils.check_time_consistency(light_curve_data, light_curve_model, args)
 
@@ -74,7 +75,6 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         detection_limit=np.inf,
         error_budget=1.0,
         verbose=False,
-        param_conv_func=None,
         **kwargs
     ):  
         basic_transient_args = (light_curve_model, light_curve_data, priors, detection_limit, error_budget, verbose)
@@ -84,15 +84,14 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         else:
             sub_model = BasicEMTransient(*basic_transient_args)
 
-
-        super().__init__(sub_model=sub_model, priors=priors, param_conversion_func=param_conv_func, **kwargs)
+        super().__init__(sub_model=sub_model, priors=priors, **kwargs)
 
     def __repr__(self):
         return f"{self.__class__.__name__} based on {self.sub_model.__repr__()}"
     
        
 
-class BasicEMTransient(object):
+class BasicEMTransient:
     """A basic bolometric EM transient object
 
     Parameters
@@ -131,6 +130,8 @@ class BasicEMTransient(object):
 
         self.error_budget = error_budget
 
+        self.compute_em_err = self.em_err_from_parameters
+
         (self.light_curve_times, self.light_curves, 
          self.light_curve_uncertainties, self.trigger_time) = light_curve_data
 
@@ -143,13 +144,13 @@ class BasicEMTransient(object):
     def __repr__(self):
         return f"{self.__class__.__name__} (light_curve_model={self.light_curve_model})"   
     
-    def log_likelihood(self):
-        obs_times, model_lc = self.light_curve_model.gen_detector_lc(self.parameters)
+    def log_likelihood(self, parameters):
+        obs_times, model_lc = self.light_curve_model.gen_detector_lc(parameters)
         
         # sanity check: did the model return a valid light curve?
         if not self.sanity_check(model_lc):
             if self.verbose:
-                print(f"Model light curve generation failed for {self.parameters}"\
+                print(f"Model light curve generation failed for {parameters}"\
                       "returning -inf log_likelihood")
             return np.nan_to_num(-np.inf)
         
@@ -157,9 +158,10 @@ class BasicEMTransient(object):
         expected_observations = self.update_lightcurve_reference(obs_times, model_lc)
 
         # compare the estimated light curve and the measured data
-        logL_model = self.band_log_likelihood(expected_observations)
+        obs_error = self.compute_em_err(parameters)
+        logL_model = self.band_log_likelihood(expected_observations, obs_error)
         if self.verbose:
-            print(self.parameters, logL_model)
+            print(parameters, logL_model)
         return logL_model
 
     def sanity_check(self, model_lc):
@@ -169,13 +171,15 @@ class BasicEMTransient(object):
 
     def update_lightcurve_reference(self, obs_times, model_lc):
         return utils.autocomplete_data(self.light_curve_times, obs_times, model_lc)
+    
+    def em_err_from_parameters(self, parameters):
+        return parameters.get('em_syserr', self.error_budget)
 
-    def band_log_likelihood(self, expected_lc):
-        em_err_param = self.parameters.get('em_syserr', self.error_budget)
-        data_sigma = np.sqrt(self.light_curve_uncertainties**2 + em_err_param**2)
-        
+    def band_log_likelihood(self, expected_lc, obs_error):
+        data_sigma = np.sqrt(self.light_curve_uncertainties**2 + obs_error**2)
+
         minus_chisquare, gaussprob = self.chisquare_gaussianlog_from_lc_data(
-            expected_lc, self.light_curves, data_sigma, em_err_param, lim=self.detection_limit)
+            expected_lc, self.light_curves, data_sigma, obs_error, lim=self.detection_limit)
         if minus_chisquare is False:
             return np.nan_to_num(-np.inf)
         else:
@@ -308,13 +312,18 @@ class MultiFilterTransient(BasicEMTransient):
 
         self.compute_em_err = self.em_err_from_systematics_sampling    
     
-    def em_err_from_systematics_sampling(self, filt, data_time):
-        systematics_filt = self.systematics_filters[filt]
-        sampled_filter_systematics = [self.parameters[f"em_syserr_{systematics_filt}{i}"] for i in range(len(self.systematics_time_nodes))]
-        return utils.autocomplete_data(data_time, self.systematics_time_nodes, sampled_filter_systematics)
+    def em_err_from_systematics_sampling(self, parameters):
+        return {filt: self.filt_err_from_systematics_sampling(self.systematics_filters[filt], 
+                parameters, self.light_curve_times[filt]) for filt in self.observed_filters}
     
-    def em_err_from_parameters(self, *_):
-        return self.parameters['em_syserr']
+    def filt_err_from_systematics_sampling(self, filt, parameters, time):
+            sampled_filter_systematics = [parameters[f"em_syserr_{filt}{i}"] for i in range(len(self.systematics_time_nodes))]
+            return utils.autocomplete_data(time, self.systematics_time_nodes, sampled_filter_systematics)
+        
+    
+    def em_err_from_parameters(self, parameters):
+        em_err =  parameters['em_syserr']
+        return {filt: em_err for filt in self.observed_filters}
     
     def adjust_error_budget(self, error_budget):
         if isinstance(error_budget, str):
@@ -323,9 +332,9 @@ class MultiFilterTransient(BasicEMTransient):
                                 
         self.compute_em_err = self.em_err_from_budget
 
-    def em_err_from_budget(self, filt, _):
-        return self.error_budget[filt]
-            
+    def em_err_from_budget(self, _):
+        return self.error_budget
+
     def sanity_check(self, model_lc):
         if not model_lc:
             return False
@@ -355,19 +364,18 @@ class MultiFilterTransient(BasicEMTransient):
             # if not np.isfinite(expected_mags[filt]).all():
             #     breakpoint()
         return expected_mags
-
-    def band_log_likelihood(self, expected_mags):
+    
+    def band_log_likelihood(self, expected_mags, obs_error):
         minus_chisquare_total = 0.0
         gaussprob_total = 0.0
-        for filt in self.observed_filters:
-            systematic_em_err = self.compute_em_err(filt, self.light_curve_times[filt])
-            data_sigma = np.sqrt(self.light_curve_uncertainties[filt]**2 + systematic_em_err**2)
+        for filt, err in obs_error.items():
+            data_sigma = np.sqrt(self.light_curve_uncertainties[filt]**2 + err**2)
             minus_chisquare, gaussprob = self.chisquare_gaussianlog_from_lc_data( 
-                expected_mags[filt], self.light_curves[filt] , data_sigma,  systematic_em_err, 
+                expected_mags[filt], self.light_curves[filt] , data_sigma,  err, 
                 lim=self.detection_limit[filt]
             )
             if (minus_chisquare is False):
-                #this should only be the case if also (self.parameters['timeshift'] <= self.light_curve_times[filt][0] ):
+                #this should only be the case if also (parameters['timeshift'] <= self.light_curve_times[filt][0] ):
                 return np.nan_to_num(-np.inf)
             else:
                 minus_chisquare_total+=minus_chisquare
