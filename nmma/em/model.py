@@ -386,7 +386,9 @@ class FiestaModel(LightCurveModelContainer):
                 print(f"Parameter {key} not found in priors, might fail.")
 
     def combine_lc_params(self, parameters):
-        # Fiesta takes care of this internally
+        parameters['redshift'] = self.redshift
+        parameters['luminosity_distance'] = self.luminosity_distance
+        parameters['timeshift'] = self.timeshift
         return parameters
 
     def gen_detector_lc(self, parameters = None, sample_times=None):
@@ -1100,6 +1102,19 @@ class CombinedLightCurveModelContainer:
     @property
     def good_parameters(self):
         return True if all(lc_model.good_parameters for lc_model in self.lc_models) else False
+    
+    @property
+    def sampled_parameters(self):
+        sampled_params = {}
+        for lc_model in self.lc_models:
+            sampled_params.update(lc_model.sampled_parameters)
+        return sampled_params
+    
+    @sampled_parameters.setter
+    def sampled_parameters(self, value):
+        for lc_model in self.lc_models:
+            lc_model.sampled_parameters = value
+
         
     def parameter_conversion(self, parameters):
         for lc_model in self.lc_models:
