@@ -1,11 +1,11 @@
 future
-bilby>=2.7.0
-bilby_pipe>=1.4.0
+bilby>=2.7.1
+bilby_pipe>=1.7.0
 schwimmbad
 colorcet
 numpy>=2.0
 matplotlib>=3.8
-scipy>=1.10
+scipy>=1.15
 pandas>=2.0
 astropy>=6.0
 pymultinest

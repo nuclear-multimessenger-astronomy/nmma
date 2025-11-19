@@ -105,7 +105,6 @@ In order to prepare the joint inference, a `config.ini` file is required which s
     em-error=1
     em-tstep=0.1
     em-interpolation-type=sklearn_gp
-    grb-resolution=12
     
     ################################################################################
     ## EOS arguments

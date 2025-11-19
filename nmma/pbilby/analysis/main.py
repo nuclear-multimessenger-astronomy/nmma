@@ -27,7 +27,6 @@ def analysis_runner(
     nlive=5,
     bound="live",
     walks=100,
-    proposals=None,
     maxmcmc=5000,
     naccept=60,
     nact=2,
@@ -39,8 +38,7 @@ def analysis_runner(
     rejection_sample_posterior=True,
     #
     check_point_deltaT=3600,
-    n_effective=np.inf,
-    dlogz=10,
+    dlogz=0.1,
     save_bounds=False,
     n_check_point=1000,
     max_its=1e10,
@@ -95,21 +93,11 @@ def analysis_runner(
                 facc=facc,
                 min_eff=min_eff,
                 enlarge=enlarge,
-                sampling_seed=sampling_seed,
-                proposals=proposals,
+                sampling_seed=sampling_seed
             )
-            logger.info(f"sampling_keys={run.sampling_keys}")
-            if run.periodic:
-                logger.info(
-                    f"Periodic keys: {[run.sampling_keys[ii] for ii in run.periodic]}"
-                )
-            if run.reflective:
-                logger.info(
-                    f"Reflective keys: {[run.sampling_keys[ii] for ii in run.reflective]}"
-                )
             logger.info("Using priors:")
-            for key in worker_run.priors:
-                logger.info(f"{key}: {worker_run.priors[key]}")
+            for k, p in worker_run.priors.items():
+                logger.info(f"{k}: {p}")
 
             resume_file = f"{run.outdir}/{run.label}_checkpoint_resume.pickle"
             samples_file= f"{run.outdir}/{run.label}_samples.parquet"
@@ -118,11 +106,9 @@ def analysis_runner(
             if sampler is False:
                 logger.info(f"Initializing sampling points with pool size={POOL_SIZE}")
                 live_points = run.get_initial_points_from_prior(pool)
-                logger.info(
-                    f"Initialize NestedSampler with "
-                    f"{json.dumps(run.init_sampler_kwargs, indent=1, sort_keys=True)}"
-                )
-                sampler = run.get_nested_sampler(live_points, pool, POOL_SIZE)
+                logger.info(f"init_kwargs:  {run.init_sampler_kwargs}")
+                logger.info( f"Initialize NestedSampler with {run.init_sampler_kwargs}")
+                sampler = run.get_nested_sampler(live_points, pool)
             else:
                 # Reinstate the pool and map (not saved in the pickle)
                 logger.info(f"Read in resume file with sampling_time = {sampling_time}")
@@ -136,28 +122,25 @@ def analysis_runner(
                 f"and check_point_deltaT={check_point_deltaT}"
             )
 
-            sampler_kwargs = dict(
-                n_effective=n_effective,
-                dlogz=dlogz,
-                save_bounds=save_bounds,
-            )
-            logger.info(f"Run criteria: {json.dumps(sampler_kwargs)}")
-
             run_time = 0
             early_stop = False
             
-            #FIXME
             ## graceful handling of preemptive shutdowns
             def handle_sigterm(signum, frame):
                 logger.info("Received SIGTERM, writing checkpoint and exiting.")
-                pool.abort()
                 ## no time for plotting when file_size becomes larger
-                pb_utils.checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot=False)
+                pb_utils.checkpointing(run, sampler, resume_file, samples_file, 
+                                       sampling_time, checkpoint_plot=False)
+                pool.close()
+                pool.wait()
                 logger.info("Exited gracefully.")
                 sys.exit(0)
 
             signal.signal(signal.SIGTERM, handle_sigterm)
-            signal.signal(signal.SIGINT, handle_sigterm)
+            signal.signal(signal.SIGINT , handle_sigterm)
+
+            sampler_kwargs = dict(dlogz=dlogz, save_bounds=save_bounds)
+            logger.info(f"Run criteria: {json.dumps(sampler_kwargs)}")
 
             for it, res in enumerate(sampler.sample(**sampler_kwargs)):
                 pb_utils.stdout_sampling_log(
@@ -237,7 +220,7 @@ def analysis_runner(
                     "Generating posterior from marginalized parameters for"
                     f" nsamples={len(result.posterior)}"
                 )
-                result.posterior, _ = worker_run.parameter_conversion.convert_to_multimessenger_parameters(result.posterior)
+                result.posterior, _ = worker_run.likelihood.parameter_conversion(result.posterior)
 
                 logger.debug(
                     "Updating prior to the actual prior (undoing marginalization)"

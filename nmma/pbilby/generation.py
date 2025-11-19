@@ -11,6 +11,7 @@ import pickle
 from argparse import Namespace
 
 import bilby
+from bilby.core.prior import DeltaFunction
 import bilby_pipe
 import bilby_pipe.data_generation
 import dynesty
@@ -19,13 +20,15 @@ import numpy as np
 
 
 from . multi_parsing import create_nmma_generation_parser, parse_generation_args
-
+from ..em.prior import extinction_prior
 from ..em.io import load_em_observations
 from ..em.model import create_injection_model
 from ..em.lightcurve_generation import create_light_curve_data
-from ..eos.eos_likelihood import compose_eos_constraints, setup_joint_eos_constraint
+from ..eos.eos_likelihood import compose_eos_constraints, setup_joint_eos_constraint, setup_tabulated_eos_priors
 from ..joint.constants import default_cosmology
+from ..joint.base import adjust_priors_for_nmma, adjust_hubble_prior
 from ..joint.utils import read_trigger_time
+
 
 from .. import __version__
 
@@ -117,7 +120,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
     but are required by bilby_pipe and are set as the default there.
     """
     ###FIXME get rid of compulsory GW structure
-    def __init__(self, args, unknown_args):
+    def __init__(self, args, unknown_args, logger=None):
 
         # nmma-defaults that might conflict with bilby/bilby_pipe defaults
         args.cosmology = getattr(args, "cosmology", default_cosmology.name)
@@ -170,11 +173,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
 
-        # This is done before instantiating the likelihood so that it is the full prior
-        self._priors=self._get_priors()
-        self.priors.to_json(outdir=self.data_directory, label=self.label)
-        self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
-
         ### identify messengers, to be extended
         messengers=[]
         if args.emulator_metadata:
@@ -192,6 +190,10 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         if args.eos_data:
             analysis_modifiers.append('tabulated_eos')
         self.analysis_modifiers= analysis_modifiers
+
+
+        # This is done before instantiating the likelihood so that it is the full prior
+        self.create_priors(args, logger)
 
         self.create_data(args, unknown_args)
 
@@ -244,6 +246,29 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             )
         with open(self.data_dump_file, "wb+") as file:
             pickle.dump(data_dump, file)
+
+    def create_priors(self, args, logger):
+        priors = self._get_priors()
+        priors = adjust_priors_for_nmma(priors, logger)
+        # add the ratio_epsilon in case it is not present (for no-grb case)
+        if "ratio_epsilon" not in priors:
+            priors["ratio_epsilon"] = DeltaFunction(0.01, "ratio_epsilon")
+
+        ###adjust hubble prior if applicable
+        # this may overwrite an existing Hubble prior from adjust_priors_for_nmma
+        priors = adjust_hubble_prior(priors, args, logger)
+
+        if getattr(args, 'em_model', False):
+            priors = extinction_prior(priors, args)
+
+        # construct the eos prior
+        if "tabulated_eos" in self.analysis_modifiers:
+            priors = setup_tabulated_eos_priors(args, priors, logger)
+
+        self._priors = priors
+        self.priors.to_json(outdir=self.data_directory, label=self.label)
+        self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
+        
 
     def create_data(self, args, unknown_args):
         self.data_set = False
@@ -324,7 +349,7 @@ def generate_runner(parser=None, **kwargs):
     for package, version in get_version_info().items():
         logger.info(f"{package} version: {version}")
 
-    inputs = NMMADataGenerationInput(args, [])
+    inputs = NMMADataGenerationInput(args, [], logger)
 
     logger.info(f"Setting sampling-seed={inputs.sampling_seed}")
     logger.info(f"prior-file save at {inputs.prior_file}")

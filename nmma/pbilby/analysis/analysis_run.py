@@ -5,29 +5,17 @@ from glob import glob
 import pickle
 
 import numpy as np
+from numpy.random import Generator, PCG64, SeedSequence
+
 from bilby.core.result import Result
-from bilby.core.sampler.base_sampler import _SamplingContainer
-from bilby.core.sampler.dynesty import DynestySetupError, _set_sampling_kwargs
-from bilby.core.sampler.dynesty_utils import (
-    AcceptanceTrackingRWalk,
-    ACTTrackingRWalk,
-    FixedRWalk,
-    LivePointSampler,
-    MultiEllipsoidLivePointSampler,
-)
+from bilby.core.sampler import dynesty3_utils  as dy_utils
 from bilby.core.utils import logger
 from bilby.core.prior import PriorDict, Constraint
 
 import dynesty
 
 from ...joint.joint_likelihood import setup_nmma_likelihood
-from ...joint.conversion import MultimessengerConversion
-from ...joint.base import adjust_hubble_prior
 from ...joint.utils import reorder_loglikelihoods, rejection_sample, read_bestfit_from_posterior
-from ...em.analysis import post_process_bestfit
-from ...em.prior import extinction_prior
-from ...eos.plotting_routines import plot_eos_vs_constraints
-from ...eos.eos_likelihood import setup_tabulated_eos_priors
 
 
 class MainRun:
@@ -53,19 +41,28 @@ class MainRun:
         facc=0.5,
         min_eff=10,
         enlarge=1.5,
-        sampling_seed=0,
-        proposals=None,
+        sampling_seed=0
     ):
+        
+        # Create a random generator, which is saved across restarts
+        # This ensures that runs are fully deterministic, which is important
+        # for reproducibility
+        self.rstate = Generator(PCG64(sampling_seed))
+        logger.debug(
+            f"Setting random state = {self.rstate} (seed={sampling_seed})"
+        )
         ## Set some basic attributes
         self.sampling_keys = sampling_keys
-        self.ndim = len(sampling_keys)
-        self.maxmcmc = maxmcmc
-        self.nact = nact
-        self.naccept = naccept
-        self.proposals = proposals
+        logger.info(f"sampling_keys={sampling_keys}")
+        if periodic:
+            logger.info(
+                f"Periodic keys: {[sampling_keys[ii] for ii in periodic]}"
+            )
+        if reflective:
+            logger.info(
+                f"Reflective keys: {[sampling_keys[ii] for ii in reflective]}"
+            )
         self.nlive = nlive
-        self.periodic = periodic
-        self.reflective = reflective
         self.args = args
         self.pooled_log_likelihood_function = pooled_log_likelihood_function
         self.pooled_prior_transform_function= pooled_prior_transform_function
@@ -86,96 +83,79 @@ class MainRun:
             label = self.args.label
         self.label = label
 
-        self.init_sampler_kwargs = dict(
-            nlive=nlive,
-            sample=sample,
-            bound=bound,
-            walks=walks,
-            facc=facc,
-            first_update=dict(min_eff=min_eff, min_ncall=2 * nlive),
-            enlarge=enlarge,
+
+        
+        # dynesty3 init kwargs
+        dyn_kwargs = dict(
+        ndim=len(sampling_keys),
+        nlive=nlive,
+        bound=bound,
+        sample=sample,
+        periodic=periodic,
+        reflective=reflective,
+        first_update=dict(min_eff=min_eff, min_ncall=2 * nlive),
+        enlarge=enlarge,
+        walks=walks,
+        facc=facc
         )
 
-        self._set_sampling_method()
+        self._init_sampler_kwargs(dyn_kwargs, nact, naccept, maxmcmc)
 
-        # Create a random generator, which is saved across restarts
-        # This ensures that runs are fully deterministic, which is important
-        # for reproducibility
-        self.sampling_seed = sampling_seed
-        self.rstate = np.random.Generator(np.random.PCG64(self.sampling_seed))
-        logger.debug(
-            f"Setting random state = {self.rstate} (seed={self.sampling_seed})"
+    def _init_sampler_kwargs(self, kwargs,  nact, naccept, maxmcmc):
+        """
+        Stolen from bilby.core.sampler.dynesty to set up the internal sampler kwargs
+        """
+        
+        internal_kwargs = dict(
+            ndim=kwargs['ndim'],
+            nonbounded=None,
+            periodic = kwargs["periodic"],
+            reflective = kwargs["reflective"],
+            maxmcmc = maxmcmc
         )
+        if kwargs["sample"] == "act-walk":
+            internal_kwargs["nact"] = nact
+            kwargs["sample"] = dy_utils.ACTTrackingEnsembleWalk(**internal_kwargs)
+            kwargs["bound"] = "none"
 
-    def _set_sampling_method(self):
+            logger.info(
+                f"Using the bilby-implemented ensemble rwalk sampling tracking the "
+                f"autocorrelation function and thinning by {kwargs['sample'].thin} with "
+                f"maximum length {kwargs['sample'].thin * kwargs['sample'].maxmcmc}."
+            )
 
-        sample = self.init_sampler_kwargs["sample"]
-        bound = self.init_sampler_kwargs["bound"]
+        elif kwargs["sample"] == "acceptance-walk":
+            internal_kwargs["naccept"] = naccept
+            internal_kwargs["walks"] = kwargs["walks"]
+            kwargs["sample"] = dy_utils.EnsembleWalkSampler(**internal_kwargs)
+            kwargs["bound"] = "none"
+            logger.info(
+                f"Using the bilby-implemented ensemble rwalk sampling method with an "
+                f"average of {kwargs['sample'].naccept} accepted steps up to chain "
+                f"length {kwargs['sample'].maxmcmc}."
+            )
 
-        _set_sampling_kwargs((self.nact, self.maxmcmc, self.proposals, self.naccept))
+        elif kwargs["sample"] == "rwalk":
+            internal_kwargs["nact"] = nact
+            kwargs["sample"] = dy_utils.AcceptanceTrackingRWalk(**internal_kwargs)
+            kwargs["bound"] = "none"
+            logger.info(
+                f"Using the bilby-implemented ensemble rwalk sampling method with ACT "
+                f"estimated chain length. An average of {2 * kwargs['sample'].nact} "
+                f"steps will be accepted up to chain length {kwargs['sample'].maxmcmc}."
+            )
 
-        if sample not in ["rwalk", "act-walk", "acceptance-walk"] and bound in [
-            "live",
-            "live-multi",
-        ]:
+        elif kwargs["bound"] == "live":
             logger.info(
                 "Live-point based bound method requested with dynesty sample "
-                f"'{sample}', overwriting to 'multi'"
+                f"'{kwargs['sample']}', overwriting to 'multi'"
             )
-            self.init_sampler_kwargs["bound"] = "multi"
-        elif bound == "live":
-            dynesty.dynamicsampler._SAMPLERS["live"] = LivePointSampler
-        elif bound == "live-multi":
-            dynesty.dynamicsampler._SAMPLERS[
-                "live-multi"
-            ] = MultiEllipsoidLivePointSampler
-        elif sample == "acceptance-walk":
-            raise DynestySetupError(
-                "bound must be set to live or live-multi for sample=acceptance-walk"
-            )
-        elif self.proposals is None:
-            logger.warning(
-                "No proposals specified using dynesty sampling, defaulting "
-                "to 'volumetric'."
-            )
-            self.proposals = ["volumetric"]
-            _SamplingContainer.proposals = self.proposals
-        elif "diff" in self.proposals:
-            raise DynestySetupError(
-                "bound must be set to live or live-multi to use differential "
-                "evolution proposals"
-            )
+            kwargs["bound"] = "multi"
 
-        if sample == "rwalk":
-            logger.info(
-                "Using the bilby-implemented rwalk sample method with ACT estimated walks. "
-                f"An average of {2 * self.nact} steps will be accepted up to chain length "
-                f"{self.maxmcmc}."
-            )
-            if self.init_sampler_kwargs["walks"] > self.maxmcmc:
-                raise DynestySetupError("You have maxmcmc < walks (minimum mcmc)")
-            if self.nact < 1:
-                raise DynestySetupError("Unable to run with nact < 1")
-            dynesty.nestedsamplers._SAMPLING["rwalk"] = AcceptanceTrackingRWalk()
-        elif sample == "acceptance-walk":
-            logger.info(
-                "Using the bilby-implemented rwalk sampling with an average of "
-                f"{self.naccept} accepted steps per MCMC and maximum length {self.maxmcmc}"
-            )
-            dynesty.nestedsamplers._SAMPLING["acceptance-walk"] = FixedRWalk()
-        elif sample == "act-walk":
-            logger.info(
-                "Using the bilby-implemented rwalk sampling tracking the "
-                f"autocorrelation function and thinning by "
-                f"{self.nact} with maximum length {self.nact * self.maxmcmc}"
-            )
-            dynesty.nestedsamplers._SAMPLING["act-walk"] = ACTTrackingRWalk()
-        elif sample == "rwalk_dynesty":
-            sample = sample.strip("_dynesty")
-            self.init_sampler_kwargs["sample"] = sample
-            logger.info(f"Using the dynesty-implemented {sample} sample method")
+        self.init_sampler_kwargs = kwargs
 
-    def get_nested_sampler(self, live_points, pool, pool_size):
+
+    def get_nested_sampler(self, live_points, pool):
         """
         Returns the dynesty nested sampler, getting most arguments
         from the object's attributes
@@ -190,36 +170,22 @@ class MainRun:
             Schwimmbad pool for MPI parallelisation
             (pbilby implements a modified version: MPIPoolFast)
 
-        pool_size: int
-            Number of workers in the pool
 
         Returns
         -------
         dynesty.NestedSampler
 
         """
-        sampler = dynesty.NestedSampler(
+        return dynesty.NestedSampler(
             self.pooled_log_likelihood_function,
             self.pooled_prior_transform_function,
-            self.ndim,
             pool=pool,
-            queue_size=pool_size,
-            periodic=self.periodic,
-            reflective=self.reflective,
             live_points=live_points,
             rstate=self.rstate,
-            use_pool=dict(
-                update_bound=True,
-                propose_point=True,
-                prior_transform=True,
-                loglikelihood=True,
-            ),
             **self.init_sampler_kwargs,
         )
 
-        return sampler
-
-    def get_initial_points_from_prior(self, pool, calculate_likelihood=True):
+    def get_initial_points_from_prior(self, pool):
         """
         Generates a set of initial points, drawn from the prior
 
@@ -227,20 +193,14 @@ class MainRun:
         ----------
         pool: schwimmbad.MPIPool
             Schwimmbad pool for MPI parallelisation
-            (pbilby implements a modified version: MPIPoolFast)
-
-        calculate_likelihood: bool
-            Option to calculate the likelihood for the generated points
-            (default: True)
 
         Returns
         -------
-        (numpy.ndarraym, numpy.ndarray, numpy.ndarray, None)
-            Returns a tuple (unit, theta, logl, blob)
+        (numpy.ndarraym, numpy.ndarray, numpy.ndarray)
+            Returns a tuple (unit, theta, logl) where
             unit: point in the unit cube
-            theta: scaled value
+            theta: scaled value to prior space
             logl: log(likelihood)
-            blob: None
 
         """
         # Create a new rstate for each point, otherwise each task will generate
@@ -248,25 +208,15 @@ class MainRun:
         # The argument to self.rstate.integers() is a very large integer.
         # These rstates aren't used after this map, but each time they are created,
         # a different (but deterministic) seed is used.
-        sg = np.random.SeedSequence(self.rstate.integers(9223372036854775807))
-        map_rstates = [
-            np.random.Generator(np.random.PCG64(n)) for n in sg.spawn(self.nlive)
-        ]
+        seed_gen = SeedSequence(self.rstate.integers(9223372036854775807))
+        rstates = [Generator(PCG64(n)) for n in seed_gen.spawn(self.nlive)]
+        initial_points = pool.map(self.pooled_initial_point_function, rstates)
 
-        args_list = [
-            (
-                calculate_likelihood,
-                map_rstates[i],
-            )
-            for i in range(self.nlive)
-        ]
-        initial_points = pool.map(self.pooled_initial_point_function, args_list)
         u_list = [point[0] for point in initial_points]
         v_list = [point[1] for point in initial_points]
         l_list = [point[2] for point in initial_points]
-        blobs = None
 
-        return np.array(u_list), np.array(v_list), np.array(l_list), blobs
+        return np.array(u_list), np.array(v_list), np.array(l_list)
 
     def format_result(
         self,
@@ -353,7 +303,7 @@ class WorkerRun:
             data_dump,
             bilby_zero_likelihood_mode=False
             ):
-
+        
         ## Load the data dump
         if data_dump is None:
             test_out = os.path.join(os.getcwd(), 'outdir')
@@ -367,30 +317,24 @@ class WorkerRun:
         ## Set properties from the data dump
         self.data_dump = data_dump
         self.args = data_dump["args"]
-        self.messengers= data_dump["messengers"]
-        self.analysis_modifiers = data_dump['analysis_modifiers']
         self.injection_parameters = data_dump.get("injection_parameters", None)
         self.zero_likelihood_mode=bilby_zero_likelihood_mode
 
         ## Set up the priors
-        self.compose_priors( data_dump["prior_file"], self.args, 
-                self.analysis_modifiers, logger
-            )
+        self.compose_priors(data_dump["prior_file"])
 
-
-        self.parameter_conversion=MultimessengerConversion(self.args, self.messengers, self.analysis_modifiers)
-        # priors.conversion_function = param_conv.priors_conversion_function
-
+        ## Set up the likelihood
         logger.setLevel(logging.WARNING)
-        
-        self.likelihood= setup_nmma_likelihood(data_dump,
-            self.priors, self.args, self.messengers,  logger
-            )
-        
+        self.likelihood = setup_nmma_likelihood(data_dump,
+            self.priors, self.args, logger)
         logger.setLevel(logging.INFO)
 
+        check_keys = self.sampling_keys.copy()
+        check_keys.extend(self.fixed_keys)
+        self.likelihood.check_parameter_equivalencies(check_keys)
 
-    def compose_priors(self, prior_file, args, ana_modifiers, logger):
+
+    def compose_priors(self, prior_file):
         """
         Routine to create a bilby-Prior object from a prior-file and to modify it for NMMA
 
@@ -398,8 +342,6 @@ class WorkerRun:
         ----------
         prior_file: str
             The path to the prior-file
-        args: Namespace
-            The parser arguments
 
         Returns
         -------
@@ -407,35 +349,17 @@ class WorkerRun:
             a bilby-Prior object
 
         """
-        priors = PriorDict.from_json(prior_file)
-        # add the ratio_epsilon in case it is not present (for no-grb case)
-        if "ratio_epsilon" not in priors:
-            priors["ratio_epsilon"] = 0.01
-        priors.convert_floats_to_delta_functions()
+        priors=PriorDict.from_json(prior_file)
 
-        ###adjust hubble prior if applicable
-        priors = adjust_hubble_prior(priors, args, logger)
-
-        if getattr(args, 'em_model', False):
-            priors = extinction_prior(priors, args)
-
-        # construct the eos prior
-        if "tabulated_eos" in ana_modifiers:
-            priors = setup_tabulated_eos_priors(args, priors, logger)
-
-        
-        self.priors=priors
-
-        # check prior properties
         sampling_keys = []
         fixed_keys = []
-        for p in priors:
-            if isinstance(priors[p], Constraint):
+        for k, prior in priors.items():
+            if isinstance(prior, Constraint):
                 continue
-            elif priors[p].is_fixed:
-                fixed_keys.append(p)
+            elif prior.is_fixed:
+                fixed_keys.append(k)
             else:
-                sampling_keys.append(p)
+                sampling_keys.append(k)
 
         self.sampling_keys = sampling_keys
         self.ndim = len(sampling_keys)
@@ -459,6 +383,7 @@ class WorkerRun:
         
         self.periodic = periodic
         self.reflective = reflective
+        self.priors = priors
     
 
     def prior_transform_function(self, u_array):
@@ -477,12 +402,6 @@ class WorkerRun:
 
         """
         return self.priors.rescale(self.sampling_keys, u_array)
-    
-    def evaluate_constraints(self, out_sample):
-        for key in self.priors:
-            if isinstance(self.priors[key], Constraint) and key in out_sample and not self.priors[key].prob(out_sample[key]):
-                return False
-        return True
 
 
     def log_likelihood_function(self, v_array):
@@ -504,14 +423,9 @@ class WorkerRun:
             return 0
         parameters = {key: v for key, v in zip(self.sampling_keys, v_array)}
         parameters.update(self.fixed_prior)
-        parameters, local_parameters = self.parameter_conversion.convert_to_multimessenger_parameters(parameters, return_internal=True)
-        if self.evaluate_constraints(parameters):
-            return (
-                self.likelihood.sub_log_likelihood(parameters, local_parameters)
-                - self.likelihood.noise_log_likelihood()
-            )
-        else:
-            return np.nan_to_num(-np.inf)
+        # During sampling, working in likelihood ratio space is preferable
+        # we add the noise log-likelihood later to retrieve the full log-likelihood
+        return self.likelihood.log_likelihood_ratio(parameters)
 
     def log_prior_function(self, v_array):
         """
@@ -535,7 +449,7 @@ class WorkerRun:
 
 
     # @staticmethod
-    def get_initial_point_from_prior(self, args):
+    def get_initial_point_from_prior(self, rstate):
         """
         Draw initial points from the prior subject to constraints applied both to
         the prior and the likelihood.
@@ -545,23 +459,19 @@ class WorkerRun:
         The `log_likelihood_function` often converts infinite values to large
         finite values so we catch those.
         """
-
-        (
-            calculate_likelihood,
-            rstate,
-        ) = args
-        bad_values = [np.inf, np.nan_to_num(np.inf), np.nan]
+        bad_values = [ np.inf, np.nan_to_num(np.inf),
+                      -np.inf, np.nan_to_num(- np.inf), np.nan]
+        
         while True:
             unit = rstate.random(self.ndim)
             theta = self.prior_transform_function(unit)
 
-            if abs(self.log_prior_function(theta)) not in bad_values:
-                if calculate_likelihood:
-                    logl = self.log_likelihood_function(theta)
-                    if abs(logl) not in bad_values:
-                        return unit, theta, logl
-                else:
-                    return unit, theta, np.nan
+            if self.log_prior_function(theta) in bad_values:
+                continue
+            logl = self.log_likelihood_function(theta)
+            if logl in bad_values:
+                continue
+            return unit, theta, logl
                 
     def final_diagnostics(self, result):
 
@@ -571,15 +481,5 @@ class WorkerRun:
         if self.args.plot:
             result.plot_corner()
             bestfit_params = read_bestfit_from_posterior(self.args)
-            for i, msg in enumerate(self.messengers):
-                sub_model = self.likelihood.sub_likelihoods[i].sub_model
-                if msg == 'em':
-                    post_process_bestfit(bestfit_params, sub_model, self.args)
-                elif msg == 'gw':
-                    pass  # FIXME add suitable plotting for gw
-                elif msg == 'eos':
-                    eos_emulator = self.parameter_conversion.tov_emulator
-                    eos_data = eos_emulator.generate_macro_eos(bestfit_params)[0]
-                    plot_eos_vs_constraints(eos_data, sub_model.constraints, 
-                        save_path = os.path.join(
-                            self.args.outdir, f"{self.args.label}_mr_curve.png") )
+            for lhood in self.likelihood.likelihoods:
+                lhood.final_diagnostics(bestfit_params, self.args, result)

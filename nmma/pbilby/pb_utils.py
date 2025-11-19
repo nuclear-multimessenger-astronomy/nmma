@@ -10,7 +10,7 @@ from pandas import DataFrame
 from bilby.core.utils import logger
 from bilby.core.sampler.dynesty import dynesty_stats_plot
 
-import dynesty.plotting as dyplot 
+from dynesty.plotting import traceplot, runplot 
 from dynesty.utils import get_print_fn_args
 
 from ..joint.utils import rejection_sample
@@ -54,43 +54,22 @@ def write_sample_dump(sampler, samples_file, search_parameter_keys, rng):
         df.to_parquet(samples_file, index=False)
 
 @time_storage
-def plot_current_state(sampler, search_parameter_keys, outdir, label):
-    labels = [label.replace("_", " ") for label in search_parameter_keys]
-    try:
-        filename = f"{outdir}/{label}_checkpoint_trace.png"
-        fig = dyplot.traceplot(sampler.results, labels=labels)[0]
-        fig.tight_layout()
-        fig.savefig(filename)
-    except (
-        AssertionError,
-        RuntimeError,
-        np.linalg.linalg.LinAlgError,
-        ValueError,
-    ) as e:
-        logger.warning(e)
-        logger.warning("Failed to create dynesty state plot at checkpoint")
-    finally:
-        plt.close("all")
-    try:
-        filename = f"{outdir}/{label}_checkpoint_run.png"
-        fig, axs = dyplot.runplot(sampler.results, mark_final_live=False)
-        fig.tight_layout()
-        plt.savefig(filename)
-    except (RuntimeError, np.linalg.linalg.LinAlgError, ValueError) as e:
-        logger.warning(e)
-        logger.warning("Failed to create dynesty run plot at checkpoint")
-    finally:
-        plt.close("all")
-    try:
-        filename = f"{outdir}/{label}_checkpoint_stats.png"
-        fig, _ = dynesty_stats_plot(sampler)
-        fig.tight_layout()
-        plt.savefig(filename)
-    except (RuntimeError, ValueError) as e:
-        logger.warning(e)
-        logger.warning("Failed to create dynesty stats plot at checkpoint")
-    finally:
-        plt.close("all")
+def plot_current_state(sampler, outdir, label):
+    # labels = [label.replace("_", " ") for label in search_parameter_keys]
+    for name, func in zip (
+        ["trace", "run", "stats"],
+        [traceplot, runplot, dynesty_stats_plot]):
+
+        try: 
+            fig, _ = func(sampler.results)
+            fig.tight_layout()
+            fig.savefig(f"{outdir}/{label}_checkpoint_{name}.png")
+
+        except Exception as e:
+            logger.warning(e)
+            logger.warning(f"Failed to create dynesty {name} plot at checkpoint")
+        finally:
+            plt.close("all")
 
 
 @time_storage
@@ -118,10 +97,9 @@ def write_current_state(sampler, resume_file, sampling_time):
     except FileNotFoundError:
         logger.info("Start checkpoint writing" + " (no previous checkpoint)")
 
-    sampler.kwargs["sampling_time"] = sampling_time
 
-    # Get random state and package it into the resume object
-    sampler.kwargs["random_state"] = sampler.rstate.bit_generator.state
+    sampler.resume_kwargs = {"sampling_time" : sampling_time,
+        "bitgen_state" : sampler.rstate.bit_generator.state}
 
     if dill.pickles(sampler):
         temp_filename = resume_file + ".temp"
@@ -129,13 +107,12 @@ def write_current_state(sampler, resume_file, sampling_time):
             with BufferedWriter(file) as buffer:
                 dill.dump(sampler, buffer, protocol=dill.HIGHEST_PROTOCOL)
         os.rename(temp_filename, resume_file)
-
         logger.info(f"Written checkpoint file {resume_file}")
     else:
         logger.warning("Cannot write pickle resume file!")
 
     # Delete the random state so that the object is unchanged
-    del sampler.kwargs["random_state"]
+    del sampler.resume_kwargs
 
 
 def read_saved_state(resume_file):
@@ -167,13 +144,15 @@ def read_saved_state(resume_file):
             if sampler.added_live:
                 sampler._remove_live_points()
 
-            # Create random number generator and restore state
-            # from file, then remove it from kwargs because it
-            # is not useful after the generator has been cycled
-            sampler.rstate = np.random.Generator(np.random.PCG64())
-            sampler.rstate.bit_generator.state = sampler.kwargs.pop("random_state")
-
-            sampling_time = sampler.kwargs.pop("sampling_time")
+            resume_kwargs = sampler.resume_kwargs
+            bitgen = np.random.PCG64()
+            try:
+                bitgen.state = resume_kwargs["bitgen_state"] 
+            except KeyError:
+                bitgen.state = resume_kwargs["rstate_props"]
+            sampler.rstate = np.random.Generator(bitgen)
+            sampling_time = resume_kwargs.pop("sampling_time")
+            del sampler.resume_kwargs
         return sampler, sampling_time
     else:
         logger.info(f"Resume file {resume_file} does not exist.")
@@ -184,4 +163,4 @@ def checkpointing( run, sampler, resume_file, samples_file, sampling_time, check
     write_current_state(sampler, resume_file, sampling_time )
     write_sample_dump(sampler, samples_file, run.sampling_keys, run.rstate)
     if checkpoint_plot:
-        plot_current_state(sampler, run.sampling_keys, run.outdir, run.label)
+        plot_current_state(sampler, run.outdir, run.label)

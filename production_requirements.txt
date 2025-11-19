@@ -2,3 +2,4 @@ nestcheck
 mpi4py
 pyarrow
 parquet
+dynesty>=3.0.0
