@@ -26,12 +26,14 @@ def setup_eos_generator(args):
         return LECEoSGenerator(meta_dict)
     elif eos_model_type == 'lec-7':
         return LEC7EoSGenerator(meta_dict)
+    elif eos_model_type == 'lec-13':
+        return LEC13EoSGenerator(meta_dict)
     ## add more models
     else:
         raise ValueError(f"Unknown eos model type: {eos_model_type}")
 
 class EoSGenerator:
-    def __init__(self, emulator_path, eos_parameters=None):
+    def __init__(self, emulator_path, eos_parameters=None, n_mass_samples = 30):
         
         # load the emulator
         try:
@@ -58,6 +60,8 @@ class EoSGenerator:
             self.eos_parameters = self.identify_eos_parameters()
         else:
             self.eos_parameters = eos_parameters
+        
+        self.set_mass_construction(n_mass_samples) 
 
     
     def pickle_predict(self, x):
@@ -68,6 +72,21 @@ class EoSGenerator:
 
     def tensorflow_predict(self, x):
         return self.emulator(x)
+
+    
+    def set_mass_construction(self, n_mass_samples):
+            
+        self.n_mass_samples = n_mass_samples
+        self.decompose_mass_data = self.equal_distance_masses
+
+    def equal_distance_masses(self, mtov):
+        "Get mass array(s) from 1 to mtov of length n_mass_samples"
+        mass_range= np.linspace(1, mtov, self.n_mass_samples, axis =-1)
+        try: 
+            mass_range = np.squeeze(mass_range, axis=1)
+        except ValueError:
+            pass
+        return mass_range
 
 
     
@@ -175,7 +194,7 @@ class LECEoSGenerator(EoSGenerator):
         self.radius_emulator= joblib.load(metadata['radius_emulator'])
         self.lambda_emulator= joblib.load(metadata['lambda_emulator'])
 
-        self.n_mass_samples = metadata.get('n_mass_samples', 30)
+        self.set_mass_construction(metadata.get('n_mass_samples', 30))
         self.eos_parameters = self.identify_eos_parameters()
         
     def predict(self, converted_parameters):
@@ -187,40 +206,38 @@ class LECEoSGenerator(EoSGenerator):
         radius_prediction = self.radius_emulator.predict(scaled_features)
         lambda_prediction = self.lambda_emulator.predict(scaled_features)
 
-        # Inverse transform the predictions
-        radius_prediction = self.radius_scaler.inverse_transform(radius_prediction)
-        lambda_prediction = self.lambda_scaler.inverse_transform(lambda_prediction)
 
         return (mass_prediction, radius_prediction, lambda_prediction)
     
 
-    def assemble_eos_params(self, converted_parameters):
-        """Assemble the parameters for the EoS model into a 2D-array for the emulator"""
-        eos_params = np.array([
-            converted_parameters[par] + converted_parameters.get(f"{par}_shift", 0)
-            for par in self.eos_parameters
-        ]).T
-        return np.atleast_2d(eos_params)
+    # def assemble_eos_params(self, converted_parameters):
+    #     """Assemble the parameters for the EoS model into a 2D-array for the emulator"""
+    #     eos_params = np.array([
+    #         converted_parameters[par] + converted_parameters.get(f"{par}_shift", 0)
+    #         for par in self.eos_parameters
+    #     ]).T
+    #     return np.atleast_2d(eos_params)
     
-    def equal_distance_masses(self, mtov):
-        "Get mass array(s) from 1 to mtov of length n_mass_samples"
-        mass_range= np.linspace(1, mtov, self.n_mass_samples, axis =-1)
-        try: 
-            mass_range = np.squeeze(mass_range, axis=1)
-        except ValueError:
-            pass
-        return mass_range
     
     def adjust_format(self, predictions):
         mass_data, rad_data, lam_data = predictions
-        return np.stack([rad_data, mass_data, 10**lam_data], axis=1)
+
+        # Inverse transform the predictions
+        mass_array = self.decompose_mass_data(mass_data)
+        radius_array = self.radius_scaler.inverse_transform(rad_data)
+        lambda_array = self.lambda_scaler.inverse_transform(lam_data)
+        return np.stack([radius_array, mass_array, 10**lambda_array], axis=1)
     
 class LEC7EoSGenerator(LECEoSGenerator):
     def identify_eos_parameters(self):
         return ['d11', 'd22', 'd3', 'd4', 'd6', 'd7']
-    
-    
 
+class LEC13EoSGenerator(LECEoSGenerator):
+    def identify_eos_parameters(self):
+        return ['d11', 'd22', 'd3', 'd4', 'd6', 'd7', 
+                'ksat','qsat', 'zsat', 
+                'cssq1', 'cssq2', 'cssq3', 'cssq4']
+    
 def load_eos_files(eos_data, Neos):
     if isinstance(eos_data, str):
         eos_data = sorted(glob(os.path.join(eos_data, "*.dat")))

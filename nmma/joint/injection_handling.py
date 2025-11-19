@@ -68,7 +68,10 @@ class NMMAInjectionCreator(InjectionCreator):
 
             # we need to be able to do a parameter conversion
             messengers, modifiers = self.determine_conversion_from_args(args)
-            self.param_conversion = MultimessengerConversion(args, messengers, modifiers)
+            internal_conversions = {}
+            if 'em' in messengers:
+                internal_conversions['em'] = self.lc_model.parameter_conversion
+            self.param_conversion = MultimessengerConversion(args, messengers, modifiers, internal_conversions)
 
             self.original_parameters = args.original_parameters
 
@@ -121,7 +124,6 @@ class NMMAInjectionCreator(InjectionCreator):
         # eos conversion:
         if args.eos_file:
             modifiers.append('tabulated_eos')
-            args.eos_to_ram = True
         elif args.micro_eos_model:
             messengers.append('eos') 
         return messengers, modifiers

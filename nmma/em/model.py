@@ -1,5 +1,3 @@
-from __future__ import division
-
 import os
 from copy import copy
 import joblib
@@ -161,18 +159,18 @@ class LightCurveModelContainer:
     ----------
     model: str
         Name of the model
-    model_parameters: list, None
-        list of alternative model parameters, if not specified default will be used.
     filters : List[str]
         List of filters to create model for.
         Defaults to all available filters.
+    model_parameters: list, None
+        list of alternative model parameters, if not specified default will be used.
     sample_times: array_like, optional
         Times at which to sample the light curve. If None, sets model default.
 
     Returns
     -------
-    LightCurveModel: `nmma.em.model.SVDLightCurveModel`
-        A light curve model object to evaluate the light curve
+    LightCurveModel: `nmma.em.model.LightCurveModelContainer`
+        A light curve model object to compute light curves
         from a set of parameters
     """
 
@@ -198,6 +196,7 @@ class LightCurveModelContainer:
         self.filters = filters
         self.default_filts, self.lambdas = utils.get_default_filts_lambdas(self.filters)
         self.nu_0s = c_SI / self.lambdas
+        self.good_parameters = True
 
         # sample times are used as nodes to generate the light curve, 
         # characterising the model's validity range and the resolution
@@ -220,37 +219,56 @@ class LightCurveModelContainer:
                 print(f"Parameter {key} not found in priors, might fail.")
 
     def sanity_checks(self, parameters):
-        return True
+        self.good_parameters = True
         
-    def em_parameter_setup(self, parameters):
-        new_parameters = parameters.copy()
-        new_parameters = observation_angle_conversion(new_parameters)
+    def parameter_conversion(self, parameters):
+        """Do necessary parameter conversions for the EM model.
+        This is done on the prior-level to work with bilby Constraints."""
 
-        param_dict = {}
+        new_parameters = observation_angle_conversion(parameters)
         for key in self.model_parameters:
-            try:
-                param_dict[key] = new_parameters[key]
-            except KeyError:
+            if key not in new_parameters:
                 if key.lstrip('log10_') in new_parameters.keys():
-                    param_dict[key] = np.log10(new_parameters[key.lstrip('log10_')])
+                    new_parameters[key] = np.log10(new_parameters[key.lstrip('log10_')])
                 elif "log10_"+key in new_parameters.keys():
-                    param_dict[key] = 10**new_parameters["log10_"+key]
+                    new_parameters[key] = 10**new_parameters["log10_"+key]
                 else:
                     pass ## Unclean fix, allows later addition of required params
-        
+        self.sampled_parameters = copy(new_parameters)
+
+        self.sanity_checks(new_parameters)
+        return new_parameters
+
+    def em_parameter_setup(self, parameters, combine_params=True):
         # read here, but used later for correction that is observation-dependent
-        self.Ebv = new_parameters.get("Ebv", 0.0)
-        d_lum = new_parameters.get("luminosity_distance", 1e-5) ## default 10pc = 1e-5 Mpc
-        self.distmod = distance_modulus_nmma(d_lum) ## default 10pc = 1e-5 Mpc
-        param_dict['luminosity_distance'] = d_lum
-        self.timeshift = new_parameters.get('timeshift', 0.)
+        self.Ebv = parameters.get("Ebv", 0.0)
+        self.luminosity_distance = parameters.get("luminosity_distance", 1e-5) ## default 10pc = 1e-5 Mpc
+        self.distmod = distance_modulus_nmma(self.luminosity_distance) ## default 10pc = 1e-5 Mpc
+        self.timeshift = parameters.get('timeshift', 0.)
         
         # redshift computation can be expensive, so we only do it 
         # once and store it for conversion to detector frame
-        self.redshift = get_redshift(new_parameters)
-        param_dict['redshift'] = self.redshift
+        self.redshift = get_redshift(parameters)
+        if combine_params:
+            return self.combine_lc_params(parameters)
 
-        return param_dict
+    def combine_lc_params(self, parameters):
+        """Extract the light curve parameters in the necessary format.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Combined light curve parameters.
+        """
+        return {
+            key: parameters[key] if key in parameters else getattr(self, key)
+            for key in self.model_parameters
+        }
 
     def get_extinction_mags(self, redshift=None, Ebv=None):
         if redshift is None:
@@ -273,13 +291,13 @@ class LightCurveModelContainer:
                 continue
         return mag  
     
-    def gen_detector_lc(self, parameters, sample_times=None):
+    def gen_detector_lc(self, parameters = None, sample_times=None):
         """Generate a light curve for given parameter as observable in detector frame.
 
         Parameters
         ----------
         parameters: dict
-            Parameters of the light curve model.
+            Parameters of the light curve model. If None, uses self.sampled_parameters, assuming that this was set in parameters conversion
         filters: str or list of str, optional
             Filters to use for the light curve. Defaults to 'all'.
 
@@ -290,6 +308,8 @@ class LightCurveModelContainer:
         """
         if sample_times is None:
             sample_times = self.model_times
+        if parameters is None:
+            parameters = self.sampled_parameters
                     
         model_lc = self.generate_lightcurve(sample_times, parameters)
 
@@ -365,7 +385,11 @@ class FiestaModel(LightCurveModelContainer):
             except KeyError:
                 print(f"Parameter {key} not found in priors, might fail.")
 
-    def gen_detector_lc(self, parameters, sample_times=None):
+    def combine_lc_params(self, parameters):
+        # Fiesta takes care of this internally
+        return parameters
+
+    def gen_detector_lc(self, parameters = None, sample_times=None):
         """Generate a light curve for given parameter as observable in detector frame.
         Parameters
         ----------
@@ -373,21 +397,22 @@ class FiestaModel(LightCurveModelContainer):
             Parameters of the light curve model.
         sample_times: Unused, included for compatibility with other Models."""
         # convert the parameters to the fiesta model parameters
-        new_parameters = self.em_parameter_setup(parameters)
-        
-        if not self.sanity_checks(new_parameters):
+        if parameters is None:
+            parameters = self.sampled_parameters
+        parameters = self.em_parameter_setup(parameters)
+        if self.good_parameters:
+            # generate the light curve using fiesta
+            time_range, mag = self.fiesta_model.predict(parameters)
+
+            # apply the extinction correction
+            ext_mag = self.get_extinction_mags()
+            obs_mags = self.apply_extinction_correction(mag, ext_mag, self.default_filts)
+            
+            # we are in observer frame, but still need to add the timeshift
+            #time_range = is in jax-specific format that we need to convert
+            return (np.array(time_range) + self.timeshift, obs_mags)
+        else:
             return self.fiesta_model.times, {}
-
-        # generate the light curve using fiesta
-        time_range, mag = self.fiesta_model.predict(parameters)
-
-        # apply the extinction correction
-        ext_mag = self.get_extinction_mags()
-        obs_mags = self.apply_extinction_correction(mag, ext_mag, self.default_filts)
-        
-        # we are in observer frame, but still need to add the timeshift
-        #time_range = is in jax-specific format that we need to convert
-        return (np.array(time_range) + self.timeshift, obs_mags)
     
     
     def generate_lightcurve(self, sample_times, parameters):
@@ -441,8 +466,7 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
 
     def generate_lightcurve(self, sample_times, parameters):
         new_parameters = self.em_parameter_setup(parameters)
-        lbol = self.lc_func(sample_times, new_parameters)
-        return lbol
+        return self.lc_func(sample_times, new_parameters)
 
 
 class SVDLightCurveModel(LightCurveModelContainer):
@@ -594,10 +618,10 @@ class SVDLightCurveModel(LightCurveModelContainer):
     def __repr__(self):
         return super().__repr__() + f"(model={self.model}, svd_path={self.svd_path})"
     
-    def em_parameter_setup(self, parameters):
-        param_dict = super().em_parameter_setup(parameters)
-        return [param_dict[key] for key in self.model_parameters]
-
+    def combine_lc_params(self, parameters):
+        return [parameters[key] if key in parameters else getattr(self, key)
+                for key in self.model_parameters]
+    
     def generate_lightcurve(self, sample_times, parameters, filters = 'all'):
         parameters_list = self.em_parameter_setup(parameters)
         # parameters_list.append(param_dict["redshift"])
@@ -658,8 +682,38 @@ class FiestaKilonovaModel(FiestaModel):
 
         super().__init__(fiesta_model, filters, sample_times=kwargs.get('sample_times', None))
 
+class GRBMixin:
+    def __init__(self, *args, resolution=12, **kwargs):
+        self.resolution = resolution
+        super().__init__(*args, **kwargs)
 
-class FiestaGRBModel(FiestaModel):
+    def parameter_conversion(self, parameters):
+               
+        # it is beneficial to sample the ratio of angles alpha instead of checking later whether this can be resolved
+        try:
+            #FIXME We should get rid of the resolution attribute and only use alphaWing
+            self.resolution = parameters["alphaWing"] + 1e-10 # to avoid precision issues 
+            parameters["thetaWing"] = parameters["alphaWing"] * parameters['thetaCore']
+        except KeyError:
+            parameters["thetaWing"] = parameters["thetaWing"]
+
+        try:
+            parameters['epsilon_tot'] = parameters['epsilon_e'] + parameters['epsilon_B']
+        except KeyError:
+            parameters['epsilon_tot'] = 10**parameters['log10_epsilon_e'] + 10**parameters['log10_epsilon_B']
+        new_parameters =super().parameter_conversion(parameters)
+        return new_parameters
+    
+    def sanity_checks(self, parameters):
+        """Perform sanity checks on the GRB parameters."""
+        self.good_parameters = (
+            parameters["thetaWing"] <= np.pi / 2
+            and (parameters["thetaWing"] / parameters["thetaCore"] <= self.resolution)
+            and (parameters["thetaCore"] > np.pi / 1800.)
+            and (parameters['epsilon_tot'] <= 1.0)
+        )
+    
+class FiestaGRBModel(GRBMixin,FiestaModel):
     """A light curve model object for GRB light curves using fiesta
 
     An object to evaluate the GRB light curve across filters
@@ -691,36 +745,8 @@ class FiestaGRBModel(FiestaModel):
 
         super().__init__(fiesta_model, filters, sample_times=kwargs.get('sample_times', None))
 
-    def em_parameter_setup(self, parameters):
-        new_parameters =super().em_parameter_setup(parameters)
-        try:
-            new_parameters["thetaWing"] = new_parameters["alphaWing"] * new_parameters['thetaCore']
-        except KeyError:
-            new_parameters["thetaWing"] = new_parameters["thetaWing"]
-
-        try:
-            new_parameters['epsilon_tot'] = new_parameters['epsilon_e'] + new_parameters['epsilon_B']
-        except KeyError:
-            new_parameters['epsilon_tot'] = 10**new_parameters['log10_epsilon_e'] + 10**new_parameters['log10_epsilon_B']
-
-        return new_parameters
     
-    def sanity_checks(self, fiesta_parameters):
-        """Perform sanity checks on the GRB parameters."""
-        if fiesta_parameters["thetaWing"] > np.pi / 2:
-            return False
-        
-        # core opening angle must be greater than 0.1 degree for proper integration
-        if fiesta_parameters["thetaCore"] < np.pi / 1800.:
-            return False
-
-        if fiesta_parameters['epsilon_tot'] > 1.0:
-            return False
-        
-        return True
-
-
-class GRBLightCurveModel(LightCurveModelContainer):
+class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
     """A light curve model object for GRB light curves using afterglowpy
 
     An object to evaluate the GRB light curve across filters
@@ -754,8 +780,7 @@ class GRBLightCurveModel(LightCurveModelContainer):
         filters=None,
         sample_times=None,
     ):
-        super().__init__(model, filters, model_parameters, sample_times)
-        self.resolution = resolution
+        super().__init__(model, filters, model_parameters, sample_times, resolution=resolution)
         self.jet_type = jet_type
         self.default_parameters = {"xi_N": 1.0, "d_L": 3.086e19, "jetType": jet_type, "specType": 0}  # d_L=10pc in cm
         self.def_keys = self.default_parameters.keys()
@@ -770,7 +795,7 @@ class GRBLightCurveModel(LightCurveModelContainer):
         tmax = 200  # maximum time in days
         nsteps = 201  # number of time steps
         return np.geomspace(tmin, tmax, nsteps)
-    
+        
     def em_parameter_setup(self, parameters):
         
         ## set on first call
@@ -782,67 +807,37 @@ class GRBLightCurveModel(LightCurveModelContainer):
             else: #case 2
                 self.flux_func = lc_gen.flux_density_on_time_array
 
-        new_parameters = super().em_parameter_setup(parameters)
+        super().em_parameter_setup(parameters, combine_params=False)
 
         # set the default parameters, preferentially from sampling
-        grb_param_dict = {k: new_parameters.get(k, self.default_parameters[k]) for k in self.def_keys}
+        grb_param_dict = {k: parameters.get(k, self.default_parameters[k]) for k in self.def_keys}
 
-        grb_param_dict["z"] = new_parameters['redshift']
-        grb_param_dict["thetaObs"] = new_parameters["inclination_EM"]# energy handling
+        grb_param_dict["z"] = self.redshift
+        grb_param_dict["thetaObs"] = parameters["inclination_EM"]# afterglowpy uses viewing angle in rad!
 
         for key in self.log_sampling_keys:
             try:
-                grb_param_dict[key] = new_parameters[key]
+                grb_param_dict[key] = parameters[key]
             except KeyError:
-                grb_param_dict[key] = 10 ** new_parameters[f"log10_{key}"]
-
-        # it is beneficial to sample the ratio of angles alpha instead of checking later whether this can be resolved        
-        try:
-            grb_param_dict["thetaWing"] = new_parameters["alphaWing"] * new_parameters['thetaCore']
-        except KeyError:
-            grb_param_dict["thetaWing"] = new_parameters["thetaWing"]
-
-        try:
-            grb_param_dict['epsilon_tot'] = new_parameters['epsilon_e'] + new_parameters['epsilon_B']
-        except KeyError:
-            grb_param_dict['epsilon_tot'] = 10**new_parameters['log10_epsilon_e'] + 10**new_parameters['log10_epsilon_B']
+                grb_param_dict[key] = 10 ** parameters[f"log10_{key}"]
 
         # make sure L0, q and ts are also passed
-        for param in ["thetaCore","p", 'L0', 'q', 'ts']:
+        for param in ["thetaCore","thetaWing", "p", 'L0', 'q', 'ts']:
             try:
-                grb_param_dict[param] = new_parameters[param]
+                grb_param_dict[param] = parameters[param]
             except KeyError:
                 pass
 
-        if self.jet_type == 1 or self.jet_type == 4:
-            grb_param_dict["b"] = new_parameters["b"]
+        if grb_param_dict['jetType'] in [1, 4]:
+            grb_param_dict["b"] = parameters["b"]
         return grb_param_dict
     
-    def sanity_checks(self, grb_param_dict):
-        """Perform sanity checks on the GRB parameters."""
-        if "thetaWing" in grb_param_dict.keys():
-            if grb_param_dict["thetaWing"] > np.pi / 2:
-                return False
-            elif grb_param_dict["thetaWing"] / grb_param_dict["thetaCore"] > self.resolution:
-                return False
-        
-        # core opening angle must be greater than 0.1 degree for proper integration
-        if grb_param_dict["thetaCore"] < np.pi / 1800.:
-            return False
-
-        if grb_param_dict.pop('epsilon_tot') > 1.0:
-            return False
-        
-        return True
 
     def generate_lightcurve(self, sample_times, parameters):
         grb_param_dict = self.em_parameter_setup(parameters)
 
         #sanity checks
-        if not self.sanity_checks(grb_param_dict):
-            return {}
-        
-        return lc_gen.afterglowpy_lc(
+        return {} if not self.good_parameters else  lc_gen.afterglowpy_lc(
             sample_times, grb_param_dict, filters=self.default_filts, 
             obs_frequencies= self.nu_0s, flux_func= self.flux_func
         )
@@ -930,23 +925,22 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         super().__init__(model, filters, model_parameters, sample_times)
 
     def em_parameter_setup(self, parameters):
-        new_parameters = super().em_parameter_setup(parameters)
+        lc_pars = super().em_parameter_setup(parameters)
+        self.sn_model.set(**lc_pars)
 
-        new_parameters["supernova_mag_stretch"] = parameters.get('supernova_mag_stretch', 1.)
-        new_parameters["t0"] = new_parameters.get("t0", 0.)
-        new_parameters["z"] = new_parameters.get("z", self.redshift)
-
-        return new_parameters
+    def combine_lc_params(self, parameters):
+        # FIXME: This should probably be removed, use sncosmo parameters instead
+        self.stretch = parameters.get('supernova_mag_stretch', 1.)
+        parameters["t0"] = parameters.get("t0", 0.)
+        parameters["z"] = self.redshift
+        return {p: parameters.get(p, self.sn_model.get(p)) 
+                for p in self.model_parameters}
 
     def generate_lightcurve(self, sample_times, parameters):
-        em_param_dict = self.em_parameter_setup(parameters)
+        self.em_parameter_setup(parameters)
 
-        # FIXME: This should probably be removed, use sncosmo parameters instead
-        stretch = em_param_dict["supernova_mag_stretch"]
 
-        lc_pars = {p: em_param_dict.get(p, self.sn_model.get(p)) for p in self.model_parameters}
-        self.sn_model.set(**lc_pars)
-        mag = lc_gen.sn_lc(sample_times / stretch, self.sn_model, 
+        mag = lc_gen.sn_lc(sample_times / self.stretch, self.sn_model, 
                            self.default_filts, self.lambdas)
         
         return {filt: filt_mag for filt, filt_mag in mag.items()}
@@ -994,7 +988,7 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
             filters = self.default_filts
         lbol, Rs = lc_gen.sc_bol_lc(sample_times, lc_param_dict, compute_Rs=True)
 
-        nu_host = self.nu_0s * (1 + lc_param_dict['redshift'])  # convert to host frame
+        nu_host = self.nu_0s * (1 + self.redshift)  # convert to host frame
         return lc_gen.sc_lc(lbol, Rs, nu_host, filters)
 
 
@@ -1040,7 +1034,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         param_dict = self.em_parameter_setup(parameters)
         param_dict['distance_modulus'] = self.distmod
 
-        nu_host = self.nu_0s * (1 + param_dict['redshift'])  # convert to host frame
+        nu_host = self.nu_0s * (1 + self.redshift)  # convert to host frame
         # prevent the output message flooded by these warning messages
         old = np.seterr()
         np.seterr(invalid="ignore")
@@ -1072,32 +1066,46 @@ class CombinedLightCurveModelContainer:
     """
     def __init__(self, models, model_args=None):
         if model_args is None:
-            self.models= models
+            self.lc_models= models
         else:
-            self.models = [model(*model_args[i]) for i, model in enumerate(models)]
+            self.lc_models = [model(*model_args[i]) for i, model in enumerate(models)]
+        self.model = [lc_model.model for lc_model in self.lc_models]
         
-        self.all_filters = set().union(*[model.filters for model in self.models])
+        self.all_filters = set().union(*[model.filters for model in self.lc_models])
         ## FIXME: Better treatment for synonymous or equivalent filters?
         self.compatible_filters, _ = utils.get_filter_name_mapping(self.all_filters)
 
         self.model_times = np.array(sorted(set().union(
-            *[model.model_times for model in self.models]
+            *[model.model_times for model in self.lc_models]
             )))
 
     def __repr__(self):
-        return f"Combination of {', '.join(map(str, self.models[:-1].__repr__()))} and {self.models[-1].__repr__()}"
+        if len(self.lc_models) == 2:
+            sub_str = f"{self.lc_models[0].__repr__()} and {self.lc_models[1].__repr__()}"
+        else:
+            sub_str  = f"{self.__class__.__name__} of {', '.join([lc_model.__repr__() for lc_model in self.lc_models[:-1]])} and {self.lc_models[-1].__repr__()}"
+        return f"Combination of {sub_str}"
 
     def check_vs_priors(self, priors):
-        for model in self.models:
+        for model in self.lc_models:
             model.check_vs_priors(priors)
 
     @property
     def citation(self):
         citations = {}
-        for model in self.models:
-            citations.update(model.citation)
+        for lc_model in self.lc_models:
+            citations.update(lc_model.citation)
         return citations
+    
+    @property
+    def good_parameters(self):
+        return True if all(lc_model.good_parameters for lc_model in self.lc_models) else False
         
+    def parameter_conversion(self, parameters):
+        for lc_model in self.lc_models:
+            parameters = lc_model.parameter_conversion(parameters)
+        return parameters
+    
     def gen_detector_lc(self, parameters, sample_times=None, return_all=False):
         """
         Generate the detector light curve for the combined model.
@@ -1107,7 +1115,7 @@ class CombinedLightCurveModelContainer:
 
         lc_per_model = []
         time_per_model = []
-        for model in self.models:
+        for model in self.lc_models:
             ref_times, lc = model.gen_detector_lc(parameters, sample_times)
 
             if not lc:
@@ -1144,7 +1152,7 @@ class CombinedLightCurveModelContainer:
     def generate_lightcurve(self, sample_times, parameters, return_all=False):
 
         lc_per_model = []
-        for model in self.models:
+        for model in self.lc_models:
             lc = model.generate_lightcurve(sample_times, parameters)
 
             if not lc:

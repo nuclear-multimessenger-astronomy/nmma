@@ -13,6 +13,8 @@ from bilby.core.prior import (
     ConditionalPriorDict, PriorDict as _PriorDict)
 from bilby.gw import cosmology as bilby_cosmo
 from ligo.skymap import io, moc
+
+from . import model as em_model
 from ..joint.base import adjust_hubble_prior
 from ..joint.constants import default_cosmology
 from ..joint.conversion import cosmology_to_distance, convert_mtot_mni
@@ -180,7 +182,7 @@ def inclination_prior_from_fits(priors, args):
     prob_iota_EM = prob_lt_pi2 + prob_gt_pi2[::-1]
 
     # normalize
-    prob_iota /= np.trapz(iota_EM, prob_iota_EM)
+    prob_iota /= np.trapezoid(iota_EM, prob_iota_EM)
 
     priors['inclination_EM'] = Interped(
         xx=iota_EM,
@@ -247,30 +249,35 @@ def extinction_prior(priors, args):
     return priors
 
 
-def create_prior_from_args(args, model_names=[]):
-
-    if isinstance(model_names, str):
-        model_names = [model_names]
-        
+def create_prior_from_args(args, lc_model):
+    """Function to create prior dictionary from command line arguments and nmma-LightCurveModel
+    Parameters
+    ----------
+    args : argparse.Namespace   
+        Command line arguments
+    lc_model : nmma.em.model.LightCurveModelContainer
+        Light curve model object to compute light curves
+    """
     conv_functions = []
+    
     # parameter conversion as used in EM-only sector
-    if any(model in ['AnBa2022_linear', 'AnBa2022_log'] for model in model_names):
+    model_list = lc_model.model if isinstance(lc_model, em_model.CombinedLightCurveModelContainer) else [lc_model.model]
+    if any(model_name in ['AnBa2022_linear', 'AnBa2022_log'] for model_name in model_list):
         conv_functions.append(convert_mtot_mni)
     # elif to be extended...
 
-    cosmo = getattr(args, 'cosmology', None)
-    if cosmo is None:
-        cosmo = default_cosmology
-    else:
-        cosmo = getattr(cosmology, cosmo)
-    bilby_cosmo.set_cosmology(cosmo)
+    if getattr(args, 'Hubble', False):  
+        cosmo = getattr(args, 'cosmology', None)
+        if cosmo is None:
+            cosmo = default_cosmology
+        bilby_cosmo.set_cosmology(cosmo)
 
-    if getattr(args, 'Hubble', False):
-            
         def Hubble_conversion(priors):
-            params, _ = cosmology_to_distance(priors, [], cosmo)
+            params = cosmology_to_distance(priors, bilby_cosmo.COSMOLOGY[0])
             return params
         conv_functions.append(Hubble_conversion)
+
+    conv_functions.append(lc_model.parameter_conversion)
         
     def param_conv(params):
         for func in conv_functions:
@@ -280,7 +287,7 @@ def create_prior_from_args(args, model_names=[]):
     priors = _PriorDict(
         args.prior_file, conversion_function=param_conv)
     
-    priors.convert_floats_to_delta_functions()    
+    # priors.convert_floats_to_delta_functions()    
     priors = adjust_hubble_prior(priors, args)
     priors = extinction_prior(priors, args)
 

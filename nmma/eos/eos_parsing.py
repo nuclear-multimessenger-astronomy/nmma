@@ -1,4 +1,4 @@
-from ..joint.base_parsing import noneint
+from ..joint.base_parsing import noneint, single_messenger_analysis_parsing
 
 def tabulated_eos_parsing(parser):
     tab_eos_input_parser = parser.add_argument_group(
@@ -60,4 +60,10 @@ def eos_parsing(parser):
         help= "list of files with additional radius-mass posteriors to consider")
     eos_input_parser.add( "--mass-radius-arxiv", nargs ="*",
         help= "list of arxiv-ids for additional R-M posteriors to consider")    
+    return parser
+
+def eos_analysis_parsing(parser):
+    parser = single_messenger_analysis_parsing(parser)
+    parser = tabulated_eos_parsing(parser)
+    parser = eos_parsing(parser)
     return parser

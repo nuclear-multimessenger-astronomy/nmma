@@ -47,7 +47,7 @@ def get_redshift(parameters):
         ## zeros like the first input of parameters, independent of size and keys
         return np.zeros_like(next(iter(parameters.values()))) 
 
-def cosmology_to_distance(parameters, added_keys, cosmology= default_cosmology):
+def cosmology_to_distance(parameters, cosmology= default_cosmology):
     cosmo_parameters = {}
     if "Hubble_constant" in parameters:
         cosmo_parameters["H0"] = parameters["Hubble_constant"]
@@ -60,10 +60,8 @@ def cosmology_to_distance(parameters, added_keys, cosmology= default_cosmology):
             # if luminosity distance is available, we assume it is in Mpc
             parameters["redshift"] = luminosity_distance_to_redshift(
                 parameters["luminosity_distance"], cosmology=alt_cosmo)
-            added_keys = added_keys + ["redshift"]
         elif "redshift" in parameters:
             parameters["luminosity_distance"] = alt_cosmo.luminosity_distance(parameters["redshift"]).value
-            added_keys = added_keys + ["luminosity_distance"]
         else:
             raise KeyError("Either redshift or luminosity_distance must be in parameters")
 
@@ -79,36 +77,36 @@ def cosmology_to_distance(parameters, added_keys, cosmology= default_cosmology):
                 [luminosity_distance_to_redshift(
                     parameters["luminosity_distance"][i], cosmology=alt_cosmo) 
                 for i, alt_cosmo in enumerate(alt_cosmos)])
-            added_keys = added_keys + ["redshift"]
+            
         elif "redshift" in parameters:
             parameters["luminosity_distance"] = np.array(
                 [alt_cosmo.luminosity_distance(parameters["redshift"][i]).value 
                 for i, alt_cosmo in enumerate(alt_cosmos)])
-            added_keys = added_keys + ["luminosity_distance"]
-    return parameters, added_keys
+    return parameters
 
-def source_frame_masses(converted_parameters, added_keys):
+def source_frame_masses(converted_parameters):
     converted_parameters = generate_mass_parameters(converted_parameters)
     if "redshift" not in converted_parameters.keys():
         distance = converted_parameters["luminosity_distance"]
         converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
-        added_keys = added_keys + ["redshift"]
 
     if "mass_1_source" not in converted_parameters.keys():
         z = converted_parameters["redshift"]
         converted_parameters["mass_1_source"] = np.array(converted_parameters["mass_1"] / (1 + z))
-        added_keys = added_keys + ["mass_1_source"]
 
     if "mass_2_source" not in converted_parameters.keys():
         z = converted_parameters["redshift"]
         converted_parameters["mass_2_source"] = np.array(converted_parameters["mass_2"] / (1 + z))
-        added_keys = added_keys + ["mass_2_source"]
 
-    return converted_parameters, added_keys
+    return converted_parameters
 
 def observation_angle_conversion(parameters):
+    theta_jn = parameters.get('theta_jn', np.arccos(parameters.get("cos_theta_jn", 1.)))
+    theta_jn = np.minimum(theta_jn, np.pi - theta_jn)  #default effective 0 if neither is given
     if "KNtheta" not in parameters:
-        parameters["KNtheta"] = parameters.get("inclination_EM", 0.0) * 180.0 / np.pi
+        parameters["KNtheta"] =  parameters.get("inclination_EM", theta_jn ) * 180.0 / np.pi
+    if "inclination_EM" not in parameters:
+        parameters["inclination_EM"] = parameters["KNtheta"] / 180.0 * np.pi
     return parameters
 
 
@@ -157,128 +155,167 @@ def reweight_to_flat_mass_prior(df):
     return df_new
 
 
-def convert_mtot_mni(paramms):
+def convert_mtot_mni(params):
 
     for par in ["mni", "mtot", "mrp"]:
-        if par not in paramms:
-            paramms[par] = 10**paramms[f"log10_{par}"]
+        if par not in params:
+            params[par] = 10**params[f"log10_{par}"]
 
-    paramms["mni_c"] = paramms["mni"] / paramms["mtot"]
-    paramms["mrp_c"] = (paramms["xmix"]*(paramms["mtot"]-paramms["mni"])-paramms["mrp"])
-    return paramms
+    params["mni_c"] = params["mni"] / params["mtot"]
+    params["mrp_c"] = (params["xmix"]*(params["mtot"]-params["mni"])-params["mrp"])
+    return params
 
 ############################## EOS-related conversions ####################################
-def lambda_to_compactness(lambda_i):
-    "Function to link tidal deformability to compactness based on quasi-universal relation"
-    loglam= np.log(lambda_i)
-    return 0.371 - 0.0391 * loglam + 0.001056 * loglam * loglam
+class EoSConverter:
+    def __init__(self, args, method=None):
+        # Case 1: eos is generated from emulator on the fly
+        if method == "emulated":
+            self.tov_emulator = setup_eos_generator(args)
+            self.macro_conversion = self.tov_emulator.generate_macro_eos
+        
+        elif method == "tabulated":
+            #case 2a: we use a single eos
+            if getattr(args, 'eos_file', None):
+                self.eos_data = [np.loadtxt(args.eos_file, usecols = [0,1,2]).T]
+                self.macro_conversion = self.single_eos_from_ram
 
-def mass_and_compactness_to_radius(mass, comp):
-    ### returns 0 if compactness is greater than 0.5, i.e. black hole
-    return np.where(comp<0.5, mass / comp * geom_msun_km, 0.0)
+            # Case 2b: precomputed eos data is loaded to ram
+            elif args.eos_to_ram:
+                self.eos_data = [np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T 
+                                for j in range(args.Neos)]
+                self.macro_conversion = self.eos_from_ram
 
-def radii_from_qur(converted_parameters, added_keys):
-    mass_1_source = converted_parameters["mass_1_source"]
-    mass_2_source = converted_parameters["mass_2_source"]    
-    lambda_1 = converted_parameters["lambda_1"]
-    lambda_2 = converted_parameters["lambda_2"]
+            # Case 2c: eos are loaded directly from file
+            else:
+                self.eos_data = args.eos_data
+                self.macro_conversion = self.eos_direct_load
+
+        
+    def full_eos_conversion(self, parameters):
+        self.macro_conversion(parameters)
+        return self.macro_props_from_eos(parameters)    
+
+    def eos_direct_load(self, converted_parameters):
+        EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
+        return [np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID]
+
+    def eos_from_ram(self, converted_parameters):
+        EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
+        return [self.eos_data[i] for i in EOSID]
+    
+    def single_eos_from_ram(self, _):
+        return self.eos_data
+      
+
+
+    def compute_macro_parameters(self, parameters):
+        eos_data = self.macro_conversion(parameters)
+        if len(eos_data) ==1:
+            radii, masses, lambdas = eos_data[0]
+        else:
+            radii, masses, lambdas = map(list, zip(*eos_data))
+        
+        self.macro_parameters = {'radii': radii, 'masses': masses, 'lambdas': lambdas}
+
+    
+    def macro_props_from_eos(self, converted_parameters):
+        eos_keys = ["TOV_mass", "TOV_radius", "lambda_1", "lambda_2",
+                    "radius_1", "radius_2", "R_14", "R_16"]
+        
+        m1_source = converted_parameters["mass_1_source"]
+        m2_source = converted_parameters["mass_2_source"]
+        radii, masses, lambdas = self.macro_parameters.values()
+
+        if isinstance(radii, np.ndarray): # single eos case
+            for key, val_array in zip(eos_keys, 
+            self.EOS2Parameters(radii, masses, lambdas, m1_source, m2_source)
+            ):
+                converted_parameters[key] = val_array
+        else:
+            ### assuming TOV mass and radius are the last entries of the respective arrays
+            TOV_mass_list, TOV_radius_list, R_14_list, R_16_list = [], [], [], []
+            lambda_1_list, lambda_2_list, radius_1_list, radius_2_list = [], [], [], []
+            for i, rad in enumerate(radii):
+                (TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1,
+                    radius_2, R_14, R_16
+                ) = self.EOS2Parameters(rad, masses[i], lambdas[i], m1_source[i],  m2_source[i] )
+                    
+                TOV_radius_list.append(TOV_radius)
+                TOV_mass_list.append(TOV_mass)
+                lambda_1_list.append(lambda_1)
+                lambda_2_list.append(lambda_2)
+                radius_1_list.append(radius_1)
+                radius_2_list.append(radius_2)
+                R_14_list.append(R_14)
+                R_16_list.append(R_16)
+        
+            for key, _list in zip(eos_keys, [
+                TOV_mass_list, TOV_radius_list, lambda_1_list,
+                lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list
+            ]):
+                converted_parameters[key] = np.array(_list)
+
+        return converted_parameters
+
+
+    def EOS2Parameters(self, radii, masses, lambdas, m1_source, m2_source
+    ):
+        ### FIXME: Under what circumstance would these not simply be mass_val[-1], radius_val[-1]?
+        TOV_mass = masses.max(axis=-1)
+        TOV_radius = radii[np.argmax(masses)]
+
+        (log_lambda_1, log_lambda_2) = np.interp(x=[m1_source, m2_source],
+                xp= masses, fp=np.log(lambdas), left=0, right=0)
+        lambda_1 = np.exp(log_lambda_1)
+        lambda_2 = np.exp(log_lambda_2)
+        try:
+            (radius_1, radius_2, R_14, R_16) = np.interp(
+                    x=[m1_source, m2_source, 1.4, 1.6],
+                    xp=masses, fp= radii, left =0, right=0)
+
+            return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
+        ## radius interpolation will raise an error if dealing with multiple sources at once
+        # In that case we return all values as corresponding arrays
+        except ValueError:
+            ref = np.ones_like(radius_1)
+            (radius_1, radius_2, R_14, R_16) = np.interp(
+                    x=[m1_source, m2_source, 1.4*ref, 1.6*ref],
+                    xp=masses, fp= radii, left =0, right=0)
+
+            return ref*TOV_mass, ref*TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
+
+def radii_from_qur(parameters):
+    mass_1_source = parameters["mass_1_source"]
+    mass_2_source = parameters["mass_2_source"]    
+    lambda_1 = parameters["lambda_1"]
+    lambda_2 = parameters["lambda_2"]
 
     compactness_1 = lambda_to_compactness(lambda_1)
-    converted_parameters["radius_1"] = mass_and_compactness_to_radius( mass_1_source, compactness_1)
+    parameters["radius_1"] = mass_and_compactness_to_radius(mass_1_source, compactness_1)
     
-    compactness_2=  lambda_to_compactness(lambda_2)
-    converted_parameters["radius_2"] = mass_and_compactness_to_radius(mass_2_source, compactness_2)
+    compactness_2 = lambda_to_compactness(lambda_2)
+    parameters["radius_2"] = mass_and_compactness_to_radius(mass_2_source, compactness_2)
 
     chirp_mass_source = component_masses_to_chirp_mass(mass_1_source, mass_2_source)
     lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(
         lambda_1, lambda_2, mass_1_source, mass_2_source
     )
 
-    converted_parameters["R_16"] = (
+    parameters["R_16"] = (
         chirp_mass_source
         * np.power(lambda_tilde / 0.0042, 1.0 / 6.0)
         * geom_msun_km
     )
+    return parameters
 
-    added_keys += ["radius_1", "radius_2", "R_16"]
-    # we return empty dict for array-like local_parameters 
-    return converted_parameters, added_keys, {}
+def lambda_to_compactness(lambda_i):
+    "Function to link tidal deformability to compactness based on quasi-universal relation"
+    loglam= np.log(lambda_i)
+    return 0.371 - 0.0391 * loglam + 0.001056 * loglam * loglam
 
-def macro_props_from_eos(eos_data, converted_parameters, added_keys):
-    eos_keys = ["TOV_mass", "TOV_radius", "lambda_1", "lambda_2",
-                "radius_1", "radius_2", "R_14", "R_16"]
-    added_keys += eos_keys
-    
-    m1_source = np.atleast_1d(converted_parameters["mass_1_source"])
-    m2_source = np.atleast_1d(converted_parameters["mass_2_source"])
-    if len(eos_data)==1:
-        radii, masses, lambdas = eos_data[0]
-        local_parameters = {'radii': radii, 'masses': masses, 'lambdas': lambdas}
-        for key, val_array in zip(eos_keys, 
-        EOS2Parameters(radii, masses, lambdas, m1_source, m2_source)
-        ):
-            converted_parameters[key] = val_array
-    else:
-        ### assuming TOV mass and radius are the last entries of the respective arrays
-        TOV_mass_list, TOV_radius_list, R_14_list, R_16_list = [], [], [], []
-        lambda_1_list, lambda_2_list, radius_1_list, radius_2_list = [], [], [], []
-        rad_list, mass_list, lam_list = [], [], []
-        for i, eos_vals in enumerate(eos_data):
-            rad, mass, lam = eos_vals
-            rad_list.append(rad)
-            mass_list.append(mass)
-            lam_list.append(lam)
-            (TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1,
-                radius_2, R_14, R_16
-            ) = EOS2Parameters(rad, mass, lam, m1_source[i],  m2_source[i] )
-                
-            TOV_radius_list.append(TOV_radius)
-            TOV_mass_list.append(TOV_mass)
-            lambda_1_list.append(lambda_1)
-            lambda_2_list.append(lambda_2)
-            radius_1_list.append(radius_1)
-            radius_2_list.append(radius_2)
-            R_14_list.append(R_14)
-            R_16_list.append(R_16)
-    
-        for key, _list in zip(eos_keys, [
-             TOV_mass_list, TOV_radius_list, lambda_1_list,
-            lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list
-        ]):
-            converted_parameters[key] = np.array(_list)
-        local_parameters = {'radii': rad_list, 'masses': mass_list, 'lambdas': lam_list}
-
-    return converted_parameters, added_keys, local_parameters
-
-
-def EOS2Parameters(radius_val, mass_val, Lambda_val, m1_source, m2_source
-):
-    ### FIXME: Under what circumstance would these not simply be mass_val[-1], radius_val[-1]?
-    TOV_mass = mass_val.max(axis=-1)
-    TOV_radius = radius_val[np.argmax(mass_val)]
-
-    (log_lambda_1, log_lambda_2) = np.interp(x=[m1_source, m2_source],
-            xp= mass_val, fp=np.log(Lambda_val), left=0, right=0)
-    lambda_1 = np.exp(log_lambda_1)
-    lambda_2 = np.exp(log_lambda_2)
-    try:
-        (radius_1, radius_2, R_14, R_16) = np.interp(
-                x=[m1_source, m2_source, 1.4, 1.6],
-                xp=mass_val, fp= radius_val, left =0, right=0)
-
-        return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
-    ## radius interpolation will raise an error if dealing with multiple sources at once
-    # In that case we return all values as corresponding arrays
-    except ValueError:
-        (radius_1, radius_2) = np.interp(
-                x=[m1_source, m2_source],
-                xp=mass_val, fp= radius_val, left =0, right=0)
-        (R_14, R_16) = np.interp(x=[1.4, 1.6],
-                xp=mass_val, fp= radius_val, left =0, right=0)
-        ref = np.ones_like(radius_1)
-
-        return ref*TOV_mass, ref*TOV_radius, lambda_1, lambda_2, radius_1, radius_2, ref*R_14, ref*R_16
-
+def mass_and_compactness_to_radius(mass, comp):
+        ### returns 0 if compactness is greater than 0.5, i.e. black hole
+        return np.where(comp<0.5, mass / comp * geom_msun_km, 0.0)
 
 class BBHEjectaFitting:
     def __init__(self):
@@ -287,12 +324,11 @@ class BBHEjectaFitting:
         return  np.full((4,)+ converted_parameters["mass_1_source"].shape, -np.inf)
         
 
-    def ejecta_parameter_conversion(self, converted_parameters, added_keys):
-        added_keys = added_keys + self.mass_fitting_keys
+    def ejecta_parameter_conversion(self, converted_parameters):
         for key, val in zip(self.mass_fitting_keys, self.vals_only_ejecta_parameter_conversion(converted_parameters)):
             converted_parameters[key] = val
         
-        return converted_parameters, added_keys
+        return converted_parameters
     
 
 class NSBHEjectaFitting:
@@ -408,6 +444,7 @@ class NSBHEjectaFitting:
             mass_1_source, mass_2_source, compactness_2, chi_1
         )
         mdisk_fit = remnant_disk_fit - mdyn_fit
+        mej_dyn = mdyn_fit + converted_parameters['alpha']
 
         # prevent the output message from being flooded by these warning messages
         old = np.seterr()
@@ -415,12 +452,11 @@ class NSBHEjectaFitting:
         np.seterr(divide='ignore')
 
         log_mej_wind = np.full_like(mdisk_fit, -np.inf)
-        log_mej_dyn = np.full_like(mdisk_fit, -np.inf)
-        disc_mask = mdisk_fit > 0.
+        log_mej_dyn  = np.full_like(mdisk_fit, -np.inf)
+        disk_mask = mdisk_fit > 0.
 
-        log_alpha = converted_parameters.get("log10_alpha",np.log10(converted_parameters['alpha']))* np.log(10.0)
-        log_mej_dyn[disc_mask] = np.logaddexp( np.log(mdisk_fit[disc_mask]), log_alpha[disc_mask] )/ np.log(10.0)
-        log_mej_wind[disc_mask] = np.log10(mdisk_fit[disc_mask]) + np.log10(converted_parameters["ratio_zeta"])[disc_mask]
+        log_mej_dyn[disk_mask] = np.log10(mej_dyn[disk_mask])
+        log_mej_wind[disk_mask] = np.log10(mdisk_fit[disk_mask]) + np.log10(converted_parameters["ratio_zeta"])[disk_mask]
         
 
         if uniform_output:
@@ -435,17 +471,16 @@ class NSBHEjectaFitting:
             np.seterr(**old)
             return log_mej_dyn, log_mej_wind 
     
-    def ejecta_parameter_conversion(self, converted_parameters, added_keys, uniform_output=False):
+    def ejecta_parameter_conversion(self, converted_parameters, uniform_output=False):
         if uniform_output:
             add_keys = self.uniform_mass_fitting_keys
         else: 
             add_keys = self.proper_mass_fitting_keys
 
-        added_keys = added_keys + add_keys
         for key, val in zip(add_keys, 
                 self.vals_only_ejecta_parameter_conversion(converted_parameters, uniform_output)):
             converted_parameters[key] = val
-        return converted_parameters, added_keys
+        return converted_parameters
 
 
 class BNSEjectaFitting:
@@ -567,8 +602,8 @@ class BNSEjectaFitting:
             converted_parameters["R_16"] / geom_msun_km,
         )
 
-        mej_dyn = mdyn_fit + converted_parameters["alpha"]
-        log10_mej_dyn = np.log10(mej_dyn)
+        log10_mej_dyn = np.log10(mdyn_fit + converted_parameters["alpha"])
+
         log10_mej_wind = np.log10(converted_parameters["ratio_zeta"]) + log10_mdisk_fit
         # total eject mass
         total_ejeta_mass = 10**log10_mej_dyn + 10**log10_mej_wind
@@ -585,121 +620,55 @@ class BNSEjectaFitting:
         return  np.where(np.isfinite(converted_ejecta), converted_ejecta, -np.inf)
 
 
-    def ejecta_parameter_conversion(self, converted_parameters, added_keys): 
+    def ejecta_parameter_conversion(self, converted_parameters): 
         for key, val in zip(self.mass_fitting_keys, 
                 self.vals_only_ejecta_parameter_conversion(converted_parameters)):
             converted_parameters[key] = val
 
-        added_keys = added_keys + self.mass_fitting_keys
-        return converted_parameters, added_keys
+        return converted_parameters
 
 
 class MultimessengerConversion:
-    def __init__(self, args, messengers, ana_modifiers =[], fixed_prior={}):
+    def __init__(self, args, messengers, ana_modifiers =[], internal_conversions = {}):
         self.messengers     = messengers
         self.modifiers      = ana_modifiers
         self.args           = args
-        self.fixed_prior    = fixed_prior
+
         self.BNSejectaFitting   = BNSEjectaFitting()
         self.NSBHejectaFitting  = NSBHEjectaFitting()
         self.BBHejectaFitting   = BBHEjectaFitting()
+
         run_cosmo = getattr(args, 'cosmology', None)
         if run_cosmo is None:
             self.cosmology = default_cosmology
         else:
             self.cosmology = run_cosmo
-        self.macro_eos_conversion = self.setup_eos_converter(args)
-        
-    def setup_eos_converter(self, args):
-        # Case 1: eos is generated from emulator on the fly
-        if 'eos' in self.messengers:
-            self.tov_emulator = setup_eos_generator(args)
-            return self.eos_from_emulator
-        
-        elif 'tabulated_eos' in self.modifiers:
-            # Case 2a: precomputed eos data is loaded to ram
-            if args.eos_to_ram:
-                try:
-                    self.eos_data = [np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in range(args.Neos)]
-                    return self.eos_from_ram
-                except:
-                    self.eos_data = [np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T]
-                    return self.single_eos_from_ram
 
         
-            # Case 2b: eos is loaded directly from file
-            else:
-                return self.eos_direct_load
+        self.eos_conversion= internal_conversions.get('eos', self.setup_eos_conversion(args))
+        self.gw_conversion = internal_conversions.get('gw', convert_to_lal_binary_black_hole_parameters)
+        self.em_conversion = internal_conversions.get('em', observation_angle_conversion)
+        
+    def setup_eos_conversion(self, args):
+        "This should only be called if we want to get ns-properties "
+        "but do not evaluate a corresponding EoS-likelihood. "
+        # 
+        # Case 1: eos is generated from emulator on the fly
+        if 'eos' in self.messengers:
+            self.eos_converter = EoSConverter(args, method='emulated')
+            return self.eos_converter.full_eos_conversion
+        
+        # Case 2: eos is loaded from tabulated data
+        elif 'tabulated_eos' in self.modifiers:
+            self.eos_converter = EoSConverter(args, method='tabulated')
+            return self.eos_converter.full_eos_conversion
         
         # Case 3: no eos sampling, use quasi-universal relations instead
         else:
             return radii_from_qur 
         
 
-    def eos_direct_load(self, converted_parameters, added_keys):
-        try:
-            EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
-            eos_data = [np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID]
-        except:
-            #In case we only use one eos, e.g. for injection
-            eos_data = [np.loadtxt(self.args.eos_file, usecols = [0,1,2]).T]
-        return macro_props_from_eos(eos_data, converted_parameters, added_keys)
-
-    def eos_from_ram(self, converted_parameters, added_keys):
-        EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
-        eos_data = [self.eos_data[i] for i in EOSID]
-        return macro_props_from_eos(eos_data, converted_parameters, added_keys)
-    
-    def single_eos_from_ram(self, converted_parameters, added_keys):
-        return macro_props_from_eos(self.eos_data, converted_parameters, added_keys)
-    
-    def eos_from_emulator(self, converted_parameters, added_keys):
-        eos_data = self.tov_emulator.generate_macro_eos(converted_parameters)
-        return macro_props_from_eos(eos_data, converted_parameters, added_keys)
-
-    def convert_to_multimessenger_parameters(self, parameters, return_internal=False):
-        converted_parameters = parameters.copy()
-        original_keys = list(converted_parameters.keys())
-        added_keys = []
-
-        if "Hubble" in self.modifiers:
-            converted_parameters, added_keys = cosmology_to_distance(
-            converted_parameters, added_keys, cosmology=self.cosmology
-        )
-        if "gw" in self.messengers:
-            
-            converted_parameters, lal_added_keys = convert_to_lal_binary_black_hole_parameters(
-                converted_parameters
-            )
-            added_keys = added_keys + lal_added_keys
-
-        converted_parameters, added_keys = source_frame_masses(
-            converted_parameters, added_keys
-        )
-
-        ####EOS/ tidal treatment
-        converted_parameters, added_keys, local_parameters = self.macro_eos_conversion(converted_parameters, added_keys)
-
-            
-        if "em" in self.messengers:
-            converted_parameters, added_keys = self.ejecta_parameter_conversion(
-                converted_parameters, added_keys
-            )
-            if "inclination_EM" not in converted_parameters:
-                theta_jn = converted_parameters["theta_jn"]
-                converted_parameters["inclination_EM"] = np.minimum(theta_jn, np.pi - theta_jn)
-                converted_parameters["KNtheta"] = 180.0 / np.pi * converted_parameters["inclination_EM"]
-                added_keys = added_keys + ["KNtheta", "inclination_EM"]
-    
-        added_keys = [
-            key for key in converted_parameters.keys() if key not in original_keys
-        ]
-        if return_internal:
-            return converted_parameters, local_parameters
-        return converted_parameters, added_keys
-    
-
-    def ejecta_parameter_conversion(self, parameters, added_keys = None):
+    def ejecta_parameter_conversion(self, parameters):
         try:
             #heavier object is a NS
             if parameters['radius_1'] > 0.:
@@ -725,18 +694,42 @@ class MultimessengerConversion:
         for key, val in zip(self.BNSejectaFitting.mass_fitting_keys,
                 ejecta_parameters):
             parameters[key] = val
-        try:
-            added_keys = added_keys + self.BNSejectaFitting.mass_fitting_keys
-            return parameters, added_keys
-        except TypeError:
-            # added_keys is None, i.e. not passed
-            return parameters
+        return parameters
 
+    def convert_to_multimessenger_parameters(self, parameters):
+        original_keys = list(parameters.keys())
+        converted_parameters = self.clean_datatypes(parameters)
+
+        if "Hubble" in self.modifiers:
+            converted_parameters = cosmology_to_distance(
+            converted_parameters, cosmology=self.cosmology
+        )
+        if "gw" in self.messengers:            
+            converted_parameters, _ = self.gw_conversion(converted_parameters)
+
+        converted_parameters = source_frame_masses(converted_parameters)
+
+        ####EOS/ tidal treatment
+        converted_parameters = self.eos_conversion(converted_parameters)
+
+            
+        if "em" in self.messengers:
+            converted_parameters = self.ejecta_parameter_conversion(converted_parameters)
+            converted_parameters, _ = self.em_conversion(converted_parameters)
+
+        added_keys = [key for key in converted_parameters.keys()
+                      if key not in original_keys]
+
+        converted_parameters = self.clean_datatypes(converted_parameters)
+        return converted_parameters, added_keys
+    
     def identity_conversion(self, parameters):
         return parameters, []
 
-    def priors_conversion_function(self, sample):
-        out_sample = sample.copy()
-        out_sample.update(self.fixed_prior) 
-        out_sample, _ = self.convert_to_multimessenger_parameters(out_sample)
-        return out_sample
+    def clean_datatypes(self, parameters):
+        """Homogenise data types, preferentially to scalars instead of arrays"""
+        try:
+            return {k: np.ravel(v).item() for k, v in parameters.copy().items()}
+        except ValueError:
+            return {k: np.ravel(v) for k, v in parameters.copy().items()}
+        
