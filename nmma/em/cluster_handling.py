@@ -1,68 +1,55 @@
 import os
 import numpy as np
-from .em_parsing import slurm_lc_parser, parsing_and_logging, slurm_analysis_parser
+import subprocess
+from concurrent.futures import ThreadPoolExecutor
+
+from . import em_parsing as emp
+from .io import load_yaml
 from ..joint.base_parsing import nmma_base_parsing
 from ..joint.injection_handling import NMMAInjectionCreator
 from ..joint.utils import read_injection_file
 
 
 def main():
-    args = parsing_and_logging(slurm_lc_parser)
+    args = emp.parsing_and_logging(emp.slurm_lc_parser)
     injection_creator = NMMAInjectionCreator(args)
     dataframe = injection_creator.generate_prelim_dataframe()
 
-    for index, row in dataframe.iterrows():
+    for index, _ in dataframe.iterrows():
+        outdir = os.path.join(args.outdir, str(index))
+        os.makedirs(outdir, exist_ok=True)
+        injection_creator.priors.to_file(outdir, label="injection")
         with open(args.analysis_file, "r") as file:
             analysis = file.read()
 
-        outdir = os.path.join(args.outdir, str(index))
-        os.makedirs(outdir, exist_ok=True)
+        for key, data in zip(
+            ('PRIOR', 'OUTDIR', 'INJOUT', 'INJNUM'), 
+            (os.path.join(outdir, "injection.prior"), outdir, os.path.join(outdir, "lc.csv"), str(index))
+        ):
+            analysis = analysis.replace(key, data)
 
-        injection_creator.priors.to_file(outdir, label="injection")
-        priorfile = os.path.join(outdir, "injection.prior")
-        injfile = os.path.join(outdir, "lc.csv")
-
-        analysis = analysis.replace("PRIOR", priorfile)
-        analysis = analysis.replace("OUTDIR", outdir)
-        analysis = analysis.replace("INJOUT", injfile)
-        analysis = analysis.replace("INJNUM", str(index))
-        analysis_file = os.path.join(outdir, "inference.sh")
-
-        fid = open(analysis_file, "w")
-        fid.write(analysis)
-        fid.close()
+        with open(os.path.join(outdir, "inference.sh"), "w") as file:
+            file.write(analysis)
 
 
 def lc_creation():
-    args = parsing_and_logging(slurm_lc_parser)
-
-    logdir = os.path.join(args.outdir, "logs")
-    os.makedirs(logdir, exist_ok=True)
+    args = emp.parsing_and_logging(emp.slurm_lc_parser)
+    os.makedirs(os.path.join(args.outdir, "logs"), exist_ok=True)
 
     injection_df = read_injection_file(args)
-    number_jobs = int(
-        np.ceil(len(injection_df) / args.lightcurves_per_job)
-    )
+    n_jobs = int(np.ceil(len(injection_df) / args.lightcurves_per_job))
 
-    for ii in range(number_jobs):
+    for ii in range(n_jobs):
         with open(args.analysis_file, "r") as file:
             analysis = file.read()
+        analysis = analysis.replace("INJRANGE", f"{ii*n_jobs:i},{(ii+1)*n_jobs:i}") 
 
-        injection_min, injection_max = ii * number_jobs, (ii + 1) * number_jobs
-
-        analysis = analysis.replace(
-            "INJRANGE", "%d,%d" % (injection_min, injection_max)
-        )
-        analysis_file = os.path.join(args.outdir, "inference_%d.sh" % ii)
-
-        fid = open(analysis_file, "w")
-        fid.write(analysis)
-        fid.close()
-
-    fid.close()
+        with open(os.path.join(args.outdir, f"inference_{ii:i}.sh"), "w") as file:
+            file.write(analysis)
+            
 
 def slurm_analysis(args=None):
-    parser = nmma_base_parsing(slurm_analysis_parser, return_parser=True)
+    parser = nmma_base_parsing(emp.slurm_analysis_parser, return_parser=True)
     if args is None:
         args = parser.parse_args()
 
@@ -144,6 +131,59 @@ def slurm_analysis(args=None):
         f'To queue this script, run e.g. "sbatch --export=MODEL=Bu2019lm,TT=59361.0,DATA=example_files/candidate_data/ZTF21abdpqpq.dat {args.script_name}" on your HPC.'
     )
 
+def run_cmd_in_subprocess(cmd):
+    subprocess.run(cmd)
+
+
+def multi_config_analysis(args=None):
+    parser = nmma_base_parsing(emp.multi_config_parser, return_parser=True)
+    args, _ = parser.parse_known_args(namespace=args)
+
+    main_args = nmma_base_parsing(emp.multi_wavelength_analysis_parser, cli_args=[])
+
+    yaml_dict = load_yaml(args.config)
+
+    total_configs = len(list(yaml_dict.keys()))
+    futures = []
+
+    with ThreadPoolExecutor() as executor:
+        for analysis_set in yaml_dict.keys():
+            params = yaml_dict[analysis_set]
+
+            if "process-per-config" in params or args.process is None:
+                processes = params["process-per-config"]
+            elif args.parallel and args.process is not None:
+                processes = args.process // total_configs
+            else:
+                processes = args.process
+
+            cmd = ["mpiexec", "-np", str(processes), "lightcurve-analysis"]
+
+            for key, value in params.items():
+                key = key.replace("-", "_")
+
+                if key == "process_per_config":
+                    continue
+
+                if key not in main_args:
+                    raise ValueError(f"{key} not a known argument... please remove")
+                key = key.replace("_", "-")
+
+                cmd.append(f"--{key}")
+                if value is not True:
+                    cmd.append(str(value))
+
+            if not args.parallel:
+                print(f"{'#'*100}")
+                print(f"Running analysis set:  {analysis_set} with {processes} processes")
+                run_cmd_in_subprocess(cmd)
+                print(f"{'#'*100}")
+            else:
+                future = executor.submit(run_cmd_in_subprocess, cmd)
+                futures.append(future)
+    if args.parallel:
+        for future in futures:
+            future.result()
 
 if __name__ == "__main__":
     main()
