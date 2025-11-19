@@ -1,12 +1,10 @@
 import inspect
 import warnings
-from pathlib import Path
-
-import yaml
 from bilby.core.prior import analytical
 
 warnings.simplefilter("module", DeprecationWarning)
 
+from .io import load_yaml
 
 class ValidationError(ValueError):
     def __init__(self, key, message):
@@ -24,19 +22,19 @@ ALLOWED_FILTERS = [
     "bessellr",
     "bessellux",
     "bessellv",
-    "ps1__g",
-    "ps1__i",
-    "ps1__r",
-    "ps1__y",
-    "ps1__z",
+    "ps1::g",
+    "ps1::i",
+    "ps1::r",
+    "ps1::y",
+    "ps1::z",
     "sdssu",
-    "uvot__b",
-    "uvot__u",
-    "uvot__uvm2",
-    "uvot__uvw1",
-    "uvot__uvw2",
-    "uvot__v",
-    "uvot__white",
+    "uvot::b",
+    "uvot::u",
+    "uvot::uvm2",
+    "uvot::uvw1",
+    "uvot::uvw2",
+    "uvot::v",
+    "uvot::white",
     "ztfg",
     "ztfi",
     "ztfr",
@@ -61,8 +59,6 @@ def get_positional_args(cls):
 DISTRIBUTION_PARAMETERS = {k: get_positional_args(v) for k, v in ALLOWED_DISTRIBUTIONS.items()}
 
 
-def load_yaml(file_path):
-    return yaml.safe_load(Path(file_path).read_text())
 
 
 def validate_only_one_true(yaml_dict):

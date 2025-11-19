@@ -7,6 +7,20 @@ from argparse import Namespace
 from bilby.core.utils import decode_bilby_json
 from astropy import time
 
+from matplotlib.colors import LinearSegmentedColormap
+from pathlib import Path
+import yaml
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def load_yaml(file_path):
+    return yaml.safe_load(os.path.expandvars(Path(file_path).read_text()))
+
 def read_trigger_time(parameters=None, args=None, out_format = 'mjd'):
     trigger_time = None
     if parameters is not None:
@@ -166,3 +180,43 @@ def sig_lims(values, quantiles=None, sig_unc=2):
         return f"${{{q_mean:{fmt}}}}_{{-{low_err:{fmt}}}}^{{+{high_err:{fmt}}}}$"
     else:
         return f"${{{int(q_mean)}}}_{{-{int(low_err)}}}^{{+{int(high_err)}}}$"
+
+
+def input_obj_to_str(input_obj, ref_name= None):
+    """Convert input object to string representation.
+
+    Parameters
+    ----------
+    input_obj: str, list, dict, Namespace
+        The input object to convert.
+
+    Returns
+    -------
+    str
+        String representation of the input object.
+    """
+    if isinstance(input_obj, Namespace):
+        return getattr(input_obj, ref_name, None)
+    if isinstance(input_obj, dict):
+        try:
+            return input_obj[ref_name]
+        except KeyError:
+            input_obj = list(input_obj.values())
+    if isinstance(input_obj, list):
+        input_obj = input_obj[0]
+
+
+    if isinstance(input_obj, str):
+        return input_obj
+    else:
+        raise TypeError("Input object could not be identified.")
+    
+def fading_cmap(color):
+    cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white",color], gamma = 2)
+
+    cdict = cmap._segmentdata.copy()
+    vals = cdict['alpha'][:, 0]
+    alpha = np.linspace(0, 1, len(vals))
+    cdict['alpha'] = np.column_stack([vals, alpha, alpha])
+
+    return LinearSegmentedColormap(cmap.name, cdict, cmap.N, cmap._gamma)

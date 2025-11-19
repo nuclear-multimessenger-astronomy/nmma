@@ -146,12 +146,11 @@ def lightcurveInjectionTest(model_name):
             init_kwargs['interpolation_type'] = "sklearn_gp"
         model_class = get_lc_model_from_modelname(model_name)
         lightcurve_model = model_class(**init_kwargs)
-        obs_times, lightcurve_from_function = lightcurve_model.gen_detector_lc(
-            lightcurve_parameters,
-        )
+        lc_params = lightcurve_model.parameter_conversion(lightcurve_parameters)
+        _, func_lc = lightcurve_model.gen_detector_lc(lc_params )
         #lightcurve_from_function["t"] = obs_times
  
-        return lightcurve_from_function
+        return func_lc
 
     def compare_lightcurves(lightcurve_from_function, lightcurve_from_command_line):
         """

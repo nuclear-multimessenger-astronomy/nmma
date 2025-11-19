@@ -1,7 +1,5 @@
-from pathlib import Path
 import pytest
-
-import yaml
+from yaml import YAMLError
 from ..em.systematics import (
     ValidationError,
     validate_only_one_true,
@@ -12,6 +10,7 @@ from ..em.systematics import (
     ALLOWED_FILTERS,
     ALLOWED_DISTRIBUTIONS
 )
+from ..em.io import load_yaml
 
 
 @pytest.fixture
@@ -43,7 +42,7 @@ def sample_yaml_file(tmp_path, sample_yaml_content):
 
 
 def test_validate_only_one_true_valid(sample_yaml_file):
-    yaml_dict = yaml.safe_load(Path(sample_yaml_file).read_text())
+    yaml_dict = load_yaml(sample_yaml_file)
     validate_only_one_true(yaml_dict)  # Should not raise an exception
 
 
@@ -86,7 +85,7 @@ def test_main(sample_yaml_file):
 def test_main_invalid_yaml(tmp_path):
     invalid_yaml = tmp_path / "invalid_config.yaml"
     invalid_yaml.write_text("invalid: yaml: content")
-    with pytest.raises(yaml.YAMLError):
+    with pytest.raises(YAMLError):
         main(invalid_yaml)
 
 
@@ -199,5 +198,5 @@ def test_load_yaml_file_not_found():
 def test_load_yaml_invalid_format(tmp_path):
     invalid_yaml = tmp_path / "invalid_format.yaml"
     invalid_yaml.write_text("{ invalid: yaml: content")
-    with pytest.raises(yaml.YAMLError):
+    with pytest.raises(YAMLError):
         main(invalid_yaml)

@@ -9,14 +9,8 @@ import pandas as pd
 from bilby.core.utils import decode_bilby_json
 import scipy.signal
 
+from ..joint.utils import load_yaml, NumpyEncoder
 # from sncosmo.bandpasses import _BANDPASSES
-
-
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
 
 
 def load_em_observations(filename, args=None, format='observations'):

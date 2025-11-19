@@ -2,12 +2,13 @@ import os
 import pytest
 import shutil
 import copy
+from argparse import Namespace
 
-
-from ..em import analysis, em_parsing, slurm_handling
+from ..em import analysis, em_parsing, cluster_handling
 
 WORKING_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(WORKING_DIR, "data")
+os.environ["WORKING_DIR"] = WORKING_DIR
 
 
 @pytest.fixture(autouse=True)
@@ -111,5 +112,13 @@ def test_analysis_slurm(args):
 
     args.__dict__.update(args_slurm)
 
-    slurm_handling.slurm_analysis(args) 
+    cluster_handling.slurm_analysis(args) 
     shutil.rmtree(os.path.join(args.base_dir, args.logs_dir_name), ignore_errors=True)
+
+
+
+def test_analysis_multi():
+    config = os.path.join(WORKING_DIR, "data/multi_config_analysis/config.yaml")
+
+    args = Namespace(config=config, process=2, parallel=False)
+    cluster_handling.multi_config_analysis(args)

@@ -30,8 +30,7 @@ def mpi_barrier(comm):
 def download_models_list(models_home=None):
     # first we load the models list from gitlab
     models_home = get_models_home(models_home)
-    if not exists(models_home):
-        makedirs(models_home)
+    makedirs(models_home, exist_ok=True)
     r = requests.get(f"{REPO}/raw/main/models.yaml", allow_redirects=True)
     with open(Path(models_home, "models.yaml"), "wb") as f:
         f.write(r.content)
@@ -141,10 +140,7 @@ def get_model(
         raise ValueError(f"model_name {model_name} not found in models list")
     model_info = MODELS[model_name]
 
-    if not exists(models_home):
-        makedirs(models_home)
-    if not exists(Path(models_home, model_name)):
-        makedirs(Path(models_home, model_name))
+    makedirs(Path(models_home, model_name), exist_ok=True)
 
     filter_synonyms = [filt.replace("_", ":") for filt in model_info["filters"]]
 

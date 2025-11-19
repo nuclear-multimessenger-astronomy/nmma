@@ -1,5 +1,6 @@
+from argparse import Namespace
 from ..utils.models import get_model, refresh_models_list
-
+from ..em import model, prior
 
 def test_download_model_gitlab():
     # Test that we can download a model from GitLab
