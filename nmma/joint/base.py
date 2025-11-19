@@ -181,6 +181,10 @@ def h5_to_multivar_prior(h5_file_path, priors = {}):
 
     eos_dist = MultivariateGaussianDist(keys, mus=[mean], covs=[cov])
     priors.update({key: MultivariateGaussian(eos_dist, key) for key in keys})
+
+    # We need "at least" a conditional Prior Dict, but should not "downgrade" CBC-dicts
+    if isinstance(priors, ConditionalPriorDict):
+        return priors
     return ConditionalPriorDict(priors)
 
 

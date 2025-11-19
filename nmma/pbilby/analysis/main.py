@@ -65,9 +65,7 @@ def analysis_runner(
     # persistence of states beyond the pool's scope.
     # Otherwise emulators retrace on each evaluation.
     global worker_run
-    worker_run = WorkerRun(
-        data_dump, bilby_zero_likelihood_mode
-    )
+    worker_run = WorkerRun(data_dump, bilby_zero_likelihood_mode)
     t0 = datetime.datetime.now()
     sampling_time = 0
     with MPIPool(use_dill=True) as pool:

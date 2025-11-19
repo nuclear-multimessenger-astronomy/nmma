@@ -305,8 +305,8 @@ class WorkerRun:
             ):
         
         ## Load the data dump
-        if data_dump is None:
-            test_out = os.path.join(os.getcwd(), 'outdir')
+        if not data_dump.endswith("_dump.pickle"):
+            test_out = os.path.join(os.getcwd(), data_dump)
             test_dump = glob(f"{test_out}/data/*_dump.pickle")
             data_dump = test_dump[0]
 
