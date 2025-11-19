@@ -8,9 +8,11 @@ from tqdm.contrib.concurrent import process_map
 import numpy as np
 from scipy.special import logsumexp
 from scipy.stats import norm, gaussian_kde
-from matplotlib.colors import LinearSegmentedColormap
-from ..joint.base import NMMABaseLikelihood
+from matplotlib import pyplot as plt
 from bilby.core.prior import WeightedCategorical
+from ..joint.base import NMMABaseLikelihood
+from ..joint.utils import fading_cmap
+from ..joint.conversion import EoSConverter
     
 
 def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
@@ -83,16 +85,70 @@ def setup_eos_kwargs(data_dump, args, logger):
     # eos_kwargs = default_eos_kwargs | dict(
     eos_kwargs = dict(
         constraint_dict=data_dump['eos_constraint_dict'],
+        eos_converter=EoSConverter(args, 'emulated'),
         # crust_path=args.eos_crust_file
     )
     return eos_kwargs 
    
 class EquationofStateLikelihood(NMMABaseLikelihood):
-    def __init__(self, priors, constraint_dict, **kwargs):
+    def __init__(self, priors, constraint_dict, eos_converter, **kwargs):
         constraint =setup_joint_eos_constraint(constraint_dict)
-        # to be extended for more complex likelihood expressions
+        # TODO: to be extended for more complex likelihood expressions
         super().__init__(constraint, priors, **kwargs)
+        self.converter = eos_converter
 
+    def macro_conversion(self, parameters):
+        self.converter.compute_macro_parameters(parameters)
+        self.sub_model.macro_parameters = self.converter.macro_parameters
+
+    def parameter_conversion(self, parameters):
+        self.macro_conversion(parameters)
+        return self.converter.macro_props_from_eos(parameters)
+
+
+    def log_likelihood(self, parameters):
+        self.macro_conversion(parameters)
+        return self.sub_log_likelihood(parameters)
+     
+    def final_diagnostics(self, bestfit_params, args, result=None):
+        self.macro_conversion(bestfit_params)
+        
+        color_densities = []
+        radii, masses, lambdas = self.converter.macro_parameters.values()
+        x_lim = (np.min(radii)-0.3, np.max(radii)+0.3)
+        y_lim = (masses[0], masses[-1]+0.1)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.set_xlim(x_lim)
+        ax.set_ylim(y_lim)
+        for constraint in self.sub_model.constraints:
+            color = ax._get_lines.get_next_color()
+            ax = constraint.plot(ax=ax, resolution=100, color=color)
+        ax.plot(radii, masses, label='Best fit EOS', zorder=10)
+
+        ax.set_xlabel(r'Radius [km]')
+        ax.set_ylabel(r'Mass [M$_\odot$]')
+        ax.legend()
+        fig.savefig(os.path.join(args.outdir, f"{args.label}_mr_curve.png"))
+        
+        plt.show()
+
+
+def additive_blend(density_list, resolution):
+    composite_image = np.ones((resolution, resolution, 4))   # Initialize composite image
+    for dens, cmap in density_list:
+        rgba = cmap(dens)
+        rgba[..., 3] = 0.5  # Set a fixed alpha value for blending
+        dens_mask = dens > 1e-8
+        composite_image[dens_mask, :] = rgba[dens_mask]
+        # dens[dens < 1e-8] = 0  # Threshold to avoid artifacts
+
+        # composite_image += rgba
+    # composite_image /= len(rgba)  # Average to keep in [0, 1] range
+    # print(composite_image.shape)
+    # Clip to valid display range
+    # composite_image = np.clip(composite_image, 0, 1)
+
+    return composite_image
 
 def setup_joint_eos_constraint(constraint_dict):
     constraint_list=[]
@@ -126,12 +182,10 @@ def setup_joint_eos_constraint(constraint_dict):
                              ')
     return JointEoSConstraint(*constraint_list)
 
-     
-
 class JointEoSConstraint:
     def __init__(self, *constraints):
         self.constraints = constraints
-        self.local_parameters = {}
+        self.macro_parameters = {}
 
     def __repr__(self):
         if len(self.constraints) == 1:
@@ -142,7 +196,7 @@ class JointEoSConstraint:
             return f"{self.__class__.__name__} of {', '.join([cons.__repr__() for cons in self.constraints[:-1]])} and {self.constraints[-1].__repr__()}"
 
     def log_likelihood(self, parameters):
-        return sum([constraint.log_likelihood(parameters, self.local_parameters) for constraint in self.constraints])
+        return sum([constraint.log_likelihood(parameters, self.macro_parameters) for constraint in self.constraints])
     
     def tabulate_weights(self, macro_eos_path, outdir, weight_path=None, normalise=True):  
         """Given a directory of macroscopic EOSs and nmma.joint.Constraint,
@@ -231,21 +285,27 @@ class MassConstraint:
         return  out
     
     def log_likelihood(self, parameters, local_parameters=None):
-        return self.lognorm_method(parameters['TOV_mass'], loc=self.mass, scale=self.error)
+        tov_mass = parameters.get('TOV_mass', None)
+        if tov_mass is None:
+            if isinstance(local_parameters['masses'], list):
+                tov_mass = [masses[-1] for masses in local_parameters['masses']]
+            else:   
+                tov_mass = local_parameters['masses'][-1]
+        return self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)
     
     def plot(self, ax, resolution = 100, **kwargs):
         """Plot the mass constraint on the given figure."""
-        y_min, y_max = ax.get_ylim()
-        x_min, x_max = ax.get_xlim()
-        line = ax.hlines(self.mass, x_min, x_max, linestyle='--', linewidth=1.5, label=self.name)
-        cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white", line.get_color()])
-        M_grid = np.linspace(y_min, y_max,num=resolution)
+        x_lim = ax.get_xlim()
+        y_lim = ax.get_ylim()
+        M_grid = np.linspace(*y_lim, num=resolution)
+        show_x, show_y = np.meshgrid(np.linspace(*x_lim, resolution), M_grid)
+        line = ax.hlines(self.mass, *x_lim, linestyle='--', linewidth=1.5, zorder=3, label=self.name, **kwargs)
+        cmap = fading_cmap(line.get_color())
         shade_profile = norm.pdf(M_grid, loc=self.mass, scale=self.error)
         shading_matrix = np.repeat(shade_profile[:, np.newaxis], resolution, axis=1)
-        ax.imshow(shading_matrix, aspect='auto', cmap=cmap, alpha=0.5,
-                  extent=[x_min, x_max, y_min, y_max], origin='lower')
+        ax.contourf(show_x, show_y, shading_matrix, levels=50, cmap=cmap)
         return ax
-    
+
 class LowerMTOVConstraint(MassConstraint):
     '''Constraint that an EOS supports at least a certain TOV mass(within Gaussian uncertainty)'''
     def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None):
@@ -373,12 +433,14 @@ class MassRadiusConstraint:
         return masses, radius, weights
 
     def log_likelihood(self, parameters, local_parameters):
+        
         try:
-            return self.single_logl(parameters['TOV_mass'], local_parameters['masses'], local_parameters['radii'])
+            tov_mass = parameters.get('TOV_mass', local_parameters['masses'][-1])
+            return self.single_logl(tov_mass, local_parameters['masses'], local_parameters['radii'])
         except (ValueError, IndexError):
             return [
-                self.single_logl(mtov, local_parameters['masses'][i], local_parameters['radii'][i])
-                for i, mtov in enumerate(parameters['TOV_mass'])
+                self.single_logl(masses[-1], masses, local_parameters['radii'][i])
+                for i, masses in enumerate(local_parameters['masses'])
             ]
 
     def single_logl(self, tov_mass, masses, radii):
@@ -391,21 +453,26 @@ class MassRadiusConstraint:
         """Plot the mass-radius constraint on the given figure."""
         x_lim = ax.get_xlim()
         y_lim = ax.get_ylim()
+
+        # for the legend
+        dummy_line = ax.plot([], [], label=self.name, linewidth=2, **kwargs) 
+        color = dummy_line[0].get_color()
+
         show_x, show_y = np.meshgrid(
             np.linspace(*x_lim, resolution), np.linspace(*y_lim, resolution))
-        test_data = np.column_stack((show_x.flatten(), show_y.flatten()))
+        # test_data = np.column_stack((show_x.flatten(), show_y.flatten()))
+        test_data = np.stack((show_x.flatten(), show_y.flatten()))
         test_scores = self.KDE.pdf(test_data)
         test_scores = np.exp(test_scores).reshape(resolution, resolution)
-        level_90 = np.percentile(test_scores, 90)
-        
-        # just for legend and color cycle
-        dummy_line = ax.plot([], [], label=self.name, linewidth=2) 
-        colour = dummy_line[0].get_color()
-        cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white",colour])
 
-        ax.contour(show_x, show_y, test_scores, levels=[level_90], colors=[colour], linewidths=2, label = "Contour")  
-        ax.imshow(test_scores, aspect= 'auto', cmap = cmap, extent = [*x_lim, *y_lim], origin = 'lower')
+        # levels = np.percentile(test_scores, [68, 95, 99.7])   
+        levels = 50  
+        # ax.contour(show_x, show_y, test_scores, levels=[level_90], colors=[color], linewidths=2) 
+        cmap = fading_cmap(color)
+        ax.contourf(show_x, show_y, 10*test_scores, levels=levels, cmap = cmap)
 
+        return ax
+    
 class PulsarConstraint(LowerMTOVConstraint):
     '''legacy synonym for general LowerMTOVConstraint'''
 class MTOVUpperConstraint(UpperMTOVConstraint):
@@ -504,7 +571,6 @@ def EOSSorting(eos_files, out_dir, sort_quantity_array):
     sort_quantity_array: iterable 
         Contains the quantity by which EoS files should be sorted, typically prior probability or an associated observable (e.g. Lambda_1.4)
     """
-    import os
     sort_quantity_array=np.atleast_1d(sort_quantity_array).argsort()
     sortIdcs = sort_quantity_array.argsort()
     for i, eos_file in enumerate(eos_files):

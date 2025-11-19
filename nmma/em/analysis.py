@@ -1,23 +1,15 @@
-import json
 import os
-from pathlib import Path
-import yaml
-from ast import literal_eval
-
-import bilby
 import matplotlib
 import numpy as np
 import pandas as pd
-from bilby.core.likelihood import ZeroLikelihood
 
-from matplotlib.pyplot import cm
-
-from .lightcurve_handling import make_injection
+from .lightcurve_handling import make_injection, post_process_bestfit, bestfit_lightcurve
 from .em_likelihood import EMTransientLikelihood
 from .prior import create_prior_from_args
 from . import io, model, utils  
-from .plotting_utils import basic_em_analysis_plot, bolometric_lc_plot
+from .plotting_utils import bolometric_lc_plot
 from .em_parsing import parsing_and_logging, multi_wavelength_analysis_parser, bolometric_parser
+from ..joint.base import bilby_sampling, multi_analysis_loop
 from ..joint.utils import read_injection_file, set_filename, read_bestfit_from_posterior, read_trigger_time
 matplotlib.use("agg")
 
@@ -61,196 +53,6 @@ def set_analysis_filters(filters, data):
     print(f"Running with filters {filters_to_analyze}")
     return filters_to_analyze
 
-def em_only_sampling(likelihood, priors, args, injection_parameters=None):
-
-    if args.bilby_zero_likelihood_mode:
-        likelihood = ZeroLikelihood(likelihood)
-
-    # fetch the additional sampler kwargs
-    sampler_kwargs = literal_eval(args.sampler_kwargs)
-    print("Running with the following additional sampler_kwargs:")
-    print(sampler_kwargs)
-
-    # check if it is running with reactive sampler
-    nlive = None if args.reactive_sampling else args.nlive
-    if nlive is None and args.sampler != "ultranest":
-        raise ValueError("reactive sampling is only available for ultranest, "
-                         "please set nlive or use ultranest sampler")
-
-
-    if args.skip_sampling:
-        print("Sampling for 1 iteration and plotting checkpointed results.")
-        if args.sampler == "pymultinest":
-            sampler_kwargs["max_iter"] = 1
-        elif args.sampler == "ultranest":
-            sampler_kwargs["niter"] = 1
-        elif args.sampler == "dynesty":
-            sampler_kwargs["maxiter"] = 1
-
-    result = bilby.run_sampler(
-        likelihood,
-        priors,
-        sampler=args.sampler,
-        outdir=args.outdir,
-        label=args.label,
-        nlive=nlive,
-        seed=args.sampling_seed,
-        soft_init=args.soft_init,
-        queue_size=args.cpus,
-        check_point_delta_t=3600,
-        save=False,
-        **sampler_kwargs,
-    )
-
-    # check if it is running under mpi
-    try:
-        from mpi4py import MPI
-
-        rank = MPI.COMM_WORLD.Get_rank()
-        if rank != 0:
-            exit()
-    except ImportError:
-        pass
-
-    result.save_to_file()
-    result.save_posterior_samples()
-
-    if injection_parameters: 
-        var_columns = {col for col in result.posterior 
-                       if len(result.posterior[col].unique()) > 1}
-        injection_parameters = {k: v for k, v in injection_parameters.items()
-                        if k in var_columns}
-        
-    result.plot_corner(injection_parameters)
-
-def post_process_bestfit(bestfit_params, transient, args, result=None):
-    best_mags = bestfit_lightcurve(transient, bestfit_params)
-    if hasattr(transient, 'systematics_filters'):
-        model_error = {filt: transient.filt_err_from_systematics_sampling(
-            transient.systematics_filters[filt], bestfit_params, best_mags["time"])
-                        for filt in best_mags.keys() if filt != "time"}
-    else: 
-        model_error = transient.compute_em_err(bestfit_params)
-
-    # model may not necessarily work on observed filters:
-    for filt in set(transient.observed_filters) - set(best_mags.keys()):
-        best_mags[filt] =  utils.get_filtered_mag(best_mags, filt)
-        model_error[filt]= utils.get_filtered_mag(model_error, filt)
-
-    
-    transient.parameters = bestfit_params
-    chi2_dict, mismatches = compute_chisquare_dict(transient, best_mags, 
-                                        model_error, verbose=args.verbose)
-
-    if getattr(args, "bestfit", False):
-        bestfit_to_write = bestfit_params.copy()
-        if result is not None:
-            bestfit_to_write["log_bayes_factor"] = result.log_bayes_factor
-            bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
-        bestfit_to_write["Magnitudes"] = {filt: best_mags[filt].tolist() 
-                                          for filt in transient.observed_filters}
-        bestfit_to_write["obs_times"] = best_mags["time"].tolist()
-        bestfit_to_write["chi2_per_dof"] = chi2_dict["total"]
-        bestfit_to_write["chi2_dict"] = chi2_dict
-        bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
-
-        with open(bestfit_file, "w") as file:
-            json.dump(bestfit_to_write, file, indent=4)
-
-        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
-
-    if args.plot:
-        filters_to_plot = [
-            filt for filt in transient.observed_filters
-            if not np.isnan(transient.light_curves[filt]).all()
-        ]
-        plot_error = {filt: model_error[filt] for filt in filters_to_plot}
-        mags_to_plot = {filt: best_mags[filt] for filt in filters_to_plot}
-        mags_to_plot["time"] = best_mags["time"]
-
-        if isinstance(transient.light_curve_model, model.CombinedLightCurveModelContainer):
-            sub_models = transient.light_curve_model.models
-            model_colors = cm.Spectral(np.linspace(0, 1, len(sub_models)))[::-1]
-            obs_times , mag_all = transient.light_curve_model.gen_detector_lc(
-                bestfit_params, return_all=True
-            )
-            sub_model_plot_props = {}
-            for i, sub_model in enumerate(sub_models):
-                sub_model_plot_props[sub_model.model] ={
-                    'color': model_colors[i], 
-                    'plot_times': obs_times[i]
-                }
-                plot_mags = []
-                for filt in filters_to_plot:
-                    try:
-                        plot_mags.append(utils.get_filtered_mag(mag_all[i], filt))
-                    except KeyError:
-                        plot_mags.append(np.full_like(obs_times[i], np.nan))
-
-                sub_model_plot_props[sub_model.model]['plot_mags'] = plot_mags
-        else: sub_model_plot_props = None
-
-        
-        basic_em_analysis_plot(
-            transient, mags_to_plot, plot_error, chi2_dict, mismatches,
-            sub_model_plot_props, xlim = args.xlim, ylim = args.ylim, 
-            save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
-        )
-
-def bestfit_lightcurve(transient, bestfit_params, sample_times=None):
-    
-    light_curve_model = transient.light_curve_model
-    observable_times, obs_lightcurve = light_curve_model.gen_detector_lc(
-        bestfit_params, sample_times
-    )
-    if not isinstance(obs_lightcurve, dict): # bolometric model, have to turn it into a dict
-        obs_lightcurve = {'lbol': obs_lightcurve}
-    obs_lightcurve["time"] = observable_times
-    return obs_lightcurve
-       
-def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
-    chi2 = 0.0
-    dof = 0.0
-    chi2_dict = {}
-    mismatches = {}
-    for filt  in model_data.keys():
-        if filt=="time":
-            continue
-        mag = transient.light_curves[filt]
-        t = transient.light_curve_times[filt]
-        sigma_y = transient.light_curve_uncertainties[filt]
-        # only the detection data are needed
-        finite_idx = np.isfinite(sigma_y)
-        n_finite = finite_idx.sum()
-        if n_finite > 0:
-            t_det, y_det, sigma_y_det = (
-                t[finite_idx],
-                mag[finite_idx],
-                sigma_y[finite_idx],
-            )
-            
-            offset = (y_det - np.interp(t_det,model_data["time"], model_data[filt])) ** 2
-            try:
-                errors = np.interp(t_det,model_data["time"], model_error[filt])
-            except ValueError:
-                errors = model_error[filt] 
-            total_unc = sigma_y_det**2 + errors**2
-            chi2_per_filt = np.sum(offset / total_unc)
-            # store the data
-            chi2 += chi2_per_filt
-            dof += n_finite
-            mismatches[filt] = (offset, total_unc)
-            chi2_dict[filt] = float(chi2_per_filt / n_finite)
-
-            if verbose:
-                print(f"the {filt} data being analyzed is: ", t, mag, sigma_y)
-                print(f"for {filt} the length of the detections array is: ", n_finite, "increasing the dof to", dof)
-
-    chi2_dict["total"] = chi2 / dof if dof > 0 else np.inf
-    chi2_dict["dof"] = dof
-
-    return chi2_dict, mismatches
-
 
 def bolometric_analysis(args):
 
@@ -269,7 +71,7 @@ def bolometric_analysis(args):
     )
 
     # setup the prior
-    priors = create_prior_from_args(args, args.em_model)
+    priors = create_prior_from_args(args, light_curve_model)
 
     # setup the likelihood
     likelihood_kwargs = dict(
@@ -280,7 +82,7 @@ def bolometric_analysis(args):
         verbose=args.verbose,
     )
     likelihood = EMTransientLikelihood(**likelihood_kwargs)
-    em_only_sampling(likelihood, priors, args)
+    bilby_sampling(likelihood, priors, args)
 
     if args.bestfit or args.plot:
         transient = likelihood.sub_model
@@ -341,8 +143,7 @@ def analysis(args):
                                 if k in injlist_all}
     
     # setup the prior
-    priors = create_prior_from_args(args, model_names)
-
+    priors = create_prior_from_args(args, light_curve_model)
     light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
     utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
     # setup the likelihood
@@ -360,7 +161,7 @@ def analysis(args):
 
     likelihood = EMTransientLikelihood(**likelihood_kwargs)
 
-    em_only_sampling(likelihood, priors, args, injection_parameters)
+    bilby_sampling(likelihood, priors, args, injection_parameters)
 
     if args.bestfit or args.plot:
         bestfit_params = read_bestfit_from_posterior(args)
@@ -405,7 +206,7 @@ def nnanalysis(args):
     )
     
     # setup the prior
-    priors = create_prior_from_args(args, args.em_model)
+    priors = create_prior_from_args(args, light_curve_model)
     
     # now that we have the kilonova light curve, we need to pad it with non-detections
     # this part is currently hard coded in terms of the times !!!! likely will need the most work
@@ -469,21 +270,6 @@ def nnanalysis(args):
     flow_result = cast_as_bilby_result(samples, truth, priors=priors)
     fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
     print('saved posterior plot')
-
-def multi_analysis_loop(args, analysis_function):
-    if getattr(args, 'config', None) is not None:
-        yaml_dict = yaml.safe_load(Path(args.config).read_text())
-        for analysis_set in yaml_dict.keys():
-            params = yaml_dict[analysis_set]
-            for key, value in params.items():
-                key = key.replace("-", "_")
-                if key not in args:
-                    print(f"{key} not a known argument... please remove")
-                    exit()
-                setattr(args, key, value)
-            analysis_function(args)
-    else:
-        analysis_function(args)
 
 def main(args=None):
     args = parsing_and_logging(multi_wavelength_analysis_parser, args)

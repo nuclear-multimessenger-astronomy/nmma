@@ -2,9 +2,10 @@ from __future__ import division
 import numpy as np
 from bilby_pipe.utils import convert_string_to_dict
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
+from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
 
-def setup_gw_likelihood(data_dump, args, logger, **kwargs):
+def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     """
     Set up the gravitational-wave likelihood.
     We read some required args for the chosen gw-likelihood in this process.
@@ -21,7 +22,6 @@ def setup_gw_likelihood(data_dump, args, logger, **kwargs):
     """
     default_gw_kwargs = initialisation_args_from_signature_and_namespace(
         GravitationalWaveTransientLikelihood, args, prefixes=['gw_'])
-
     gw_kwargs = default_gw_kwargs | dict(
             interferometers=data_dump["ifo_list"],
             waveform_generator=data_dump["waveform_generator"],
@@ -203,6 +203,12 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
 
         super().__init__(gw_transient, priors)
 
+    def parameter_conversion(self, parameters):
+        return convert_to_lal_binary_black_hole_parameters(parameters)
 
+    def sanity_checks(self):
+        #TODO: add additional checks RelativeBinning!
+        return True
+    
     def noise_log_likelihood(self):
         return self.sub_model.noise_log_likelihood()

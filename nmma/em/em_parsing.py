@@ -6,7 +6,7 @@ import numpy as np
 from ..utils.models import refresh_models_list
 from .utils import DEFAULT_FILTERS
 from bilby.core.utils import setup_logger
-from ..joint.base_parsing import (nmma_base_parsing, base_analysis_parsing, 
+from ..joint.base_parsing import (nmma_base_parsing, single_messenger_analysis_parsing, 
     base_injection_parsing, pipe_inj_parsing, nonefloat, noneint, nonestr )
 
 
@@ -42,31 +42,17 @@ def basic_em_only_parsing(parser):
 
 
 def basic_em_only_analysis_parsing(parser):
+    parser = single_messenger_analysis_parsing(parser)
 
-    parser.add_argument("--config", help="Name of the configuration file containing parameter values.")
     parser.add_argument("--trigger-time", 
         help="Trigger time, format will be inferred but can be but can be explicitly adjusted with --time-format, not required if injection set is provided")
     parser.add_argument("--light-curve-data", "--data", help="Path to data in [time filter magnitude error] format, time format will be inferred, but can be explicitly adjusted with --time-format. If not given, will try to generate data from the injection file.")
     parser.add_argument("--time-format", 
         help="Time format of the light curve data, e.g. isot, mjd, see https://docs.astropy.org/en/stable/time/#time-format")
-    parser.add_argument("--prior-file","--prior", help="Path to the prior file")
-    parser.add_argument("--skip-sampling", action='store_true', 
-        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
     parser.add_argument("--bestfit", action='store_true',
         help="Save the best fit parameters and magnitudes to JSON")
-    parser.add_argument("--sampler", default="pymultinest",
-        help="Sampler to be used (default: pymultinest)")
-    parser.add_argument("--sampler-kwargs", default="{}", 
-        help="Additional kwargs (e.g. {'evidence_tolerance':0.5}) for bilby.run_sampler, put a double quotation marks around the dictionary")
-    parser.add_argument("--soft-init", action='store_true',
-        help="To start the sampler softly (without any checking, default: False)")
-    parser.add_argument("--cpus", type=int, default=1,
-        help="Number of cores to be used, only needed for dynesty (default: 1)")
-    parser.add_argument("-n","--nlive", type=int, default=2048, help="Number of live points (default: 2048)")
     parser.add_argument("--cosmology", help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)")
 
-    parser.add_argument("--reactive-sampling", action='store_true',
-        help="To use reactive sampling in ultranest (default: False)")
     return parser
 
 def multi_wavelength_parsing(parser):
@@ -262,10 +248,8 @@ def multi_wavelength_analysis_parser(parser):
     parser.description="Inference on transient parameters from multi-wavelength observations."
     parser.add_help=True
     
-    parser = basic_em_only_parsing(parser)
-    parser = base_analysis_parsing(parser)
-    parser = em_analysis_parsing(parser)
     parser = basic_em_only_analysis_parsing(parser)
+    parser = em_analysis_parsing(parser)
     parser = em_only_injection_parsing(parser)
     parser = skymap_parsing(parser)
 
@@ -282,9 +266,7 @@ def bolometric_parser(parser):
     parser.description="Inference on astronomical transient parameters with bolometric luminosity data."
     parser.add_help=True
     
-    parser = basic_em_only_parsing(parser)
     parser = em_time_parsing(parser)
-    parser = base_analysis_parsing(parser)
     parser = basic_em_only_analysis_parsing(parser)
     parser = modified_em_prior_parsing(parser)
     #FIXME: add injection to bol_ analysis, this currently does not work
@@ -388,7 +370,7 @@ def multi_lc_parser(parser):
         help='Employ Savitzky-Golay filter for smoothing')
     parser.add_argument("--dMpc", type=float, default=1e-5,
         help="distance in Mpc, default is 10 pc to get lightcurves in Absolute Mag" )
-    parser.add_argument("--z", type=float, 
+    parser.add_argument("--redshift","--z", type=float, 
         help="redshift, if provided it dominates over dMpc")
 
     return parser

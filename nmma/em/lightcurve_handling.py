@@ -1,39 +1,160 @@
 import os
 import shutil
+import json
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from gwpy.table import Table
-from ligo.skymap import bayestar, distance
-from ligo.skymap.io import read_sky_map
 import sncosmo
 from astropy import units as u
 from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
 
 from .lightcurve_generation import create_light_curve_data
-from . import io, utils, em_parsing as emp
-from .model import  create_light_curve_model_from_args, create_injection_model
-from .plotting_utils import lc_plot_with_histogram
+from . import io, model, utils, em_parsing as emp
+from .plotting_utils import lc_plot_with_histogram, basic_em_analysis_plot
 
 from ..joint.constants import default_cosmology, D, c_cgs
-from ..joint.conversion import (MultimessengerConversion, 
-                                   mass_ratio_to_eta,
-                                   luminosity_distance_to_redshift,
-                                   component_masses_to_mass_quantities,
-                                   chirp_mass_and_eta_to_component_masses)
+from ..joint import conversion as conv 
 from ..joint.utils import read_injection_file, set_filename, read_trigger_time
 
 from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict
 
+def post_process_bestfit(bestfit_params, transient, args, result=None):
+    best_mags = bestfit_lightcurve(transient, bestfit_params)
+    if hasattr(transient, 'systematics_filters'):
+        model_error = {filt: transient.filt_err_from_systematics_sampling(
+            transient.systematics_filters[filt], bestfit_params, best_mags["time"])
+                        for filt in best_mags.keys() if filt != "time"}
+    else: 
+        model_error = transient.compute_em_err(bestfit_params)
+
+    # model may not necessarily work on observed filters:
+    for filt in set(transient.observed_filters) - set(best_mags.keys()):
+        best_mags[filt] =  utils.get_filtered_mag(best_mags, filt)
+        model_error[filt]= utils.get_filtered_mag(model_error, filt)
+
+    
+    # transient.parameters = bestfit_params
+    chi2_dict, mismatches = compute_chisquare_dict(transient, best_mags, 
+                                        model_error, verbose=args.verbose)
+
+    if getattr(args, "bestfit", False):
+        bestfit_to_write = bestfit_params.copy()
+        if result is not None:
+            bestfit_to_write["log_bayes_factor"] = result.log_bayes_factor
+            bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
+        bestfit_to_write["Magnitudes"] = {filt: best_mags[filt].tolist() 
+                                          for filt in transient.observed_filters}
+        bestfit_to_write["obs_times"] = best_mags["time"].tolist()
+        bestfit_to_write["chi2_per_dof"] = chi2_dict["total"]
+        bestfit_to_write["chi2_dict"] = chi2_dict
+        bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
+
+        with open(bestfit_file, "w") as file:
+            json.dump(bestfit_to_write, file, indent=4)
+
+        print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
+
+    if args.plot:
+        filters_to_plot = [
+            filt for filt in transient.observed_filters
+            if not np.isnan(transient.light_curves[filt]).all()
+        ]
+        plot_error = {filt: model_error[filt] for filt in filters_to_plot}
+        mags_to_plot = {filt: best_mags[filt] for filt in filters_to_plot}
+        mags_to_plot["time"] = best_mags["time"]
+
+        if isinstance(transient.light_curve_model, model.CombinedLightCurveModelContainer):
+            sub_models = transient.light_curve_model.models
+            model_colors = plt.cm.Spectral(np.linspace(0, 1, len(sub_models)))[::-1]
+            obs_times , mag_all = transient.light_curve_model.gen_detector_lc(
+                bestfit_params, return_all=True
+            )
+            sub_model_plot_props = {}
+            for i, sub_model in enumerate(sub_models):
+                sub_model_plot_props[sub_model.model] ={
+                    'color': model_colors[i], 
+                    'plot_times': obs_times[i]
+                }
+                plot_mags = []
+                for filt in filters_to_plot:
+                    try:
+                        plot_mags.append(utils.get_filtered_mag(mag_all[i], filt))
+                    except KeyError:
+                        plot_mags.append(np.full_like(obs_times[i], np.nan))
+
+                sub_model_plot_props[sub_model.model]['plot_mags'] = plot_mags
+        else: sub_model_plot_props = None
+
+        
+        basic_em_analysis_plot(
+            transient, mags_to_plot, plot_error, chi2_dict, mismatches,
+            sub_model_plot_props, xlim = args.xlim, ylim = args.ylim, 
+            save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
+        )
+
+def bestfit_lightcurve(transient, bestfit_params, sample_times=None):
+    
+    light_curve_model = transient.light_curve_model
+    observable_times, obs_lightcurve = light_curve_model.gen_detector_lc(
+        bestfit_params, sample_times
+    )
+    if not isinstance(obs_lightcurve, dict): # bolometric model, have to turn it into a dict
+        obs_lightcurve = {'lbol': obs_lightcurve}
+    obs_lightcurve["time"] = observable_times
+    return obs_lightcurve
+       
+def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
+    chi2 = 0.0
+    dof = 0.0
+    chi2_dict = {}
+    mismatches = {}
+    for filt  in model_data.keys():
+        if filt=="time":
+            continue
+        mag = transient.light_curves[filt]
+        t = transient.light_curve_times[filt]
+        sigma_y = transient.light_curve_uncertainties[filt]
+        # only the detection data are needed
+        finite_idx = np.isfinite(sigma_y)
+        n_finite = finite_idx.sum()
+        if n_finite > 0:
+            t_det, y_det, sigma_y_det = (
+                t[finite_idx],
+                mag[finite_idx],
+                sigma_y[finite_idx],
+            )
+            
+            offset = (y_det - np.interp(t_det,model_data["time"], model_data[filt])) ** 2
+            try:
+                errors = np.interp(t_det,model_data["time"], model_error[filt])
+            except ValueError:
+                errors = model_error[filt] 
+            total_unc = sigma_y_det**2 + errors**2
+            chi2_per_filt = np.sum(offset / total_unc)
+            # store the data
+            chi2 += chi2_per_filt
+            dof += n_finite
+            mismatches[filt] = (offset, total_unc)
+            chi2_dict[filt] = float(chi2_per_filt / n_finite)
+
+            if verbose:
+                print(f"the {filt} data being analyzed is: ", t, mag, sigma_y)
+                print(f"for {filt} the length of the detections array is: ", n_finite, "increasing the dof to", dof)
+
+    chi2_dict["total"] = chi2 / dof if dof > 0 else np.inf
+    chi2_dict["dof"] = dof
+
+    return chi2_dict, mismatches
 
 def lcs_from_injection_parameters(args=None):
     args = emp.parsing_and_logging(emp.lightcurve_parser, args)
     
     # initialize light curve model
-    light_curve_model = create_light_curve_model_from_args(args.em_model, args)
+    light_curve_model = model.create_light_curve_model_from_args(args.em_model, args)
     # lightcurve model will set them to usable list
     filters = light_curve_model.filters
 
@@ -107,8 +228,9 @@ def make_injection(injection_parameters, args, filters = None, injection_model =
 
     if injection_model is None:
         print("Creating injection light curve model")
-        injection_model = create_injection_model(args, filters)
-
+        injection_model = model.create_injection_model(args, filters)
+    
+    injection_parameters = injection_model.parameter_conversion(injection_parameters)
     data = create_light_curve_data(
         injection_parameters,
         args,
@@ -141,14 +263,14 @@ class LightCurveHandler:
         self.filters = utils.set_filters(args)
 
         # Use redshift or dMpc if z is not provided
-        if args.z is None:
+        if args.redshift is None:
             self.dMpc = args.dMpc
-            self.z = luminosity_distance_to_redshift(self.dMpc, default_cosmology)
+            self.redshift = conv.luminosity_distance_to_redshift(self.dMpc, default_cosmology)
             dist_filler = f"dMpc{int(self.dMpc)}"
         else:
-            self.z = args.z
-            self.dMpc = default_cosmology.luminosity_distance(self.z).to("Mpc").value
-            dist_filler = f"z{self.z}"
+            self.redshift = args.redshift
+            self.dMpc = default_cosmology.luminosity_distance(self.redshift).to("Mpc").value
+            dist_filler = f"z{self.redshift}"
         
         if args.doAB:
             self.format = "model"
@@ -213,9 +335,9 @@ class LightCurveHandler:
             f"{base}_theta{self.thetas[index]:.2f}_{self.dist_filler}.dat")
 
     def process_source(self, i, data):
-        wave = data[self.Nwave * i : self.Nwave * (i + 1), 0] * (1 + self.z)
+        wave = data[self.Nwave * i : self.Nwave * (i + 1), 0] * (1 + self.redshift)
         Istokes = data[self.Nwave * i : self.Nwave * (i + 1), 1 :len(self.time)+1]
-        fl = Istokes.T * (1e-5 / self.dMpc) ** 2 / (1 + self.z)
+        fl = Istokes.T * (1e-5 / self.dMpc) ** 2 / (1 + self.redshift)
 
         return (wave, fl)
 
@@ -234,7 +356,7 @@ class LightCurveHandler:
 
     def compose_lbol_data(self, processed_data):
         wave, fl = processed_data
-        Lbol = np.trapz(fl * (4 * np.pi * D**2), x=wave)
+        Lbol = np.trapezoid(fl * (4 * np.pi * D**2), x=wave)
         return { "time": self.time, "lbol": Lbol }
 
 class LANLLightCurveHandler(LightCurveHandler):
@@ -275,7 +397,7 @@ class H5LightCurveHandler(LightCurveHandler):
             data = f["observables"]
             stokes = np.array(data["stokes"])
             self.time = np.array(data["time"]) / (60 * 60 * 24)  # get time in days
-            self.wave = np.array(data["wave"]) * (1 + self.z)  # wavelength spec w/ redshift
+            self.wave = np.array(data["wave"]) * (1 + self.redshift)  # wavelength spec w/ redshift
             self.Lbol = np.array(data["lbol"])
 
         Istokes = stokes[:, :, :, 0]  # get I stokes parameter
@@ -286,7 +408,7 @@ class H5LightCurveHandler(LightCurveHandler):
         return range(Nobs), Istokes
 
     def process_filter_source(self, i, data):
-        fl = data[i] * (1.0 / self.dMpc) ** 2 / (1 + self.z)
+        fl = data[i] * (1.0 / self.dMpc) ** 2 / (1 + self.redshift)
         return (self.wave, fl)
     
     def process_lbol_source(self, i, data):
@@ -342,7 +464,7 @@ class KasenLightCurveHandler(LightCurveHandler):
 
     def compose_lbol_data(self, processed_data):
         wave, _ = processed_data
-        lbol = np.trapz( self.Lnu * self.nu ** 2.0 / c_cgs / 1e8 * (4 * np.pi * D**2),
+        lbol = np.trapezoid( self.Lnu * self.nu ** 2.0 / c_cgs / 1e8 * (4 * np.pi * D**2),
             x=wave )
         if self.smoothing:
             lbol = 10**utils.autocomplete_data(self.time, self.time, np.log10(lbol))
@@ -473,7 +595,7 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     filters = utils.set_filters(args)
     if filters is None:
         filters = 'u,g,r,i,z,y,J,H,K'
-    light_curve_model = create_light_curve_model_from_args(args.em_model, args, filters)
+    light_curve_model = model.create_light_curve_model_from_args(args.em_model, args, filters)
     
 
     ## read eos and gw data
@@ -496,9 +618,10 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
 
 
     elif args.coinc_file is not None:
+        from ligo.skymap import bayestar, distance, io as lio
         data_out = Table.read(args.coinc_file, format="ligolw", tablename="sngl_inspiral")
         data_out["m1"], data_out["m2"] = data_out["mass1"], data_out["mass2"]
-        skymap = read_sky_map(args.skymap, moc=True, distances=True)
+        skymap = lio.fits.read_sky_map(args.skymap, moc=True, distances=True)
         skymap = bayestar.rasterize(skymap, order=9)
         dist_mean, dist_std = distance.parameters_to_marginal_moments(
             skymap["PROB"], skymap["DISTMU"], skymap["DISTSIGMA"]
@@ -561,11 +684,11 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
             log10_alpha = rng.uniform(log10_alpha_min, log10_alpha_max)
             alpha = 10 ** log10_alpha
         params.update({ "alpha"         : alpha,
-                        "log10_alpha"   : log10_alpha, 
                         "ratio_zeta"    : zeta})
         
-        conversion = MultimessengerConversion(args, 
-                messengers=['gw', 'em'], ana_modifiers=['tabulated_eos'])
+        conversion = conv.MultimessengerConversion(args, 
+                messengers=['gw', 'em'], ana_modifiers=['tabulated_eos'], 
+                internal_conversions={'em': light_curve_model.parameter_conversion})
         complete_parameters, _ = conversion.convert_to_multimessenger_parameters(params)
 
         log10_mej_dyn = complete_parameters["log10_mej_dyn"].item()
@@ -627,13 +750,13 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
 
 def get_all_gw_quantities(data_out):
     try:
-        data_out["mchirp"], data_out["eta"], data_out["q"] = component_masses_to_mass_quantities(
+        data_out["mchirp"], data_out["eta"], data_out["q"] = conv.component_masses_to_mass_quantities(
             data_out["m1"], data_out["m2"]
         )
     except KeyError:
-        data_out["eta"] = mass_ratio_to_eta(data_out["q"])
+        data_out["eta"] = conv.mass_ratio_to_eta(data_out["q"])
         data_out["mchirp"] = data_out["mc"]
-        data_out["m1"], data_out["m2"] = chirp_mass_and_eta_to_component_masses(data_out["mchirp"], data_out["eta"])
+        data_out["m1"], data_out["m2"] = conv.chirp_mass_and_eta_to_component_masses(data_out["mchirp"], data_out["eta"])
     
     
     data_out["weight"] = 1.0 / len(data_out["m1"])

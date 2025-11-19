@@ -2,12 +2,12 @@ from __future__ import division
 import numpy as np
 from scipy.stats import norm, truncnorm
 from ast import literal_eval
-from astropy.time import Time
 import warnings
 warnings.filterwarnings("error", category=RuntimeWarning)
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
 from ..joint.utils import read_trigger_time
 from . import model, utils, systematics
+from .lightcurve_handling import post_process_bestfit
 
 
 
@@ -24,7 +24,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     light_curve_model = model.create_light_curve_model_from_args(lc_model, args, filters)
     trigger_time = read_trigger_time(None, args)
     light_curve_data = utils.setup_filtered_lc_data(light_curve_data, trigger_time)
-    light_curve_data = utils.check_time_consistency(light_curve_data, light_curve_model, args)
+    utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
 
     em_kwargs = initialisation_args_from_signature_and_namespace(
         EMTransientLikelihood, args, ['em_', 'kilonova_']
@@ -35,6 +35,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
         light_curve_model=light_curve_model,light_curve_data=light_curve_data,
         priors = priors, filters=filters,
         error_budget=args.em_error_budget,
+        params_from_prior_conversion = False
     )
     return em_kwargs | em_likelihood_kwargs
 
@@ -58,6 +59,10 @@ class EMTransientLikelihood(NMMABaseLikelihood):
     error_budget: Any (default:1)
         Additionally introduced statistical error on the light curve data,
         so as to keep the systematic error under control. This will only be used if the parameters-dict does not containt a 'em_syserr' sampling parameter.
+    verbose: bool (default: False)
+        If True, print additional information during computation
+    params_from_prior_conversion: bool (default: True)
+        If True, the parameters are assumed to be set during prior conversion.
 
     Returns
     -------
@@ -75,9 +80,10 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         detection_limit=np.inf,
         error_budget=1.0,
         verbose=False,
+        params_from_prior_conversion = True,
         **kwargs
     ):  
-        basic_transient_args = (light_curve_model, light_curve_data, priors, detection_limit, error_budget, verbose)
+        basic_transient_args = (light_curve_model, light_curve_data, priors, detection_limit, error_budget, verbose, params_from_prior_conversion)
         
         if filters:
             sub_model = MultiFilterTransient(filters, *basic_transient_args, kwargs.get("systematics_file", None))
@@ -86,8 +92,31 @@ class EMTransientLikelihood(NMMABaseLikelihood):
 
         super().__init__(sub_model=sub_model, priors=priors, **kwargs)
 
+    def parameter_conversion(self, parameters):
+        converted_parameters = self.sub_model.light_curve_model.parameter_conversion(parameters)
+        return converted_parameters, []
+
+    def sanity_checks(self):
+        return self.sub_model.light_curve_model.good_parameters
+    
     def __repr__(self):
         return f"{self.__class__.__name__} based on {self.sub_model.__repr__()}"
+    
+    def final_diagnostics(self, bestfit_params, args, result=None):
+        """Plot the best-fit light curve against the data
+
+        Parameters
+        ----------
+        bestfit_params: dict
+            Dictionary of best-fit parameters
+
+        Returns
+        -------
+        fig: matplotlib.figure.Figure
+            The figure object containing the plot
+
+        """
+        post_process_bestfit(bestfit_params, self.sub_model, args, result)
     
        
 
@@ -110,6 +139,8 @@ class BasicEMTransient:
         Detection limit for the light curve data
     verbose: bool (default: False)
         If True, print additional information during computation
+    params_from_prior_conversion: bool (default: True)
+        If True, the parameters are assumed to be set during prior conversion.
 
     Returns
     -------
@@ -121,7 +152,7 @@ class BasicEMTransient:
 
 
     def __init__(self, light_curve_model, light_curve_data, priors, 
-                 detection_limit, error_budget, verbose):
+                 detection_limit, error_budget, verbose, params_from_prior_conversion):
 
         self.light_curve_model = light_curve_model
 
@@ -136,6 +167,7 @@ class BasicEMTransient:
          self.light_curve_uncertainties, self.trigger_time) = light_curve_data
 
         self.verbose = verbose
+        self.internal_params = params_from_prior_conversion
         self.set_detection_limit(detection_limit)
 
     def set_detection_limit(self, detection_limit):
@@ -145,6 +177,8 @@ class BasicEMTransient:
         return f"{self.__class__.__name__} (light_curve_model={self.light_curve_model})"   
     
     def log_likelihood(self, parameters):
+        if self.internal_params:
+            parameters = self.light_curve_model.sampled_parameters
         obs_times, model_lc = self.light_curve_model.gen_detector_lc(parameters)
         
         # sanity check: did the model return a valid light curve?
@@ -224,38 +258,39 @@ class MultiFilterTransient(BasicEMTransient):
 
     Parameters
     ----------
-    light_curve_model: `nmma.em.LightCurveModelContainer`
-        An object which computes the light curve of a transient ignal,
-        given a set of parameters
-    light_curve_data: dict
-        Dictionary of light curve data 
     filters: list, str
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
+    light_curve_model: `nmma.em.LightCurveModelContainer`
+        An object which computes the light curve of a transient signal,
+        given a set of parameters
+    light_curve_data: dict
+        Dictionary of light curve data 
+    priors: dict, optional
+        Dictionary of prior distributions for the model parameters
+    detection_limit: float or dict (default: np.inf)
+        Detection limit for the light curve data
     error_budget: float (default: 1.0)
         Additionally introduced statistical error on the light curve data,
         so as to keep the systematic error in control
-    detection_limit: float or dict (default: np.inf)
-        Detection limit for the light curve data
     verbose: bool (default: False)
         If True, print additional information during computation
     systematics_file: str, optional
         Path to a YAML file containing systematic error information
-    priors: dict, optional
-        Dictionary of prior distributions for the model parameters
 
     """
 
     def __init__( self, filters,
         light_curve_model, light_curve_data, priors,
-        detection_limit, error_budget, verbose,
+        detection_limit, error_budget, verbose, params_from_prior_conversion,
         systematics_file=None,
     ):  
         
         self.observed_filters = filters
         self.model_filter_mapping, self.obs_average_mapping = utils.get_filter_name_mapping(filters)
 
-        super().__init__(light_curve_model, light_curve_data, priors, detection_limit, error_budget, verbose)
+        super().__init__(light_curve_model, light_curve_data, priors, detection_limit, 
+                         error_budget, verbose, params_from_prior_conversion)
         
 
         #determine_systematic_error_handling
@@ -337,6 +372,9 @@ class MultiFilterTransient(BasicEMTransient):
 
     def sanity_check(self, model_lc):
         if not model_lc:
+            return False
+        # this may happen if parameter conversion provides improper values, e.g. no E0 as EoS conversion entails a black hole
+        if any([np.isinf(mag).all() for mag in model_lc.values()]):
             return False
         return True
     

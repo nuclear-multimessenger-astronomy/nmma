@@ -63,6 +63,31 @@ def base_analysis_parsing(parser):
         help="Sampling seed (default: 42)")
     return parser
 
+def single_messenger_analysis_parsing(parser):
+    parser = base_analysis_parsing(parser)
+
+    parser.add_argument("--config", help="Name of the configuration file containing parameter values.")
+    parser.add_argument("-o", "--outdir", default="outdir",  help="Path to the output directory")
+    parser.add_argument("--label", default ="em_transient", help="Label for the run")
+    parser.add_argument("--plot", action='store_true', help="create characteristic plot")
+    parser.add_argument("--verbose", action='store_true', help="print out log likelihoods" )
+    parser.add_argument("--prior-file","--prior", help="Path to the prior file")
+    parser.add_argument("--sampler", default="pymultinest",
+        help="Sampler to be used (default: pymultinest)")
+    parser.add_argument("--sampler-kwargs", default="{}", 
+        help="Additional kwargs (e.g. {'evidence_tolerance':0.5}) for bilby.run_sampler, put a double quotation marks around the dictionary")
+    parser.add_argument("--soft-init", action='store_true',
+        help="To start the sampler softly (without any checking, default: False)")
+    parser.add_argument("--cpus", type=int, default=1,
+        help="Number of cores to be used, only needed for dynesty (default: 1)")
+    parser.add_argument("-n","--nlive", "--n-live", type=int, default=2048, help="Number of live points (default: 2048)")
+    parser.add_argument("--reactive-sampling", action='store_true',
+        help="To use reactive sampling in ultranest (default: False)")
+    parser.add_argument("--skip-sampling", action='store_true', 
+        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
+
+    return parser
+
 def base_injection_parsing(parser):
     parser.add_argument("-f", "--injection-file","--filename", default="injection", 
         help="Path to the file with injection parameters, default: 'injection'.")

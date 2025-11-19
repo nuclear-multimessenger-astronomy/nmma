@@ -8,7 +8,6 @@ from importlib import resources
 from scipy.integrate import quad, solve_ivp
 from scipy.special import erfc
 from scipy.interpolate import CubicSpline
-import sncosmo
 
 from .utils import (
     estimate_mag_err, autocomplete_data, flux_to_ABmag, 
@@ -38,6 +37,8 @@ from nmma.joint.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D
 seconds_a_day = 86400.0  
 abs_mag_dist_factor = D**2
 
+
+#################################################################
 def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared = abs_mag_dist_factor):
     exponent = np.clip(h * nu * inv_temp / kb, None, 700)  # to avoid overflow in exp
     bb_factor = 2.* h/ c_cgs**2
