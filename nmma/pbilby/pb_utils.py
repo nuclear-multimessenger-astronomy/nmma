@@ -41,10 +41,11 @@ def stdout_sampling_log(**kwargs):
     sys.stdout.flush()
 
 @time_storage
-def write_sample_dump(sampler, samples_file, search_parameter_keys, rng):
+def write_sample_dump(sampler, search_parameter_keys):
     """Writes a checkpoint file """
+    samples_file= sampler.samples_file
     weights = np.exp(sampler.saved_run.D["logwt"] - sampler.saved_run.D["logz"][-1])
-    samples, keep = rejection_sample(sampler.saved_run.D["v"], weights, rng)
+    samples, keep = rejection_sample(sampler.saved_run.D["v"], weights, sampler.rstate)
 
     logger.info(f"Writing {np.sum(keep)} current samples to {samples_file}")
     df = DataFrame(samples, columns=search_parameter_keys)
@@ -73,19 +74,19 @@ def plot_current_state(sampler, outdir, label):
 
 
 @time_storage
-def write_current_state(sampler, resume_file, sampling_time):
+def write_current_state(sampler, sampling_time):
     """Writes a checkpoint file
 
     Parameters
     ----------
     sampler: dynesty.NestedSampler
         The sampler object itself
-    resume_file: str
-        The name of the resume/checkpoint file to use
     sampling_time: float
         The total sampling time in seconds
     """
     print("")
+    resume_file = sampler.resume_file
+    pool = sampler.pool
     try:
         seconds = time() - os.path.getmtime(resume_file)
         m, s = divmod(seconds, 60)
@@ -98,24 +99,25 @@ def write_current_state(sampler, resume_file, sampling_time):
         logger.info("Start checkpoint writing" + " (no previous checkpoint)")
 
 
-    sampler.resume_kwargs = {"sampling_time" : sampling_time,
-        "bitgen_state" : sampler.rstate.bit_generator.state}
-
     if dill.pickles(sampler):
+        # Temporarily remove the pool to avoid pickling issues
+        sampler.pool = None
+        sampler.mapper = map
+        sampler.sampling_time = sampling_time
         temp_filename = resume_file + ".temp"
         with open(temp_filename, "wb") as file:
             with BufferedWriter(file) as buffer:
                 dill.dump(sampler, buffer, protocol=dill.HIGHEST_PROTOCOL)
         os.rename(temp_filename, resume_file)
         logger.info(f"Written checkpoint file {resume_file}")
+        sampler.pool = pool
+        sampler.mapper = pool.map
     else:
         logger.warning("Cannot write pickle resume file!")
 
-    # Delete the random state so that the object is unchanged
-    del sampler.resume_kwargs
 
 
-def read_saved_state(resume_file):
+def read_saved_state(resume_file, pool):
     """
     Read a saved state of the sampler to disk.
 
@@ -144,23 +146,23 @@ def read_saved_state(resume_file):
             if sampler.added_live:
                 sampler._remove_live_points()
 
-            resume_kwargs = sampler.resume_kwargs
-            bitgen = np.random.PCG64()
+            #reset pool
+            sampler.nqueue = -1
+            sampler.pool = pool
+            sampler.queue_size = pool.size
+            sampler.mapper = pool.map
             try:
-                bitgen.state = resume_kwargs["bitgen_state"] 
-            except KeyError:
-                bitgen.state = resume_kwargs["rstate_props"]
-            sampler.rstate = np.random.Generator(bitgen)
-            sampling_time = resume_kwargs.pop("sampling_time")
-            del sampler.resume_kwargs
+                sampling_time = sampler.sampling_time
+            except AttributeError:
+                sampling_time = sampler.resume_kwargs["sampling_time"]
         return sampler, sampling_time
     else:
         logger.info(f"Resume file {resume_file} does not exist.")
         return False, 0
 
 
-def checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot=False):
-    write_current_state(sampler, resume_file, sampling_time )
-    write_sample_dump(sampler, samples_file, run.sampling_keys, run.rstate)
+def checkpointing( run, sampler, sampling_time, checkpoint_plot=False):
+    write_current_state(sampler, sampling_time )
+    write_sample_dump(sampler, run.sampling_keys)
     if checkpoint_plot:
         plot_current_state(sampler, run.outdir, run.label)

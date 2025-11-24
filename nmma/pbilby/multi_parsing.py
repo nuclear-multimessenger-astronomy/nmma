@@ -97,7 +97,7 @@ def add_misc_settings(parser):
         help="Whether to generate analytical check-point plots")
     misc_group.add_argument("--save-bounds", action='store_true',
         help="Whether to store bounds in the resume file. Not doing this can make resume files large (~GB)")
-    misc_group.add_argument("--check-point-deltaT", default=3600, type=float,
+    misc_group.add_argument("--check-point-delta-t","--check-point-deltaT", default=3600, type=float,
         help="Write a checkpoint resume file and diagnostic plots every deltaT [s]. Default: 1 hour.")
     misc_group.add_argument("--plot", action='store_true',
         help="Whether to generate the various data plots at the end of the run")
