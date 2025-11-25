@@ -19,7 +19,7 @@ import lalsimulation
 import numpy as np
 
 
-from . multi_parsing import create_nmma_generation_parser, parse_generation_args
+from  .multi_parsing import create_nmma_generation_parser, parse_generation_args
 from ..em.prior import extinction_prior
 from ..em.io import load_em_observations
 from ..em.model import create_injection_model
@@ -125,6 +125,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         # nmma-defaults that might conflict with bilby/bilby_pipe defaults
         args.cosmology = getattr(args, "cosmology", default_cosmology.name)
         self.cosmology = args.cosmology
+        bilby.gw.cosmology.set_cosmology(self.cosmology)
 
         super().__init__(args, unknown_args)
         # Generic setup, ripped from bilby pipe
@@ -250,15 +251,15 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
     def create_priors(self, args, logger):
         priors = self._get_priors()
         priors = adjust_priors_for_nmma(priors, logger)
-        # add the ratio_epsilon in case it is not present (for no-grb case)
-        if "ratio_epsilon" not in priors:
-            priors["ratio_epsilon"] = DeltaFunction(0.01, "ratio_epsilon")
 
         ###adjust hubble prior if applicable
         # this may overwrite an existing Hubble prior from adjust_priors_for_nmma
         priors = adjust_hubble_prior(priors, args, logger)
 
-        if getattr(args, 'em_model', False):
+        if args.em_model or args.em_transient_class:
+            # add the ratio_epsilon in case it is not present (for no-grb case)
+            if "ratio_epsilon" not in priors:
+                priors["ratio_epsilon"] = DeltaFunction(0.01, "ratio_epsilon")
             priors = extinction_prior(priors, args)
 
         # construct the eos prior

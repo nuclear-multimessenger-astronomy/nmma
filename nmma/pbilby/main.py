@@ -1,30 +1,43 @@
 """
 Module to run parallel bilby using MPI
 """
-import json
-import os
+
+import mpi4py
+mpi4py.rc.threads = False
+mpi4py.rc.recv_mprobe = False
+del mpi4py
+
 import sys
-import datetime
-import time
-import signal
-
-import numpy as np
-from pandas import DataFrame
-
-from schwimmbad import MPIPool
-
-from .. import pb_utils
-from ..multi_parsing import create_nmma_analysis_parser, parse_analysis_args
-from .analysis_run import MainRun, WorkerRun
-
+import os
+from time import time
 from bilby.core.utils import logger
+
+import io
+import contextlib
+# Create buffers
+stdout_buffer = io.StringIO()
+stderr_buffer = io.StringIO()
+
+# Redirect python output into buffers
+redirect_out = contextlib.redirect_stdout(stdout_buffer)
+redirect_err = contextlib.redirect_stderr(stderr_buffer)
+
+redirect_out.__enter__()
+redirect_err.__enter__()
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
+from schwimmbad import MPIPool, MultiPool
+import signal
+from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args
+from .analysis_run import MainRun, WorkerRun
 
 def analysis_runner(
     data_dump,
     outdir=None,
     label=None,
     sample="acceptance-walk",
-    nlive=5,
+    nlive=1000,
     bound="live",
     walks=100,
     maxmcmc=5000,
@@ -37,7 +50,7 @@ def analysis_runner(
     bilby_zero_likelihood_mode=False,
     rejection_sample_posterior=True,
     #
-    check_point_deltaT=3600,
+    check_point_delta_t=3600,
     dlogz=0.1,
     save_bounds=False,
     n_check_point=1000,
@@ -45,6 +58,7 @@ def analysis_runner(
     max_run_time=1e10,
     checkpoint_plot=False,
     result_format="hdf5",
+    pool_type ='mpi',
     **kwargs,
 ):
     """
@@ -66,10 +80,18 @@ def analysis_runner(
     # Otherwise emulators retrace on each evaluation.
     global worker_run
     worker_run = WorkerRun(data_dump, bilby_zero_likelihood_mode)
-    t0 = datetime.datetime.now()
+    t0 = time()
     sampling_time = 0
-    with MPIPool(use_dill=True) as pool:
+    POOL = MPIPool if pool_type == 'mpi' else MultiPool
+    # Restore normal stdout/stderr
+    redirect_out.__exit__(None, None, None)
+    redirect_err.__exit__(None, None, None)
+
+    with POOL(use_dill=True) as pool:
         if pool.is_master():
+            sys.stdout.write(stdout_buffer.getvalue())
+            sys.stderr.write(stderr_buffer.getvalue())
+
             POOL_SIZE = pool.size
             run = MainRun(
                 worker_run.sampling_keys,
@@ -91,44 +113,20 @@ def analysis_runner(
                 facc=facc,
                 min_eff=min_eff,
                 enlarge=enlarge,
-                sampling_seed=sampling_seed
+                sampling_seed=sampling_seed,
+                sampler_kwargs = dict(dlogz=dlogz, save_bounds=save_bounds)
             )
             logger.info("Using priors:")
             for k, p in worker_run.priors.items():
                 logger.info(f"{k}: {p}")
-
-            resume_file = f"{run.outdir}/{run.label}_checkpoint_resume.pickle"
-            samples_file= f"{run.outdir}/{run.label}_samples.parquet"
-            sampler, sampling_time = pb_utils.read_saved_state(resume_file)
-
-            if sampler is False:
-                logger.info(f"Initializing sampling points with pool size={POOL_SIZE}")
-                live_points = run.get_initial_points_from_prior(pool)
-                logger.info(f"init_kwargs:  {run.init_sampler_kwargs}")
-                logger.info( f"Initialize NestedSampler with {run.init_sampler_kwargs}")
-                sampler = run.get_nested_sampler(live_points, pool)
-            else:
-                # Reinstate the pool and map (not saved in the pickle)
-                logger.info(f"Read in resume file with sampling_time = {sampling_time}")
-                sampler.pool = pool
-                sampler.queue_size = pool.size
-                sampler.M = pool.map
-                sampler.loglikelihood.pool = pool
-
-            logger.info(
-                f"Starting sampling for job {run.label}, with pool size={POOL_SIZE} "
-                f"and check_point_deltaT={check_point_deltaT}"
-            )
-
-            run_time = 0
-            early_stop = False
             
+            sampler, sampling_time = run.start_sampler(pool)
+
             ## graceful handling of preemptive shutdowns
             def handle_sigterm(signum, frame):
                 logger.info("Received SIGTERM, writing checkpoint and exiting.")
                 ## no time for plotting when file_size becomes larger
-                pb_utils.checkpointing(run, sampler, resume_file, samples_file, 
-                                       sampling_time, checkpoint_plot=False)
+                run.checkpointing(sampler, sampling_time, False)
                 pool.close()
                 pool.wait()
                 logger.info("Exited gracefully.")
@@ -136,41 +134,42 @@ def analysis_runner(
 
             signal.signal(signal.SIGTERM, handle_sigterm)
             signal.signal(signal.SIGINT , handle_sigterm)
+            signal.signal(signal.SIGUSR1, handle_sigterm)
 
-            sampler_kwargs = dict(dlogz=dlogz, save_bounds=save_bounds)
-            logger.info(f"Run criteria: {json.dumps(sampler_kwargs)}")
+            run_time = 0
+            last_checkpoint_time= t0
+            early_stop = False
+            logger.info(f"Run criteria: {run.sampler_kwargs}")
 
-            for it, res in enumerate(sampler.sample(**sampler_kwargs)):
-                pb_utils.stdout_sampling_log(
+            logger.info(f"Starting sampling for job {run.label}, with pool size={POOL_SIZE} "
+                f"and time between checkpoints ={check_point_delta_t}s" )
+            for it, res in enumerate(sampler.sample(**run.sampler_kwargs)):
+                run.stdout_sampling_log(
                     results=res, niter=it, ncall=sampler.ncall, dlogz=dlogz
                 )
 
-                iteration_time = (datetime.datetime.now() - t0).total_seconds()
-                t0 = datetime.datetime.now()
+                iteration_time = time() - t0
+                t0 = time()
 
                 sampling_time += iteration_time
                 run_time += iteration_time
-
-                if os.path.isfile(resume_file):
-                    last_checkpoint_s = time.time() - os.path.getmtime(resume_file)
-                else:
-                    last_checkpoint_s = np.inf
+                last_checkpoint_s = t0 - last_checkpoint_time
 
                 """
                 Criteria for writing checkpoints:
-                a) time since last checkpoint > check_point_deltaT
+                a) time since last checkpoint > check_point_delta_t
                 b) reached an integer multiple of n_check_point
                 c) reached max iterations
                 d) reached max runtime
                 """
 
                 if (
-                    last_checkpoint_s > check_point_deltaT
+                    last_checkpoint_s > check_point_delta_t
                     or (it % n_check_point == 0 and it != 0)
                     or it == max_its
                     or run_time > max_run_time
                 ):
-                    pb_utils.checkpointing( run, sampler, resume_file, samples_file, sampling_time, checkpoint_plot)
+                    run.checkpointing(sampler, sampling_time, checkpoint_plot)
                     if it == max_its:
                         exit_reason = 1
                         logger.info(
@@ -186,6 +185,7 @@ def analysis_runner(
                         )
                         early_stop = True
                         break
+                    last_checkpoint_time = time() 
 
             if not early_stop:
                 exit_reason = 0
@@ -194,54 +194,19 @@ def analysis_runner(
                     pass
 
                 # Create a final checkpoint and set of plots
-                pb_utils.checkpointing( run, sampler, resume_file, samples_file.replace('.parquet','.dat'), sampling_time, checkpoint_plot)
+                run.temp_ext = 'dat'
+                run.checkpointing(sampler, sampling_time, checkpoint_plot)
 
-                sampling_time += (datetime.datetime.now() - t0).total_seconds()
+                sampling_time += time() - t0
 
-                out = sampler.results
-
-                nested_samples = DataFrame(out.samples, columns=run.sampling_keys)
-                nested_samples["log_likelihood"] = out.logl
-                run.priors = worker_run.priors
-                result = run.format_result(
+                run.format_result(
                     worker_run,
                     data_dump,
-                    out,
-                    nested_samples,
-                    sampler_kwargs,
+                    sampler.results,
+                    result_format,
                     sampling_time,
                     rejection_sample_posterior=rejection_sample_posterior
                 )
-
-
-                logger.info(
-                    "Generating posterior from marginalized parameters for"
-                    f" nsamples={len(result.posterior)}"
-                )
-                result.posterior, _ = worker_run.likelihood.parameter_conversion(result.posterior)
-
-                logger.debug(
-                    "Updating prior to the actual prior (undoing marginalization)"
-                )
-                for par, name in zip(
-                    ["distance", "phase", "time"],
-                    ["luminosity_distance", "phase", "geocent_time"],
-                ):
-                    if getattr(worker_run.likelihood, f"{par}_marginalization", False):
-                        worker_run.priors[name] = worker_run.likelihood.priors[name]
-                result.priors = worker_run.priors
-
-                result.posterior = result.posterior.map(
-                    lambda x: x[0] if isinstance(x, list) else x
-                )
-                result.posterior = result.posterior.select_dtypes([np.number])
-                logger.info(
-                    f"Saving result to {run.outdir}/{run.label}_result.{result_format}"
-                )
-                if result_format != "json":  # json is saved by default
-                    result.save_to_file(extension="json")
-                result.save_to_file(extension=result_format)
-                worker_run.final_diagnostics(result)
         else:
             exit_reason = -1
         return exit_reason

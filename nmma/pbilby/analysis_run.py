@@ -1,22 +1,41 @@
 import logging
 import datetime
 import os
+import sys
+from io import BufferedWriter
 from glob import glob
 import pickle
+import dill
+import functools
+from time import time
 
+from matplotlib import pyplot as plt
 import numpy as np
+from pandas import DataFrame
 from numpy.random import Generator, PCG64, SeedSequence
 
-from bilby.core.result import Result
-from bilby.core.sampler import dynesty3_utils  as dy_utils
 from bilby.core.utils import logger
 from bilby.core.prior import PriorDict, Constraint
-
+from bilby.core.result import Result
+from bilby.core.sampler import dynesty3_utils  as dy_utils
+from bilby.core.sampler.dynesty import dynesty_stats_plot
 import dynesty
+from dynesty.plotting import traceplot, runplot 
 
-from ...joint.joint_likelihood import setup_nmma_likelihood
-from ...joint.utils import reorder_loglikelihoods, rejection_sample, read_bestfit_from_posterior
 
+from ..joint.joint_likelihood import setup_nmma_likelihood
+from ..joint.utils import reorder_loglikelihoods, rejection_sample, read_bestfit_from_posterior
+
+
+def time_storage(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time()
+        result = func(*args, **kwargs)
+        logger.info(f"{func.__name__} took {time()-start}s")
+        return result
+
+    return wrapper
 
 class MainRun:
    
@@ -41,9 +60,28 @@ class MainRun:
         facc=0.5,
         min_eff=10,
         enlarge=1.5,
-        sampling_seed=0
+        sampling_seed=0,
+        sampler_kwargs={},
     ):
         
+        self.nlive = nlive
+        self.args = args
+        # If the run dir has not been specified, get it from the args
+        if outdir is None:
+            outdir = self.args.outdir
+        else:
+            # Create the run dir
+            os.makedirs(outdir, exist_ok=True)
+        self.outdir = outdir
+
+        # If the label has not been specified, get it from the args
+        if label is None:
+            label = self.args.label
+        self.label = label
+
+        self.resume_file = f"{self.outdir}/{self.label}_checkpoint_resume.pickle" 
+        self.temp_ext='parquet'
+
         # Create a random generator, which is saved across restarts
         # This ensures that runs are fully deterministic, which is important
         # for reproducibility
@@ -62,27 +100,9 @@ class MainRun:
             logger.info(
                 f"Reflective keys: {[sampling_keys[ii] for ii in reflective]}"
             )
-        self.nlive = nlive
-        self.args = args
         self.pooled_log_likelihood_function = pooled_log_likelihood_function
         self.pooled_prior_transform_function= pooled_prior_transform_function
         self.pooled_initial_point_function =  pooled_initial_point_function
-
-
-
-        # If the run dir has not been specified, get it from the args
-        if outdir is None:
-            outdir = self.args.outdir
-        else:
-            # Create the run dir
-            os.makedirs(outdir, exist_ok=True)
-        self.outdir = outdir
-
-        # If the label has not been specified, get it from the args
-        if label is None:
-            label = self.args.label
-        self.label = label
-
 
         
         # dynesty3 init kwargs
@@ -98,6 +118,8 @@ class MainRun:
         walks=walks,
         facc=facc
         )
+
+        self.sampler_kwargs = sampler_kwargs
 
         self._init_sampler_kwargs(dyn_kwargs, nact, naccept, maxmcmc)
 
@@ -154,6 +176,54 @@ class MainRun:
 
         self.init_sampler_kwargs = kwargs
 
+    def start_sampler(self, pool):
+        """
+        Start from a saved state or initialise.
+
+        The required information to reconstruct the state of the run is read from a
+        pickle file.
+
+        Parameters
+        ----------
+        pool: a Schwimmbad-pool object
+
+        Returns
+        -------
+        sampler: dynesty.NestedSampler
+            If a resume file exists and was successfully read, the nested sampler 
+            instance updated with the values stored to disk. If unavailable, create the initial state from scratch.
+        sampling_time: float
+            The current sampling time
+        """
+
+        if os.path.isfile(self.resume_file):
+            logger.info(f"Reading resume file {self.resume_file}")
+            with open(self.resume_file, "rb") as file:
+                sampler = dill.load(file)
+                if sampler.added_live:
+                    sampler._remove_live_points()
+
+                #reset pool
+                sampler.nqueue = -1
+                sampler.pool = pool
+                sampler.queue_size = pool.size
+                sampler.mapper = pool.map
+                try:
+                    sampling_time = sampler.sampling_time
+                except AttributeError:
+                    sampling_time = sampler.resume_kwargs["sampling_time"]
+
+            sampler.prior_transform = self.pooled_prior_transform_function
+            sampler.loglikelihood = dynesty.utils.LogLikelihood(
+                self.pooled_log_likelihood_function, sampler.ndim)
+            return sampler, sampling_time
+        
+        else:
+            logger.info(f"Resume file {self.resume_file} does not exist. "
+            f"Initializing sampling points with pool size={pool.size}")
+            live_points = self.get_initial_points_from_prior(pool)
+            logger.info( f"Initialize NestedSampler with {self.init_sampler_kwargs}")
+            return self.get_nested_sampler(live_points, pool), 0
 
     def get_nested_sampler(self, live_points, pool):
         """
@@ -218,13 +288,116 @@ class MainRun:
 
         return np.array(u_list), np.array(v_list), np.array(l_list)
 
+
+    def stdout_sampling_log(self, **kwargs):
+        """Logs will look like:
+        #:282|eff(%):26.406|logl*:-inf<-160.2<inf|logz:-165.5+/-0.1|dlogz:1038.1>0.1
+
+        Adapted from dynesty
+        https://github.com/joshspeagle/dynesty/blob/bb1c5d5f9504c9c3bbeffeeba28ce28806b42273/py/dynesty/utils.py#L349
+        """
+        niter, short_str, mid_str, long_str = dynesty.utils.get_print_fn_args(**kwargs)
+        custom_str = [f"#: {niter:d}"] + mid_str
+        custom_str = "|".join(custom_str).replace(" ", "")
+        sys.stdout.write("\033[K" + custom_str + "\r")
+        sys.stdout.flush()
+
+    def checkpointing(self, sampler, sampling_time, checkpoint_plot=False):
+        self.write_current_state(sampler, sampling_time )
+        self.write_sample_dump(sampler.saved_run.D)
+        if checkpoint_plot:
+            self.plot_current_state(sampler)
+
+    @time_storage
+    def write_sample_dump(self, data):
+        """Writes a checkpoint file """
+        samples_file = f'{self.outdir}/{self.label}_samples.{self.temp_ext}'
+        weights = np.exp(data["logwt"] - data["logz"][-1])
+        samples, keep = rejection_sample(data["v"], weights, self.rstate)
+
+        logger.info(f"Writing {np.sum(keep)} current samples to {samples_file}")
+        df = DataFrame(samples, columns=self.sampling_keys)
+        if samples_file.endswith(".dat"):
+            df.to_csv(samples_file, index=False, header=True, sep=" ")
+        else:
+            df.to_parquet(samples_file, index=False)
+
+    @time_storage
+    def write_current_state(self, sampler, sampling_time):
+        """Writes a checkpoint file
+
+        Parameters
+        ----------
+        sampler: dynesty.NestedSampler
+            The sampler object itself
+        sampling_time: float
+            The total sampling time in seconds
+        """
+        print("")
+        pool = sampler.pool
+        logl_func = sampler.loglikelihood
+        prior_func = sampler.prior_transform
+        try:
+            seconds = time() - os.path.getmtime(self.resume_file)
+            m, s = divmod(seconds, 60)
+            strtime = f"{m:02.0f}m {s:02.0f}s"
+
+            logger.info(
+                "Start checkpoint writing" + f" (last checkpoint {strtime} ago)"
+            )
+        except FileNotFoundError:
+            logger.info("Start checkpoint writing" + " (no previous checkpoint)")
+
+
+        if dill.pickles(sampler):
+            # Temporarily remove to accelerate pickling
+            sampler.pool = None
+            sampler.loglikelihood = None
+            sampler.prior_transform = None
+            sampler.mapper = map
+
+            sampler.sampling_time = sampling_time
+            temp_filename = f"{self.resume_file}.temp"
+            with open(temp_filename, "wb") as file:
+                with BufferedWriter(file) as buffer:
+                    dill.dump(sampler, buffer, protocol=dill.HIGHEST_PROTOCOL)
+            os.rename(temp_filename, self.resume_file)
+            logger.info(f"Written checkpoint file {self.resume_file}")
+
+            # reset after succesful pickle
+            sampler.pool = pool
+            sampler.mapper = pool.map
+            sampler.loglikelihood = logl_func
+            sampler.prior_transform = prior_func
+        else:
+            logger.warning("Cannot write pickle resume file!")
+
+    @time_storage
+    def plot_current_state(self, sampler):
+        # labels = [label.replace("_", " ") for label in search_parameter_keys]
+        for name, func, obj in zip (
+            ["trace", "run", "stats"],
+            [traceplot, runplot, dynesty_stats_plot],
+            [sampler.results, sampler.results, sampler]):
+
+            try: 
+                fig, _ = func(obj)
+                fig.tight_layout()
+                fig.savefig(f"{self.outdir}/{self.label}_checkpoint_{name}.png")
+
+            except Exception as e:
+                logger.warning(e)
+                logger.warning(f"Failed to create dynesty {name} plot at checkpoint")
+            finally:
+                plt.close("all")
+
+
     def format_result(
         self,
         worker_run,
         data_dump,
         out,
-        nested_samples,
-        sampler_kwargs,
+        result_format,
         sampling_time,
         rejection_sample_posterior=True,
     ):
@@ -238,10 +411,8 @@ class MainRun:
             Path to the *_data_dump.pickle file
         out: dynesty.results.Results
             Results from the dynesty sampler
-        nested_samples: pandas.core.frame.DataFrame
-            DataFrame of the weights and likelihoods
-        sampler_kwargs: dict
-            Dictionary of keyword arguments for the sampler
+        result_format: str
+            The format to save the result in
         sampling_time: float
             Time in seconds spent sampling
         rejection_sample_posterior: bool
@@ -254,17 +425,18 @@ class MainRun:
             result object with values written into its attributes
         """
 
-        result = Result(self.label, self.outdir, search_parameter_keys=self.sampling_keys)
-        result.priors = worker_run.priors
-        result.nested_samples = nested_samples
-        result.meta_data = worker_run.data_dump["meta_data"]
-        result.meta_data["command_line_args"]["sampler"] = "parallel_bilby"
-        result.meta_data["data_dump"] = data_dump
-        result.meta_data["likelihood"] = worker_run.likelihood.meta_data
-        result.meta_data["sampler_kwargs"] = self.init_sampler_kwargs
-        result.meta_data["run_sampler_kwargs"] = sampler_kwargs
-        result.meta_data["injection_parameters"] = worker_run.injection_parameters
-        result.injection_parameters = worker_run.injection_parameters
+        nested_samples = DataFrame(out.samples, columns=self.sampling_keys)
+        nested_samples["log_likelihood"] = out.logl
+        
+        meta_data = worker_run.data_dump["meta_data"]
+        meta_data["data_dump"] = data_dump
+        meta_data["likelihood"] = worker_run.likelihood.meta_data
+        meta_data["sampler_kwargs"] = self.init_sampler_kwargs
+        meta_data["run_sampler_kwargs"] = self.sampler_kwargs
+        meta_data["injection_parameters"] = worker_run.injection_parameters
+
+
+        result = Result(self.label, self.outdir, search_parameter_keys=self.sampling_keys, priors =  worker_run.priors, nested_samples = nested_samples, injection_parameters= worker_run.injection_parameters)
 
         weights = np.exp(out["logwt"] - out["logz"][-1])
         if rejection_sample_posterior:
@@ -288,8 +460,20 @@ class MainRun:
         result.sampling_time = sampling_time
         result.num_likelihood_evaluations = np.sum(out.ncall)
 
-        result.samples_to_posterior(likelihood=worker_run.likelihood, priors=result.priors)
-        return result
+        result.samples_to_posterior(priors=result.priors)
+        result.posterior = worker_run.likelihood.posterior_conversion(result.posterior)
+
+        logger.info(
+            f"Saving result to {self.outdir}/{self.label}_result.{result_format}"
+        )
+        try:
+            result.save_to_file(extension=result_format)
+        except Exception as e:
+            logger.warning(f"Failed to save result to {result_format}: {e}")
+            result.save_to_file(extension="json")
+
+
+        worker_run.final_diagnostics(result)
 
 class WorkerRun:
     """

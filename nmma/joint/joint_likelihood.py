@@ -83,6 +83,10 @@ class MultiMessengerLikelihood(JointLikelihood):
     def parameter_conversion(self, samples):
         return self.multi_conversion.convert_to_multimessenger_parameters(samples)
     
+    def posterior_conversion(self, posterior_samples):
+        posterior = self.multi_conversion.core_conversion(posterior_samples)
+        return posterior.select_dtypes([np.number])
+    
     def check_parameter_equivalencies(self, parameter_names):
         """Check for equivalent parameters and terminate if found"""
         #FIXME: to be extended
