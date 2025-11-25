@@ -169,11 +169,9 @@ class NMMAInjectionCreator(InjectionCreator):
         dataframe.drop(columns=['tests_passed'], inplace=True)
   
         # step 5: Wrap things up
-        # do final conversion to all necessary parameters
-        dataframe, added_keys = self.param_conversion.convert_to_multimessenger_parameters(dataframe)
-        # remove the parameters that were added by the conversion if not desired
-        if self.original_parameters:
-            dataframe.drop(columns=added_keys, inplace=True)
+        # do final conversion to all necessary parameters if desired
+        if not self.original_parameters:
+            dataframe, _ = self.param_conversion.core_conversion(dataframe)
         # or add expensive information not required for tests
         for postprocess in self.postprocessing:
             dataframe = postprocess(dataframe)
@@ -210,7 +208,7 @@ class NMMAInjectionCreator(InjectionCreator):
             test_df = dataframe[self.fail_mask].copy()
 
         # transform the parameters to multimessenger parameters and test them
-        test_df, _ = self.param_conversion.convert_to_multimessenger_parameters(test_df)
+        test_df = self.param_conversion.core_conversion(test_df)
         for test_routine in self.test_routines:
             # run the test routine on the test_df
             # this will modify the dataframe in place

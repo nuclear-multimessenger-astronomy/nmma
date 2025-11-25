@@ -16,6 +16,16 @@ from bilby.gw.conversion import (
 
 from ..eos.eos_processing import setup_eos_generator
 
+def val_to_scalar(val):
+    """Convert single-value quantities to scalars for easier handling"""
+    if np.isscalar(val):
+        return val
+    else:
+        val = np.asarray(val)
+        if val.size == 1:
+            return val.item()
+        return val
+
 ########################## distance conversions ####################################
 def distance_modulus_nmma(d_lum = 1e-5):
         # mag_app = mag_abs + 5* log10(dist/10pc) | NMMA-dist is in Mpc
@@ -607,15 +617,16 @@ class BNSEjectaFitting:
         log10_mej_wind = np.log10(converted_parameters["ratio_zeta"]) + log10_mdisk_fit
         # total eject mass
         total_ejeta_mass = 10**log10_mej_dyn + 10**log10_mej_wind
+
         # GRB afterglow energy
-        log10_E0_MSUN = (
-            np.log10(converted_parameters["ratio_epsilon"])
+        log10_E0 = converted_parameters.get("log10_E0", (
+              np.log10(converted_parameters.get("ratio_epsilon", 0.01))
             + np.log10(1.0 - converted_parameters["ratio_zeta"])
-            + log10_mdisk_fit
+            + log10_mdisk_fit + np.log10(msun_to_ergs) )
         )
         
         np.seterr(**old)
-        converted_ejecta = np.stack((log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_E0_MSUN + np.log10(msun_to_ergs) ))
+        converted_ejecta = np.stack((log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_E0 ))
 
         return  np.where(np.isfinite(converted_ejecta), converted_ejecta, -np.inf)
 
@@ -698,8 +709,17 @@ class MultimessengerConversion:
 
     def convert_to_multimessenger_parameters(self, parameters):
         original_keys = list(parameters.keys())
-        converted_parameters = self.clean_datatypes(parameters)
+        converted_parameters = {k: val_to_scalar(v) for k, v in parameters.items()}
 
+        converted_parameters = self.core_conversion(converted_parameters)
+
+        added_keys = [key for key in converted_parameters.keys()
+                      if key not in original_keys]
+
+        converted_parameters = {k: val_to_scalar(v) for k, v in converted_parameters.items()}
+        return converted_parameters, added_keys
+    
+    def core_conversion(self, converted_parameters):
         if "Hubble" in self.modifiers:
             converted_parameters = cosmology_to_distance(
             converted_parameters, cosmology=self.cosmology
@@ -717,19 +737,10 @@ class MultimessengerConversion:
             converted_parameters = self.ejecta_parameter_conversion(converted_parameters)
             converted_parameters, _ = self.em_conversion(converted_parameters)
 
-        added_keys = [key for key in converted_parameters.keys()
-                      if key not in original_keys]
-
-        converted_parameters = self.clean_datatypes(converted_parameters)
-        return converted_parameters, added_keys
+        return converted_parameters
     
     def identity_conversion(self, parameters):
         return parameters, []
 
-    def clean_datatypes(self, parameters):
-        """Homogenise data types, preferentially to scalars instead of arrays"""
-        try:
-            return {k: np.ravel(v).item() for k, v in parameters.copy().items()}
-        except ValueError:
-            return {k: np.ravel(v) for k, v in parameters.copy().items()}
+        
         

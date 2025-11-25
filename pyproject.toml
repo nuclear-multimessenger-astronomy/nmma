@@ -43,7 +43,7 @@ optional-dependencies.sampler = { file = ["sampler_requirements.txt"] }
 
 [project.scripts]
 nmma-generation = "nmma.pbilby.generation:nmma_generation"
-nmma-analysis = "nmma.pbilby.analysis:nmma_analysis"
+nmma-analysis = "nmma.pbilby.main:nmma_analysis"
 lightcurve-analysis = "nmma.em.analysis:main"
 lightcurve-analysis-lbol = "nmma.em.analysis:lbol_main"
 lightcurve-injection-slurm-setup = "nmma.em.cluster_handling:main"

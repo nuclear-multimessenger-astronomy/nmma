@@ -597,6 +597,8 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         filters = 'u,g,r,i,z,y,J,H,K'
     light_curve_model = model.create_light_curve_model_from_args(args.em_model, args, filters)
     
+    conversion = conv.MultimessengerConversion(args,messengers=['gw', 'em'], ana_modifiers=['tabulated_eos'], 
+            internal_conversions={'em': light_curve_model.parameter_conversion})
 
     ## read eos and gw data
     EOS_data, weights, Neos = load_tabulated_macro_eos_set_to_dict(args.eos_data, args.eos_weights)
@@ -686,9 +688,6 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         params.update({ "alpha"         : alpha,
                         "ratio_zeta"    : zeta})
         
-        conversion = conv.MultimessengerConversion(args, 
-                messengers=['gw', 'em'], ana_modifiers=['tabulated_eos'], 
-                internal_conversions={'em': light_curve_model.parameter_conversion})
         complete_parameters, _ = conversion.convert_to_multimessenger_parameters(params)
 
         log10_mej_dyn = complete_parameters["log10_mej_dyn"].item()
