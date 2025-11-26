@@ -121,7 +121,7 @@ def analysis_runner(
                 logger.info(f"{k}: {p}")
             
             sampler, sampling_time = run.start_sampler(pool)
-
+            
             ## graceful handling of preemptive shutdowns
             def handle_sigterm(signum, frame):
                 logger.info("Received SIGTERM, writing checkpoint and exiting.")

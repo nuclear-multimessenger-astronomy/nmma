@@ -1,13 +1,11 @@
-import logging
-import datetime
 import os
 import sys
 from io import BufferedWriter
 from glob import glob
 import pickle
-import dill
-import functools
+from functools import wraps
 from time import time
+from datetime import timedelta
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -28,11 +26,12 @@ from ..joint.utils import reorder_loglikelihoods, rejection_sample, read_bestfit
 
 
 def time_storage(func):
-    @functools.wraps(func)
+    @wraps(func)
     def wrapper(*args, **kwargs):
         start = time()
         result = func(*args, **kwargs)
-        logger.info(f"{func.__name__} took {time()-start}s")
+        duration = timedelta(seconds=time()-start)
+        logger.info(f"{func.__name__} took {duration}")
         return result
 
     return wrapper
@@ -69,9 +68,7 @@ class MainRun:
         # If the run dir has not been specified, get it from the args
         if outdir is None:
             outdir = self.args.outdir
-        else:
-            # Create the run dir
-            os.makedirs(outdir, exist_ok=True)
+        os.makedirs(outdir, exist_ok=True)
         self.outdir = outdir
 
         # If the label has not been specified, get it from the args
@@ -199,7 +196,7 @@ class MainRun:
         if os.path.isfile(self.resume_file):
             logger.info(f"Reading resume file {self.resume_file}")
             with open(self.resume_file, "rb") as file:
-                sampler = dill.load(file)
+                sampler = pickle.load(file)
                 if sampler.added_live:
                     sampler._remove_live_points()
 
@@ -338,18 +335,14 @@ class MainRun:
         logl_func = sampler.loglikelihood
         prior_func = sampler.prior_transform
         try:
-            seconds = time() - os.path.getmtime(self.resume_file)
-            m, s = divmod(seconds, 60)
-            strtime = f"{m:02.0f}m {s:02.0f}s"
-
-            logger.info(
-                "Start checkpoint writing" + f" (last checkpoint {strtime} ago)"
+            time_elapsed = timedelta(seconds= time()-os.path.getmtime(self.resume_file))
+            logger.info(f"Start checkpoint writing (last checkpoint {time_elapsed} ago)"
             )
         except FileNotFoundError:
-            logger.info("Start checkpoint writing" + " (no previous checkpoint)")
+            logger.info("Start checkpoint writing (no previous checkpoint)")
 
 
-        if dill.pickles(sampler):
+        try:
             # Temporarily remove to accelerate pickling
             sampler.pool = None
             sampler.loglikelihood = None
@@ -360,7 +353,7 @@ class MainRun:
             temp_filename = f"{self.resume_file}.temp"
             with open(temp_filename, "wb") as file:
                 with BufferedWriter(file) as buffer:
-                    dill.dump(sampler, buffer, protocol=dill.HIGHEST_PROTOCOL)
+                    pickle.dump(sampler, buffer, protocol=pickle.HIGHEST_PROTOCOL)
             os.rename(temp_filename, self.resume_file)
             logger.info(f"Written checkpoint file {self.resume_file}")
 
@@ -369,7 +362,7 @@ class MainRun:
             sampler.mapper = pool.map
             sampler.loglikelihood = logl_func
             sampler.prior_transform = prior_func
-        else:
+        except:
             logger.warning("Cannot write pickle resume file!")
 
     @time_storage
@@ -508,10 +501,8 @@ class WorkerRun:
         self.compose_priors(data_dump["prior_file"])
 
         ## Set up the likelihood
-        logger.setLevel(logging.WARNING)
         self.likelihood = setup_nmma_likelihood(data_dump,
             self.priors, self.args, logger)
-        logger.setLevel(logging.INFO)
 
         check_keys = self.sampling_keys.copy()
         check_keys.extend(self.fixed_keys)
@@ -659,7 +650,7 @@ class WorkerRun:
                 
     def final_diagnostics(self, result):
 
-        print(f"Sampling time = {datetime.timedelta(seconds=result.sampling_time)}s")
+        print(f"Sampling time = {timedelta(seconds=result.sampling_time)}s")
         print(f"Number of lnl calls = {result.num_likelihood_evaluations}")
         print(result)
         if self.args.plot:
