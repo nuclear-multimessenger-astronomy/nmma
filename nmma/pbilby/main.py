@@ -29,31 +29,24 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 from schwimmbad import MPIPool, MultiPool
 import signal
-from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args
+from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args, process_sampler_kwargs
 from .analysis_run import MainRun, WorkerRun
 
 def analysis_runner(
     data_dump,
     outdir=None,
     label=None,
-    sample="acceptance-walk",
-    nlive=1000,
-    bound="live",
-    walks=100,
     maxmcmc=5000,
     naccept=60,
     nact=2,
-    facc=0.5,
-    min_eff=10,
-    enlarge=1.5,
-    sampling_seed=0,
+    init_sampler_kwargs={},
+    run_sampler_kwargs={},
+    sampling_seed=42,
     bilby_zero_likelihood_mode=False,
     rejection_sample_posterior=True,
     #
-    check_point_delta_t=3600,
-    dlogz=0.1,
-    save_bounds=False,
-    n_check_point=1000,
+    check_point_delta_t=1800,
+    n_check_point=2000,
     max_its=1e10,
     max_run_time=1e10,
     checkpoint_plot=False,
@@ -64,16 +57,6 @@ def analysis_runner(
     """
     API for running the analysis from Python instead of the command line.
     It takes all the same options as the CLI, specified as keyword arguments.
-
-    Returns
-    -------
-    exit_reason: integer u
-        Used during testing, to determine the reason the code halted:
-            0 = run completed normally, based on convergence criteria
-            1 = reached max iterations
-            2 = reached max runtime
-        MPI worker tasks always return -1
-
     """
     # Initialise a WorkerRun. this needs a global scope to allow 
     # persistence of states beyond the pool's scope.
@@ -86,13 +69,18 @@ def analysis_runner(
     # Restore normal stdout/stderr
     redirect_out.__exit__(None, None, None)
     redirect_err.__exit__(None, None, None)
-
     with POOL(use_dill=True) as pool:
         if pool.is_master():
             sys.stdout.write(stdout_buffer.getvalue())
             sys.stderr.write(stderr_buffer.getvalue())
 
-            POOL_SIZE = pool.size
+            prelim_sampler_kwargs, run_sampler_kwargs = process_sampler_kwargs(
+                init_sampler_kwargs, run_sampler_kwargs, kwargs)
+            init_sampler_kwargs = dict(
+                periodic=worker_run.periodic,
+                reflective=worker_run.reflective,
+                ndim=len(worker_run.sampling_keys)
+            ) | prelim_sampler_kwargs
             run = MainRun(
                 worker_run.sampling_keys,
                 pooled_log_likelihood, 
@@ -101,20 +89,12 @@ def analysis_runner(
                 args=worker_run.args,
                 outdir=outdir,
                 label=label,
-                periodic=worker_run.periodic,
-                reflective=worker_run.reflective,
-                sample=sample,
-                nlive=nlive,
-                bound=bound,
-                walks=walks,
                 maxmcmc=maxmcmc,
                 nact=nact,
                 naccept=naccept,
-                facc=facc,
-                min_eff=min_eff,
-                enlarge=enlarge,
                 sampling_seed=sampling_seed,
-                sampler_kwargs = dict(dlogz=dlogz, save_bounds=save_bounds)
+                run_sampler_kwargs = run_sampler_kwargs,
+                sampler_init_kwargs=init_sampler_kwargs,
             )
             logger.info("Using priors:")
             for k, p in worker_run.priors.items():
@@ -138,75 +118,47 @@ def analysis_runner(
 
             run_time = 0
             last_checkpoint_time= t0
-            early_stop = False
+            last_checkpoint_it = 0
             logger.info(f"Run criteria: {run.sampler_kwargs}")
 
-            logger.info(f"Starting sampling for job {run.label}, with pool size={POOL_SIZE} "
+            logger.info(f"Starting sampling for job {run.label}, with pool size={pool.size} "
                 f"and time between checkpoints ={check_point_delta_t}s" )
             for it, res in enumerate(sampler.sample(**run.sampler_kwargs)):
-                run.stdout_sampling_log(
-                    results=res, niter=it, ncall=sampler.ncall, dlogz=dlogz
-                )
 
+                run.stdout_sampling_log(results=res, niter=it, ncall=sampler.ncall)
                 iteration_time = time() - t0
-                t0 = time()
-
                 sampling_time += iteration_time
                 run_time += iteration_time
-                last_checkpoint_s = t0 - last_checkpoint_time
+                t0 = time()
 
-                """
-                Criteria for writing checkpoints:
-                a) time since last checkpoint > check_point_delta_t
-                b) reached an integer multiple of n_check_point
-                c) reached max iterations
-                d) reached max runtime
-                """
-
-                if (
-                    last_checkpoint_s > check_point_delta_t
-                    or (it % n_check_point == 0 and it != 0)
-                    or it == max_its
-                    or run_time > max_run_time
+                if it == max_its or run_time > max_run_time:
+                    logger.info(f"{it} of max {max_its} iterations completed after {sampling_time:.2f}s sampling time of max {max_run_time}s. Stopping.")  
+                    run.checkpointing(sampler, sampling_time, checkpoint_plot)
+                    exit_reason = 1
+                    return exit_reason
+                
+                elif (
+                    # checkpoint criteria
+                    t0 - last_checkpoint_time > check_point_delta_t
+                    or (it - last_checkpoint_it > n_check_point) 
                 ):
                     run.checkpointing(sampler, sampling_time, checkpoint_plot)
-                    if it == max_its:
-                        exit_reason = 1
-                        logger.info(
-                            f"Max iterations ({it}) reached; stopping sampling (exit_reason={exit_reason})."
-                        )
-                        early_stop = True
-                        break
-
-                    if run_time > max_run_time:
-                        exit_reason = 2
-                        logger.info(
-                            f"Max run time ({max_run_time}) reached; stopping sampling (exit_reason={exit_reason})."
-                        )
-                        early_stop = True
-                        break
                     last_checkpoint_time = time() 
+                    last_checkpoint_it = it
 
-            if not early_stop:
-                exit_reason = 0
-                # Adding the final set of live points.
-                for it_final, res in enumerate(sampler.add_live_points()):
-                    pass
+            # Adding the final set of live points.
+            for it_final, res in enumerate(sampler.add_live_points()):
+                pass
 
-                # Create a final checkpoint and set of plots
-                run.temp_ext = 'dat'
-                run.checkpointing(sampler, sampling_time, checkpoint_plot)
+            # Create a final checkpoint in case anything happens during the formatting
+            run.sampling_time = sampling_time + time() - t0
+            run.write_current_state(sampler, run.sampling_time )
+            run.plot_current_state(sampler)
 
-                sampling_time += time() - t0
-
-                run.format_result(
-                    worker_run,
-                    data_dump,
-                    sampler.results,
-                    result_format,
-                    sampling_time,
-                    rejection_sample_posterior=rejection_sample_posterior
-                )
+            run.format_result(worker_run, sampler.results, result_format,
+                rejection_sample_posterior=rejection_sample_posterior
+            )
+            exit_reason = 0
         else:
             exit_reason = -1
         return exit_reason

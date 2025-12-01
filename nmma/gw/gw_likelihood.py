@@ -210,5 +210,8 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
         #TODO: add additional checks RelativeBinning!
         return True
     
+    def final_diagnostics(self, bestfit_params, args, result=None):
+        # TODO add some nice plotting for final waveform
+        pass
     def noise_log_likelihood(self):
         return self.sub_model.noise_log_likelihood()

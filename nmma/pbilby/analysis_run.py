@@ -31,7 +31,7 @@ def time_storage(func):
         start = time()
         result = func(*args, **kwargs)
         duration = timedelta(seconds=time()-start)
-        logger.info(f"{func.__name__} took {duration}")
+        logger.info(f"{func.__name__} took {duration} ")
         return result
 
     return wrapper
@@ -47,23 +47,14 @@ class MainRun:
         args=None,
         outdir=None,
         label=None,
-        periodic=None,
-        reflective = None,
-        sample="acceptance-walk",
-        nlive=5,
-        bound="live",
-        walks=100,
         maxmcmc=5000,
         naccept=60,
         nact=2,
-        facc=0.5,
-        min_eff=10,
-        enlarge=1.5,
-        sampling_seed=0,
+        sampling_seed=42,
         sampler_kwargs={},
+        sampler_init_kwargs={}
     ):
         
-        self.nlive = nlive
         self.args = args
         # If the run dir has not been specified, get it from the args
         if outdir is None:
@@ -88,39 +79,23 @@ class MainRun:
         )
         ## Set some basic attributes
         self.sampling_keys = sampling_keys
-        logger.info(f"sampling_keys={sampling_keys}")
-        if periodic:
-            logger.info(
-                f"Periodic keys: {[sampling_keys[ii] for ii in periodic]}"
-            )
-        if reflective:
-            logger.info(
-                f"Reflective keys: {[sampling_keys[ii] for ii in reflective]}"
-            )
+        logger.info(f"sampling keys:{sampling_keys}")
+        for name in ['periodic', 'reflective']:
+            if name in sampler_init_kwargs:
+                logger.info(
+                    f"{name} keys: {[sampling_keys[ii] for ii in sampler_init_kwargs[name]]}"
+                )
         self.pooled_log_likelihood_function = pooled_log_likelihood_function
         self.pooled_prior_transform_function= pooled_prior_transform_function
         self.pooled_initial_point_function =  pooled_initial_point_function
 
-        
-        # dynesty3 init kwargs
-        dyn_kwargs = dict(
-        ndim=len(sampling_keys),
-        nlive=nlive,
-        bound=bound,
-        sample=sample,
-        periodic=periodic,
-        reflective=reflective,
-        first_update=dict(min_eff=min_eff, min_ncall=2 * nlive),
-        enlarge=enlarge,
-        walks=walks,
-        facc=facc
-        )
-
+        # dynesty3 sampler kwargs
+        self.dlogz = sampler_kwargs['dlogz']
         self.sampler_kwargs = sampler_kwargs
+        self._init_sampler_kwargs(sampler_init_kwargs, nact, naccept, maxmcmc)
+        self.nlive = sampler_init_kwargs['nlive']
 
-        self._init_sampler_kwargs(dyn_kwargs, nact, naccept, maxmcmc)
-
-    def _init_sampler_kwargs(self, kwargs,  nact, naccept, maxmcmc):
+    def _init_sampler_kwargs(self, kwargs, nact, naccept, maxmcmc):
         """
         Stolen from bilby.core.sampler.dynesty to set up the internal sampler kwargs
         """
@@ -293,7 +268,7 @@ class MainRun:
         Adapted from dynesty
         https://github.com/joshspeagle/dynesty/blob/bb1c5d5f9504c9c3bbeffeeba28ce28806b42273/py/dynesty/utils.py#L349
         """
-        niter, short_str, mid_str, long_str = dynesty.utils.get_print_fn_args(**kwargs)
+        niter, _, mid_str, _ = dynesty.utils.get_print_fn_args(dlogz = self.dlogz,**kwargs)
         custom_str = [f"#: {niter:d}"] + mid_str
         custom_str = "|".join(custom_str).replace(" ", "")
         sys.stdout.write("\033[K" + custom_str + "\r")
@@ -331,9 +306,6 @@ class MainRun:
             The total sampling time in seconds
         """
         print("")
-        pool = sampler.pool
-        logl_func = sampler.loglikelihood
-        prior_func = sampler.prior_transform
         try:
             time_elapsed = timedelta(seconds= time()-os.path.getmtime(self.resume_file))
             logger.info(f"Start checkpoint writing (last checkpoint {time_elapsed} ago)"
@@ -341,7 +313,10 @@ class MainRun:
         except FileNotFoundError:
             logger.info("Start checkpoint writing (no previous checkpoint)")
 
-
+        # avoid expensive pickling of easily rebuilt objects
+        pool = sampler.pool
+        logl_func = sampler.loglikelihood
+        prior_func = sampler.prior_transform
         try:
             # Temporarily remove to accelerate pickling
             sampler.pool = None
@@ -388,10 +363,8 @@ class MainRun:
     def format_result(
         self,
         worker_run,
-        data_dump,
-        out,
+        sampler_result,
         result_format,
-        sampling_time,
         rejection_sample_posterior=True,
     ):
         """
@@ -400,69 +373,62 @@ class MainRun:
         Parameters
         ----------
         worker_run: WorkerRun
-        data_dump: str
-            Path to the *_data_dump.pickle file
         out: dynesty.results.Results
             Results from the dynesty sampler
         result_format: str
-            The format to save the result in
-        sampling_time: float
-            Time in seconds spent sampling
+            The format to save the result
         rejection_sample_posterior: bool
             Whether to generate the posterior samples by rejection sampling the
             nested samples or resampling with replacement
-
-        Returns
-        -------
-        result: bilby.core.result.Result
-            result object with values written into its attributes
         """
 
-        nested_samples = DataFrame(out.samples, columns=self.sampling_keys)
-        nested_samples["log_likelihood"] = out.logl
+        nested_samples = DataFrame(sampler_result.samples, columns=self.sampling_keys)
+        nested_samples["log_likelihood"] = sampler_result.logl
+        log_noise_evidence= worker_run.likelihood.noise_log_likelihood()
+        log_bayes = sampler_result.logz[-1]
         
-        meta_data = worker_run.data_dump["meta_data"]
-        meta_data["data_dump"] = data_dump
+        meta_data = worker_run.data_dump
+        meta_data["args"] = vars(self.args) # convert Namespace to dict for storing
         meta_data["likelihood"] = worker_run.likelihood.meta_data
         meta_data["sampler_kwargs"] = self.init_sampler_kwargs
         meta_data["run_sampler_kwargs"] = self.sampler_kwargs
-        meta_data["injection_parameters"] = worker_run.injection_parameters
 
+        result = Result(self.label, self.outdir, search_parameter_keys=self.sampling_keys, 
+                        priors =  worker_run.priors, nested_samples = nested_samples, 
+                        injection_parameters= worker_run.injection_parameters, 
+                        sampling_time=self.sampling_time, meta_data=meta_data,
+                        num_likelihood_evaluations=np.sum(sampler_result.ncall),
+                        log_noise_evidence=log_noise_evidence, log_bayes_factor=log_bayes,
+                        log_evidence_err=sampler_result.logzerr[-1], 
+                        log_evidence=log_noise_evidence + log_bayes
+        )
 
-        result = Result(self.label, self.outdir, search_parameter_keys=self.sampling_keys, priors =  worker_run.priors, nested_samples = nested_samples, injection_parameters= worker_run.injection_parameters)
-
-        weights = np.exp(out["logwt"] - out["logz"][-1])
+        weights = np.exp(sampler_result["logwt"] - log_bayes)
         if rejection_sample_posterior:
-            result.samples, keep = rejection_sample(out.samples, weights, self.rstate)
-            result.log_likelihood_evaluations = out.logl[keep]
-            logger.info(
-                f"Rejection sampling nested samples to obtain {sum(keep)} posterior samples"
-            )
+            result.samples, keep = rejection_sample(sampler_result.samples, weights, self.rstate)
+            result.log_likelihood_evaluations = sampler_result.logl[keep]
+            logger.info(f"Rejection sampling nested samples to obtain {sum(keep)} posterior samples")
+
         else:
-            result.samples = dynesty.utils.resample_equal(out.samples, weights)
+            result.samples = dynesty.utils.resample_equal(sampler_result.samples, weights)
             result.log_likelihood_evaluations = reorder_loglikelihoods(
-                unsorted_loglikelihoods=out.logl,
-                unsorted_samples=out.samples,
+                unsorted_loglikelihoods=sampler_result.logl,
+                unsorted_samples=sampler_result.samples,
                 sorted_samples=result.samples,
             )
             logger.info("Resampling nested samples to posterior samples in place.")
 
-        result.log_evidence = out.logz[-1] + worker_run.likelihood.noise_log_likelihood()
-        result.log_evidence_err = out.logzerr[-1]
-        result.log_bayes_factor = result.log_evidence - result.log_noise_evidence
-        result.sampling_time = sampling_time
-        result.num_likelihood_evaluations = np.sum(out.ncall)
 
         result.samples_to_posterior(priors=result.priors)
         result.posterior = worker_run.likelihood.posterior_conversion(result.posterior)
+        result.save_posterior_samples()
 
-        logger.info(
-            f"Saving result to {self.outdir}/{self.label}_result.{result_format}"
-        )
+        logger.info(f"Saving result to {self.outdir}/{self.label}_result.{result_format}")
         try:
             result.save_to_file(extension=result_format)
         except Exception as e:
-            logger.warning(f"Failed to save result to {result_format}: {e}")
+            logger.warning(f"Failed to save result to {result_format}: {e}"
+                           "Trying to save as json instead.")
             result.save_to_file(extension="json")
 
 
@@ -650,11 +616,10 @@ class WorkerRun:
                 
     def final_diagnostics(self, result):
 
-        print(f"Sampling time = {timedelta(seconds=result.sampling_time)}s")
+        print(f"Sampling time = {result.sampling_time} seconds")
         print(f"Number of lnl calls = {result.num_likelihood_evaluations}")
         print(result)
         if self.args.plot:
             result.plot_corner()
             bestfit_params = read_bestfit_from_posterior(self.args)
-            for lhood in self.likelihood.likelihoods:
-                lhood.final_diagnostics(bestfit_params, self.args, result)
+            self.likelihood.final_diagnostics(bestfit_params, self.args, result)

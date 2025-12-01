@@ -1,4 +1,5 @@
 import argparse
+from ast import literal_eval
 import bilby
 from bilby_pipe import parser as bp_parser, data_generation as data_gen
 
@@ -45,6 +46,8 @@ def em_settings_parsing(parser):
 def sampler_parsing(parser):
     sampler_group = parser.add_argument_group(title = "Setting for the Sampler")
 
+    sampler_group.add_argument("--init-sampler-kwargs", default="{}", 
+        help="Additional keyword arguments to pass to the sampler as a dictionary" )
     sampler_group.add_argument("--sampler", choices=["dynesty"], default="dynesty",
         help="The parallelised sampler to use, defaults to dynesty")
     sampler_group.add_argument( "-n", "--nlive", default=1000, type=int, help="Number of live points" )
@@ -233,7 +236,28 @@ def parse_generation_args(parser, cli_args=[""], as_namespace=False):
         return args
     return vars(args)
 
+def process_sampler_kwargs(init_sampler_kwargs, run_sampler_kwargs, kwargs):
+    # Set defaults here to avoid inconsistent values between main.py and MainRun
+    default_kwargs = dict(dlogz=0.1, save_bounds=False,
+        min_eff=10, sample="acceptance-walk", nlive=1000, bound="live",
+        walks=100, facc=0.5, enlarge=1.5)
+    
+    def_run_kwargs = {key: kwargs.get(key, default_kwargs[key]) 
+        for key in ['dlogz', 'save_bounds']}
+    if isinstance(run_sampler_kwargs, str):
+        run_sampler_kwargs = literal_eval(run_sampler_kwargs)
+    run_sampler_kwargs = def_run_kwargs | run_sampler_kwargs
+    
 
+    def_init_kwargs = {key: kwargs.get(key, default_kwargs[key]) 
+        for key in ['min_eff','sample', 'nlive', 'bound', 'walks', 'facc', 'enlarge']}
+    if isinstance(init_sampler_kwargs, str):
+        init_sampler_kwargs = literal_eval(init_sampler_kwargs)
+    init_sampler_kwargs = def_init_kwargs | init_sampler_kwargs
+    init_sampler_kwargs['first_update'] = dict(min_eff=init_sampler_kwargs.pop('min_eff'), 
+                        min_ncall= 2 * init_sampler_kwargs['nlive'])
+        
+    return init_sampler_kwargs, run_sampler_kwargs
 
 
 def create_nmma_analysis_parser(sampler="dynesty"):

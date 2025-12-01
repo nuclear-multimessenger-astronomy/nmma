@@ -38,16 +38,21 @@ def luminosity_distance_to_redshift(distance, cosmology = default_cosmology):
     if isinstance(distance, pd.Series):
         distance = distance.values
 
-    if hasattr(distance, '__len__') and len(distance)>50: #luminosity_distance_to_redshift gets really slow if too many distances are put in at once
-        # zmax since solutions can be non-unique at high distances!
-        zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance.min() * units.Mpc)
-        zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
-        zgrid = np.geomspace(zmin, zmax, 50)
-        distance_grid = cosmology.luminosity_distance(zgrid).value
-        return np.interp(distance, distance_grid, zgrid).value
+    if hasattr(distance, '__len__') and len(distance)>50: 
+        d_min, d_max = distance.min(), distance.max()
+        dist_grid, z_grid = get_cosmo_grids(d_min, d_max, cosmology)
+        return np.interp(distance, dist_grid, z_grid).value
     else:
         return cosmo.z_at_value(cosmology.luminosity_distance, distance *units.Mpc).value
         
+def get_cosmo_grids(distance_min, distance_max, cosmology):
+    #luminosity_distance_to_redshift gets really slow if too many distances are put in at once
+    zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance_min * units.Mpc)
+    zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance_max * units.Mpc)
+    z_grid = np.geomspace(zmin, zmax, 50)
+    dist_grid = cosmology.luminosity_distance(z_grid).value
+    return dist_grid, z_grid
+
 def get_redshift(parameters):
     if "redshift" in parameters:
         return parameters["redshift"]
@@ -275,7 +280,7 @@ class EoSConverter:
         TOV_radius = radii[np.argmax(masses)]
 
         (log_lambda_1, log_lambda_2) = np.interp(x=[m1_source, m2_source],
-                xp= masses, fp=np.log(lambdas), left=0, right=0)
+                xp= masses, fp=np.log(lambdas), left=-np.inf, right=-np.inf)
         lambda_1 = np.exp(log_lambda_1)
         lambda_2 = np.exp(log_lambda_2)
         try:

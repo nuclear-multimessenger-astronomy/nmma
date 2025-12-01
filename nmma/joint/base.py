@@ -8,7 +8,8 @@ from bilby import run_sampler
 from bilby.core.likelihood import Likelihood, ZeroLikelihood
 from bilby.core.prior import (Prior, Interped, ConditionalPriorDict, PriorDict,
                               MultivariateGaussianDist, MultivariateGaussian)
-from .utils import input_obj_to_str, load_yaml
+from bilby.core.result import FileMovedError
+from .utils import input_obj_to_str, load_yaml, read_bestfit_from_posterior
 
 def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes = []):
     prefixes.append('')
@@ -80,12 +81,16 @@ class NMMABaseLikelihood(Likelihood):
         logL_model = self.sub_model.log_likelihood(parameters)
         if not np.isfinite(logL_model):
             return np.nan_to_num(-np.inf)
-
         return logL_model
 
     def noise_log_likelihood(self):
         return self.noise_logl
         # return self.sub_model.noise_log_likelihood()
+    
+
+    def post_process_bestfit(self, args, result):
+        bestfit_params = read_bestfit_from_posterior(args)
+        self.final_diagnostics(bestfit_params, args, result)
     
     def final_diagnostics(self, bestfit_params, args, result=None):
         """Plot the best-fit light curve against the data
@@ -240,19 +245,42 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None):
     except ImportError:
         pass
 
-    result.save_to_file()
-    result.save_posterior_samples()
+    try:
+        result.save_to_file()
+        result.save_posterior_samples()
+    except FileMovedError:
+        # We assume the result was only moved here, no need to save
+        result.outdir = args.outdir
+        result.label = args.label
+        result.parameter_labels_with_unit = None
+        result_prior = result.priors.copy()
+        for k, v in result_prior.items():
+            if k in priors:
+                v.latex_label = priors[k].latex_label
+                result_prior[k] = v
+        result.priors = result_prior
+        # result.save_posterior_samples()
 
     if injection_parameters: 
         var_columns = {col for col in result.posterior 
                        if len(result.posterior[col].unique()) > 1}
         injection_parameters = {k: v for k, v in injection_parameters.items()
                         if k in var_columns}
+    try:
+        result.plot_corner(injection_parameters, priors)
+    except RuntimeError:
+        result.parameter_labels_with_unit = None
+        for k, v in priors.copy().items():
+            v.latex_label = None
+            priors[k] = v
+        result.priors = priors 
+        result.plot_corner(injection_parameters, priors)
         
-    result.plot_corner(injection_parameters, priors)
+    if args.bestfit or args.plot:
+        likelihood.post_process_bestfit(args, result)
 
 
-def multi_analysis_loop(args, analysis_function):
+def multi_analysis_loop(args, analysis_setup):
     if getattr(args, 'config', None):
         yaml_dict = load_yaml(args.config)
         for params in yaml_dict.values():
@@ -262,6 +290,8 @@ def multi_analysis_loop(args, analysis_function):
                     print(f"{key} not a known argument... please remove")
                     exit()
                 setattr(args, key, value)
-            analysis_function(args)
+            priors, likelihood, injection_parameters = analysis_setup(args)
+            bilby_sampling(likelihood, priors, args, injection_parameters)
     else:
-        analysis_function(args)
+        priors, likelihood, injection_parameters = analysis_setup(args)
+        bilby_sampling(likelihood, priors, args, injection_parameters)

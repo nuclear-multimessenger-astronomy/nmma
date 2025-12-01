@@ -11,7 +11,6 @@ import pickle
 from argparse import Namespace
 
 import bilby
-from bilby.core.prior import DeltaFunction
 import bilby_pipe
 import bilby_pipe.data_generation
 import dynesty
@@ -24,6 +23,8 @@ from ..em.prior import extinction_prior
 from ..em.io import load_em_observations
 from ..em.model import create_injection_model
 from ..em.lightcurve_generation import create_light_curve_data
+from ..em.systematics import FilterSystematicsHandler
+from ..em import utils as em_utils
 from ..eos.eos_likelihood import compose_eos_constraints, setup_joint_eos_constraint, setup_tabulated_eos_priors
 from ..joint.constants import default_cosmology
 from ..joint.base import adjust_priors_for_nmma, adjust_hubble_prior
@@ -97,12 +98,26 @@ def write_complete_config_file(parser, args, inputs):
     required_arg_groups= determine_required_args(check_messengers)
     parser= remove_expandable_args(parser, required_arg_groups)
 
-    try:
-        bilby_pipe.main.write_complete_config_file(parser, args, inputs)
-    except AttributeError:
-        # bilby_pipe expects the ini to have "online_pe" and some other non pBilby args
-        pass
-
+    args_dict = vars(args).copy()
+    for key, val in args_dict.items():
+        if key == "label":
+            continue
+        if isinstance(val, str):
+            if os.path.isfile(val) or os.path.isdir(val):
+                setattr(args, key, os.path.abspath(val))
+        if isinstance(val, list):
+            if len(val) == 0:
+                setattr(args, key, "[]")
+            elif isinstance(val[0], str):
+                setattr(args, key, f"[{', '.join(val)}]")
+    args.sampler_kwargs = str(inputs.sampler_kwargs)
+    args.submit = False
+    parser.write_to_file(
+        filename=inputs.complete_ini_file,
+        args=args,
+        overwrite=False,
+        include_description=False,
+    )
 
 def create_generation_logger(outdir, label):
     logger = bilby.core.utils.logger
@@ -130,7 +145,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         super().__init__(args, unknown_args)
         # Generic setup, ripped from bilby pipe
         # Admin arguments
-        self.injection_parameters=None
         self.ini = args.ini
         self.transfer_files = args.transfer_files
 
@@ -142,6 +156,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         # Naming arguments
         self.outdir = args.outdir
         self.label = args.label
+        self.unknown_args = unknown_args
 
         # Prior arguments
         self.reference_frame = args.reference_frame
@@ -174,40 +189,114 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
 
-        ### identify messengers, to be extended
-        messengers=[]
-        if args.emulator_metadata:
-            messengers.append("eos")
-        if args.em_model or args.em_transient_class:
-            messengers.append("em")
-        if args.detectors:
-            messengers.append("gw")
+        self.data_set = False
+        self.injection = args.injection
+        self.injection_numbers = args.injection_numbers
+        self.injection_file = args.injection_file
+        self.injection_dict = args.injection_dict
+        if self.injection:
+            self.injection_parameters = self.injection_df.iloc[self.idx].to_dict()
+        else: 
+            self.injection_parameters=None
 
-        self.messengers = messengers
-
-        analysis_modifiers= []
-        if args.Hubble:
-            analysis_modifiers.append("Hubble")
-        if args.eos_data:
-            analysis_modifiers.append('tabulated_eos')
-        self.analysis_modifiers= analysis_modifiers
-
-
-        # This is done before instantiating the likelihood so that it is the full prior
-        self.create_priors(args, logger)
-
-        self.create_data(args, unknown_args)
 
         self.meta_data = dict(
                 config_file=self.ini,
                 data_dump_file=self.data_dump_file,
                 **get_version_info(),
-                command_line_args=args.__dict__,
-                unknown_command_line_args=unknown_args,
+                command_line_args=self.args.__dict__,
+                unknown_command_line_args=self.unknown_args,
                 injection_parameters= self.injection_parameters,
         )
-
+        self.adjust_priors_and_data(args, logger)
         self.save_data_dump()
+
+    def adjust_priors_and_data(self, args, logger):
+        messengers, analysis_modifiers = [], []
+        data_dump = dict(injection_parameters = self.injection_parameters)
+        priors = self._get_priors()
+        priors = adjust_priors_for_nmma(priors, logger)
+
+        ###adjust hubble prior if applicable
+        # this may overwrite an existing Hubble prior from adjust_priors_for_nmma
+        priors = adjust_hubble_prior(priors, args, logger)
+        if args.Hubble or any(['hubble' in key.lower() for key in priors.keys()]):
+            analysis_modifiers.append("Hubble")
+
+
+        # EM SETUP
+        if args.em_model or args.em_transient_class:
+            messengers.append('em')
+            if self.injection_parameters:
+                injection_model = create_injection_model(args)
+                light_curve_data = create_light_curve_data(
+                    self.injection_parameters, args, injection_model
+                )
+            else:
+                light_curve_data = load_em_observations(args)
+
+            filters = em_utils.set_filters(args)
+            if not filters:
+                filters = list(light_curve_data.keys())
+            
+            sys_handler = FilterSystematicsHandler(filters, 
+                args.systematics_file, error_budget=args.em_error_budget)
+            
+            priors = sys_handler.setup_systematics_priors(priors)
+            priors = extinction_prior(priors, args)
+            data_dump |= dict(light_curve_data=light_curve_data, filters = filters,
+                    systematics_dict = sys_handler.systematics_dict)
+            
+
+        # EOS Setup
+        if args.emulator_metadata:
+            messengers.append("eos")
+            data_dump |= dict(eos_constraint_dict= compose_eos_constraints(args))
+
+        elif args.eos_data:
+            analysis_modifiers.append('tabulated_eos')
+            eos_constraint_dict = compose_eos_constraints(args)
+            if eos_constraint_dict:
+                constraint = setup_joint_eos_constraint(eos_constraint_dict)
+                args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weights(
+                    args.eos_data, args.outdir, args.eos_weight
+                )
+            priors = setup_tabulated_eos_priors(args, priors, logger)
+
+        # GW SETUP
+        if args.detectors:
+            messengers.append("gw")
+            self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, self.unknown_args)
+            #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
+            self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)
+            args.gw_likelihood_type = self.gw_inputs.likelihood_type
+            if args.gw_likelihood_type == "ROQGravitationalWaveTransient":
+                self.gw_inputs.save_roq_weights()
+            data_dump |= dict(waveform_generator=self.gw_inputs.waveform_generator,
+                ifo_list=self.gw_inputs.interferometers)
+
+        self.args = args
+        self.messengers = messengers
+        self.analysis_modifiers= analysis_modifiers
+        self._priors = priors
+        self.priors.to_json(outdir=self.data_directory, label=self.label)
+        self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
+        self.data_dump = data_dump | dict(
+                prior_file=self.prior_file,
+                args=self.args,
+                messengers = self.messengers,
+                analysis_modifiers= self.analysis_modifiers,
+                data_dump_file=self.data_dump_file,
+                meta_data=self.meta_data,
+                injection_parameters=self.injection_parameters,
+        )
+        
+
+
+    def save_data_dump(self):        
+
+        with open(self.data_dump_file, "wb+") as file:
+            pickle.dump(self.data_dump, file)
 
     @property
     def sampling_seed(self):
@@ -220,105 +309,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self._sampling_seed = sampling_seed
         np.random.seed(sampling_seed)
     
-
-    def save_data_dump(self):
-        data_dump= dict(
-                prior_file=self.prior_file,
-                args=self.args,
-                messengers = self.messengers,
-                analysis_modifiers= self.analysis_modifiers,
-                data_dump_file=self.data_dump_file,
-                meta_data=self.meta_data,
-                injection_parameters=self.injection_parameters,
-        )
-        if "em" in self.messengers:
-            data_dump |=  dict(
-                light_curve_data=self.light_curve_data
-            )
-
-        if "gw" in self.messengers:
-            data_dump |= dict(
-                waveform_generator=self.gw_inputs.waveform_generator,
-                ifo_list=self.gw_inputs.interferometers,
-            )
-        if ("eos" in self.messengers):
-            data_dump |= dict(
-                eos_constraint_dict=self.eos_constraint_dict
-            )
-        with open(self.data_dump_file, "wb+") as file:
-            pickle.dump(data_dump, file)
-
-    def create_priors(self, args, logger):
-        priors = self._get_priors()
-        priors = adjust_priors_for_nmma(priors, logger)
-
-        ###adjust hubble prior if applicable
-        # this may overwrite an existing Hubble prior from adjust_priors_for_nmma
-        priors = adjust_hubble_prior(priors, args, logger)
-
-        if args.em_model or args.em_transient_class:
-            # add the ratio_epsilon in case it is not present (for no-grb case)
-            if "ratio_epsilon" not in priors:
-                priors["ratio_epsilon"] = DeltaFunction(0.01, "ratio_epsilon")
-            priors = extinction_prior(priors, args)
-
-        # construct the eos prior
-        if "tabulated_eos" in self.analysis_modifiers:
-            priors = setup_tabulated_eos_priors(args, priors, logger)
-
-        self._priors = priors
-        self.priors.to_json(outdir=self.data_directory, label=self.label)
-        self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
-        
-
-    def create_data(self, args, unknown_args):
-        self.data_set = False
-        self.injection = args.injection
-        self.injection_numbers = args.injection_numbers
-        self.injection_file = args.injection_file
-        self.injection_dict = args.injection_dict
-        if self.injection:
-            self.injection_parameters = self.injection_df.iloc[self.idx].to_dict()
-        else: 
-            self.injection_parameters=None
-
-            #FIXME add routine for eos model training!
-        if "eos" in self.messengers:
-            self.eos_constraint_dict = compose_eos_constraints(args)
-        elif "tabulated_eos" in self.analysis_modifiers:
-            eos_constraint_dict = compose_eos_constraints(args)
-            if eos_constraint_dict:
-                constraint = setup_joint_eos_constraint(eos_constraint_dict)
-                args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weights(
-                    args.eos_data, args.outdir, args.eos_weight
-                )
-
-        if "em" in self.messengers:
-            if self.injection_parameters:
-                injection_model = create_injection_model(args)
-                self.light_curve_data = create_light_curve_data(
-                    self.injection_parameters, args, injection_model
-                )
-            else:
-                self.light_curve_data = load_em_observations(args)
-            ## Test-build the model already here to ensure that svd is properly loaded
-            
-
-        if "gw" in self.messengers:
-            self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, unknown_args)
-            #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
-            args.gw_likelihood_type = self.gw_inputs.likelihood_type
-            self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)
-
-            # # We build the likelihood here to ensure the 
-            # # distance marginalization exist before sampling
-            # self.gw_inputs.likelihood
-
-            if args.gw_likelihood_type == "ROQGravitationalWaveTransient":
-                self.gw_inputs.save_roq_weights()
-        
-        self.args = args
-
 
 def generate_runner(parser=None, **kwargs):
     """

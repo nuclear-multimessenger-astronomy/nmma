@@ -54,13 +54,10 @@ class MultiMessengerLikelihood(JointLikelihood):
             return f"{self.__class__.__name__} with {', '.join(map(str, reprs[:-1]))} and {reprs[-1]}"
             
     def sanity_checks(self):
-        return all([lhood.sanity_checks() for lhood in self.likelihoods])
+        return np.prod([lhood.sanity_checks() for lhood in self.likelihoods])
 
     def evaluate_constraints(self, out_sample):
-        for k, con in self.constraints.items():
-            if not con.prob(out_sample[k]):
-                return False
-        return True
+        return np.prod([con.prob(out_sample[k] ) for k, con in self.constraints.items()])   
     
     def log_likelihood(self, parameters):
         parameters, _ = self.parameter_conversion(parameters)
@@ -79,7 +76,10 @@ class MultiMessengerLikelihood(JointLikelihood):
     def noise_log_likelihood(self):
         return self._noise_logl
         
-
+    def final_diagnostics(self, bestfit_params, args, result=None):
+        for lhood in self.likelihoods:
+            lhood.final_diagnostics(bestfit_params, args, result)
+            
     def parameter_conversion(self, samples):
         return self.multi_conversion.convert_to_multimessenger_parameters(samples)
     
@@ -130,7 +130,7 @@ def setup_nmma_likelihood(data_dump, priors, args, logger):
 
     """
     messengers= data_dump["messengers"]
-    modifiers = data_dump['analysis_modifiers']
+    modifiers = data_dump["analysis_modifiers"]
 
     messenger_lhoods= []
     likelihood_kwargs={}
