@@ -22,15 +22,14 @@ from ..joint.utils import read_injection_file, set_filename, read_trigger_time
 
 from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict
 
-def post_process_bestfit(bestfit_params, transient, args, result=None):
-    best_mags = bestfit_lightcurve(transient, bestfit_params)
-    if hasattr(transient, 'systematics_filters'):
-        model_error = {filt: transient.filt_err_from_systematics_sampling(
-            transient.systematics_filters[filt], bestfit_params, best_mags["time"])
-                        for filt in best_mags.keys() if filt != "time"}
-    else: 
-        model_error = transient.compute_em_err(bestfit_params)
-
+def post_process_bestfit(transient, bestfit_params, args, result=None):
+    
+    lc_model = transient.light_curve_model
+    observable_times, best_mags = lc_model.gen_detector_lc(bestfit_params)
+    model_error_data = transient.systematics_handler(bestfit_params)
+    model_error = {filt: utils.autocomplete_data(observable_times,
+    transient.light_curve_times[filt], data) 
+        for filt, data in model_error_data.items()}
     # model may not necessarily work on observed filters:
     for filt in set(transient.observed_filters) - set(best_mags.keys()):
         best_mags[filt] =  utils.get_filtered_mag(best_mags, filt)
@@ -39,7 +38,7 @@ def post_process_bestfit(bestfit_params, transient, args, result=None):
     
     # transient.parameters = bestfit_params
     chi2_dict, mismatches = compute_chisquare_dict(transient, best_mags, 
-                                        model_error, verbose=args.verbose)
+            observable_times, model_error, verbose=args.verbose)
 
     if getattr(args, "bestfit", False):
         bestfit_to_write = bestfit_params.copy()
@@ -48,7 +47,7 @@ def post_process_bestfit(bestfit_params, transient, args, result=None):
             bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
         bestfit_to_write["Magnitudes"] = {filt: best_mags[filt].tolist() 
                                           for filt in transient.observed_filters}
-        bestfit_to_write["obs_times"] = best_mags["time"].tolist()
+        bestfit_to_write["obs_times"] = observable_times.tolist()
         bestfit_to_write["chi2_per_dof"] = chi2_dict["total"]
         bestfit_to_write["chi2_dict"] = chi2_dict
         bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
@@ -65,12 +64,12 @@ def post_process_bestfit(bestfit_params, transient, args, result=None):
         ]
         plot_error = {filt: model_error[filt] for filt in filters_to_plot}
         mags_to_plot = {filt: best_mags[filt] for filt in filters_to_plot}
-        mags_to_plot["time"] = best_mags["time"]
+        mags_to_plot["time"] = observable_times
 
-        if isinstance(transient.light_curve_model, model.CombinedLightCurveModelContainer):
-            sub_models = transient.light_curve_model.models
+        if isinstance(lc_model, model.CombinedLightCurveModelContainer):
+            sub_models = lc_model.lc_models
             model_colors = plt.cm.Spectral(np.linspace(0, 1, len(sub_models)))[::-1]
-            obs_times , mag_all = transient.light_curve_model.gen_detector_lc(
+            obs_times , mag_all = lc_model.gen_detector_lc(
                 bestfit_params, return_all=True
             )
             sub_model_plot_props = {}
@@ -79,14 +78,18 @@ def post_process_bestfit(bestfit_params, transient, args, result=None):
                     'color': model_colors[i], 
                     'plot_times': obs_times[i]
                 }
+                plot_errors = []
                 plot_mags = []
                 for filt in filters_to_plot:
                     try:
                         plot_mags.append(utils.get_filtered_mag(mag_all[i], filt))
                     except KeyError:
                         plot_mags.append(np.full_like(obs_times[i], np.nan))
+                    plot_errors.append(utils.autocomplete_data(obs_times[i],
+                        transient.light_curve_times[filt], model_error_data[filt]))
 
                 sub_model_plot_props[sub_model.model]['plot_mags'] = plot_mags
+                sub_model_plot_props[sub_model.model]['plot_errors'] = plot_errors
         else: sub_model_plot_props = None
 
         
@@ -96,25 +99,13 @@ def post_process_bestfit(bestfit_params, transient, args, result=None):
             save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
         )
 
-def bestfit_lightcurve(transient, bestfit_params, sample_times=None):
-    
-    light_curve_model = transient.light_curve_model
-    observable_times, obs_lightcurve = light_curve_model.gen_detector_lc(
-        bestfit_params, sample_times
-    )
-    if not isinstance(obs_lightcurve, dict): # bolometric model, have to turn it into a dict
-        obs_lightcurve = {'lbol': obs_lightcurve}
-    obs_lightcurve["time"] = observable_times
-    return obs_lightcurve
        
-def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
+def compute_chisquare_dict(transient, model_data, model_time, model_error, verbose=False):
     chi2 = 0.0
     dof = 0.0
     chi2_dict = {}
     mismatches = {}
     for filt  in model_data.keys():
-        if filt=="time":
-            continue
         mag = transient.light_curves[filt]
         t = transient.light_curve_times[filt]
         sigma_y = transient.light_curve_uncertainties[filt]
@@ -128,9 +119,9 @@ def compute_chisquare_dict(transient, model_data, model_error, verbose=False):
                 sigma_y[finite_idx],
             )
             
-            offset = (y_det - np.interp(t_det,model_data["time"], model_data[filt])) ** 2
+            offset = (y_det - np.interp(t_det,model_time, model_data[filt])) ** 2
             try:
-                errors = np.interp(t_det,model_data["time"], model_error[filt])
+                errors = np.interp(t_det,model_time, model_error[filt])
             except ValueError:
                 errors = model_error[filt] 
             total_unc = sigma_y_det**2 + errors**2

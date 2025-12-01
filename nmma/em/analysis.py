@@ -3,14 +3,13 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from .lightcurve_handling import make_injection, post_process_bestfit, bestfit_lightcurve
+from .lightcurve_handling import make_injection
 from .em_likelihood import EMTransientLikelihood
 from .prior import create_prior_from_args
-from . import io, model, utils  
-from .plotting_utils import bolometric_lc_plot
+from . import io, model, utils, systematics  
 from .em_parsing import parsing_and_logging, multi_wavelength_analysis_parser, bolometric_parser
-from ..joint.base import bilby_sampling, multi_analysis_loop
-from ..joint.utils import read_injection_file, set_filename, read_bestfit_from_posterior, read_trigger_time
+from ..joint.base import multi_analysis_loop
+from ..joint.utils import read_injection_file, set_filename, read_trigger_time
 matplotlib.use("agg")
 
 def data_from_injection(args, filters, detection_limit):
@@ -54,12 +53,13 @@ def set_analysis_filters(filters, data):
     return filters_to_analyze
 
 
-def bolometric_analysis(args):
+def bolometric_setup(args):
 
     # create the data 
     # FIXME add  injection functionality
     # if args.injection_file:
     #     pass
+    injection_parameters = None
 
     # load the bolometric data
     data = pd.read_csv(args.light_curve_data)
@@ -69,32 +69,25 @@ def bolometric_analysis(args):
     light_curve_model = model.SimpleBolometricLightCurveModel(args.em_model,
         sample_times=utils.setup_sample_times(args),  ## usually None, defaults to model_times
     )
+    systematics_handler = systematics.SystematicsHandler(
+        args.systematics_file, args.em_error_budget)
 
     # setup the prior
-    priors = create_prior_from_args(args, light_curve_model)
+    priors = create_prior_from_args(args, light_curve_model, systematics_handler)
 
     # setup the likelihood
     likelihood_kwargs = dict(
         light_curve_model=light_curve_model,
         light_curve_data=light_curve_data,
         priors=priors,
-        error_budget=args.error_budget,
+        systematics_handler=systematics_handler,
         verbose=args.verbose,
     )
     likelihood = EMTransientLikelihood(**likelihood_kwargs)
-    bilby_sampling(likelihood, priors, args)
 
-    if args.bestfit or args.plot:
-        transient = likelihood.sub_model
-        bestfit_params = read_bestfit_from_posterior(args)
-        lbol_dict  = bestfit_lightcurve(transient, bestfit_params)
+    return priors, likelihood, injection_parameters
 
-        bolometric_lc_plot(transient, lbol_dict,
-            save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
-        )
-    return
-
-def analysis(args):
+def analysis_setup(args):
     filters = utils.set_filters(args)
     detection_limit = utils.create_detection_limit(args, filters)
         
@@ -142,8 +135,9 @@ def analysis(args):
         injection_parameters = {k: v for k, v in injection_parameters.items() 
                                 if k in injlist_all}
     
-    # setup the prior
-    priors = create_prior_from_args(args, light_curve_model)
+    systematics_handler = systematics.FilterSystematicsHandler(filters_to_analyze,
+        args.systematics_file, error_budget=args.em_error_budget)
+    priors = create_prior_from_args(args, light_curve_model, systematics_handler)
     light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
     utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
     # setup the likelihood
@@ -152,20 +146,13 @@ def analysis(args):
         filters=filters_to_analyze,
         light_curve_data=light_curve_data,
         priors=priors,
-        trigger_time=trigger_time,
-        error_budget=args.em_error_budget,
+        systematics_handler=systematics_handler,
         verbose=args.verbose,
-        detection_limit=detection_limit,
-        systematics_file=args.systematics_file
+        detection_limit=detection_limit
     )
 
     likelihood = EMTransientLikelihood(**likelihood_kwargs)
-
-    bilby_sampling(likelihood, priors, args, injection_parameters)
-
-    if args.bestfit or args.plot:
-        bestfit_params = read_bestfit_from_posterior(args)
-        post_process_bestfit(bestfit_params, likelihood.sub_model, args)
+    return priors, likelihood, injection_parameters
 
 def nnanalysis(args):
 
@@ -273,10 +260,12 @@ def nnanalysis(args):
 
 def main(args=None):
     args = parsing_and_logging(multi_wavelength_analysis_parser, args)
-    analysis_function = nnanalysis if args.sampler == "neuralnet" else analysis
-    multi_analysis_loop(args, analysis_function)
+    if args.sampler == 'neuralnet':
+        nnanalysis(args)
+    else:
+        multi_analysis_loop(args, analysis_setup)
     
 
 def lbol_main(args=None):
     args = parsing_and_logging(bolometric_parser, args)
-    multi_analysis_loop(args, bolometric_analysis)
+    multi_analysis_loop(args, bolometric_setup)

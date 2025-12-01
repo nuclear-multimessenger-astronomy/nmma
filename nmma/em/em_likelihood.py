@@ -1,13 +1,12 @@
 from __future__ import division
 import numpy as np
 from scipy.stats import norm, truncnorm
-from ast import literal_eval
-import warnings
-warnings.filterwarnings("error", category=RuntimeWarning)
 from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
 from ..joint.utils import read_trigger_time
 from . import model, utils, systematics
-from .lightcurve_handling import post_process_bestfit
+from .lightcurve_handling import post_process_bestfit as lch_bestfit
+from .plotting_utils import bolometric_lc_plot
+
 
 
 
@@ -15,9 +14,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     #Prerequisites
     ## get lc_data and filters
     light_curve_data= data_dump["light_curve_data"]
-    filters = utils.set_filters(args)
-    if not filters:
-        filters = list(light_curve_data.keys())
+    filters = data_dump['filters']
 
     ## setup the light curve model for this transient class and filters
     lc_model = model.identify_model_type(args)
@@ -25,6 +22,8 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     trigger_time = read_trigger_time(None, args)
     light_curve_data = utils.setup_filtered_lc_data(light_curve_data, trigger_time)
     utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
+    sys_handler = systematics.FilterSystematicsHandler(filters, 
+        data_dump['systematics_file'], error_budget=args.em_error_budget)
 
     em_kwargs = initialisation_args_from_signature_and_namespace(
         EMTransientLikelihood, args, ['em_', 'kilonova_']
@@ -34,7 +33,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     em_likelihood_kwargs = dict(
         light_curve_model=light_curve_model,light_curve_data=light_curve_data,
         priors = priors, filters=filters,
-        error_budget=args.em_error_budget,
+        systematics_handler = sys_handler,
         params_from_prior_conversion = False
     )
     return em_kwargs | em_likelihood_kwargs
@@ -50,15 +49,14 @@ class EMTransientLikelihood(NMMABaseLikelihood):
         given a set of parameters
     light_curve_data: dict
         Dictionary of light curve data 
+    systematics_handler: nmma.em.systematics.SystematicsHandler
+        An object to handle modelling systematics in various ways.
     priors: dict, optional
         A dictionary of prior distributions for the model parameters
     filters: list, str, None
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
     detection_limit: float or dict, default: np.inf
-    error_budget: Any (default:1)
-        Additionally introduced statistical error on the light curve data,
-        so as to keep the systematic error under control. This will only be used if the parameters-dict does not containt a 'em_syserr' sampling parameter.
     verbose: bool (default: False)
         If True, print additional information during computation
     params_from_prior_conversion: bool (default: True)
@@ -75,18 +73,19 @@ class EMTransientLikelihood(NMMABaseLikelihood):
     def __init__(self, 
         light_curve_model,
         light_curve_data,
+        systematics_handler,
         priors = None,
         filters=None,
         detection_limit=np.inf,
-        error_budget=1.0,
         verbose=False,
         params_from_prior_conversion = True,
         **kwargs
     ):  
-        basic_transient_args = (light_curve_model, light_curve_data, priors, detection_limit, error_budget, verbose, params_from_prior_conversion)
+        basic_transient_args = (light_curve_model, light_curve_data, systematics_handler,
+            priors, detection_limit, verbose, params_from_prior_conversion)
         
         if filters:
-            sub_model = MultiFilterTransient(filters, *basic_transient_args, kwargs.get("systematics_file", None))
+            sub_model = MultiFilterTransient(filters, *basic_transient_args)
         else:
             sub_model = BasicEMTransient(*basic_transient_args)
 
@@ -116,7 +115,7 @@ class EMTransientLikelihood(NMMABaseLikelihood):
             The figure object containing the plot
 
         """
-        post_process_bestfit(bestfit_params, self.sub_model, args, result)
+        self.sub_model.final_diagnostics(bestfit_params, args, result)
     
        
 
@@ -130,11 +129,10 @@ class BasicEMTransient:
         given a set of parameters
     light_curve_data: dict
         Dictionary of light curve data
+    systematics_handler: nmma.em.systematics.SystematicsHandler
+        An object to handle modelling systematics in various ways.
     priors: dict, optional
         A dictionary of bilby-style priors
-    error_budget: Any (default:1)
-        Additionally introduced statistical error on the light curve data,
-        so as to keep the systematic error under control. This will only be used if the parameters-dict does not containt a 'em_syserr' sampling parameter.
     detection_limit: float (default: np.inf)
         Detection limit for the light curve data
     verbose: bool (default: False)
@@ -151,20 +149,21 @@ class BasicEMTransient:
     """
 
 
-    def __init__(self, light_curve_model, light_curve_data, priors, 
-                 detection_limit, error_budget, verbose, params_from_prior_conversion):
+    def __init__(self, light_curve_model, light_curve_data, systematics_handler, priors, 
+                 detection_limit, verbose, params_from_prior_conversion):
 
         self.light_curve_model = light_curve_model
 
         if priors is not None:
             self.light_curve_model.check_vs_priors(priors)
 
-        self.error_budget = error_budget
-
-        self.compute_em_err = self.em_err_from_parameters
-
         (self.light_curve_times, self.light_curves, 
          self.light_curve_uncertainties, self.trigger_time) = light_curve_data
+        
+        self.systematics_handler = systematics_handler
+        t_model = light_curve_model.model_times
+        self.systematics_handler.time_range = (t_model[0], t_model[-1])
+        self.systematics_handler.reset_em_error_method(priors, self.light_curve_times)
 
         self.verbose = verbose
         self.internal_params = params_from_prior_conversion
@@ -192,7 +191,7 @@ class BasicEMTransient:
         expected_observations = self.update_lightcurve_reference(obs_times, model_lc)
 
         # compare the estimated light curve and the measured data
-        obs_error = self.compute_em_err(parameters)
+        obs_error = self.systematics_handler(parameters)
         logL_model = self.band_log_likelihood(expected_observations, obs_error)
         if self.verbose:
             print(parameters, logL_model)
@@ -206,9 +205,6 @@ class BasicEMTransient:
     def update_lightcurve_reference(self, obs_times, model_lc):
         return utils.autocomplete_data(self.light_curve_times, obs_times, model_lc)
     
-    def em_err_from_parameters(self, parameters):
-        return parameters.get('em_syserr', self.error_budget)
-
     def band_log_likelihood(self, expected_lc, obs_error):
         data_sigma = np.sqrt(self.light_curve_uncertainties**2 + obs_error**2)
 
@@ -251,6 +247,13 @@ class BasicEMTransient:
         a = -np.inf # no lower bound of truncation
         b = (upper_lim - loc) / scale # upper bound in number of std-deviations
         return truncnorm.logpdf(m_det, a, b, loc=loc, scale=scale)
+    
+    def final_diagnostics(self, bestfit_params, args, result=None):
+        obs_times, obs_lc = self.light_curve_model.gen_detector_lc(bestfit_params)
+        if result is None:
+            save_path = f'{args.outdir}/{args.label}_bol_lightcurve.png'
+        save_path = f'{result.outdir}/{result.label}_bol_lightcurve.png'
+        bolometric_lc_plot(self, obs_times, obs_lc, save_path = save_path)
 
 
 class MultiFilterTransient(BasicEMTransient):
@@ -266,109 +269,31 @@ class MultiFilterTransient(BasicEMTransient):
         given a set of parameters
     light_curve_data: dict
         Dictionary of light curve data 
+    systematics_handler: nmma.em.systematics.FilterSystematicsHandler
+        An object to handle filter-dependent modelling systematics in various ways.
     priors: dict, optional
         Dictionary of prior distributions for the model parameters
     detection_limit: float or dict (default: np.inf)
         Detection limit for the light curve data
-    error_budget: float (default: 1.0)
-        Additionally introduced statistical error on the light curve data,
-        so as to keep the systematic error in control
     verbose: bool (default: False)
         If True, print additional information during computation
-    systematics_file: str, optional
-        Path to a YAML file containing systematic error information
 
     """
 
     def __init__( self, filters,
-        light_curve_model, light_curve_data, priors,
-        detection_limit, error_budget, verbose, params_from_prior_conversion,
-        systematics_file=None,
+        light_curve_model, light_curve_data, systematics_handler, priors,
+        detection_limit, verbose, params_from_prior_conversion,
     ):  
         
         self.observed_filters = filters
         self.model_filter_mapping, self.obs_average_mapping = utils.get_filter_name_mapping(filters)
 
-        super().__init__(light_curve_model, light_curve_data, priors, detection_limit, 
-                         error_budget, verbose, params_from_prior_conversion)
+        super().__init__(light_curve_model, light_curve_data, systematics_handler, priors, 
+                         detection_limit, verbose, params_from_prior_conversion)
         
-
-        #determine_systematic_error_handling
-        ## case 1: use systematics_file
-        if systematics_file:
-            systematics_dict = systematics.load_yaml(systematics_file)
-            systematics.validate_only_one_true(systematics_dict)
-            time_dep_sys_dict = systematics_dict["config"]["withTime"]
-            # case 1a: time-dependent systematics
-            if time_dep_sys_dict['value']:
-                self.setup_time_systematics(time_dep_sys_dict)
-            else:
-                # case 1b: no time-dependency and sample with 
-                # time-independent error-> this is actually case 2
-                ## FIXME would it not be more natural to still have a filter-dependent error, even if it does not vary in time?
-                self.compute_em_err = self.em_err_from_parameters
-
-        # case 2: sample over general limit
-        elif 'em_syserr' in priors:
-            self.compute_em_err = self.em_err_from_parameters
-        
-        #case 3: preset general limit
-        else:
-            self.adjust_error_budget(self.error_budget)
 
     def set_detection_limit(self, detection_limit):
         self.detection_limit = utils.set_filter_associated_dict(detection_limit, self.observed_filters)
-
-    def setup_time_systematics(self, time_dep_sys_dict):
-        #get the time nodes and the filters
-        self.systematics_time_nodes = np.round(
-            np.linspace(self.light_curve_model.model_times[0], 
-                        self.light_curve_model.model_times[-1],
-                        time_dep_sys_dict["time_nodes"]),
-            decimals=2)
-        yaml_filters = list(time_dep_sys_dict["filters"])
-        systematics.validate_filters(yaml_filters)
-
-        #iterate over the filters and assign them to a systematics filter group
-        systematics_filters = {}
-        for filter_group in yaml_filters:
-            #this should only be the case if no filters are specified
-            if filter_group is None:
-                systematics_filters = {filt: 'all' for filt in self.observed_filters}
-                break
-            elif isinstance(filter_group, list):
-                for filt in filter_group:
-                    systematics_filters[filt] = "___".join(filter_group)
-            else:
-                #this should mean that the filter_group is in fact a single filter
-                systematics_filters[filter_group] = filter_group
-        ## By this procedure, every filter should immediately be assigned to a systematics filter-group that we can use to calculate the systematics error       
-        self.systematics_filters = systematics_filters  
-
-        self.compute_em_err = self.em_err_from_systematics_sampling    
-    
-    def em_err_from_systematics_sampling(self, parameters):
-        return {filt: self.filt_err_from_systematics_sampling(self.systematics_filters[filt], 
-                parameters, self.light_curve_times[filt]) for filt in self.observed_filters}
-    
-    def filt_err_from_systematics_sampling(self, filt, parameters, time):
-            sampled_filter_systematics = [parameters[f"em_syserr_{filt}{i}"] for i in range(len(self.systematics_time_nodes))]
-            return utils.autocomplete_data(time, self.systematics_time_nodes, sampled_filter_systematics)
-        
-    
-    def em_err_from_parameters(self, parameters):
-        em_err =  parameters['em_syserr']
-        return {filt: em_err for filt in self.observed_filters}
-    
-    def adjust_error_budget(self, error_budget):
-        if isinstance(error_budget, str):
-            error_budget = literal_eval(error_budget)
-        self.error_budget   = utils.set_filter_associated_dict(error_budget, self.observed_filters, default_limit=1.)
-                                
-        self.compute_em_err = self.em_err_from_budget
-
-    def em_err_from_budget(self, _):
-        return self.error_budget
 
     def sanity_check(self, model_lc):
         if not model_lc:
@@ -419,3 +344,6 @@ class MultiFilterTransient(BasicEMTransient):
                 minus_chisquare_total+=minus_chisquare
                 gaussprob_total += gaussprob
         return minus_chisquare_total + gaussprob_total
+   
+    def final_diagnostics(self, bestfit_params, args, result=None):
+        lch_bestfit(self, bestfit_params, args, result)

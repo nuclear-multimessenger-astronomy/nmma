@@ -66,8 +66,8 @@ def test_validate_filters_invalid():
 def test_handle_withTime():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": [["bessellb", "bessellv"], "ztfr"]}
     result = handle_withTime(values)
-    assert "em_syserr_bessellb___bessellv0" in result[0]
-    assert "em_syserr_ztfr1" in result[3]
+    assert "em_syserr_bessellb___bessellv_0" in result[0]
+    assert "em_syserr_ztfr_1" in result[3]
 
 
 def test_handle_withoutTime():
@@ -147,7 +147,7 @@ def test_handle_withTime_all_filters():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [None]}
     result = handle_withTime(values)
     assert len(result) == 1
-    assert "em_syserr_all0" in result[0]
+    assert "em_syserr_all_0" in result[0]
 
 
 def test_main_withoutTime(tmp_path):
@@ -187,7 +187,7 @@ def test_all_allowed_filters(filter_name):
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [filter_name]}
     result = handle_withTime(values)
     assert len(result) == 1
-    assert f"em_syserr_{filter_name}0" in result[0]
+    assert f"em_syserr_{filter_name}_0" in result[0]
 
 
 def test_load_yaml_file_not_found():

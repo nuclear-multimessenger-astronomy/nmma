@@ -90,12 +90,13 @@ def basic_em_analysis_plot(
             ## plot additional lcs for each sub_model
             for model_name, prop_dict in sub_model_plot_props.items():
                 mag_plot = prop_dict['plot_mags'][cnt]
+                mag_err = prop_dict['plot_errors'][cnt]
                 plot_times = prop_dict['plot_times']
                 ax_sum.plot(plot_times, mag_plot,
                     color='coral', linewidth=3, linestyle="--")
                 ax_sum.fill_between(plot_times,
-                    mag_plot + error_budget,
-                    mag_plot - error_budget,
+                    mag_plot + mag_err,
+                    mag_plot - mag_err,
                     facecolor=prop_dict['color'],
                     alpha=0.2,
                     label=model_name,
@@ -110,7 +111,7 @@ def basic_em_analysis_plot(
     plt.savefig(save_path, bbox_inches='tight')
     plt.close()
 
-def bolometric_lc_plot(transient, lbol_dict, save_path, color = "coral"):
+def bolometric_lc_plot(transient, time, lc, save_path, color = "coral"):
     matplotlib.rcParams.update(
         {'font.size': 12,
         # 'font.family': 'Times New Roman'
@@ -120,7 +121,7 @@ def bolometric_lc_plot(transient, lbol_dict, save_path, color = "coral"):
     ax, _ = plot_observations(ax, transient, markersize=12)
 
     ### plot the bestfit model
-    ax.plot(lbol_dict['time'], lbol_dict['lbol'],
+    ax.plot(time, lc,
             color=color, linewidth=3, linestyle="--")
 
     ax.set_ylabel("L [erg / s]")

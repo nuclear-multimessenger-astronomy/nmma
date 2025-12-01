@@ -64,7 +64,6 @@ def setup_corner_plot(posterior_samples, *messengers, limits = None, plot_keys =
         plot_keys = plottable_keys # show all we can
     if limits is None:
         limits = [(np.inf, -np.inf) for key in plot_keys] # will adjust more permissively later
-
     # find what to actually plot
     plot_samples, plot_labels, titles = [], [], []
     for i, k in enumerate(plot_keys):

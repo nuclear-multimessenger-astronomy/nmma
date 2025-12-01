@@ -11,8 +11,8 @@ from . import utils
 from . import lightcurve_generation as lc_gen
 
 from nmma.joint.base import initialisation_args_from_signature_and_namespace
-from nmma.joint.constants import c_SI
-from nmma.joint.conversion import observation_angle_conversion, get_redshift,  distance_modulus_nmma
+from nmma.joint.constants import c_SI, default_cosmology
+from nmma.joint.conversion import observation_angle_conversion, get_redshift,  distance_modulus_nmma, get_cosmo_grids
 from nmma.utils.models import get_models_home, get_model
 
 ln10 = np.log(10)
@@ -190,7 +190,7 @@ class LightCurveModelContainer:
             self.model_parameters = model_parameters
 
         self.model = model
-
+        self.redshift_func = get_redshift
         if isinstance(filters, str):
             filters = filters.split(',')
         self.filters = filters
@@ -217,6 +217,16 @@ class LightCurveModelContainer:
         for key in self.model_parameters:
             if key not in priors:
                 print(f"Parameter {key} not found in priors, might fail.")
+
+        if 'redshift' not in priors and 'luminosity_distance' in priors:
+            dlum_prior = priors["luminosity_distance"]
+            cosmo = getattr(dlum_prior, 'cosmology', default_cosmology)
+            dist_grid, z_grid = get_cosmo_grids(dlum_prior.minimum, dlum_prior.maximum, cosmo)
+            def redshift_from_dlum(parameters):
+                return np.interp(parameters['luminosity_distance'], dist_grid, z_grid).value
+            self.redshift_func = redshift_from_dlum
+                
+
 
     def sanity_checks(self, parameters):
         self.good_parameters = True
@@ -248,7 +258,7 @@ class LightCurveModelContainer:
         
         # redshift computation can be expensive, so we only do it 
         # once and store it for conversion to detector frame
-        self.redshift = get_redshift(parameters)
+        self.redshift = self.redshift_func(parameters)
         if combine_params:
             return self.combine_lc_params(parameters)
 
@@ -708,11 +718,14 @@ class GRBMixin:
     
     def sanity_checks(self, parameters):
         """Perform sanity checks on the GRB parameters."""
+        # FIXME if ratio zeta and ratio epsilon are given, 
+        # we should check that the GRB energy does not 
+        # exceed the energy equivalent of the disk mass!
         self.good_parameters = (
-            parameters["thetaWing"] <= np.pi / 2
-            and (parameters["thetaWing"] / parameters["thetaCore"] <= self.resolution)
-            and (parameters["thetaCore"] > np.pi / 1800.)
-            and (parameters['epsilon_tot'] <= 1.0)
+              (parameters["thetaWing"] <= np.pi / 2)
+            & (parameters["thetaWing"] / parameters["thetaCore"] <= self.resolution)
+            & (parameters["thetaCore"] > np.pi / 1800.)
+            & (parameters['epsilon_tot'] <= 1.0)   
         )
     
 class FiestaGRBModel(GRBMixin,FiestaModel):
@@ -1101,7 +1114,7 @@ class CombinedLightCurveModelContainer:
     
     @property
     def good_parameters(self):
-        return True if all(lc_model.good_parameters for lc_model in self.lc_models) else False
+        return np.prod([lc_model.good_parameters for lc_model in self.lc_models])
     
     @property
     def sampled_parameters(self):

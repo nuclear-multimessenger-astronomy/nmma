@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from bilby.core.prior import (
     Prior, DeltaFunction, Interped, ConditionalTruncatedGaussian,
     ConditionalPriorDict, PriorDict as _PriorDict)
-from bilby.gw import cosmology as bilby_cosmo
+from bilby.gw import cosmology
 from ligo.skymap import io, moc
 
 from . import model as em_model
@@ -19,9 +19,6 @@ from ..joint.base import adjust_hubble_prior
 from ..joint.constants import default_cosmology
 from ..joint.conversion import cosmology_to_distance, convert_mtot_mni
 
-from astropy import cosmology
-
-from . import systematics
 
 
 def from_list(self, systematics):
@@ -249,7 +246,7 @@ def extinction_prior(priors, args):
     return priors
 
 
-def create_prior_from_args(args, lc_model):
+def create_prior_from_args(args, lc_model, systematics_handler=None):
     """Function to create prior dictionary from command line arguments and nmma-LightCurveModel
     Parameters
     ----------
@@ -270,10 +267,10 @@ def create_prior_from_args(args, lc_model):
         cosmo = getattr(args, 'cosmology', None)
         if cosmo is None:
             cosmo = default_cosmology
-        bilby_cosmo.set_cosmology(cosmo)
+        cosmology.set_cosmology(cosmo)
 
         def Hubble_conversion(priors):
-            params = cosmology_to_distance(priors, bilby_cosmo.COSMOLOGY[0])
+            params = cosmology_to_distance(priors, cosmology.COSMOLOGY[0])
             return params
         conv_functions.append(Hubble_conversion)
 
@@ -312,9 +309,6 @@ def create_prior_from_args(args, lc_model):
 
     if getattr(args,'fits_file', False):
         priors = inclination_prior_from_fits(priors, args)
-
-    if getattr(args, 'systematics_file', None):
-        systematics_priors = systematics.main(args.systematics_file)
-        priors.from_list(systematics_priors)
-
+    if systematics_handler is not None:
+        priors = systematics_handler.setup_systematics_priors(priors)
     return priors

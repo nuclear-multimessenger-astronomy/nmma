@@ -4,7 +4,7 @@ import shutil
 import copy
 from argparse import Namespace
 
-from ..em import analysis, em_parsing, cluster_handling
+from nmma.em import analysis, em_parsing, cluster_handling
 
 WORKING_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(WORKING_DIR, "data")
