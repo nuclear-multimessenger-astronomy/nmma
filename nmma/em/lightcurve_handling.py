@@ -679,7 +679,7 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         params.update({ "alpha"         : alpha,
                         "ratio_zeta"    : zeta})
         
-        complete_parameters, _ = conversion.convert_to_multimessenger_parameters(params)
+        complete_parameters = conversion.convert_to_multimessenger_parameters(params)
 
         log10_mej_dyn = complete_parameters["log10_mej_dyn"].item()
         log10_mej_wind = complete_parameters["log10_mej_wind"].item()

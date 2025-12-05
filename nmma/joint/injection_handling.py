@@ -11,7 +11,7 @@ from .base_parsing import nmma_base_parsing, process_multi_condition_string
 from .constants import default_cosmology
 from .joint_parsing import injection_parsing
 from .utils import set_filename, rejection_sample, read_injection_file
-from .conversion import MultimessengerConversion
+from .conversion import MultimessengerConversion, EoSConverter
 from ..em import utils, lightcurve_handling as lch
 from ..em.model import create_injection_model
 
@@ -67,11 +67,7 @@ class NMMAInjectionCreator(InjectionCreator):
             self.setup_post_processing(args)
 
             # we need to be able to do a parameter conversion
-            messengers, modifiers = self.determine_conversion_from_args(args)
-            internal_conversions = {}
-            if 'em' in messengers:
-                internal_conversions['em'] = self.lc_model.parameter_conversion
-            self.param_conversion = MultimessengerConversion(args, messengers, modifiers, internal_conversions)
+            self.param_conversion = self.determine_conversion_from_args(args)
 
             self.original_parameters = args.original_parameters
 
@@ -117,16 +113,17 @@ class NMMAInjectionCreator(InjectionCreator):
     def determine_conversion_from_args(self, args):
         """Determine the messengers and modifiers for the conversion based on the args."""
         # FIXME: To be extended
-        messengers = []
-        modifiers = []
         if 'ejecta' in (args.tests or args.post_processing):
-            messengers.append('em')
-        # eos conversion:
-        if args.eos_file:
-            modifiers.append('tabulated_eos')
-        elif args.micro_eos_model:
-            messengers.append('eos') 
-        return messengers, modifiers
+            em_conversion = self.lc_model.parameter_conversion
+        else:
+            em_conversion = False
+        if 'snr' in (args.tests or args.post_processing):
+            gw_conversion = True
+        else:
+            gw_conversion = False
+
+        return MultimessengerConversion(EoSConverter(args), 
+            gw_conversion, em_conversion, getattr(args, 'cosmology', None) )
 
     def generate_prelim_dataframe(self):
         #step 1: Check: we may want to extend a preliminary injection file

@@ -21,7 +21,8 @@ warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
 
 import astropy.units
-from nmma.joint.conversion import distance_modulus_nmma, luminosity_distance_to_redshift
+from nmma.joint.conversion import (distance_modulus_nmma, 
+        luminosity_distance_to_redshift, cosmology_to_distance)
 ### some frequently used constants:
 from nmma.joint.constants import c_cgs, c_SI, eV_per_h_SI
 
@@ -199,10 +200,10 @@ def check_model_time_consistency(light_curve_data, light_curve_model, priors):
     elif "luminosity_distance" in priors:
         if "Hubble_constant" in priors:
             min_pars = {par: priors[par].minimum for par in priors}
-            min_pars = priors.conversion_function(min_pars)
+            min_pars = cosmology_to_distance(min_pars)
             zmin = min_pars["redshift"]
             max_pars = {par: priors[par].maximum for par in priors}
-            max_pars = priors.conversion_function(max_pars)
+            max_pars = cosmology_to_distance(max_pars)
             zmax = max_pars["redshift"]
         else:
             zmin = luminosity_distance_to_redshift(priors["luminosity_distance"].minimum)

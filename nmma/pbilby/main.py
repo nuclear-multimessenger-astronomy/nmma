@@ -2,15 +2,15 @@
 Module to run parallel bilby using MPI
 """
 
-import mpi4py
-mpi4py.rc.threads = False
-mpi4py.rc.recv_mprobe = False
-del mpi4py
+# import mpi4py
+# mpi4py.rc.threads = False
+# mpi4py.rc.recv_mprobe = False
+# del mpi4py
 
 import sys
 import os
 from time import time
-from bilby.core.utils import logger
+import traceback
 
 import io
 import contextlib
@@ -22,15 +22,14 @@ stderr_buffer = io.StringIO()
 redirect_out = contextlib.redirect_stdout(stdout_buffer)
 redirect_err = contextlib.redirect_stderr(stderr_buffer)
 
-redirect_out.__enter__()
-redirect_err.__enter__()
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
-from schwimmbad import MPIPool, MultiPool
-import signal
-from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args, process_sampler_kwargs
-from .analysis_run import MainRun, WorkerRun
+with redirect_out, redirect_err:
+    from schwimmbad import MPIPool, MultiPool
+    import signal
+    from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args, process_sampler_kwargs
+    from .analysis_run import MainRun, WorkerRun
 
 def analysis_runner(
     data_dump,
@@ -58,29 +57,38 @@ def analysis_runner(
     API for running the analysis from Python instead of the command line.
     It takes all the same options as the CLI, specified as keyword arguments.
     """
+    POOL = MPIPool if pool_type == 'mpi' else MultiPool
+    global worker_run
     # Initialise a WorkerRun. this needs a global scope to allow 
     # persistence of states beyond the pool's scope.
     # Otherwise emulators retrace on each evaluation.
-    global worker_run
-    worker_run = WorkerRun(data_dump, bilby_zero_likelihood_mode)
-    t0 = time()
-    sampling_time = 0
-    POOL = MPIPool if pool_type == 'mpi' else MultiPool
-    # Restore normal stdout/stderr
-    redirect_out.__exit__(None, None, None)
-    redirect_err.__exit__(None, None, None)
-    with POOL(use_dill=True) as pool:
+    try:
+        with redirect_out, redirect_err:
+            worker_run = WorkerRun(data_dump, bilby_zero_likelihood_mode)
+    except:
+        with POOL() as pool:
+            if pool.is_master():
+                sys.stdout.write(stdout_buffer.getvalue())
+                traceback.print_exc()
+                sys.stderr.write(stderr_buffer.getvalue())
+                pool.close()
+            else:
+                pool.wait()
+            sys.exit() 
+        
+    
+    with POOL() as pool:
         if pool.is_master():
             sys.stdout.write(stdout_buffer.getvalue())
             sys.stderr.write(stderr_buffer.getvalue())
-
             prelim_sampler_kwargs, run_sampler_kwargs = process_sampler_kwargs(
                 init_sampler_kwargs, run_sampler_kwargs, kwargs)
             init_sampler_kwargs = dict(
-                periodic=worker_run.periodic,
-                reflective=worker_run.reflective,
+                periodic    =worker_run.periodic,
+                reflective  =worker_run.reflective,
                 ndim=len(worker_run.sampling_keys)
             ) | prelim_sampler_kwargs
+
             run = MainRun(
                 worker_run.sampling_keys,
                 pooled_log_likelihood, 
@@ -93,36 +101,30 @@ def analysis_runner(
                 nact=nact,
                 naccept=naccept,
                 sampling_seed=sampling_seed,
-                run_sampler_kwargs = run_sampler_kwargs,
+                sampler_kwargs = run_sampler_kwargs,
                 sampler_init_kwargs=init_sampler_kwargs,
             )
-            logger.info("Using priors:")
-            for k, p in worker_run.priors.items():
-                logger.info(f"{k}: {p}")
-            
+
             sampler, sampling_time = run.start_sampler(pool)
             
             ## graceful handling of preemptive shutdowns
             def handle_sigterm(signum, frame):
-                logger.info("Received SIGTERM, writing checkpoint and exiting.")
                 ## no time for plotting when file_size becomes larger
-                run.checkpointing(sampler, sampling_time, False)
+                run.checkpointing(sampler, sampling_time, False, 
+                    "succesfully created checkpoint after termination signal.")
                 pool.close()
                 pool.wait()
-                logger.info("Exited gracefully.")
                 sys.exit(0)
 
             signal.signal(signal.SIGTERM, handle_sigterm)
             signal.signal(signal.SIGINT , handle_sigterm)
             signal.signal(signal.SIGUSR1, handle_sigterm)
 
+            t0 = time()
             run_time = 0
             last_checkpoint_time= t0
             last_checkpoint_it = 0
-            logger.info(f"Run criteria: {run.sampler_kwargs}")
-
-            logger.info(f"Starting sampling for job {run.label}, with pool size={pool.size} "
-                f"and time between checkpoints ={check_point_delta_t}s" )
+            
             for it, res in enumerate(sampler.sample(**run.sampler_kwargs)):
 
                 run.stdout_sampling_log(results=res, niter=it, ncall=sampler.ncall)
@@ -131,18 +133,19 @@ def analysis_runner(
                 run_time += iteration_time
                 t0 = time()
 
-                if it == max_its or run_time > max_run_time:
-                    logger.info(f"{it} of max {max_its} iterations completed after {sampling_time:.2f}s sampling time of max {max_run_time}s. Stopping.")  
-                    run.checkpointing(sampler, sampling_time, checkpoint_plot)
-                    exit_reason = 1
-                    return exit_reason
+                if it >= max_its or run_time > max_run_time:
+                    run.checkpointing(sampler, sampling_time, checkpoint_plot,
+                        f"{it} of max {max_its} iterations completed after {sampling_time:.2f}s" 
+                        f" sampling time of max {max_run_time}s. Stopping." )
+                    return 
                 
                 elif (
                     # checkpoint criteria
                     t0 - last_checkpoint_time > check_point_delta_t
                     or (it - last_checkpoint_it > n_check_point) 
                 ):
-                    run.checkpointing(sampler, sampling_time, checkpoint_plot)
+                    run.checkpointing(sampler, sampling_time, checkpoint_plot, 
+                        run.get_step_info_str(results=res, niter=it, ncall=sampler.ncall))
                     last_checkpoint_time = time() 
                     last_checkpoint_it = it
 
@@ -158,10 +161,11 @@ def analysis_runner(
             run.format_result(worker_run, sampler.results, result_format,
                 rejection_sample_posterior=rejection_sample_posterior
             )
-            exit_reason = 0
+            pool.close()
         else:
-            exit_reason = -1
-        return exit_reason
+            pool.wait()
+        exit_code = 0
+        return exit_code
 
 
 # Worker functions. These are read in the global scope by each worker
@@ -187,3 +191,4 @@ def nmma_analysis():
 
     # Run the analysis
     analysis_runner(**vars(input_args))
+    

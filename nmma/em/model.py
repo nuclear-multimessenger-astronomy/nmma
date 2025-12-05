@@ -232,8 +232,7 @@ class LightCurveModelContainer:
         self.good_parameters = True
         
     def parameter_conversion(self, parameters):
-        """Do necessary parameter conversions for the EM model.
-        This is done on the prior-level to work with bilby Constraints."""
+        """Do necessary parameter conversions for the EM model."""
 
         new_parameters = observation_angle_conversion(parameters)
         for key in self.model_parameters:
@@ -244,7 +243,6 @@ class LightCurveModelContainer:
                     new_parameters[key] = 10**new_parameters["log10_"+key]
                 else:
                     pass ## Unclean fix, allows later addition of required params
-        self.sampled_parameters = copy(new_parameters)
 
         self.sanity_checks(new_parameters)
         return new_parameters
@@ -307,7 +305,7 @@ class LightCurveModelContainer:
         Parameters
         ----------
         parameters: dict
-            Parameters of the light curve model. If None, uses self.sampled_parameters, assuming that this was set in parameters conversion
+            Parameters of the light curve model. 
         filters: str or list of str, optional
             Filters to use for the light curve. Defaults to 'all'.
 
@@ -318,8 +316,6 @@ class LightCurveModelContainer:
         """
         if sample_times is None:
             sample_times = self.model_times
-        if parameters is None:
-            parameters = self.sampled_parameters
                     
         model_lc = self.generate_lightcurve(sample_times, parameters)
 
@@ -409,8 +405,6 @@ class FiestaModel(LightCurveModelContainer):
             Parameters of the light curve model.
         sample_times: Unused, included for compatibility with other Models."""
         # convert the parameters to the fiesta model parameters
-        if parameters is None:
-            parameters = self.sampled_parameters
         parameters = self.em_parameter_setup(parameters)
         if self.good_parameters:
             # generate the light curve using fiesta
@@ -1116,18 +1110,6 @@ class CombinedLightCurveModelContainer:
     def good_parameters(self):
         return np.prod([lc_model.good_parameters for lc_model in self.lc_models])
     
-    @property
-    def sampled_parameters(self):
-        sampled_params = {}
-        for lc_model in self.lc_models:
-            sampled_params.update(lc_model.sampled_parameters)
-        return sampled_params
-    
-    @sampled_parameters.setter
-    def sampled_parameters(self, value):
-        for lc_model in self.lc_models:
-            lc_model.sampled_parameters = value
-
         
     def parameter_conversion(self, parameters):
         for lc_model in self.lc_models:

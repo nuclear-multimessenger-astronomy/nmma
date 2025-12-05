@@ -10,36 +10,11 @@ matplotlib.use("agg")
 import matplotlib.pyplot as plt
 from bilby.core.prior import (
     Prior, DeltaFunction, Interped, ConditionalTruncatedGaussian,
-    ConditionalPriorDict, PriorDict as _PriorDict)
-from bilby.gw import cosmology
+    ConditionalPriorDict, PriorDict)
 from ligo.skymap import io, moc
 
-from . import model as em_model
 from ..joint.base import adjust_hubble_prior
-from ..joint.constants import default_cosmology
-from ..joint.conversion import cosmology_to_distance, convert_mtot_mni
 
-
-
-def from_list(self, systematics):
-    """
-    Similar to `from_file` but instead of file buffer, takes a list of Prior strings
-    See `from_file` for more details
-    """
-
-    comments = ["#", "\n"]
-    prior = dict()
-    for line in systematics:
-        if line[0] in comments:
-            continue
-        line.replace(" ", "")
-        elements = line.split("=")
-        key = elements[0].replace(" ", "")
-        val = "=".join(elements[1:]).strip()
-        prior[key] = val
-    self.from_dictionary(prior)
-
-setattr(_PriorDict, "from_list", from_list)
 
 class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
     """
@@ -55,14 +30,22 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
 
     def __init__(
         self,
-        minimum,
-        maximum,
-        name,
+        minimum= -np.inf,
+        maximum=np.inf,
+        name=None,
         N_sigma=1,
         latex_label=None,
         unit=None,
         boundary=None,
     ):
+        if isinstance(minimum, Prior):
+            original_iota_prior = minimum
+            minimum=original_iota_prior.minimum
+            maximum=original_iota_prior.maximum
+            name=original_iota_prior.name
+            latex_label=original_iota_prior.latex_label
+            unit=original_iota_prior.unit
+            boundary=original_iota_prior.boundary
 
         super().__init__(
             mu=0,
@@ -246,7 +229,7 @@ def extinction_prior(priors, args):
     return priors
 
 
-def create_prior_from_args(args, lc_model, systematics_handler=None):
+def create_prior_from_args(args, systematics_handler):
     """Function to create prior dictionary from command line arguments and nmma-LightCurveModel
     Parameters
     ----------
@@ -255,60 +238,18 @@ def create_prior_from_args(args, lc_model, systematics_handler=None):
     lc_model : nmma.em.model.LightCurveModelContainer
         Light curve model object to compute light curves
     """
-    conv_functions = []
-    
-    # parameter conversion as used in EM-only sector
-    model_list = lc_model.model if isinstance(lc_model, em_model.CombinedLightCurveModelContainer) else [lc_model.model]
-    if any(model_name in ['AnBa2022_linear', 'AnBa2022_log'] for model_name in model_list):
-        conv_functions.append(convert_mtot_mni)
-    # elif to be extended...
-
-    if getattr(args, 'Hubble', False):  
-        cosmo = getattr(args, 'cosmology', None)
-        if cosmo is None:
-            cosmo = default_cosmology
-        cosmology.set_cosmology(cosmo)
-
-        def Hubble_conversion(priors):
-            params = cosmology_to_distance(priors, cosmology.COSMOLOGY[0])
-            return params
-        conv_functions.append(Hubble_conversion)
-
-    conv_functions.append(lc_model.parameter_conversion)
-        
-    def param_conv(params):
-        for func in conv_functions:
-            params = func(params)
-        return params
-
-    priors = _PriorDict(
-        args.prior_file, conversion_function=param_conv)
-    
-    # priors.convert_floats_to_delta_functions()    
+    priors = PriorDict(args.prior_file)
     priors = adjust_hubble_prior(priors, args)
     priors = extinction_prior(priors, args)
 
-
     # re-setup the prior if the conditional prior for inclination is used
-
     if args.conditional_gaussian_prior_thetaObs:
         priors_dict = dict(priors)
-        original_iota_prior = priors_dict["inclination_EM"]
-        setup = dict(
-            minimum=original_iota_prior.minimum,
-            maximum=original_iota_prior.maximum,
-            name=original_iota_prior.name,
-            latex_label=original_iota_prior.latex_label,
-            unit=original_iota_prior.unit,
-            boundary=original_iota_prior.boundary,
-            N_sigma=args.conditional_gaussian_prior_N_sigma,
-        )
-
-        priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(**setup)
+        priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(
+            priors_dict["inclination_EM"], N_sigma = args.conditional_gaussian_prior_N_sigma)
         priors = ConditionalPriorDict(priors_dict)
 
     if getattr(args,'fits_file', False):
         priors = inclination_prior_from_fits(priors, args)
-    if systematics_handler is not None:
-        priors = systematics_handler.setup_systematics_priors(priors)
+    priors = systematics_handler.setup_systematics_priors(priors)
     return priors

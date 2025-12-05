@@ -3,10 +3,10 @@ import os
 
 import numpy as np
 
-from ..utils.models import refresh_models_list
 from .utils import DEFAULT_FILTERS
-from bilby.core.utils import setup_logger
-from ..joint.base_parsing import (nmma_base_parsing, single_messenger_analysis_parsing, 
+
+# unused imports kept for forward compatibility
+from ..joint.base_parsing import (parsing_and_logging, single_messenger_analysis_parsing, 
     base_injection_parsing, pipe_inj_parsing, nonefloat, noneint, nonestr )
 
 
@@ -49,7 +49,7 @@ def basic_em_only_analysis_parsing(parser):
     parser.add_argument("--light-curve-data", "--data", help="Path to data in [time filter magnitude error] format, time format will be inferred, but can be explicitly adjusted with --time-format. If not given, will try to generate data from the injection file.")
     parser.add_argument("--time-format", 
         help="Time format of the light curve data, e.g. isot, mjd, see https://docs.astropy.org/en/stable/time/#time-format")
-    parser.add_argument("--bestfit", action='store_true',
+    parser.add_argument("--bestfit", "--best-fit", action='store_true',
         help="Save the best fit parameters and magnitudes to JSON")
     parser.add_argument("--cosmology", help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)")
 
@@ -485,23 +485,3 @@ def slurm_analysis_parser(parser):
     slurm_args.add_argument("--script-name", default="slurm.sub")
 
     return parser
-
-def parsing_and_logging(parser_func, args= None):
-
-    if not isinstance(args, argparse.Namespace):
-        args = nmma_base_parsing(parser_func, args)
-
-    if getattr(args, 'sampler', None) == "pymultinest":
-        if len(args.outdir) > 64:
-            raise ValueError("output directory name is longer than 64 characters" )
-
-    if getattr(args, 'refresh_model_list', False):
-        refresh_models_list(args.svd_path)
-
-    try:
-        setup_logger(outdir=args.outdir, label=args.label)
-        os.makedirs(args.outdir, exist_ok=True)
-        print('Setting up logger and storage directory')
-    except Exception as e:
-        pass
-    return args

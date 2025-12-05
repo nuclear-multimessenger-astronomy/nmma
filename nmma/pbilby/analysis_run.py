@@ -4,6 +4,7 @@ from io import BufferedWriter
 from glob import glob
 import pickle
 from functools import wraps
+import logging
 from time import time
 from datetime import timedelta
 
@@ -12,7 +13,6 @@ import numpy as np
 from pandas import DataFrame
 from numpy.random import Generator, PCG64, SeedSequence
 
-from bilby.core.utils import logger
 from bilby.core.prior import PriorDict, Constraint
 from bilby.core.result import Result
 from bilby.core.sampler import dynesty3_utils  as dy_utils
@@ -20,9 +20,12 @@ from bilby.core.sampler.dynesty import dynesty_stats_plot
 import dynesty
 from dynesty.plotting import traceplot, runplot 
 
-
 from ..joint.joint_likelihood import setup_nmma_likelihood
 from ..joint.utils import reorder_loglikelihoods, rejection_sample, read_bestfit_from_posterior
+
+from nmma.joint import utils
+global logger
+logger = utils.logger
 
 
 def time_storage(func):
@@ -54,7 +57,9 @@ class MainRun:
         sampler_kwargs={},
         sampler_init_kwargs={}
     ):
-        
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                handler.stream = sys.stdout  
         self.args = args
         # If the run dir has not been specified, get it from the args
         if outdir is None:
@@ -80,11 +85,7 @@ class MainRun:
         ## Set some basic attributes
         self.sampling_keys = sampling_keys
         logger.info(f"sampling keys:{sampling_keys}")
-        for name in ['periodic', 'reflective']:
-            if name in sampler_init_kwargs:
-                logger.info(
-                    f"{name} keys: {[sampling_keys[ii] for ii in sampler_init_kwargs[name]]}"
-                )
+
         self.pooled_log_likelihood_function = pooled_log_likelihood_function
         self.pooled_prior_transform_function= pooled_prior_transform_function
         self.pooled_initial_point_function =  pooled_initial_point_function
@@ -147,7 +148,8 @@ class MainRun:
             kwargs["bound"] = "multi"
 
         self.init_sampler_kwargs = kwargs
-
+    
+    @time_storage
     def start_sampler(self, pool):
         """
         Start from a saved state or initialise.
@@ -188,14 +190,19 @@ class MainRun:
             sampler.prior_transform = self.pooled_prior_transform_function
             sampler.loglikelihood = dynesty.utils.LogLikelihood(
                 self.pooled_log_likelihood_function, sampler.ndim)
-            return sampler, sampling_time
         
         else:
             logger.info(f"Resume file {self.resume_file} does not exist. "
             f"Initializing sampling points with pool size={pool.size}")
             live_points = self.get_initial_points_from_prior(pool)
             logger.info( f"Initialize NestedSampler with {self.init_sampler_kwargs}")
-            return self.get_nested_sampler(live_points, pool), 0
+            sampler = self.get_nested_sampler(live_points, pool)
+            sampling_time = 0.0
+
+        logger.info(f"Run criteria: {self.sampler_kwargs}")
+
+        logger.info(f"Starting sampling for job {self.label}, with pool size={pool.size}")
+        return sampler, sampling_time
 
     def get_nested_sampler(self, live_points, pool):
         """
@@ -226,7 +233,8 @@ class MainRun:
             rstate=self.rstate,
             **self.init_sampler_kwargs,
         )
-
+    
+    @time_storage
     def get_initial_points_from_prior(self, pool):
         """
         Generates a set of initial points, drawn from the prior
@@ -260,25 +268,40 @@ class MainRun:
 
         return np.array(u_list), np.array(v_list), np.array(l_list)
 
-
-    def stdout_sampling_log(self, **kwargs):
-        """Logs will look like:
+    def get_step_info_str(self, **kwargs):
+        """Generate a log string for the current sampling step.
+        Logs will look like:
         #:282|eff(%):26.406|logl*:-inf<-160.2<inf|logz:-165.5+/-0.1|dlogz:1038.1>0.1
 
         Adapted from dynesty
         https://github.com/joshspeagle/dynesty/blob/bb1c5d5f9504c9c3bbeffeeba28ce28806b42273/py/dynesty/utils.py#L349
+
+        Parameters
+        ----------
+        kwargs: dict
+            keyword arguments passed to dynesty.utils.get_print_fn_args
+
+        Returns
+        -------
+        str
+            Formatted log string for the current sampling step.
         """
         niter, _, mid_str, _ = dynesty.utils.get_print_fn_args(dlogz = self.dlogz,**kwargs)
         custom_str = [f"#: {niter:d}"] + mid_str
         custom_str = "|".join(custom_str).replace(" ", "")
-        sys.stdout.write("\033[K" + custom_str + "\r")
+        return custom_str
+    
+    def stdout_sampling_log(self, **kwargs):
+        sys.stdout.write(f"\033[K {self.get_step_info_str(**kwargs)}\r")
         sys.stdout.flush()
 
-    def checkpointing(self, sampler, sampling_time, checkpoint_plot=False):
+    def checkpointing(self, sampler, sampling_time, checkpoint_plot=False, message= None):
         self.write_current_state(sampler, sampling_time )
         self.write_sample_dump(sampler.saved_run.D)
         if checkpoint_plot:
             self.plot_current_state(sampler)
+        if message:
+            logger.info(message)
 
     @time_storage
     def write_sample_dump(self, data):
@@ -452,8 +475,6 @@ class WorkerRun:
             test_out = os.path.join(os.getcwd(), data_dump)
             test_dump = glob(f"{test_out}/data/*_dump.pickle")
             data_dump = test_dump[0]
-
-        # Read data dump from the pickle file
         with open(data_dump, "rb") as file:
             data_dump = pickle.load(file)
 
@@ -462,17 +483,12 @@ class WorkerRun:
         self.args = data_dump["args"]
         self.injection_parameters = data_dump.get("injection_parameters", None)
         self.zero_likelihood_mode=bilby_zero_likelihood_mode
-
         ## Set up the priors
         self.compose_priors(data_dump["prior_file"])
-
+        
         ## Set up the likelihood
         self.likelihood = setup_nmma_likelihood(data_dump,
             self.priors, self.args, logger)
-
-        check_keys = self.sampling_keys.copy()
-        check_keys.extend(self.fixed_keys)
-        self.likelihood.check_parameter_equivalencies(check_keys)
 
 
     def compose_priors(self, prior_file):
@@ -491,7 +507,6 @@ class WorkerRun:
 
         """
         priors=PriorDict.from_json(prior_file)
-
         sampling_keys = []
         fixed_keys = []
         for k, prior in priors.items():
@@ -525,6 +540,11 @@ class WorkerRun:
         self.periodic = periodic
         self.reflective = reflective
         self.priors = priors
+
+        logger.info("Using priors:")
+        for k, p in self.priors.items():
+            logger.info(f"{k}: {p}")
+            
     
 
     def prior_transform_function(self, u_array):
@@ -602,7 +622,6 @@ class WorkerRun:
         """
         bad_values = [ np.inf, np.nan_to_num(np.inf),
                       -np.inf, np.nan_to_num(- np.inf), np.nan]
-        
         while True:
             unit = rstate.random(self.ndim)
             theta = self.prior_transform_function(unit)

@@ -27,6 +27,7 @@ from ..em.systematics import FilterSystematicsHandler
 from ..em import utils as em_utils
 from ..eos.eos_likelihood import compose_eos_constraints, setup_joint_eos_constraint, setup_tabulated_eos_priors
 from ..joint.constants import default_cosmology
+from ..joint.conversion import EoSConverter
 from ..joint.base import adjust_priors_for_nmma, adjust_hubble_prior
 from ..joint.utils import read_trigger_time
 
@@ -204,7 +205,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 config_file=self.ini,
                 data_dump_file=self.data_dump_file,
                 **get_version_info(),
-                command_line_args=self.args.__dict__,
+                command_line_args=args.__dict__,
                 unknown_command_line_args=self.unknown_args,
                 injection_parameters= self.injection_parameters,
         )
@@ -257,15 +258,17 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             analysis_modifiers.append('tabulated_eos')
             eos_constraint_dict = compose_eos_constraints(args)
             if eos_constraint_dict:
-                constraint = setup_joint_eos_constraint(eos_constraint_dict)
+                eos_converter = EoSConverter(args, 'tabulated')
+                constraint = setup_joint_eos_constraint(eos_constraint_dict, eos_converter)
                 args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weights(
-                    args.eos_data, args.outdir, args.eos_weight
-                )
+                    args.Neos, args.outdir, args.eos_weight)
             priors = setup_tabulated_eos_priors(args, priors, logger)
 
         # GW SETUP
         if args.detectors:
             messengers.append("gw")
+            gw_prior = super()._get_priors()
+            priors = gw_prior.update(priors)
             self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, self.unknown_args)
             #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
             self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)
@@ -281,6 +284,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self._priors = priors
         self.priors.to_json(outdir=self.data_directory, label=self.label)
         self.prior_file = f"{self.data_directory}/{self.label}_prior.json"
+
         self.data_dump = data_dump | dict(
                 prior_file=self.prior_file,
                 args=self.args,
@@ -290,7 +294,9 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 meta_data=self.meta_data,
                 injection_parameters=self.injection_parameters,
         )
-        
+        logger.info(f"Set up data dump with messengers: {self.messengers} "
+            f"and analysis modifiers: {self.analysis_modifiers}"
+            f"data dump is {data_dump}")
 
 
     def save_data_dump(self):        
@@ -308,6 +314,10 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             sampling_seed = np.random.randint(1, 1e6)
         self._sampling_seed = sampling_seed
         np.random.seed(sampling_seed)
+
+    def _get_priors(self):
+        # agnostic prior setup
+        return bilby.core.prior.PriorDict(self.prior_file)
     
 
 def generate_runner(parser=None, **kwargs):

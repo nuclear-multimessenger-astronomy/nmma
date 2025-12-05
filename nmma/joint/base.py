@@ -1,4 +1,8 @@
 import inspect
+import io
+import sys
+import contextlib
+import traceback
 import h5py
 from ast import literal_eval
 import numpy as np
@@ -6,10 +10,13 @@ import pandas as pd
 
 from bilby import run_sampler
 from bilby.core.likelihood import Likelihood, ZeroLikelihood
-from bilby.core.prior import (Prior, Interped, ConditionalPriorDict, PriorDict,
+from bilby.core.prior import (Prior, Constraint, Interped, ConditionalPriorDict, PriorDict,
                               MultivariateGaussianDist, MultivariateGaussian)
 from bilby.core.result import FileMovedError
+from bilby.gw import cosmology
 from .utils import input_obj_to_str, load_yaml, read_bestfit_from_posterior
+from .constants import default_cosmology
+from .conversion import cosmology_to_distance
 
 def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes = []):
     prefixes.append('')
@@ -28,69 +35,53 @@ def initialisation_args_from_signature_and_namespace(_callable, namespace, prefi
                 break
     return default_kwargs
 
-class NMMABaseLikelihood(Likelihood):
-    """ The base likelihood object for modular multi-messenger analysis
-
-    Parameters
-    ----------
-    sub_model: bilby.core.likelihood.Likelihood
-        The submodel to be used in each messenger. Must have a log_likelihood method.
-    priors: dict
-        The analysis priors, required for marginalization in some submodels
-
-    """
-
-    def __init__(self,sub_model, priors = None, **kwargs):
-
-
-        super().__init__()
-        self.sub_model = sub_model
-        try:
-            self.noise_logl = self.sub_model.noise_log_likelihood()
-        except AttributeError:
-            self.noise_logl = 0.
-        self.local_parameters = None
-        if priors is not None:
-            self.priors = priors
-
-    def __repr__(self):
-        return self.__class__.__name__ + ' with ' + self.sub_model.__repr__()
-
-    def identity_conversion(self, parameters):
-        return parameters, []
+class NMMALikelihoodMixin:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    @property
+    def priors(self):
+        return self._priors
     
+    @priors.setter
+    def priors(self, value):
+        self.constraints = value
+        sampling_keys = [k for k in value.keys() if k not in self.constraints]
+        self.check_parameter_equivalencies(sampling_keys)
+        self._priors = value
+
+    @property
+    def constraints(self):
+        return self._constraints
+    
+    @constraints.setter
+    def constraints(self, value):
+        if isinstance(value, PriorDict):
+            constr = {k: v for k, v in value.items() if isinstance(v, Constraint)}
+        elif isinstance(value, Constraint):
+            constr = {value.name: value}
+        elif isinstance(value, dict):
+            constr = value
+            assert all(isinstance(v, Constraint) for v in value.values()), \
+                "All entries in constraints dict must be of type Constraint"
+        self._constraints = constr
+
+    def evaluate_constraints(self, out_sample):
+        return np.prod([con.prob(out_sample[k] ) for k, con in self.constraints.items()])   
+    
+    def identity_conversion(self, parameters):
+        return parameters
+    
+    
+    def log_likelihood(self, parameters):
+        parameters = self.parameter_conversion(parameters)
+        if self.evaluate_constraints(parameters) and self.sanity_checks():
+            return self.sub_log_likelihood(parameters)
+        else:
+            return np.nan_to_num(-np.inf)
+        
     def sanity_checks(self):
         return True
     
-    def parameter_conversion(self, parameters):
-        return self.identity_conversion(parameters)
-
-    def log_likelihood(self, parameters):
-        # try:
-        #     out_sample = self.priors.conversion_function(parameters)
-        #     for k, p in self.priors.items():
-        #         if isinstance(p, Constraint) and not p.prob(out_sample[k]):
-        #             return np.nan_to_num(-np.inf)
-        # except AttributeError:
-        #     print('No priors found, could not evaluate constraints')
-        #     out_sample = parameters
-        
-        return self.sub_log_likelihood(parameters)
-    
-    def sub_log_likelihood(self, parameters):
-        logL_model = self.sub_model.log_likelihood(parameters)
-        if not np.isfinite(logL_model):
-            return np.nan_to_num(-np.inf)
-        return logL_model
-
-    def noise_log_likelihood(self):
-        return self.noise_logl
-        # return self.sub_model.noise_log_likelihood()
-    
-
-    def post_process_bestfit(self, args, result):
-        bestfit_params = read_bestfit_from_posterior(args)
-        self.final_diagnostics(bestfit_params, args, result)
     
     def final_diagnostics(self, bestfit_params, args, result=None):
         """Plot the best-fit light curve against the data
@@ -107,6 +98,89 @@ class NMMABaseLikelihood(Likelihood):
 
         """
         pass
+
+    def post_process_bestfit(self, args, result):
+        bestfit_params = read_bestfit_from_posterior(args)
+        bestfit_params = self.parameter_conversion(bestfit_params)
+        self.final_diagnostics(bestfit_params, args, result)
+           
+    def check_parameter_equivalencies(self, parameter_names):
+        """Check for equivalent parameters and terminate if found"""
+        #FIXME: to be extended
+        single_equivalency_groups = [
+            ["inclination_EM", "KNtheta", "theta_jn", "cos_theta_jn", "thetaObs"],
+        ]
+        for group in single_equivalency_groups:
+            intersection = set(parameter_names).intersection(set(group))
+            if len(intersection)>1:
+                raise ValueError(f"Multiple equivalent parameters found: {intersection}. Please only provide one of these.")
+            
+        double_equivalency_groups = [
+            ['redshift', 'luminosity_distance', 'Hubble_constant'], # FIXME: this would be ok if Omega_matter is investigated
+            ['mass_1', 'mass_1_source', 'chirp_mass', 'mass_ratio', 'eta','mass_2', 'mass_2_source'],
+        ]
+        for group in double_equivalency_groups:
+            intersection = set(parameter_names).intersection(set(group))
+            if len(intersection)>2:
+                raise ValueError(f"Mutually dependent parameters found: {intersection}. Please only provide up to two of these.")
+
+    
+
+class NMMABaseLikelihood(NMMALikelihoodMixin,Likelihood):
+    """ The base likelihood object for modular multi-messenger analysis
+
+    Parameters
+    ----------
+    sub_model: bilby.core.likelihood.Likelihood
+        The submodel to be used in each messenger. Must have a log_likelihood method.
+    priors: dict
+        The analysis priors, required for marginalization in some submodels
+
+    """
+
+    def __init__(self,sub_model, priors, **kwargs):
+        super().__init__()
+
+        self.sub_model = sub_model
+        try:
+            self._noise_logl = self.sub_model.noise_log_likelihood()
+        except AttributeError:
+            self._noise_logl = 0.
+        self.conv_functions = []
+        self.priors = priors
+        self.setup_submodel_conversion()
+
+    def __repr__(self):
+        return self.__class__.__name__ + ' with ' + self.sub_model.__repr__()
+        
+
+    def setup_parameter_conversion(self):
+        # FUTURE: add more standard conversions here
+        if "Hubble_constant" in self.priors:
+            def Hubble_conversion(priors):
+                params = cosmology_to_distance(priors, cosmology.COSMOLOGY[0])
+                return params
+            self.conv_functions.append(Hubble_conversion)
+
+    def setup_submodel_conversion(self):
+        pass
+        
+    def parameter_conversion(self, parameters):
+        for conv in self.conv_functions:
+            parameters = conv(parameters)
+        return parameters
+    
+    def posterior_conversion(self, parameters):
+        return self.parameter_conversion(parameters)
+    
+    def sub_log_likelihood(self, parameters):
+        logL_model = self.sub_model.log_likelihood(parameters)
+        if not np.isfinite(logL_model):
+            return np.nan_to_num(-np.inf)
+        return logL_model
+    
+    def noise_log_likelihood(self):
+        return self._noise_logl
 
 class NMMADummyPrior(Prior):
     """ A dummy prior that can be read from a prior-file into a prior dict, but is set to be replaced later """
@@ -155,6 +229,12 @@ def adjust_priors_for_nmma(priors, logger=None):
     return priors
 
 def adjust_hubble_prior(priors, args, logger=None):
+    if getattr(args, 'Hubble', False) or "Hubble_constant" in priors:  
+        cosmo = getattr(args, 'cosmology', None)
+        if cosmo is None:
+            cosmo = default_cosmology
+        cosmology.set_cosmology(cosmo)
+
     hubble_weight = input_obj_to_str(args, 'Hubble_weight')
     if hubble_weight:
         if logger:
@@ -192,10 +272,22 @@ def h5_to_multivar_prior(h5_file_path, priors = {}):
         return priors
     return ConditionalPriorDict(priors)
 
+def check_priors_and_likelihood_for_nmma(priors, likelihood):
+    # remove constraints from priors and add to likelihood (should have happened already, but just in case)
+    constraints = {k: priors.pop(k) for k in priors.copy().keys()
+                    if isinstance(priors[k], Constraint)}
+    likelihood.constraints.update(constraints)
+    test_draw = priors.sample(1)
+    test_conversion = priors.conversion_function(test_draw)
+    if len(set(test_conversion.keys()) ) != len(test_conversion.keys()):
+        priors.conversion_function = priors.default_conversion_function
+        likelihood.conv_functions.append(likelihood.priors.conversion_function)
+    # add final conversions
+    likelihood.setup_parameter_conversion()
+    return priors, likelihood
 
-
-def bilby_sampling(likelihood, priors, args, injection_parameters=None):
-
+def bilby_sampling(likelihood, priors, args, injection_parameters=None, output_container=None):
+    priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
     if args.bilby_zero_likelihood_mode:
         likelihood = ZeroLikelihood(likelihood)
 
@@ -220,6 +312,18 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None):
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
 
+    # check if it is running under mpi
+    try:
+        from mpi4py import MPI
+        rank = MPI.COMM_WORLD.Get_rank()
+    except ImportError:
+        rank = 0
+
+    if output_container is not None and rank == 0:
+        stdout_buffer, stderr_buffer= output_container
+        # Only the master process should write to the original stdout/stderr
+        sys.stdout.write(stdout_buffer.getvalue())
+        sys.stderr.write(stderr_buffer.getvalue())
     result = run_sampler(
         likelihood,
         priors,
@@ -235,15 +339,9 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None):
         **sampler_kwargs,
     )
 
-    # check if it is running under mpi
-    try:
-        from mpi4py import MPI
-
-        rank = MPI.COMM_WORLD.Get_rank()
-        if rank != 0:
-            exit()
-    except ImportError:
-        pass
+    
+    if rank != 0:
+        sys.exit()
 
     try:
         result.save_to_file()
@@ -281,17 +379,33 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None):
 
 
 def multi_analysis_loop(args, analysis_setup):
-    if getattr(args, 'config', None):
-        yaml_dict = load_yaml(args.config)
-        for params in yaml_dict.values():
-            for key, value in params.items():
-                key = key.replace("-", "_")
-                if key not in args:
-                    print(f"{key} not a known argument... please remove")
-                    exit()
-                setattr(args, key, value)
-            priors, likelihood, injection_parameters = analysis_setup(args)
-            bilby_sampling(likelihood, priors, args, injection_parameters)
-    else:
-        priors, likelihood, injection_parameters = analysis_setup(args)
-        bilby_sampling(likelihood, priors, args, injection_parameters)
+    # Create buffers
+    stdout_buffer = io.StringIO()
+    stderr_buffer = io.StringIO()
+
+    # Redirect python output into buffers
+    redirect_out = contextlib.redirect_stdout(stdout_buffer)
+    redirect_err = contextlib.redirect_stderr(stderr_buffer)
+    output_container = (stdout_buffer, stderr_buffer)
+    print('hallo1')
+
+    try:
+        with redirect_out, redirect_err:
+            if getattr(args, 'config', None):
+                yaml_dict = load_yaml(args.config)
+                for params in yaml_dict.values():
+                    for key, value in params.items():
+                        key = key.replace("-", "_")
+                        if key not in args:
+                            print(f"{key} not a known argument... please remove")
+                            exit()
+                        setattr(args, key, value)
+                    priors, likelihood, injection_parameters = analysis_setup(args)
+                    bilby_sampling(likelihood, priors, args, injection_parameters, output_container)
+            else:
+                priors, likelihood, injection_parameters = analysis_setup(args)
+                bilby_sampling(likelihood, priors, args, injection_parameters, output_container)
+    except Exception as e:
+        traceback.print_exc()
+        sys.stdout.write(stdout_buffer.getvalue())
+        sys.stderr.write(stderr_buffer.getvalue())

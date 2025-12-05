@@ -180,7 +180,15 @@ class SystematicsHandler:
         returns a list of prior strings to be read by a bilby PriorDict
         """
         prior_info = get_prior_strings(self.systematics_dict)
-        prior_dict.from_list(prior_info)
+        
+        add_prior = dict()
+        for line in prior_info:
+            line.replace(" ", "")
+            elements = line.split("=")
+            key = elements[0].replace(" ", "")
+            val = "=".join(elements[1:]).strip()
+            add_prior[key] = val
+        prior_dict.update(bprior.PriorDict(add_prior))
         return prior_dict
 
 

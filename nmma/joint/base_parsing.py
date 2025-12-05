@@ -3,12 +3,34 @@ import configargparse
 import sys
 import os
 
+from bilby.core.utils import setup_logger
+from ..utils.models import refresh_models_list
 
 # If an argument is not specified while its type is given, 
 # it will still be parsed as None. If, however, we then reparse
 # this argument, e.g. from a stored config-file, it would raise an error.
 # These classes are a workaround to avoid this error.
 from bilby_pipe.utils import nonestr, nonefloat, noneint  # we forward import these elsewhere, do not remove
+
+def parsing_and_logging(parser_func, args= None):
+
+    if not isinstance(args, argparse.Namespace):
+        args = nmma_base_parsing(parser_func, args)
+
+    if getattr(args, 'sampler', None) == "pymultinest":
+        if len(args.outdir) > 64:
+            raise ValueError("output directory name is longer than 64 characters" )
+
+    if getattr(args, 'refresh_model_list', False):
+        refresh_models_list(args.svd_path)
+
+    try:
+        setup_logger(outdir=args.outdir, label=args.label)
+        os.makedirs(args.outdir, exist_ok=True)
+        print('Setting up logger and storage directory')
+    except Exception as e:
+        pass
+    return args
 
 def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
     """Base parsing function for nmma.
@@ -44,7 +66,12 @@ def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
                     print("Please check the file format and try again.")
                     sys.exit(1)
 
-    parser = parsing_func(parser)
+    if isinstance(parsing_func, (list, tuple)):
+        for pars_func in tuple(parsing_func):
+            parser = pars_func(parser)
+    else:
+        parser = parsing_func(parser)
+        
     if return_parser:
         return parser
     return parser.parse_args(cli_args)

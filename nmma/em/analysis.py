@@ -73,7 +73,7 @@ def bolometric_setup(args):
         args.systematics_file, args.em_error_budget)
 
     # setup the prior
-    priors = create_prior_from_args(args, light_curve_model, systematics_handler)
+    priors = create_prior_from_args(args, systematics_handler)
 
     # setup the likelihood
     likelihood_kwargs = dict(
@@ -137,7 +137,7 @@ def analysis_setup(args):
     
     systematics_handler = systematics.FilterSystematicsHandler(filters_to_analyze,
         args.systematics_file, error_budget=args.em_error_budget)
-    priors = create_prior_from_args(args, light_curve_model, systematics_handler)
+    priors = create_prior_from_args(args, systematics_handler)
     light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
     utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
     # setup the likelihood
@@ -193,7 +193,9 @@ def nnanalysis(args):
     )
     
     # setup the prior
-    priors = create_prior_from_args(args, light_curve_model)
+    systematics_handler = systematics.FilterSystematicsHandler(filters_to_analyze,
+        args.systematics_file, error_budget=args.em_error_budget)
+    priors = create_prior_from_args(args, systematics_handler)
     
     # now that we have the kilonova light curve, we need to pad it with non-detections
     # this part is currently hard coded in terms of the times !!!! likely will need the most work

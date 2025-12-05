@@ -1,5 +1,7 @@
 from __future__ import division
-
+import os
+import shutil
+from glob import glob
 import numpy as np
 import pandas as pd
 from astropy import units
@@ -25,7 +27,10 @@ def val_to_scalar(val):
         if val.size == 1:
             return val.item()
         return val
-
+def to_bbh_parameters(params):
+    """Convert parameters to BBH parameters using bilby function."""
+    bbh_params, _ = convert_to_lal_binary_black_hole_parameters(params)
+    return bbh_params
 ########################## distance conversions ####################################
 def distance_modulus_nmma(d_lum = 1e-5):
         # mag_app = mag_abs + 5* log10(dist/10pc) | NMMA-dist is in Mpc
@@ -183,36 +188,60 @@ def convert_mtot_mni(params):
 ############################## EOS-related conversions ####################################
 class EoSConverter:
     def __init__(self, args, method=None):
+        if getattr(args, 'eos_file', None) or getattr(args, 'eos_data', None):
+            method = "tabulated"
+        elif getattr(args, 'emulator_metadata', None):
+            method = "emulated"
+
+        self.parameter_conversion = self.full_eos_conversion
         # Case 1: eos is generated from emulator on the fly
         if method == "emulated":
             self.tov_emulator = setup_eos_generator(args)
             self.macro_conversion = self.tov_emulator.generate_macro_eos
         
         elif method == "tabulated":
-            #case 2a: we use a single eos
+            #case 2: we use a single eos
             if getattr(args, 'eos_file', None):
                 self.eos_data = [np.loadtxt(args.eos_file, usecols = [0,1,2]).T]
                 self.macro_conversion = self.single_eos_from_ram
-
-            # Case 2b: precomputed eos data is loaded to ram
-            elif args.eos_to_ram:
-                self.eos_data = [np.loadtxt(f"{args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T 
-                                for j in range(args.Neos)]
+                return
+            
+            # case 3 : we use multiple eos
+            if os.path.isdir(args.eos_data):
+                if getattr(args, 'Neos', None) is None:
+                    eos_files  = os.listdir(args.eos_data)
+                else:
+                    eos_files = [f"{args.eos_data}/{j+1}.dat" for j in range(args.Neos)]
+            else:
+                eos_files = glob(args.eos_data)
+                if getattr(args, 'Neos', None):
+                    assert args.Neos == len(eos_files), 'Number of EOS files found does not match Neos'
+              
+            self.Neos = len(eos_files)  
+            # Case 3a: precomputed eos data is loaded to ram
+            if args.eos_to_ram:
+                self.eos_data = [np.loadtxt(f, usecols = [0,1,2]).T  for f in eos_files]
                 self.macro_conversion = self.eos_from_ram
 
-            # Case 2c: eos are loaded directly from file
+            # Case 3b: eos are loaded directly from file
             else:
-                self.eos_data = args.eos_data
+                eos_dir = os.path.dirname(eos_files[0])
+                for i, f in enumerate(eos_files):
+                    shutil.copy(f, os.path.join(eos_dir, f"{i+1}.dat"))
+                self.eos_data = eos_dir
                 self.macro_conversion = self.eos_direct_load
 
-        
-    def full_eos_conversion(self, parameters):
-        self.macro_conversion(parameters)
-        return self.macro_props_from_eos(parameters)    
+        #case 4: no eos conversion, just QURs
+        else:
+            self.parameter_conversion = radii_from_qur
+
+        def __call__(self, parameters):
+            return self.parameter_conversion(parameters)
+
 
     def eos_direct_load(self, converted_parameters):
         EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
-        return [np.loadtxt(f"{self.args.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID]
+        return [np.loadtxt(f"{self.eos_data}/{j+1}.dat", usecols = [0,1,2]).T for j in EOSID]
 
     def eos_from_ram(self, converted_parameters):
         EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
@@ -220,8 +249,6 @@ class EoSConverter:
     
     def single_eos_from_ram(self, _):
         return self.eos_data
-      
-
 
     def compute_macro_parameters(self, parameters):
         eos_data = self.macro_conversion(parameters)
@@ -231,7 +258,12 @@ class EoSConverter:
             radii, masses, lambdas = map(list, zip(*eos_data))
         
         self.macro_parameters = {'radii': radii, 'masses': masses, 'lambdas': lambdas}
+        return parameters
 
+    
+    def full_eos_conversion(self, parameters):
+        self.compute_macro_parameters(parameters)
+        return self.macro_props_from_eos(parameters) 
     
     def macro_props_from_eos(self, converted_parameters):
         eos_keys = ["TOV_mass", "TOV_radius", "lambda_1", "lambda_2",
@@ -517,7 +549,10 @@ class BNSEjectaFitting:
         beta=5.879,
         q_trans=0.886,
     ):
-
+        """
+        See https://arxiv.org/pdf/2002.11355.pdf for the disk mass relation
+        and  https://arxiv.org/pdf/1908.05442.pdf for the threshold mass
+        """
         k = -3.606 * MTOV / R16 + 2.38
         threshold_mass = k * MTOV
 
@@ -645,107 +680,92 @@ class BNSEjectaFitting:
 
 
 class MultimessengerConversion:
-    def __init__(self, args, messengers, ana_modifiers =[], internal_conversions = {}):
-        self.messengers     = messengers
-        self.modifiers      = ana_modifiers
-        self.args           = args
+    def __init__(self, eos_conversion, gw_conversion=False, em_conversion=False, cosmology=False):
+        self.eos_conversion  = eos_conversion
 
-        self.BNSejectaFitting   = BNSEjectaFitting()
-        self.NSBHejectaFitting  = NSBHEjectaFitting()
-        self.BBHejectaFitting   = BBHEjectaFitting()
+        self.BNSEjectaFitting   = BNSEjectaFitting()
+        self.NSBHEjectaFitting  = NSBHEjectaFitting()
+        self.BBHEjectaFitting   = BBHEjectaFitting()
 
-        run_cosmo = getattr(args, 'cosmology', None)
-        if run_cosmo is None:
-            self.cosmology = default_cosmology
+        if isinstance(cosmology, str):
+            cosmology = getattr(cosmo, cosmology)
+        self.cosmology = cosmology if cosmology else default_cosmology
+
+        if gw_conversion:
+            self.gw_conversion = to_bbh_parameters if gw_conversion is True else gw_conversion
         else:
-            self.cosmology = run_cosmo
+            self.gw_conversion = self.identity_conversion 
 
-        
-        self.eos_conversion= internal_conversions.get('eos', self.setup_eos_conversion(args))
-        self.gw_conversion = internal_conversions.get('gw', convert_to_lal_binary_black_hole_parameters)
-        self.em_conversion = internal_conversions.get('em', observation_angle_conversion)
-        
-    def setup_eos_conversion(self, args):
-        "This should only be called if we want to get ns-properties "
-        "but do not evaluate a corresponding EoS-likelihood. "
-        # 
-        # Case 1: eos is generated from emulator on the fly
-        if 'eos' in self.messengers:
-            self.eos_converter = EoSConverter(args, method='emulated')
-            return self.eos_converter.full_eos_conversion
-        
-        # Case 2: eos is loaded from tabulated data
-        elif 'tabulated_eos' in self.modifiers:
-            self.eos_converter = EoSConverter(args, method='tabulated')
-            return self.eos_converter.full_eos_conversion
-        
-        # Case 3: no eos sampling, use quasi-universal relations instead
+        if em_conversion:
+            self.ejecta_conversion = self.ejecta_parameter_conversion
+            self.em_conversion = observation_angle_conversion if em_conversion is True else em_conversion
         else:
-            return radii_from_qur 
-        
+            self.ejecta_conversion = self.identity_conversion
+            self.em_conversion = self.identity_conversion  
+                
 
     def ejecta_parameter_conversion(self, parameters):
         try:
             #heavier object is a NS
             if parameters['radius_1'] > 0.:
-                ejecta_parameters = self.BNSejectaFitting.vals_only_ejecta_parameter_conversion(parameters)
+                ejecta_parameters = self.BNSEjectaFitting.vals_only_ejecta_parameter_conversion(parameters)
             # heavier object is BH, but lighter object is NS
             elif parameters['radius_2']>0.:
-                ejecta_parameters = self.NSBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters, True)
+                ejecta_parameters = self.NSBHEjectaFitting.vals_only_ejecta_parameter_conversion(parameters, True)
             # both objects are BHs
             else:
-                ejecta_parameters = self.BBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters)
+                ejecta_parameters = self.BBHEjectaFitting.vals_only_ejecta_parameter_conversion(parameters)
         except ValueError:
             #ValueError occurs when trying to obtain truth values of arrays 
             # -> evaluate many points at once and chose conditional ejecta_fitting
             ejecta_parameters = np.where(parameters["radius_1"]>0.,   #heavier object is a NS
-                self.BNSejectaFitting.vals_only_ejecta_parameter_conversion(parameters),
+                self.BNSEjectaFitting.vals_only_ejecta_parameter_conversion(parameters),
                 np.where(parameters["radius_2"]>0., ## elif component 2 is a NS
-                    self.NSBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters, True),
+                    self.NSBHEjectaFitting.vals_only_ejecta_parameter_conversion(parameters, True),
                     ### else assume BBH (i.e., no ejecta)
-                    self.BBHejectaFitting.vals_only_ejecta_parameter_conversion(parameters),
+                    self.BBHEjectaFitting.vals_only_ejecta_parameter_conversion(parameters),
                     )
                 )
             
-        for key, val in zip(self.BNSejectaFitting.mass_fitting_keys,
+        for key, val in zip(self.BNSEjectaFitting.mass_fitting_keys,
                 ejecta_parameters):
             parameters[key] = val
         return parameters
 
-    def convert_to_multimessenger_parameters(self, parameters):
+    def convert_to_multimessenger_parameters(self, parameters, add_new_keys=False):
         original_keys = list(parameters.keys())
         converted_parameters = {k: val_to_scalar(v) for k, v in parameters.items()}
 
         converted_parameters = self.core_conversion(converted_parameters)
 
-        added_keys = [key for key in converted_parameters.keys()
-                      if key not in original_keys]
-
+    
         converted_parameters = {k: val_to_scalar(v) for k, v in converted_parameters.items()}
-        return converted_parameters, added_keys
+        
+        if add_new_keys:
+            added_keys = [k for k in converted_parameters.keys() if k not in original_keys]
+            return converted_parameters, added_keys
+        else:
+            return converted_parameters
     
     def core_conversion(self, converted_parameters):
-        if "Hubble" in self.modifiers:
+        if "Hubble_constant" in converted_parameters or "Omega_matter" in converted_parameters:
             converted_parameters = cosmology_to_distance(
             converted_parameters, cosmology=self.cosmology
-        )
-        if "gw" in self.messengers:            
-            converted_parameters, _ = self.gw_conversion(converted_parameters)
+        )          
+        converted_parameters = self.gw_conversion(converted_parameters)
 
         converted_parameters = source_frame_masses(converted_parameters)
 
-        ####EOS/ tidal treatment
         converted_parameters = self.eos_conversion(converted_parameters)
 
             
-        if "em" in self.messengers:
-            converted_parameters = self.ejecta_parameter_conversion(converted_parameters)
-            converted_parameters, _ = self.em_conversion(converted_parameters)
+        converted_parameters = self.ejecta_conversion(converted_parameters)
+        converted_parameters = self.em_conversion(converted_parameters)
 
         return converted_parameters
     
     def identity_conversion(self, parameters):
-        return parameters, []
+        return parameters
 
         
         
