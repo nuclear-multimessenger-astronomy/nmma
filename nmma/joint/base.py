@@ -2,7 +2,6 @@ import inspect
 import io
 import sys
 import contextlib
-import traceback
 import h5py
 from ast import literal_eval
 import numpy as np
@@ -286,7 +285,7 @@ def check_priors_and_likelihood_for_nmma(priors, likelihood):
     likelihood.setup_parameter_conversion()
     return priors, likelihood
 
-def bilby_sampling(likelihood, priors, args, injection_parameters=None, output_container=None):
+def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
     priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
     if args.bilby_zero_likelihood_mode:
         likelihood = ZeroLikelihood(likelihood)
@@ -312,18 +311,6 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, output_c
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
 
-    # check if it is running under mpi
-    try:
-        from mpi4py import MPI
-        rank = MPI.COMM_WORLD.Get_rank()
-    except ImportError:
-        rank = 0
-
-    if output_container is not None and rank == 0:
-        stdout_buffer, stderr_buffer= output_container
-        # Only the master process should write to the original stdout/stderr
-        sys.stdout.write(stdout_buffer.getvalue())
-        sys.stderr.write(stderr_buffer.getvalue())
     result = run_sampler(
         likelihood,
         priors,
@@ -339,7 +326,6 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, output_c
         **sampler_kwargs,
     )
 
-    
     if rank != 0:
         sys.exit()
 
@@ -379,33 +365,38 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, output_c
 
 
 def multi_analysis_loop(args, analysis_setup):
-    # Create buffers
-    stdout_buffer = io.StringIO()
-    stderr_buffer = io.StringIO()
 
-    # Redirect python output into buffers
-    redirect_out = contextlib.redirect_stdout(stdout_buffer)
-    redirect_err = contextlib.redirect_stderr(stderr_buffer)
-    output_container = (stdout_buffer, stderr_buffer)
-    print('hallo1')
-
+    # check if it is running under mpi
     try:
-        with redirect_out, redirect_err:
-            if getattr(args, 'config', None):
-                yaml_dict = load_yaml(args.config)
-                for params in yaml_dict.values():
-                    for key, value in params.items():
-                        key = key.replace("-", "_")
-                        if key not in args:
-                            print(f"{key} not a known argument... please remove")
-                            exit()
-                        setattr(args, key, value)
-                    priors, likelihood, injection_parameters = analysis_setup(args)
-                    bilby_sampling(likelihood, priors, args, injection_parameters, output_container)
-            else:
+        from mpi4py import MPI
+        rank = MPI.COMM_WORLD.Get_rank()
+    except ImportError:
+        rank = 0
+
+    if rank != 0:
+        # Create buffers
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+
+        # Redirect python output into buffers
+        redirect_out = contextlib.redirect_stdout(stdout_buffer)
+        redirect_err = contextlib.redirect_stderr(stderr_buffer)
+    else:
+        redirect_out = contextlib.nullcontext()
+        redirect_err = contextlib.nullcontext()
+        
+    with redirect_out, redirect_err:
+        if getattr(args, 'config', None):
+            yaml_dict = load_yaml(args.config)
+            for params in yaml_dict.values():
+                for key, value in params.items():
+                    key = key.replace("-", "_")
+                    if key not in args:
+                        print(f"{key} not a known argument... please remove")
+                        exit()
+                    setattr(args, key, value)
                 priors, likelihood, injection_parameters = analysis_setup(args)
-                bilby_sampling(likelihood, priors, args, injection_parameters, output_container)
-    except Exception as e:
-        traceback.print_exc()
-        sys.stdout.write(stdout_buffer.getvalue())
-        sys.stderr.write(stderr_buffer.getvalue())
+                bilby_sampling(likelihood, priors, args, injection_parameters, rank)
+        else:
+            priors, likelihood, injection_parameters = analysis_setup(args)
+            bilby_sampling(likelihood, priors, args, injection_parameters, rank)

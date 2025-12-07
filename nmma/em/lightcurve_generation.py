@@ -812,8 +812,8 @@ def create_light_curve_data(
     rng= None
 ):
     
+    injection_parameters = light_curve_model.parameter_conversion(injection_parameters)
     filters = set_filters(args)
-
     detection_limit = create_detection_limit(args, filters)
     trigger_time = injection_parameters.get("trigger_time", 0.)
     if rng is None:

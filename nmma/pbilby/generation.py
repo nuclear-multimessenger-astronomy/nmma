@@ -152,7 +152,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         # Run index arguments
         self.idx = args.idx
         self.generation_seed = args.generation_seed
-        self.trigger_time = read_trigger_time(None, args, 'gps')
 
         # Naming arguments
         self.outdir = args.outdir
@@ -200,6 +199,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         else: 
             self.injection_parameters=None
 
+        self.trigger_time = read_trigger_time(self.injection_parameters, args, 'gps')
 
         self.meta_data = dict(
                 config_file=self.ini,
@@ -260,15 +260,17 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             if eos_constraint_dict:
                 eos_converter = EoSConverter(args, 'tabulated')
                 constraint = setup_joint_eos_constraint(eos_constraint_dict, eos_converter)
-                args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weights(
+                args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weighted_eos(
                     args.Neos, args.outdir, args.eos_weight)
             priors = setup_tabulated_eos_priors(args, priors, logger)
-
+            
         # GW SETUP
         if args.detectors:
             messengers.append("gw")
+            # get a BBHPriorDict only if GW parameters are present
             gw_prior = super()._get_priors()
-            priors = gw_prior.update(priors)
+            gw_prior.update(priors)
+            priors = gw_prior
             self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, self.unknown_args)
             #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
             self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)

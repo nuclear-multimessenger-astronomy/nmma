@@ -277,7 +277,7 @@ class NMMAInjectionCreator(InjectionCreator):
         
         # rejection sampling for uniform mass ratio
         pop_prob= BNS_distribution(df["mass_1"], df["mass_2"])
-        df["tests_passed"] *= rejection_sample(pop_prob, np.ones_like(pop_prob), self.rng)
+        df["tests_passed"] *= rejection_sample(pop_prob, np.ones_like(pop_prob), self.rng)[1]
         # min mass constraint
         df["tests_passed"]*=(df["mass_2_source"] >=1.)
         return df

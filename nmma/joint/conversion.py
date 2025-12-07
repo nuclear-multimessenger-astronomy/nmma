@@ -209,7 +209,7 @@ class EoSConverter:
             # case 3 : we use multiple eos
             if os.path.isdir(args.eos_data):
                 if getattr(args, 'Neos', None) is None:
-                    eos_files  = os.listdir(args.eos_data)
+                    eos_files  = [f"{args.eos_data}/{f}" for f in os.listdir(args.eos_data)]
                 else:
                     eos_files = [f"{args.eos_data}/{j+1}.dat" for j in range(args.Neos)]
             else:

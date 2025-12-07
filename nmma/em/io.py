@@ -119,6 +119,7 @@ def read_lc_from_csv(filename, args, format):
 
 def write_em_observations(filename, data, format='observations'):
     # write json file in standard format or csv file, either in observations or model format
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     if filename.endswith(".json"):
         write_lc_to_json(filename, data)
     elif filename.endswith(".txt") or filename.endswith(".dat"):

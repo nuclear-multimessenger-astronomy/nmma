@@ -262,7 +262,7 @@ class JointEoSConstraint:
     def eval_eos_data(self, eos_data):
         try:
             R, M, _ = eos_data
-            self.eos_converter.local_parameters = {"radii": R, "masses": M}
+            self.eos_converter.macro_parameters = {"radii": R, "masses": M}
             return self.log_likelihood({"TOV_mass": M[-1]})
         except ValueError:
             return None
