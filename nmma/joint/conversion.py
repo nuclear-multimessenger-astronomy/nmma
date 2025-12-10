@@ -550,9 +550,12 @@ class BNSEjectaFitting:
         q_trans=0.886,
     ):
         """
-        See https://arxiv.org/pdf/2002.11355.pdf for the disk mass relation
-        and  https://arxiv.org/pdf/1908.05442.pdf for the threshold mass
+        See https://arxiv.org/pdf/2205.08513 Eq. (22)
+        The coefficients a0, delta_a etc. have been updated since then,
+        the ones here are the correct ones.
+        The threshold mass is from https://arxiv.org/pdf/1908.05442.pdf.
         """
+
         k = -3.606 * MTOV / R16 + 2.38
         threshold_mass = k * MTOV
 
@@ -621,6 +624,85 @@ class BNSEjectaFitting:
         mdyn = np.maximum(0.0, mdyn)
 
         return mdyn
+    
+    def dynamic_vel_fitting_Radice2018(
+            self,
+            mass_1,
+            mass_2,
+            compactness_1,
+            compactness_2,
+            a=-0.287,
+            b=0.494,
+            c=-3.000
+    ):
+        """
+        See https://arxiv.org/pdf/1809.11161 Eq. (22)
+        """
+
+        vej_dyn = a* mass_1/mass_2 * (1+c *compactness_1)
+        vej_dyn += a* mass_2/mass_1 * (1+c* compactness_2)
+        vej_dyn += b
+
+        return vej_dyn
+    
+    def dynamic_mass_fitting_prompt_collapse(
+            self,
+            mass_1,
+            mass_2,
+            lambda_1,
+            lambda_2,
+            a=1.25e-4,
+            b=9.82e-1,
+            c=-2.44,
+    ):
+        """
+        See https://arxiv.org/pdf/2411.02342, Eq. (9)
+        """
+        q = mass_2 / mass_1
+        lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2)
+        mdyn = a*lambda_tilde*(q**(-1) -b) * np.exp(c/q) # this is always positive
+
+        return mdyn
+    
+    def dynamic_vel_fitting_prompt_collapse(
+            self,
+            mass_1,
+            mass_2,
+            compactness_1,
+            compactness_2,
+            a=-0.395,
+            b=0.798,
+            c=-1.627):
+        """
+        See https://arxiv.org/pdf/2411.02342, Eq. (10)
+        """        
+        vdyn = a * mass_1/mass_2 *(1 + c*compactness_1)
+        vdyn += a * mass_2/mass_1 * (1 + c* compactness_2)
+        vdyn += b
+
+        return vdyn
+    
+    def log10_disk_mass_fitting_prompt_collapse(
+            self,
+            mass_1,
+            mass_2,
+            lambda_1,
+            lambda_2,
+            a=7.70,
+            b=-13.4,
+            c=8.16e-3):
+        """
+        See https://arxiv.org/pdf/2411.02342, Eq. (11)
+        Typo for b, b=-13.4 confirmed through author correspondence
+        """
+        q = mass_2 / mass_1
+        lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2)
+        log10_mdisk = a + b * q + c * lambda_tilde * q**2
+
+        log10_mdisk = np.minimum(log10_mdisk, -1)
+
+        return log10_mdisk
+        
 
     def vals_only_ejecta_parameter_conversion(self, converted_parameters):
 
