@@ -1,5 +1,5 @@
 
-from .base_parsing import nonestr, base_injection_parsing, pipe_inj_parsing
+from ..core.parsing import nonestr, base_injection_parsing, pipe_inj_parsing
 from ..em.em_parsing import em_analysis_parsing
 from ..eos.eos_parsing import tabulated_eos_parsing, eos_parsing
 from ..gw.gw_parsing import gw_injection_parsing
@@ -13,6 +13,7 @@ def injection_parsing(parser):
     parser = eos_parsing(parser)
     parser = em_analysis_parsing(parser)
     parser = gw_injection_parsing(parser)
+    parser = joint_likelihood_parsing(parser)
     
     ### NMMA-added options
     parser.add_argument("--max-redraws", type=int, default=10,
@@ -42,18 +43,17 @@ def injection_parsing(parser):
         help = "optional label for lightcurve-files to be generated;" \
         "default derives from injection-file")
 
-    parser.add_argument("--require-ejecta", action='store_true')
     parser.add_argument("--peak-magnitude", type=nonestr,
         help="Accept injection only if its peak magnitude matches some setting." \
         "If 'any', the lightcurve has to pass the detection limit in any filter." \
         "If 'all', the lightcurve has to pass the detection limit in all filters." \
         "Can also be a dict of filters and magnitudes that each have to be reached." )
-    parser.add_argument("--eos-file", type=str, 
-        help="EOS file in (radius [km], mass [solar mass], lambda)." )
+    parser.add_argument("--eos-file", help="EOS file (radius [km], mass [M_sun], lambda)." )
     # FIXME this is potentially misleading when used in conjunction with full analysis
     parser.add_argument("--cosmology", 
         help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)")
-    
+    parser.add_argument("--population-model", type=nonestr, default="uniform",
+        help="The population model to be used for injections (default: uniform)")
 
     
     ### Parameters for legacy injection file used in conjunction
@@ -65,3 +65,8 @@ def injection_parsing(parser):
 
     return parser
 
+def joint_likelihood_parsing(parser):
+    parser.description="Set up a joint NMMA likelihood from provided messengers and analysis modifiers"
+    parser.add_argument( "--ejecta-conversion", action='store_true',
+        help="Whether to set up ejecta conversions automatically if ejecta parameters are present" )
+    return parser
