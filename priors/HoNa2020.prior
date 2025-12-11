@@ -1,5 +1,5 @@
 luminosity_distance = Uniform(minimum=0.0, maximum=200, name="luminosity_distance",latex_label='$D_L$')
-log10_Mej  = Uniform(name="log10_Mej", minimum=-3, maximum=-0.5, latex_label='$\\log_{10}(M_{\\rm{ej}})$')
+log10_mej  = Uniform(name="log10_mej", minimum=-3, maximum=-0.5, latex_label='$\\log_{10}(M_{\\rm{ej}})$')
 vej_max  = Uniform(name="vej_max", minimum=0.2, maximum=0.4, latex_label='$v_{\\rm{max}}$')
 vej_min  = Uniform(name="vej_min", minimum=0.1, maximum=0.2, latex_label='$v_{\\rm{min}}$')
 vej_frac  = Uniform(name="vej_frac", minimum=0, maximum=1, latex_label='$f_{\\rm{ej}}$')

@@ -386,7 +386,9 @@ def create_light_curve_data(
                 [3.0, ["ps1__g", "ps1__z"]],
             ]
         else:
-            raise ValueError("args.rubin_ToO_type should be either platinum, gold, or silver")
+            raise ValueError(
+                "args.rubin_ToO_type should be either platinum, gold, or silver"
+            )
         # took type names from Rubin 2024 Workshop write-up
 
         mjds, passbands = [], []
@@ -414,7 +416,7 @@ def create_light_curve_data(
                 assume_sorted=True,
             )
             times = group["mjd"].tolist()
-            #print("The times of observation are: ", times)
+            # print("The times of observation are: ", times)
             data_per_filt = np.vstack([times, lc(times), lcerr(times)]).T
             data[filt] = data_per_filt
             passbands_to_keep.append(filt)

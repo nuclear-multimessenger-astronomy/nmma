@@ -21,7 +21,7 @@ from .prior import create_prior_from_args
 from .utils import running_in_ci
 
 matplotlib.use("agg")
-matplotlib.rcParams['text.usetex'] = not running_in_ci()
+matplotlib.rcParams["text.usetex"] = not running_in_ci()
 
 
 def get_parser(**kwargs):
@@ -37,9 +37,7 @@ def get_parser(**kwargs):
         help="Name of the configuration file containing parameter values.",
     )
     parser.add_argument(
-        "--model",
-        type=str,
-        help="Name of the kilonova model to be used"
+        "--model", type=str, help="Name of the kilonova model to be used"
     )
     parser.add_argument(
         "--interpolation-type",
@@ -73,11 +71,7 @@ def get_parser(**kwargs):
         type=str,
         help="Path to the data file in [time(isot) filter magnitude error] format",
     )
-    parser.add_argument(
-        "--prior",
-        type=str,
-        help="Path to the prior file"
-    )
+    parser.add_argument("--prior", type=str, help="Path to the prior file")
     parser.add_argument(
         "--tmin",
         type=float,
@@ -91,10 +85,7 @@ def get_parser(**kwargs):
         help="Days to stop analysing from the trigger time (default: 14)",
     )
     parser.add_argument(
-        "--dt",
-        type=float,
-        default=0.1,
-        help="Time step in day (default: 0.1)"
+        "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
         "--log-space-time",
@@ -170,10 +161,7 @@ def get_parser(**kwargs):
         help="Number of cores to be used, only needed for dynesty (default: 1)",
     )
     parser.add_argument(
-        "--nlive",
-        type=int,
-        default=2048,
-        help="Number of live points (default: 2048)"
+        "--nlive", type=int, default=2048, help="Number of live points (default: 2048)"
     )
     parser.add_argument(
         "--reactive-sampling",
@@ -189,16 +177,10 @@ def get_parser(**kwargs):
         help="Sampling seed (default: 42)",
     )
     parser.add_argument(
-        "--injection",
-        metavar="PATH",
-        type=str,
-        help="Path to the injection json file"
+        "--injection", metavar="PATH", type=str, help="Path to the injection json file"
     )
     parser.add_argument(
-        "--plot",
-        action="store_true",
-        default=False,
-        help="add best fit plot"
+        "--plot", action="store_true", default=False, help="add best fit plot"
     )
     parser.add_argument(
         "--bestfit",
@@ -224,7 +206,7 @@ def get_parser(**kwargs):
         action="store_true",
         default=False,
     )
-    parser.add_argument( #no use in this script
+    parser.add_argument(  # no use in this script
         "--systematics-file",
         metavar="PATH",
         help="Path to systematics configuration file",
@@ -269,12 +251,11 @@ def analysis(args):
     error_budget = args.error_budget
 
     light_curve_model = SimpleBolometricLightCurveModel(
-        model=args.model,
-        sample_times=sample_times
+        model=args.model, sample_times=sample_times
     )
 
     # setup the prior
-    priors = create_prior_from_args(args.model.split(','), args)
+    priors = create_prior_from_args(args.model.split(","), args)
 
     # setup the likelihood
     likelihood_kwargs = dict(
@@ -338,6 +319,7 @@ def analysis(args):
 
     if args.bestfit or args.plot:
         import matplotlib.pyplot as plt
+
         posterior_file = os.path.join(
             args.outdir, f"{args.label}_posterior_samples.dat"
         )
@@ -367,10 +349,7 @@ def analysis(args):
                 lbol_dict["bestfit_sample_times"] + bestfit_params["timeshift"]
             )
 
-        matplotlib.rcParams.update(
-            {'font.size': 12,
-             'font.family': 'Times New Roman'}
-        )
+        matplotlib.rcParams.update({"font.size": 12, "font.family": "Times New Roman"})
 
         plt.figure(1)
         plotName = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
@@ -385,19 +364,24 @@ def analysis(args):
 
         idx = np.where(np.isfinite(sigma_y))[0]
         plt.errorbar(
-            t[idx], y[idx], sigma_y[idx], fmt="o", color="k", markersize=12,
+            t[idx],
+            y[idx],
+            sigma_y[idx],
+            fmt="o",
+            color="k",
+            markersize=12,
         )
 
         idx = np.where(~np.isfinite(sigma_y))[0]
-        plt.errorbar(
-            t[idx], y[idx], sigma_y[idx], fmt="v", color="k", markersize=12
-        )
+        plt.errorbar(t[idx], y[idx], sigma_y[idx], fmt="v", color="k", markersize=12)
 
-        plt.plot(lbol_dict['bestfit_sample_times'], lbol_dict['lbol'],
-                 color=color,
-                 linewidth=3,
-                 linestyle="--",
-                 )
+        plt.plot(
+            lbol_dict["bestfit_sample_times"],
+            lbol_dict["lbol"],
+            color=color,
+            linewidth=3,
+            linestyle="--",
+        )
 
         plt.ylabel("L [erg / s]")
         plt.xlabel("Time [days]")

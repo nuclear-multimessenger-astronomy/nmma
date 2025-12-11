@@ -16,3 +16,4 @@ tornado
 notebook
 ligo.skymap
 healpy
+dustmaps

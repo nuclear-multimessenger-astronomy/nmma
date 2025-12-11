@@ -24,7 +24,7 @@ arnett_lc_get_int_B = np.vectorize(arnett_lc_get_int_B_non_vec, excluded=["y", "
 def arnett_lc(t_day, param_dict):
     day = 86400.0  # in seconds
     ts = t_day * day
-    Mni = 10**param_dict["log10_mni"]
+    Mni = 10 ** param_dict["log10_mni"]
     Mni *= astropy.constants.M_sun.cgs.value  # in g
     tau_m = param_dict["tau_m"] * day
 
@@ -40,8 +40,11 @@ def arnett_lc(t_day, param_dict):
     int_A = arnett_lc_get_int_A(x, y)
     int_B = arnett_lc_get_int_B(x, y, s)
 
-    Ls = Mni * np.exp(-x**2) * (
-        (epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
+    Ls = (
+        Mni
+        * np.exp(-(x**2))
+        * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
+    )
 
     return Ls
 
@@ -49,7 +52,7 @@ def arnett_lc(t_day, param_dict):
 def arnett_modified_lc(t_day, param_dict):
     day = 86400.0  # in seconds
     ts = t_day * day  # in seconds
-    Mni = 10**param_dict["log10_mni"]
+    Mni = 10 ** param_dict["log10_mni"]
     Mni *= astropy.constants.M_sun.cgs.value  # in g
     tau_m = param_dict["tau_m"] * day
     t0 = param_dict["t_0"] * day
@@ -66,7 +69,11 @@ def arnett_modified_lc(t_day, param_dict):
     int_A = arnett_lc_get_int_A(x, y)
     int_B = arnett_lc_get_int_B(x, y, s)
 
-    Ls = Mni * np.exp(-x**2) * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
-    Ls_modified = Ls * (1. - np.exp(-1. * (t0 / ts)**2))
+    Ls = (
+        Mni
+        * np.exp(-(x**2))
+        * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
+    )
+    Ls_modified = Ls * (1.0 - np.exp(-1.0 * (t0 / ts) ** 2))
 
     return Ls_modified

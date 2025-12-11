@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from .utils import running_in_ci
 
 matplotlib.use("agg")
-matplotlib.rcParams['text.usetex'] = not running_in_ci()
+matplotlib.rcParams["text.usetex"] = not running_in_ci()
 
 c = seaborn.color_palette("colorblind")
 

@@ -29,8 +29,8 @@ from parallel_bilby.analysis.sample_space import fill_sample
 from ..parser import (
     create_nmma_analysis_parser,
     create_nmma_gw_analysis_parser,
-    parse_analysis_args
-    )
+    parse_analysis_args,
+)
 from .analysis_run import AnalysisRun
 
 
@@ -270,7 +270,7 @@ def analysis_runner(
                     nested_samples,
                     sampler_kwargs,
                     sampling_time,
-                    rejection_sample_posterior=rejection_sample_posterior
+                    rejection_sample_posterior=rejection_sample_posterior,
                 )
 
                 posterior = conversion.fill_from_fixed_priors(
@@ -281,10 +281,10 @@ def analysis_runner(
                     "Generating posterior from marginalized parameters for"
                     f" nsamples={len(posterior)}, POOL={pool.size}"
                 )
-                #fill_args = [
+                # fill_args = [
                 #    (ii, row, run.likelihood) for ii, row in posterior.iterrows()
-                #]
-                #samples = pool.map(fill_sample, fill_args)
+                # ]
+                # samples = pool.map(fill_sample, fill_args)
                 posterior, _ = run.likelihood.parameter_conversion(
                     posterior,
                 )
@@ -343,7 +343,7 @@ def main_nmma():
     input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
 
     # Run the analysis
-    analysis_runner(**vars(input_args), inference_favour='nmma')
+    analysis_runner(**vars(input_args), inference_favour="nmma")
 
 
 def main_nmma_gw():
@@ -360,4 +360,4 @@ def main_nmma_gw():
     input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
 
     # Run the analysis
-    analysis_runner(**vars(input_args), inference_favour='nmma_gw')
+    analysis_runner(**vars(input_args), inference_favour="nmma_gw")

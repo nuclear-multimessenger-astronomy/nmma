@@ -14,15 +14,12 @@ ln10 = np.log(10)
 
 model_parameters_dict = {
     "Arnett": ["tau_m", "log10_mni"],
-    "Arnett_modified": ["tau_m", "log10_mni", "t_0"]
+    "Arnett_modified": ["tau_m", "log10_mni", "t_0"],
 }
 
 
 class SimpleBolometricLightCurveModel(object):
-    def __init__(
-        self, sample_times,
-        parameter_conversion=None, model="Arnett"
-    ):
+    def __init__(self, sample_times, parameter_conversion=None, model="Arnett"):
         """A light curve model object
 
         An object to evaluted the kilonova (with Me2017) light curve across filters
@@ -60,12 +57,8 @@ class SimpleBolometricLightCurveModel(object):
             new_parameters = parameters.copy()
 
         if self.model == "Arnett":
-            lbol = utils_lbol.arnett_lc(
-                sample_times, new_parameters
-            )
+            lbol = utils_lbol.arnett_lc(sample_times, new_parameters)
         elif self.model == "Arnett_modified":
-            lbol = utils_lbol.arnett_modified_lc(
-                sample_times, new_parameters
-            )
+            lbol = utils_lbol.arnett_modified_lc(sample_times, new_parameters)
 
         return lbol

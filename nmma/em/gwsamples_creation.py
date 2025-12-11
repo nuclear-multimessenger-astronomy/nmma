@@ -2,16 +2,18 @@ import numpy as np
 import pandas as pd
 import bilby
 
-# load posterior file, e.g. from https://zenodo.org/record/6106130#.YoysIHVBwUG 
-eos_post = np.loadtxt('./posterior_probability_files/Astro/15nsat_cse_uniform_R14/posterior_probability.txt')
+# load posterior file, e.g. from https://zenodo.org/record/6106130#.YoysIHVBwUG
+eos_post = np.loadtxt(
+    "./posterior_probability_files/Astro/15nsat_cse_uniform_R14/posterior_probability.txt"
+)
 
 npts = 150000
 Neos = 5000
 nparams = 3
 
 ############# [mass1,    mass2,   DL]
-params_low =  [1.001398, 1.001398, 1]
-params_high = [2.2,      2.2,     75]
+params_low = [1.001398, 1.001398, 1]
+params_high = [2.2, 2.2, 75]
 
 # 1) create dummy EOS samples with eos_post from nature paper
 EOS_raw = np.arange(0, Neos)  # the gwem_resampling will add one to this
@@ -28,7 +30,16 @@ chirp_mass = bilby.gw.conversion.component_masses_to_chirp_mass(mass_1, mass_2)
 lum_distance = np.random.uniform(params_low[2], params_high[2], size=npts)
 
 # 3) create pandas dataframe
-dataset = pd.DataFrame({'mass_1': mass_1, 'mass_2': mass_2, 'chirp_mass': chirp_mass, 'mass_ratio': mass_ratio, 'luminosity_distance': lum_distance, 'EOS': EOS_samples})
+dataset = pd.DataFrame(
+    {
+        "mass_1": mass_1,
+        "mass_2": mass_2,
+        "chirp_mass": chirp_mass,
+        "mass_ratio": mass_ratio,
+        "luminosity_distance": lum_distance,
+        "EOS": EOS_samples,
+    }
+)
 
 # 4) save GWsamples.dat file
-dataset.to_csv('GWsamples.dat', index=False, sep=' ')
+dataset.to_csv("GWsamples.dat", index=False, sep=" ")

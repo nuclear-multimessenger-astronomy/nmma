@@ -37,7 +37,7 @@ RUN apt-get install -y \
     cmake \
     liblapacke-dev \
     liblapack-dev \
-    libblas-dev 
+    libblas-dev
 
 RUN cd build && cmake .. && make
 

@@ -58,7 +58,9 @@ def get_positional_args(cls):
     return params
 
 
-DISTRIBUTION_PARAMETERS = {k: get_positional_args(v) for k, v in ALLOWED_DISTRIBUTIONS.items()}
+DISTRIBUTION_PARAMETERS = {
+    k: get_positional_args(v) for k, v in ALLOWED_DISTRIBUTIONS.items()
+}
 
 
 def load_yaml(file_path):
@@ -71,9 +73,13 @@ def validate_only_one_true(yaml_dict):
             raise ValidationError(key, "'value' key must be present and be a boolean")
     true_count = sum(value["value"] for value in yaml_dict["config"].values())
     if true_count > 1:
-        raise ValidationError("config", "Only one configuration key can be set to True at a time")
+        raise ValidationError(
+            "config", "Only one configuration key can be set to True at a time"
+        )
     elif true_count == 0:
-        raise ValidationError("config", "At least one configuration key must be set to True")
+        raise ValidationError(
+            "config", "At least one configuration key must be set to True"
+        )
 
 
 def validate_filters(filter_groups):
@@ -127,7 +133,8 @@ def validate_distribution(distribution):
     missing_params = set(required_params) - set(distribution.keys())
     if missing_params:
         raise ValidationError(
-            "distribution", f"Missing required parameters for {dist_type} distribution: {', '.join(missing_params)}"
+            "distribution",
+            f"Missing required parameters for {dist_type} distribution: {', '.join(missing_params)}",
         )
 
 
@@ -142,7 +149,9 @@ def create_prior_string(name, distribution):
 
     extra_params = set(params.keys()) - set(required_params)
     if extra_params:
-        warnings.warn(f"Distribution parameters {extra_params} are not used by {dist_type} distribution and will be ignored")
+        warnings.warn(
+            f"Distribution parameters {extra_params} are not used by {dist_type} distribution and will be ignored"
+        )
 
     params = {k: params[k] for k in required_params if k in params}
 

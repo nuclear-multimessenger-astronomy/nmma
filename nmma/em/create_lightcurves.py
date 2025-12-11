@@ -392,7 +392,7 @@ def main(args=None):
         import matplotlib
 
         matplotlib.use("agg")
-        matplotlib.rcParams['text.usetex'] = not running_in_ci()
+        matplotlib.rcParams["text.usetex"] = not running_in_ci()
         params = {
             "backend": "pdf",
             "axes.labelsize": 42,

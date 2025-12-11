@@ -14,15 +14,15 @@ from scipy.interpolate import interp1d
 import pandas as pd
 from astropy import time
 from bilby.core.likelihood import ZeroLikelihood
-import matplotlib.pyplot as plt
 
 from ..utils.models import refresh_models_list
 from .injection import create_light_curve_data
 from .likelihood import OpticalLightCurve
 from .model import create_light_curve_model_from_args, model_parameters_dict
 from .prior import create_prior_from_args
-from .utils import getFilteredMag, dataProcess
-from .io import loadEvent, detection_limit_from_m4opt_fits_file
+from .utils import getFilteredMag, dataProcess, set_mission_name
+
+from .io import loadEvent
 
 matplotlib.use("agg")
 
@@ -90,7 +90,10 @@ def get_parser(**kwargs):
         "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
-        "--dt-inj", type=float, default=1, help="Time step in day for injection (default: 1.0)"
+        "--dt-inj",
+        type=float,
+        default=1,
+        help="Time step in day for injection (default: 1.0)",
     )
     parser.add_argument(
         "--log-space-time",
@@ -280,7 +283,7 @@ def get_parser(**kwargs):
         "--rubin-ToO-type",
         help="Type of ToO observation. Won't work w/o --rubin-ToO",
         type=str,
-        choices=["platinum","gold","gold_z","silver","silver_z"],
+        choices=["platinum", "gold", "gold_z", "silver", "silver_z"],
     )
     parser.add_argument(
         "--xlim",
@@ -394,11 +397,16 @@ def get_parser(**kwargs):
 
     parser.add_argument(
         "--fits-file",
-        help="Fits file output from Bayestar, to be used for constructing dL-iota prior"
+        help="Fits file output from Bayestar, to be used for constructing dL-iota prior",
     )
+    # FIXME: to be remove latter
     parser.add_argument(
         "--detection-limit-fits-file",
-        help="Fits file output from m4opt which contain the detection limit of a given sky location"
+        help="Fits file output from m4opt which contain the detection limit of a given sky location",
+    )
+    parser.add_argument(
+        "--mission-name",
+        help="The Telescope name. When running with the detection limit from M4OPT, this will be caught in utils.py to read the appropriate bandpass (UVEX or ULTRASAT)",
     )
     parser.add_argument(
         "--cosiota-node-num",
@@ -415,17 +423,17 @@ def get_parser(**kwargs):
     parser.add_argument(
         "--ra",
         type=float,
-        help="Right ascension of the sky location; to be used together with fits file"
+        help="Right ascension of the sky location; to be used together with fits file",
     )
     parser.add_argument(
         "--dec",
         type=float,
-        help="Declination of the sky location; to be used together with fits file"
+        help="Declination of the sky location; to be used together with fits file",
     )
     parser.add_argument(
         "--dL",
         type=float,
-        help="Distance of the location; to be used together with fits file"
+        help="Distance of the location; to be used together with fits file",
     )
     parser.add_argument(
         "--fetch-Ebv-from-dustmap",
@@ -444,6 +452,14 @@ def get_parser(**kwargs):
 
 
 def analysis(args):
+
+    # Global mission name storage for M4OPT mission of specific filters
+    # When a mission name is provided (ULTRASAT or UVEX), this global variable
+    # stores it so that get_default_filts_lambdas() can dynamically add the
+    # appropriate bandpass filters (NUV for ULTRASAT, FUV+NUV for UVEX).
+    # Set once at the start of analysis() via set_mission_name(),
+    # then accessed throughout the code via get_mission_name().
+    set_mission_name(args.mission_name)
 
     if args.sampler == "pymultinest":
         if len(args.outdir) > 64:
@@ -470,19 +486,18 @@ def analysis(args):
         filters = filters.split(",")
         if len(filters) == 0:
             raise ValueError("Need at least one valid filter.")
-    elif args.rubin_ToO_type == 'platinum':
-        filters = ["ps1__g","ps1__r","ps1__i","ps1__z","ps1__y"]
-    elif args.rubin_ToO_type == 'gold':
-        filters = ["ps1__g","ps1__r","ps1__i"]
-    elif args.rubin_ToO_type == 'gold_z':
-        filters = ["ps1__g","ps1__r","ps1__z"]
-    elif args.rubin_ToO_type == 'silver':
-        filters = ["ps1__g""ps1__i"]
-    elif args.rubin_ToO_type == 'silver_z':
-        filters = ["ps1__g","ps1__z"]
+    elif args.rubin_ToO_type == "platinum":
+        filters = ["ps1__g", "ps1__r", "ps1__i", "ps1__z", "ps1__y"]
+    elif args.rubin_ToO_type == "gold":
+        filters = ["ps1__g", "ps1__r", "ps1__i"]
+    elif args.rubin_ToO_type == "gold_z":
+        filters = ["ps1__g", "ps1__r", "ps1__z"]
+    elif args.rubin_ToO_type == "silver":
+        filters = ["ps1__g" "ps1__i"]
+    elif args.rubin_ToO_type == "silver_z":
+        filters = ["ps1__g", "ps1__z"]
     else:
         filters = None
-
 
     # initialize light curve model
     timeshift = 0
@@ -496,7 +511,7 @@ def analysis(args):
         )
     else:
         sample_times = np.arange(args.tmin, args.tmax + args.dt, args.dt)
-        
+
     print("Creating light curve model for inference")
 
     if args.filters:
@@ -514,7 +529,7 @@ def analysis(args):
                 f, object_hook=bilby.core.utils.decode_bilby_json
             )
         injection_df = injection_dict["injections"]
-        row = injection_df.loc[injection_df['simulation_id'] == args.injection_num]  
+        row = injection_df.loc[injection_df["simulation_id"] == args.injection_num]
         injection_parameters = row.squeeze().to_dict()
 
         if "geocent_time" in injection_parameters:
@@ -524,10 +539,10 @@ def analysis(args):
         else:
             print("Need either geocent_time or geocent_time_x")
             exit(1)
-        
-        timeshift = 0       
+
+        timeshift = 0
         trigger_time = tc_gps.mjd + timeshift
-        
+
         if args.ignore_timeshift:
             if "timeshift" in injection_parameters:
                 timeshift = injection_parameters["timeshift"]
@@ -535,9 +550,9 @@ def analysis(args):
                 timeshift = 0
 
             trigger_time = tc_gps.mjd + timeshift
-        
-        #print("the trigger time from the injection file is: ", trigger_time)
-        
+
+        # print("the trigger time from the injection file is: ", trigger_time)
+
         # initialize light curve model
         if args.log_space_time:
             if args.n_tstep:
@@ -548,10 +563,12 @@ def analysis(args):
                     np.log10(args.tmin), np.log10(args.tmax + args.dt), n_step
                 )
         else:
-            sample_times = np.arange(args.tmin + timeshift, args.tmax + timeshift + args.dt, args.dt)
-        
+            sample_times = np.arange(
+                args.tmin + timeshift, args.tmax + timeshift + args.dt, args.dt
+            )
+
         print("Creating light curve model for inference")
-    
+
         injection_parameters["kilonova_trigger_time"] = trigger_time
         if args.prompt_collapse:
             injection_parameters["log10_mej_wind"] = -3.0
@@ -592,41 +609,49 @@ def analysis(args):
         )
         print(f"Injection generated with parameters {injection_parameters}")
 
-        #checking produced data for magnitudes dimmer than the detection limit
+        # checking produced data for magnitudes dimmer than the detection limit
         if filters is not None:
             if args.detection_limit is None:
                 if args.rubin_ToO_type:
-                    detection_limit = {'ps1__g':25.8,'ps1__r':25.5,'ps1__i':24.8,'ps1__z':24.1,'ps1__y':22.9}
-                #elif args.ztf_sampling:
-                #    detection_limit = {}
-                elif args.detection_limit_fits_file is not None:
-                    limit_given_radec = detection_limit_from_m4opt_fits_file(
-                        args.detection_limit_fits_file, args.ra, args.dec
-                    )
-                    print(f"Detection limit from {args.detection_limit_fits_file} is used")
-                    print(f"Given ra:{args.ra} and dec:{args.dec}, the limiting mag is {limit_given_radec}")
                     detection_limit = {
-                        x: float(limit_given_radec)
-                        for x in filters
+                        "ps1__g": 25.8,
+                        "ps1__r": 25.5,
+                        "ps1__i": 24.8,
+                        "ps1__z": 24.1,
+                        "ps1__y": 22.9,
                     }
+                # elif args.ztf_sampling:
+                #    detection_limit = {}
+
+                # FIXME : to be remove we could just provide the detection limit from M4OPT instead of recalculat them
+                # elif args.detection_limit_fits_file is not None:
+                #     limit_given_radec = detection_limit_from_m4opt_fits_file(
+                #         args.detection_limit_fits_file, args.ra, args.dec
+                #     )
+                #     print(f"Detection limit from {args.detection_limit_fits_file} is used")
+                #     print(f"Given ra:{args.ra} and dec:{args.dec}, the limiting mag is {limit_given_radec}")
+                #     detection_limit = {
+                #         x: float(limit_given_radec)
+                #         for x in filters
+                #     }
                 else:
                     detection_limit = {x: np.inf for x in filters}
             else:
                 detection_limit = literal_eval(args.detection_limit)
 
-            #print("the detection limits for this run are: ", detection_limit)
+            # print("the detection limits for this run are: ", detection_limit)
 
             for filt in filters:
-                i=0
+                i = 0
                 for row in data[filt]:
-                    #print('the old data is {data}'.format(data=data[filt]))
+                    # print('the old data is {data}'.format(data=data[filt]))
                     mjd, mag, mag_unc = row
-                    #print("the data for {f} is: ".format(f=filt), row)
+                    # print("the data for {f} is: ".format(f=filt), row)
                     if mag > detection_limit[filt]:
-                        data[filt][i,:] = [mjd, detection_limit[filt], -np.inf]
-                    
-                    #print("the new data is: ", data[filt])
-                    i+=1
+                        data[filt][i, :] = [mjd, detection_limit[filt], -np.inf]
+
+                    # print("the new data is: ", data[filt])
+                    i += 1
 
         if args.injection_outfile is not None:
             if filters is not None:
@@ -724,7 +749,7 @@ def analysis(args):
     detection = False
     notallnan = False
 
-    #print('data before checking for detections: ', data[filt])
+    # print('data before checking for detections: ', data[filt])
 
     for filt in data.keys():
         idx = np.where(np.isfinite(data[filt][:, 2]))[0]
@@ -786,7 +811,7 @@ def analysis(args):
     # setup the prior
     priors = create_prior_from_args(model_names, args)
 
-    #print('the data passed to likelihood is: ', data)
+    # print('the data passed to likelihood is: ', data)
 
     # setup the likelihood
     if args.detection_limit:
@@ -796,12 +821,12 @@ def analysis(args):
         filters=filters_to_analyze,
         light_curve_data=data,
         trigger_time=trigger_time,
-        tmin=args.tmin+timeshift,
-        tmax=args.tmax+timeshift,
+        tmin=args.tmin + timeshift,
+        tmax=args.tmax + timeshift,
         error_budget=error_budget,
         verbose=args.verbose,
         detection_limit=args.detection_limit,
-        systematics_file=args.systematics_file
+        systematics_file=args.systematics_file,
     )
 
     likelihood = OpticalLightCurve(**likelihood_kwargs)
@@ -832,7 +857,7 @@ def analysis(args):
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
 
-    #print("passing arguments to bilby")
+    # print("passing arguments to bilby")
 
     result = bilby.run_sampler(
         likelihood,
@@ -938,7 +963,11 @@ def analysis(args):
         # calculate the chi2 #
         ######################
         processed_data = dataProcess(
-            data, filters_to_analyze, trigger_time, args.tmin+timeshift, args.tmax+timeshift
+            data,
+            filters_to_analyze,
+            trigger_time,
+            args.tmin + timeshift,
+            args.tmax + timeshift,
         )
         chi2 = 0.0
         dof = 0.0
@@ -954,12 +983,18 @@ def analysis(args):
             print("the time values before adding timeshift are: ", t)
             # shift t values by timeshift
             if "timeshift" in bestfit_params:
-                print("timeshift found in bestfit_params is: ",bestfit_params["timeshift"])
+                print(
+                    "timeshift found in bestfit_params is: ",
+                    bestfit_params["timeshift"],
+                )
                 t += bestfit_params["timeshift"]
             # only the detection data are needed
             finite_idx = np.where(np.isfinite(sigma_y))[0]
             print("the {f} data being analyzed is: ".format(f=filt), samples)
-            print("for {f} the length of the detections array is: ".format(f=filt), len(finite_idx))
+            print(
+                "for {f} the length of the detections array is: ".format(f=filt),
+                len(finite_idx),
+            )
             if len(finite_idx) > 0:
                 # fetch the erorr_budget
                 if "em_syserr" in bestfit_params:
@@ -1044,25 +1079,29 @@ def analysis(args):
         bspace = 0.7
         trspace = 0.2
         hpanel = 2.25
-        wpanel = 3.
+        wpanel = 3.0
 
         ncol = 2
         nrow = int(np.ceil(len(filters_plot) / ncol))
         fig, axes = plt.subplots(nrow, ncol)
 
-        figsize = (1.5 * (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace),
-                   1.5 * (bspace + hpanel * nrow + hspace * (nrow - 1) + trspace))
+        figsize = (
+            1.5 * (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace),
+            1.5 * (bspace + hpanel * nrow + hspace * (nrow - 1) + trspace),
+        )
         # Create the figure and axes.
         fig, axes = plt.subplots(nrow, ncol, figsize=figsize, squeeze=False)
-        fig.subplots_adjust(left=lspace / figsize[0],
-                            bottom=bspace / figsize[1],
-                            right=1. - trspace / figsize[0],
-                            top=1. - trspace / figsize[1],
-                            wspace=wspace / wpanel,
-                            hspace=hspace / hpanel)
+        fig.subplots_adjust(
+            left=lspace / figsize[0],
+            bottom=bspace / figsize[1],
+            right=1.0 - trspace / figsize[0],
+            top=1.0 - trspace / figsize[1],
+            wspace=wspace / wpanel,
+            hspace=hspace / hpanel,
+        )
 
         if len(filters_plot) % 2:
-            axes[-1, -1].axis('off')
+            axes[-1, -1].axis("off")
 
         cnt = 0
         for filt, color in zip(filters_plot, colors):
@@ -1074,9 +1113,7 @@ def analysis(args):
             ax_sum = axes[row, col]
             # adding the ax for the Delta
             divider = make_axes_locatable(ax_sum)
-            ax_delta = divider.append_axes('bottom',
-                                           size='30%',
-                                           sharex=ax_sum)
+            ax_delta = divider.append_axes("bottom", size="30%", sharex=ax_sum)
 
             # configuring ax_sum
             ax_sum.set_ylabel("AB magnitude", rotation=90)
@@ -1110,16 +1147,13 @@ def analysis(args):
                 marker="v",
                 color=color,
             )
-  
+
             mag_plot = getFilteredMag(mag, filt)
 
             # calculating the chi2
-            mag_per_data = np.interp(
-                t[det_idx],
-                mag["bestfit_sample_times"],
-                mag_plot)
+            mag_per_data = np.interp(t[det_idx], mag["bestfit_sample_times"], mag_plot)
             diff_per_data = mag_per_data - y[det_idx]
-            sigma_per_data = np.sqrt((sigma_y[det_idx]**2 + error_budget[filt]**2))
+            sigma_per_data = np.sqrt((sigma_y[det_idx] ** 2 + error_budget[filt] ** 2))
             chi2_per_data = diff_per_data**2
             chi2_per_data /= sigma_per_data**2
             chi2_total = np.sum(chi2_per_data)
@@ -1127,12 +1161,12 @@ def analysis(args):
 
             # plot the mismatch between the model and the data
             ax_delta.scatter(t[det_idx], diff_per_data / sigma_per_data, color=color)
-            ax_delta.axhline(0, linestyle='--', color='k')
+            ax_delta.axhline(0, linestyle="--", color="k")
 
             ax_sum.plot(
                 mag["bestfit_sample_times"],
                 mag_plot,
-                color='coral',
+                color="coral",
                 linewidth=3,
                 linestyle="--",
             )
@@ -1142,7 +1176,7 @@ def analysis(args):
                     mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
                     mag_plot - error_budget[filt],
-                    facecolor='coral',
+                    facecolor="coral",
                     alpha=0.2,
                     label="combined",
                 )
@@ -1151,7 +1185,7 @@ def analysis(args):
                     mag["bestfit_sample_times"],
                     mag_plot + error_budget[filt],
                     mag_plot - error_budget[filt],
-                    facecolor='coral',
+                    facecolor="coral",
                     alpha=0.2,
                 )
 
@@ -1161,7 +1195,7 @@ def analysis(args):
                     ax_sum.plot(
                         mag["bestfit_sample_times"],
                         mag_plot,
-                        color='coral',
+                        color="coral",
                         linewidth=3,
                         linestyle="--",
                     )
@@ -1174,36 +1208,55 @@ def analysis(args):
                         label=models[ii].model,
                     )
 
-            ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$')
+            ax_sum.set_title(
+                f"{filt}: " + rf"$\chi^2 / d.o.f. = {round(chi2_total / N_data, 2)}$"
+            )
 
             ax_sum.set_xlim([float(x) for x in args.xlim.split(",")])
             ax_sum.set_ylim([float(x) for x in args.ylim.split(",")])
             ax_delta.set_xlim([float(x) for x in args.xlim.split(",")])
 
-        plt.savefig(plotName, bbox_inches='tight')
+        plt.savefig(plotName, bbox_inches="tight")
         plt.close()
+
 
 def nnanalysis(args):
 
+    set_mission_name(args.mission_name)
+
     # import functions
-    from ..mlmodel.dataprocessing import gen_prepend_filler, gen_append_filler, pad_the_data
-    from ..mlmodel.resnet import ResNet
+    from ..mlmodel.dataprocessing import (
+        # gen_prepend_filler,  # noqa:  F401
+        # gen_append_filler,  # noqa: F401
+        pad_the_data,
+    )
+
+    # from ..mlmodel.resnet import ResNet  # noqa:  F401
     from ..mlmodel.embedding import SimilarityEmbedding
     from ..mlmodel.normalizingflows import normflow_params
     from ..mlmodel.inference import cast_as_bilby_result
 
     # need to add these packages:
     import torch
-    import torch.nn as nn
-    from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
-    import torch.nn.functional as F
-    from nflows.nn.nets.resnet import ResidualNet
-    from nflows import transforms, distributions, flows
-    from nflows.distributions import StandardNormal
+
+    # import torch.nn as nn  # noqa:  F401
+    # from torch.utils.data import (
+    #     Dataset,  # noqa: F401
+    #     DataLoader,  # noqa:  F401
+    #     TensorDataset,  # noqa:  F401
+    #     random_split,  # noqa:  F401
+    # )
+    # import torch.nn.functional as F  # noqa: F401
+    # from nflows.nn.nets.resnet import ResidualNet  # noqa: F401
+    # from nflows import transforms, distributions, flows  # noqa: F401
+    # from nflows.distributions import StandardNormal  # noqa: F401
     from nflows.flows import Flow
-    from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform
-    from nflows.transforms import CompositeTransform, RandomPermutation
-    import nflows.utils as torchutils
+
+    # from nflows.transforms.autoregressive import (
+    #     MaskedAffineAutoregressiveTransform,  # noqa: F401
+    # )
+    # from nflows.transforms import CompositeTransform, RandomPermutation  # noqa: F401
+    # import nflows.utils as torchutils  # noqa: F401
 
     # only continue if the Kasen model is selected
     if args.model != "Ka2017":
@@ -1211,22 +1264,24 @@ def nnanalysis(args):
             "WARNING: model selected is not currently compatible with this inference method"
         )
         exit()
-    else: 
+    else:
         pass
 
-    print('Starting LFI')
+    print("Starting LFI")
 
     # only can use ztfr, ztfg, and ztfi filters in the light curve data
-    if args.filters: 
+    if args.filters:
         filters = args.filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
-        if ('ztfr' in filters) and ('ztfi' in filters) and ('ztfg' in filters):
+        if ("ztfr" in filters) and ("ztfi" in filters) and ("ztfg" in filters):
             pass
         else:
             raise ValueError("Need the ztfr, ztfi, and ztfg filters.")
-    else: 
-        print('Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters.')
-        filters = 'ztfg,ztfi,ztfr'
+    else:
+        print(
+            "Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters."
+        )
+        filters = "ztfg,ztfi,ztfr"
         filters = filters.replace(" ", "")  # remove all whitespace
         filters = filters.split(",")
 
@@ -1244,7 +1299,7 @@ def nnanalysis(args):
     bilby.core.utils.setup_logger(outdir=args.outdir, label=args.label)
     bilby.core.utils.check_directory_exists_and_if_not_mkdir(args.outdir)
 
-    print('Setting up logger and storage directory')
+    print("Setting up logger and storage directory")
 
     if args.log_space_time:
         if args.n_tstep:
@@ -1293,18 +1348,20 @@ def nnanalysis(args):
         if args.dt:
             time_step = args.dt
             if args.dt != 0.25:
-                raise ValueError("Need dt to be 0.25 until interpolation feature is incorporated.")
+                raise ValueError(
+                    "Need dt to be 0.25 until interpolation feature is incorporated."
+                )
                 # currently no linear interpolation function
-                do_lin_interpolation = True
+                do_lin_interpolation = True  # noqa:  F841
             else:
-                do_lin_interpolation = False
+                do_lin_interpolation = False  # noqa:  F841
 
         args.kilonova_tmin = args.tmin
         args.kilonova_tmax = args.tmax
         args.kilonova_tstep = args.dt_inj
         args.kilonova_error = args.photometric_error_budget
 
-        current_points = int(round(args.tmax - args.tmin))/args.dt + 1
+        # current_points = int(round(args.tmax - args.tmin)) / args.dt + 1
 
         if not args.injection_model:
             args.kilonova_injection_model = args.model
@@ -1338,16 +1395,17 @@ def nnanalysis(args):
                             args.injection_detection_limit.split(","),
                         )
                     }
-                elif args.detection_limit_fits_file is not None:
-                    limit_given_radec = detection_limit_from_m4opt_fits_file(
-                        args.detection_limit_fits_file, args.ra, args.dec
-                    )
-                    print(f"Detection limit from {args.detection_limit_fits_file} is used")
-                    print(f"Given ra:{args.ra} and dec:{args.dec}, the limiting mag is {limit_given_radec}")
-                    detection_limit = {
-                        x: float(limit_given_radec)
-                        for x in filters
-                    }
+                # FIXME : to be remove
+                # elif args.detection_limit_fits_file is not None:
+                #     limit_given_radec = detection_limit_from_m4opt_fits_file(
+                #         args.detection_limit_fits_file, args.ra, args.dec
+                #     )
+                #     print(f"Detection limit from {args.detection_limit_fits_file} is used")
+                #     print(f"Given ra:{args.ra} and dec:{args.dec}, the limiting mag is {limit_given_radec}")
+                #     detection_limit = {
+                #         x: float(limit_given_radec)
+                #         for x in filters
+                #     }
                 else:
                     detection_limit = {x: np.inf for x in filters}
             else:
@@ -1409,7 +1467,7 @@ def nnanalysis(args):
         # load the lightcurve data
         data = loadEvent(args.data)
         res = next(iter(data))
-        current_points = len(data[res])
+        # current_points = len(data[res])
 
         if args.trigger_time is None:
             # load the minimum time as trigger time
@@ -1493,17 +1551,21 @@ def nnanalysis(args):
 
     # setup the prior
     priors = create_prior_from_args(model_names, args)
-    
+
     # now that we have the kilonova light curve, we need to pad it with non-detections
     # this part is currently hard coded in terms of the times !!!! likely will need the most work
     # (so that the 'fixed' and 'shifted' are properly represented)
     num_points = 121
     num_channels = 3
-    bands = ['ztfg', 'ztfr', 'ztfi'] # will need to edit to not be hardcoded
-    t_zero = 44242.00021937881
-    t_min = 44240.00050450478
-    t_max = 44269.99958898723
-    days = int(round(t_max - t_min))
+    # bands = [
+    #     "ztfg",
+    #     "ztfr",
+    #     "ztfi",
+    # ]  # noqa: F841  # will need to edit to not be hardcoded
+    # t_zero = 44242.00021937881  # noqa: F841
+    # t_min = 44240.00050450478
+    # t_max = 44269.99958898723
+    # days = int(round(t_max - t_min))  # noqa: F841
     time_step = 0.25
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1511,14 +1573,14 @@ def nnanalysis(args):
 
     if args.detection_limit:
         detection_limit = args.detection_limit
-    else: 
+    else:
         detection_limit = 22.0
 
     data_df = pd.DataFrame()
     t_list = []
     for i in range(len(data[res])):
         t_list.append(data[res][i][0])
-    data_df['t'] = t_list
+    data_df["t"] = t_list
     for key in data:
         mag_list = []
         for i, val in enumerate(data[key]):
@@ -1527,52 +1589,78 @@ def nnanalysis(args):
         data_df[key] = mag_list
     column_list = data_df.columns.to_list()
 
-    # pad the data 
+    # pad the data
     padded_data_df = pad_the_data(
-        data_df, 
+        data_df,
         column_list,
-        desired_count=num_points, 
-        filler_time_step=time_step, 
-        filler_data=detection_limit
+        desired_count=num_points,
+        filler_time_step=time_step,
+        filler_data=detection_limit,
     )
 
     # change the data into pytorch tensors
-    data_tensor = torch.tensor(padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels), dtype=torch.float32).transpose(1, 2)
+    data_tensor = torch.tensor(
+        padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels),
+        dtype=torch.float32,
+    ).transpose(1, 2)
 
-    # set up the embedding 
-    similarity_embedding = SimilarityEmbedding(num_dim=7, num_hidden_layers_f=1, num_hidden_layers_h=1, num_blocks=4, kernel_size=5, num_dim_final=5).to(device)
+    # set up the embedding
+    similarity_embedding = SimilarityEmbedding(
+        num_dim=7,
+        num_hidden_layers_f=1,
+        num_hidden_layers_h=1,
+        num_blocks=4,
+        kernel_size=5,
+        num_dim_final=5,
+    ).to(device)
     num_dim = 7
-    SAVEPATH = os.getcwd() + '/nmma/mlmodel/similarity_embedding_weights.pth'
+    SAVEPATH = os.getcwd() + "/nmma/mlmodel/similarity_embedding_weights.pth"
     similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
     for name, param in similarity_embedding.named_parameters():
         param.requires_grad = False
 
     # set up the normalizing flows
-    transform, base_dist, embedding_net = normflow_params(similarity_embedding, 9, 5, 90, context_features=num_dim, num_dim=num_dim) 
+    transform, base_dist, embedding_net = normflow_params(
+        similarity_embedding, 9, 5, 90, context_features=num_dim, num_dim=num_dim
+    )
     flow = Flow(transform, base_dist, embedding_net).to(device=device)
-    PATH_nflow = os.getcwd() + '/nmma/mlmodel/frozen-flow-weights.pth'
+    PATH_nflow = os.getcwd() + "/nmma/mlmodel/frozen-flow-weights.pth"
     flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
 
     nsamples = 20000
     with torch.no_grad():
         samples = flow.sample(nsamples, context=data_tensor)
-        samples = samples.cpu().reshape(nsamples,3)
-        
+        samples = samples.cpu().reshape(nsamples, 3)
+
     if args.injection:
         avail_parameters = injection_parameters.keys()
-        if ('log10_mej' in avail_parameters) and ('log10_vej' in avail_parameters) and ('log10_Xlan' in avail_parameters):
-            param_tensor = torch.tensor([injection_parameters['log10_mej'], injection_parameters['log10_vej'], injection_parameters['log10_Xlan']], dtype=torch.float32)
+        if (
+            ("log10_mej" in avail_parameters)
+            and ("log10_vej" in avail_parameters)
+            and ("log10_Xlan" in avail_parameters)
+        ):
+            param_tensor = torch.tensor(
+                [
+                    injection_parameters["log10_mej"],
+                    injection_parameters["log10_vej"],
+                    injection_parameters["log10_Xlan"],
+                ],
+                dtype=torch.float32,
+            )
             with torch.no_grad():
-               truth = param_tensor
+                truth = param_tensor
             flow_result = cast_as_bilby_result(samples, truth, priors=priors)
-            fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
-            print('saved posterior plot')
+            flow_result.plot_corner(save=True, label=args.label, outdir=args.outdir)
+            print("saved posterior plot")
         else:
-            raise ValueError('The injection parameters provided do not match the parameters the flow has been trained on')
+            raise ValueError(
+                "The injection parameters provided do not match the parameters the flow has been trained on"
+            )
     else:
         flow_result = cast_as_bilby_result(samples, truth=None, priors=priors)
-        fig = flow_result.plot_corner(save=True, label = args.label, outdir=args.outdir)
-        print('saved posterior plot')
+        flow_result.plot_corner(save=True, label=args.label, outdir=args.outdir)
+        print("saved posterior plot")
+
 
 def main(args=None):
     if args is None:
@@ -1592,4 +1680,3 @@ def main(args=None):
         nnanalysis(args)
     else:
         analysis(args)
-    

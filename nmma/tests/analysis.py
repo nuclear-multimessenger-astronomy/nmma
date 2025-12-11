@@ -110,7 +110,7 @@ def test_analysis_systematics_with_time_and_filters(args):
 
 
 def test_analysis_systematics_without_time(args):
-    
+
     args.filters = "ztfr"
     args.systematics_file = f"{DATA_DIR}/systematics_without_time.yaml"
     analysis.main(args)
@@ -135,7 +135,7 @@ def test_nn_analysis(args):
     args.sampler = "neuralnet"
     args.prior = "priors/Ka2017.prior"
     args.dt = 0.25
-    args.dt_inj= 0.25
+    args.dt_inj = 0.25
     args.filters = "ztfg,ztfr,ztfi"
     args.local_only = False
     args.injection = f"{DATA_DIR}/Ka2017_injection.json"

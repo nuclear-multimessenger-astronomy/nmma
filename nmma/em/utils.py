@@ -24,12 +24,14 @@ import matplotlib
 import matplotlib.pyplot as plt
 from nmma.em.training import SVDTrainingModel
 
-try:
-    from m4opt.missions import uvex
-    M4OPT_INSTALLED = True
-except:
-    M4OPT_INSTALLED = False
-    print("Install m4opt if you want to use uvex filters")
+# FIXME : to be remove
+# try:
+#     from m4opt.missions import uvex
+#     M4OPT_INSTALLED = True
+# except:
+#     M4OPT_INSTALLED = False
+#     print("Install m4opt if you want to use uvex filters")
+
 
 try:
     import afterglowpy
@@ -85,6 +87,25 @@ DEFAULT_FILTERS = [
     "ztfi",
     "ultrasat",
 ]
+
+# Global mission name storage for M4OPT mission of specific filters
+# When a mission name is provided (ULTRASAT or UVEX), this global variable
+# stores it so that get_default_filts_lambdas() can dynamically add the
+# appropriate bandpass filters (NUV for ULTRASAT, FUV+NUV for UVEX).
+# Set once at the start of analysis() via set_mission_name(),
+# then accessed throughout the code via get_mission_name().
+_MISSION_NAME = None
+
+
+def set_mission_name(mission_name):
+    """Store the mission name globally for M4OPT mission filter processing"""
+    global _MISSION_NAME
+    _MISSION_NAME = mission_name
+
+
+def get_mission_name():
+    """Retrieve the stored mission name to determine which filters to use"""
+    return _MISSION_NAME
 
 
 def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
@@ -354,15 +375,38 @@ def get_default_filts_lambdas(filters=None):
 
     filts = filts + [band.name for band in bandpasses]
     lambdas = np.concatenate([lambdas, [1e-10 * band.wave_eff for band in bandpasses]])
-    if M4OPT_INSTALLED:
-        fuv_bandpass = uvex.detector.bandpasses['FUV']
-        nuv_bandpass = uvex.detector.bandpasses['NUV']
 
-        fuv_lambda = 1e-10 * fuv_bandpass.avgwave().value
-        nuv_lambda = 1e-10 * nuv_bandpass.avgwave().value
+    # To be remove
+    # if M4OPT_INSTALLED:
+    #     fuv_bandpass = uvex.detector.bandpasses['FUV']
+    #     nuv_bandpass = uvex.detector.bandpasses['NUV']
 
-        filts = filts + ['FUV', 'NUV']
-        lambdas = np.concatenate([lambdas, [fuv_lambda, nuv_lambda]])
+    #     fuv_lambda = 1e-10 * fuv_bandpass.avgwave().value
+    #     nuv_lambda = 1e-10 * nuv_bandpass.avgwave().value
+
+    #     filts = filts + ['FUV', 'NUV']
+    #     lambdas = np.concatenate([lambdas, [fuv_lambda, nuv_lambda]])
+
+    mission_name = get_mission_name()
+
+    if mission_name:
+        mission = mission_name.lower()
+
+        if mission == "ultrasat":
+            nuv_lambda = 1e-10 * 2599.999670463154  # ULTRASAT NUV
+            filts = filts + ["NUV"]
+            lambdas = np.concatenate([lambdas, [nuv_lambda]])
+
+        elif mission == "uvex":
+            fuv_lambda = 1e-10 * 1599.9999030773981
+            nuv_lambda = 1e-10 * 2299.999825539317
+            filts = filts + ["FUV", "NUV"]
+            lambdas = np.concatenate([lambdas, [fuv_lambda, nuv_lambda]])
+
+        else:
+            print(
+                f"Warning: Unknown mission '{mission_name}'. Supported missions: ULTRASAT, UVEX"
+            )
 
     if filters is not None:
         filts_slice = []
@@ -678,16 +722,11 @@ def grb_lc(t_day, Ebv, param_dict, filters=None):
 
     # output flux density is in milliJansky
     try:
-        if isinstance(param_dict['E0'], np.ndarray):
-            E0 = param_dict.pop('E0')
+        if isinstance(param_dict["E0"], np.ndarray):
+            E0 = param_dict.pop("E0")
             vec_func = np.vectorize(
-                lambda i: fluxDensity(
-                    default_time[i], 
-                    nu_0s, 
-                    E0=E0[i], 
-                    **param_dict
-                ), 
-                otypes=[np.ndarray]
+                lambda i: fluxDensity(default_time[i], nu_0s, E0=E0[i], **param_dict),
+                otypes=[np.ndarray],
             )
             mJys = vec_func(np.arange(times.shape[0]))
             mJys = np.stack(mJys)
@@ -1780,12 +1819,12 @@ def parse_LANLfile(filename, key="band"):
 # the following functions are for the semi-analytic model using Hotokezaka & Nakar heating rate
 def heating_rate_HoNa(t, eth=0.5):
     """Computes the nuclear specific heating rate over time.
-    
+
     This implementation is based on a model from Korobkin et al. 2012
     (DOI: 10.1111/j.1365-2966.2012.21859.x), derived from nucleosynthesis
     simulations in compact binary merger ejecta. The model uses these
     parameters: eps0 = 2e18, t0 = 1.3, sig = 0.11, alpha = 1.3.
-    
+
     Args:
         t: float or numpy.ndarray
            Time(s) in rest-frame to evaluate the light curve. Can be an array
@@ -1793,20 +1832,21 @@ def heating_rate_HoNa(t, eth=0.5):
         eth: float or numpy.ndarray, default=0.5
            Efficiency parameter representing the fraction of nuclear power
            retained in the matter, as defined by Korobkin et al. 2012.
-    
+
     Returns:
         float or numpy.ndarray: Nuclear specific heating rate in erg/g/s
         (units implied but not explicitly used).
     """
     # Define model constants
     eps0 = 2e18  # erg/g/s
-    t0 = 1.3     # s
-    sig = 0.11   # s
+    t0 = 1.3  # s
+    sig = 0.11  # s
     alpha = 1.3  # dimensionless
     # Calculate the time evolution term
-    time_term = 0.5 - 1.0 / np.pi * np.arctan((t-t0) / sig)
+    time_term = 0.5 - 1.0 / np.pi * np.arctan((t - t0) / sig)
     # Return the heating rate
     return eps0 * np.power(time_term, alpha) * eth / 0.5
+
 
 def luminosity_HoNa(E, t, td, be):
     # Calculate diffusion time ratio
@@ -1817,6 +1857,7 @@ def luminosity_HoNa(E, t, td, be):
     ymax = np.sqrt(0.5 * t_dif / t)
     # Return luminosity using complementary error function
     return scipy.special.erfc(ymax) * E / tesc
+
 
 def dEdt_HoNa(t, E, dM, td, be):
     # Calculate heating contribution
@@ -1831,12 +1872,12 @@ def lightcurve_HoNa(t, mass, velocities, opacities, n):
 
     # check input quantity type
     assert (
-            isinstance(mass, float)
-            and isinstance(velocities, list)
-            and all(isinstance(x, float) for x in velocities)
-            and isinstance(opacities, list)
-            and all(isinstance(x, float) for x in opacities)
-        ), 'Expected: mass=float, velocities/opacities=list[float]'
+        isinstance(mass, float)
+        and isinstance(velocities, list)
+        and all(isinstance(x, float) for x in velocities)
+        and isinstance(opacities, list)
+        and all(isinstance(x, float) for x in opacities)
+    ), "Expected: mass=float, velocities/opacities=list[float]"
     # define constants
     c = astropy.constants.c
     sigSB = astropy.constants.sigma_sb
@@ -1850,13 +1891,11 @@ def lightcurve_HoNa(t, mass, velocities, opacities, n):
     # Validate arguments
     t0 = 5e-2 * astropy.units.day
     opacities = np.atleast_1d(opacities)
-    
-    assert np.all(t > t0), (
-        f'Times must be > {t0}'
-    )
-    assert len(velocities) == len(opacities) + 1, (
-        'len(velocities) must be len(opacities) + 1'
-    )
+
+    assert np.all(t > t0), f"Times must be > {t0}"
+    assert (
+        len(velocities) == len(opacities) + 1
+    ), "len(velocities) must be len(opacities) + 1"
     # convert to internal units - using vectorized operations
     t = t.to_value(astropy.units.s)
     t0 = t0.to_value(astropy.units.s)
@@ -1864,68 +1903,73 @@ def lightcurve_HoNa(t, mass, velocities, opacities, n):
     bej = (velocities / c).to_value(astropy.units.dimensionless_unscaled)
     vej_0 = velocities[0].to_value(astropy.units.cm / astropy.units.s)
     kappas = opacities.to_value(astropy.units.cm**2 / astropy.units.g)
-    
+
     # Prepare velocity shells
     n_shells = 100
     be_0 = bej[0]
     be_max = bej[-1]
-    rho_0 = mej * (n - 3) / (4 * np.pi * vej_0**3) / (1 - (be_max/be_0)**(3 - n))
-    
+    rho_0 = mej * (n - 3) / (4 * np.pi * vej_0**3) / (1 - (be_max / be_0) ** (3 - n))
+
     # Use inverse log spacing for velocity steps - simplified with direct calculation
     bes = be_max + be_0 - np.geomspace(be_0, be_max, n_shells)
     bes = np.flipud(bes)[:-1]  # Flip and remove last element in one operation
     dbe = np.diff(np.append(bes, be_max))  # Calculate diff by appending be_max
-    
+
     # Calculate optical depths more efficiently
     i = np.searchsorted(bej, bes)
-    
+
     # Calculate power factors once for reuse
-    bej_power = (bej / be_0)**(1 - n)
-    bes_power = (bes / be_0)**(1 - n)
-    
+    bej_power = (bej / be_0) ** (1 - n)
+    bes_power = (bes / be_0) ** (1 - n)
+
     # Vectorized calculation of tau_accum
     tau_accum = -np.cumsum((kappas * np.diff(bej_power))[::-1])[::-1]
-    tau_accum = np.append(tau_accum, 0)    
+    tau_accum = np.append(tau_accum, 0)
     # Vectorized calculation of taus
     taus = tau_accum[i] + kappas[i - 1] * (bes_power - bej_power[i])
     taus *= vej_0 * rho_0 / (n - 1)
-    
+
     # Mass and time delay calculations
-    bes_power_2n = (bes / be_0)**(2 - n)  # Calculate power once
-    dMs = 4. * np.pi * vej_0**3 * rho_0 * bes_power_2n * dbe / be_0
+    bes_power_2n = (bes / be_0) ** (2 - n)  # Calculate power once
+    dMs = 4.0 * np.pi * vej_0**3 * rho_0 * bes_power_2n * dbe / be_0
     tds = taus * bes
-    
+
     # Prepare arrays for solve_ivp - use broadcasting directly
     bes_col = bes[:, np.newaxis]
     tds_col = tds[:, np.newaxis]
     dMs_col = dMs[:, np.newaxis]
-    
+
     # Evolve in time
     out = scipy.integrate.solve_ivp(
-        dEdt_HoNa, (t0, t.max()), np.zeros(len(bes)), first_step=t0,
-        args=(dMs_col, tds_col, bes_col), vectorized=True)
-    
+        dEdt_HoNa,
+        (t0, t.max()),
+        np.zeros(len(bes)),
+        first_step=t0,
+        args=(dMs_col, tds_col, bes_col),
+        vectorized=True,
+    )
+
     # Total luminosity calculation
     LL = luminosity_HoNa(out.y, out.t[np.newaxis, :], tds_col, bes_col).sum(0)
-    
+
     # Log-log space interpolation - preserve only necessary portion
     log_t = np.log(out.t[1:])
     log_LL = np.log(LL[1:])
-    log_L_interp = interp.interp1d(log_t, log_LL, kind='cubic', assume_sorted=True)
-    
+    log_L_interp = interp.interp1d(log_t, log_LL, kind="cubic", assume_sorted=True)
+
     # Calculate final results in vectorized operations
     L = np.exp(log_L_interp(np.log(t))) * (astropy.units.erg / astropy.units.s)
-    
+
     # Effective radius - use vectorized log operations
     log_taus = np.log(taus[::-1])
     log_bes = np.log(bes[::-1])
     log_t_doubled = 2 * np.log(t)
     be = np.exp(np.interp(log_t_doubled, log_taus, log_bes))
     r = be * t * (c * astropy.units.s)
-    
+
     # Effective temperature - use broadcasting for squaring
-    T = ((L / (4 * np.pi * sigSB * r**2))**0.25).to(astropy.units.K)
-    
+    T = ((L / (4 * np.pi * sigSB * r**2)) ** 0.25).to(astropy.units.K)
+
     # Return results
     return L, T, r.to(astropy.units.cm)
 
@@ -1933,7 +1977,7 @@ def lightcurve_HoNa(t, mass, velocities, opacities, n):
 def running_in_ci():
     """
     Check if the code is running in a GitHub Actions.
-    
+
     Returns:
     --------
         bool: True if running in CI, False otherwise.

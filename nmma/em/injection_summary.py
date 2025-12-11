@@ -134,7 +134,7 @@ def loglike_H0(cube, ndim, nparams):
 
     c = 299792458.0 * 1e-3
     vr_mean, vr_std = z * c, zerr * c  # noqa: F821
-    pvr = (1 / np.sqrt(2 * np.pi * vr_std ** 2)) * np.exp(
+    pvr = (1 / np.sqrt(2 * np.pi * vr_std**2)) * np.exp(
         (-1 / 2.0) * ((vr_mean - H0 * d) / vr_std) ** 2
     )
     prob_dist = kde_eval_single(kdedir_dist, [d])[0]  # noqa: F821
@@ -555,7 +555,7 @@ def main():
                 m_TOV, R14_EM = np.zeros(len(data)), np.zeros(len(data))
                 lambda_tilde_EM = np.zeros(len(data))
                 for ii, (q, eos, alpha, zeta, logl) in enumerate(data):
-                    zeta = 10 ** zeta
+                    zeta = 10**zeta
                     eos = np.floor(eos)
 
                     params = copy.deepcopy(default_parameters)
@@ -1146,7 +1146,7 @@ def main():
             for ii, key in enumerate(list(data_out.keys())):
                 vals = data_out[key][params_pair[1]]
                 if params_pair[1] == "ratio_zeta":
-                    vals = 10 ** vals
+                    vals = 10**vals
                 true = data_out[key][params_pair[0]]
 
                 parts = plt.violinplot(vals, [true], widths=0.01)
@@ -1176,7 +1176,7 @@ def main():
             for ii, key in enumerate(list(data_out.keys())):
                 vals = data_out[key][params_pair[1]]
                 if params_pair[1] == "ratio_zeta":
-                    vals = 10 ** vals
+                    vals = 10**vals
                 true = data_out[key][params_pair[0]]
                 dhist, edges = np.histogram(vals, bins=bin_edges)
                 idx = np.argmin(np.abs(bins - true))

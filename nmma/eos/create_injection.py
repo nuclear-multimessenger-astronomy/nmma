@@ -33,8 +33,9 @@ def file_to_dataframe(
         table = Table.read(injection_file, format="ligolw", tablename="sim_inspiral")
     elif injection_file.endswith(".dat"):
         table = Table.read(injection_file, format="csv", delimiter="\t")
-    elif injection_file.endswith('.ecsv'):
+    elif injection_file.endswith(".ecsv"):
         from astropy.table import Table as astro_Table
+
         table = astro_Table.read(injection_file)
     else:
         raise ValueError("Only understand xml, dat and ecsv")
@@ -77,7 +78,10 @@ def file_to_dataframe(
 
         if "geocent_end_time" in row.colnames:
             if "geocent_end_time_ns" in row.colnames:
-                injection_values["geocent_time"].append(float(row["geocent_end_time"]) + float(row["geocent_end_time_ns"]) * (10 ** -9))
+                injection_values["geocent_time"].append(
+                    float(row["geocent_end_time"])
+                    + float(row["geocent_end_time_ns"]) * (10**-9)
+                )
             else:
                 injection_values["geocent_time"].append(float(row["geocent_end_time"]))
         else:
@@ -269,21 +273,21 @@ def get_parser():
     )
     parser.add_argument(
         "--snr-cutoff",
-        default=0.,
+        default=0.0,
         type=float,
-        help="The value of SNR cutoff for the injection generation (default: 0)"
+        help="The value of SNR cutoff for the injection generation (default: 0)",
     )
     parser.add_argument(
         "--ifos",
         default="H1,L1,V1",
         type=str,
-        help="Comma seperated list of ifos to be used for SNR calculation"
+        help="Comma seperated list of ifos to be used for SNR calculation",
     )
     parser.add_argument(
         "--ifos-psd",
         default="",
         type=str,
-        help="Comma seperated list of psds files to be used (default: using bilby default)"
+        help="Comma seperated list of psds files to be used (default: using bilby default)",
     )
     parser.add_argument("-d", "--detections-file", type=str)
     parser.add_argument("-i", "--indices-file", type=str)
@@ -389,13 +393,23 @@ def main(args=None):
         )
         dataframe_from_prior["timeshift"] = timeshifts
 
-    # remove the gps time from the prior dataframe 
+    # remove the gps time from the prior dataframe
     # in case that is in the injection table
     inj_columns = set(dataframe_from_inj.columns.tolist())
-    if 'geocent_time' in inj_columns:
-        dataframe_from_prior.drop(columns=['geocent_time',], inplace=True)
-    elif 'geocent_time_x' in inj_columns:
-        dataframe_from_prior.drop(columns=['geocent_time_x',], inplace=True)
+    if "geocent_time" in inj_columns:
+        dataframe_from_prior.drop(
+            columns=[
+                "geocent_time",
+            ],
+            inplace=True,
+        )
+    elif "geocent_time_x" in inj_columns:
+        dataframe_from_prior.drop(
+            columns=[
+                "geocent_time_x",
+            ],
+            inplace=True,
+        )
 
     prior_columns = set(dataframe_from_prior.columns.tolist())
 
@@ -468,14 +482,14 @@ def main(args=None):
     if args.eject:
         if args.binary_type == "BNS":
             ejectaFitting = BNSEjectaFitting()
-            dataframe = dataframe[dataframe['lambda_1'] != 0.0]
-            dataframe = dataframe[dataframe['lambda_2'] != 0.0]
+            dataframe = dataframe[dataframe["lambda_1"] != 0.0]
+            dataframe = dataframe[dataframe["lambda_2"] != 0.0]
             dataframe.reset_index(drop=True, inplace=True)
 
         elif args.binary_type == "NSBH":
             ejectaFitting = NSBHEjectaFitting()
-            dataframe = dataframe[dataframe['lambda_1'] == 0.0]
-            dataframe = dataframe[dataframe['lambda_2'] != 0.0]
+            dataframe = dataframe[dataframe["lambda_1"] == 0.0]
+            dataframe = dataframe[dataframe["lambda_2"] != 0.0]
             dataframe.reset_index(drop=True, inplace=True)
 
         else:
@@ -516,12 +530,14 @@ def main(args=None):
     if args.snr_cutoff:
         print(f"Removing injection with SNR less than {args.snr_cutoff}")
         import bilby
+
         bilby.core.utils.setup_logger(log_level="ERROR")
-        IFOs = bilby.gw.detector.InterferometerList(args.ifos.split(','))
+        IFOs = bilby.gw.detector.InterferometerList(args.ifos.split(","))
 
         if len(args.ifos_psd) > 0:
             from bilby.gw.detector import PowerSpectralDensity
-            psds = args.ifos_psd.split(',')
+
+            psds = args.ifos_psd.split(",")
             for ifo, psd in zip(IFOs, psds):
                 ifo.power_spectral_density = PowerSpectralDensity(psd_file=psd)
 
@@ -530,7 +546,7 @@ def main(args=None):
             sampling_frequency=2048,
             frequency_domain_source_model=bilby.gw.source.lal_binary_neutron_star,
             parameter_conversion=bilby.gw.conversion.convert_to_lal_binary_neutron_star_parameters,
-            waveform_arguments = {
+            waveform_arguments={
                 "waveform_approximant": "IMRPhenomPv2_NRTidalv2",
                 "reference_frequency": 20,
                 "minimum_frequency": 20,  # Ensure consistency with PSD
@@ -541,8 +557,9 @@ def main(args=None):
         for _, inj in tqdm(dataframe.iterrows()):
             # create data just to please the bilby sanity check
             IFOs.set_strain_data_from_power_spectral_densities(
-                sampling_frequency=2048, duration=256,
-                start_time=inj['geocent_time'] - (256 - 2.)
+                sampling_frequency=2048,
+                duration=256,
+                start_time=inj["geocent_time"] - (256 - 2.0),
             )
             # Inject the waveform into the detectors
             snr = 0.0
@@ -552,10 +569,10 @@ def main(args=None):
                     parameters=inj.to_dict(),
                     raise_error=False,
                 )
-                snr += ifo.meta_data['optimal_SNR']
+                snr += ifo.meta_data["optimal_SNR"]
             snr_list.append(np.sqrt(snr))
         index_taken = np.where(np.array(snr_list) >= args.snr_cutoff)[0]
-        dataframe['optimal_network_snr'] = np.array(snr_list)
+        dataframe["optimal_network_snr"] = np.array(snr_list)
         dataframe = dataframe.take(index_taken)
 
         print("{0} injections left after snr filtering".format(len(index_taken)))
@@ -563,7 +580,7 @@ def main(args=None):
     # re-index the simulation_id
     if not args.injection_file:
         print("Re-indexing the simulation_id")
-        dataframe['simulation_id'] = np.arange(len(dataframe))
+        dataframe["simulation_id"] = np.arange(len(dataframe))
     # dump the whole thing back into a json injection file
     injection_creator.write_injection_dataframe(
         dataframe, args.filename, args.extension

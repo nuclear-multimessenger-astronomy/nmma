@@ -34,12 +34,12 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         "current working directory: ", os.getcwd()
     )  # assumes run in root nmma folder, will need to modify if this is not true
 
-    workingDir=os.path.dirname(__file__)
-    dataDir = os.path.join(workingDir, 'data')
+    workingDir = os.path.dirname(__file__)
+    dataDir = os.path.join(workingDir, "data")
     test_directory = os.path.join(dataDir, model_name)
-    priorDir=os.path.join(workingDir, '../../priors/')
-    svdmodels=os.path.join(workingDir, '../../svdmodels/')
-    
+    priorDir = os.path.join(workingDir, "../../priors/")
+    svdmodels = os.path.join(workingDir, "../../svdmodels/")
+
     if os.path.isdir(test_directory):
         shutil.rmtree(test_directory, ignore_errors=True)
     os.makedirs(test_directory, exist_ok=True)
@@ -59,11 +59,13 @@ def lightcurveInjectionTest(model_name, model_lightcurve_function):
         """
 
         if model_name == "nugent-hyper":
-            prior_path = os.path.join( priorDir, "sncosmo-generic" + ".prior")
+            prior_path = os.path.join(priorDir, "sncosmo-generic" + ".prior")
         elif model_name == "TrPi2018":
-            prior_path = os.path.join( dataDir, "TrPi2018_pinned_parameters" + ".prior") #pinning the parameter svalues in the prior file
+            prior_path = os.path.join(
+                dataDir, "TrPi2018_pinned_parameters" + ".prior"
+            )  # pinning the parameter svalues in the prior file
         else:
-            prior_path = os.path.join( priorDir, model_name + ".prior")
+            prior_path = os.path.join(priorDir, model_name + ".prior")
         assert os.path.exists(prior_path), "prior file does not exist"
         injection_name = os.path.join(test_directory, model_name + "_injection.json")
 
@@ -303,30 +305,41 @@ def test_injections():
     for model_name, model_lightcurve_function in lightcurve_models.items():
         lightcurveInjectionTest(model_name, model_lightcurve_function)
 
+
 def test_validate_lightcurves():
     print("validate_lightcurve test")
 
     ## initialize args, check a file that is known to have 3 observations in the ztf g filter and 1 in the ztf r filter. All detections occur within 9 days of the original observation.
     args = Namespace(
-        data='example_files/candidate_data/ZTF20abwysqy.dat',
+        data="example_files/candidate_data/ZTF20abwysqy.dat",
         filters="ztfg",
         min_obs=3,
         cutoff_time=0,
         silent=False,
     )
-    assert validate_lightcurve(**vars(args)) == True, "Test for 3 observations in the ztf g filter failed"
+    assert (
+        validate_lightcurve(**vars(args)) == True
+    ), "Test for 3 observations in the ztf g filter failed"
 
     args.filters = "ztfr"
     args.min_obs = 1
-    assert validate_lightcurve(**vars(args)) == True, "Test for 1 observation in the ztf r filter failed"
+    assert (
+        validate_lightcurve(**vars(args)) == True
+    ), "Test for 1 observation in the ztf r filter failed"
 
     args.filters = "ztfg,ztfr"
-    assert validate_lightcurve(**vars(args)) == True, "Test for  passing multiple filters failed"
+    assert (
+        validate_lightcurve(**vars(args)) == True
+    ), "Test for  passing multiple filters failed"
 
     args.filters = ""
     args.min_obs = 0
-    assert validate_lightcurve(**vars(args)) == True, "Test for automatic filter selection failed"
+    assert (
+        validate_lightcurve(**vars(args)) == True
+    ), "Test for automatic filter selection failed"
 
     args.cutoff_time = 1
     args.min_obs = 1
-    assert validate_lightcurve(**vars(args)) == False, "Test for setting cutoff time failed"
+    assert (
+        validate_lightcurve(**vars(args)) == False
+    ), "Test for setting cutoff time failed"

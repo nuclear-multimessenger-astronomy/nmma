@@ -14,10 +14,10 @@ from sncosmo.bandpasses import _BANDPASSES
 def loadEvent(filename):
     """
     Reads in lightcurve data from a file and returns data in a dictionary format.
-    
+
     Args:
     - filename (str): Path to lightcurve file
-    
+
     Returns:
     - data (dict): Dictionary containing the lightcurve data from the file. The keys are generally 't' and each of the filters in the file as well as their accompanying error values.
     """
@@ -109,30 +109,37 @@ def read_spectroscopy_files(
     return data
 
 
-def read_photometry_files(files: list, filters: list = None, tt: np.array = np.linspace(0, 14, 100), datatype:str ="bulla") -> dict:
+def read_photometry_files(
+    files: list,
+    filters: list = None,
+    tt: np.array = np.linspace(0, 14, 100),
+    datatype: str = "bulla",
+) -> dict:
     """
     Read in a list of photometry files with given filenames and process them in a dictionary
-    
+
     Args:
         files (list): List of filenames with the photometry files.
         filters (list): List of photometry filters to be extracted.
         tt (np.array): Array containing the time grid at which photometry values are given.
         datatype (str): Which model we are considering. Currently supports
-        
+
     Returns:
-        data: Dictionary with keys being the given filenames and values being dictionaries themselves, with keys 
+        data: Dictionary with keys being the given filenames and values being dictionaries themselves, with keys
         being t (time) and specified filters and values being the time grid, and values the time grid and lightcurves.
     """
-    
+
     # First, check whether given datatype is supported in this function
     supported_datatypes = ["ztf", "bulla", "standard", "hdf5"]
     if datatype not in supported_datatypes:
         space = " "
-        raise ValueError(f"datatype {datatype} unknown. Currently supported datatypes are: {space.join(supported_datatypes)}")
+        raise ValueError(
+            f"datatype {datatype} unknown. Currently supported datatypes are: {space.join(supported_datatypes)}"
+        )
 
-    # Return value 
+    # Return value
     data = {}
-    
+
     # Iterate over all the given files and extract the lightcurve data from it
     for filename in files:
         name = (
@@ -186,7 +193,7 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
                     assume_sorted=True,
                 )
                 data[name][filt] = lc(tt)
-        
+
         # Bulla datatype
         elif datatype == "bulla":
             with open(filename, "r") as f:
@@ -283,7 +290,7 @@ def read_photometry_files(files: list, filters: list = None, tt: np.array = np.l
 
 def read_lightcurve_file(filename: str) -> dict:
     """
-    Function to read in lightcurve file and create a dictionary containing the time (in days) at which the lightcurves 
+    Function to read in lightcurve file and create a dictionary containing the time (in days) at which the lightcurves
     are evaluated and the corresponding values for different filters.
     """
 
@@ -308,17 +315,17 @@ def detection_limit_from_m4opt_fits_file(fits_file, ra, dec):
     # Get the BinTableHDU containing the HEALPix data
     bintable = hdul[1]  # Assuming it's the first extension
     # Extract the LIMMAG data and flatten it
-    limmag_data = bintable.data['LIMMAG']
+    limmag_data = bintable.data["LIMMAG"]
     limmag_map = limmag_data.flatten()
-    
+
     # Get NSIDE from the header
-    nside = bintable.header['NSIDE']  # Should be 128 based on your header
-    
+    nside = bintable.header["NSIDE"]  # Should be 128 based on your header
+
     # Function to get limiting magnitude at a specific sky location
     def get_limmag_at_position(ra_deg, dec_deg, limmag_map, nside):
         """
         Get the limiting magnitude at a specific RA, Dec position
-        
+
         Parameters:
         -----------
         ra_deg : float
@@ -329,7 +336,7 @@ def detection_limit_from_m4opt_fits_file(fits_file, ra, dec):
             The HEALPix map containing limiting magnitude values
         nside : int
             The HEALPix NSIDE parameter
-            
+
         Returns:
         --------
         float
@@ -339,12 +346,12 @@ def detection_limit_from_m4opt_fits_file(fits_file, ra, dec):
         # theta: co-latitude (0 at north pole, pi at south pole)
         # phi: longitude (0 to 2*pi)
         theta = np.radians(90.0 - dec_deg)  # Convert Dec to co-latitude
-        phi = np.radians(ra_deg)            # RA is already longitude-like
-        
+        phi = np.radians(ra_deg)  # RA is already longitude-like
+
         # Get the corresponding HEALPix pixel index
         # nest=True because your map uses NESTED ordering
         pixel_idx = hp.ang2pix(nside, theta, phi, nest=True)
-        
+
         # Return the value at that pixel
         return limmag_map[pixel_idx]
 

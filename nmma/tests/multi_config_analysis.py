@@ -9,7 +9,6 @@ from ..em import multi_config_analysis
 WORKING_DIR = os.path.dirname(__file__)
 
 
-
 @pytest.fixture(scope="module")
 def args():
     WORKING_DIR = os.path.dirname(__file__)
@@ -23,6 +22,7 @@ def args():
 
 def test_analysis_multi(args):
     multi_config_analysis.main(args)
+
 
 # Randomly fails on GitHub runners
 # def test_analysis_parallel(args):

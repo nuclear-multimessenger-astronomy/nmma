@@ -64,13 +64,17 @@ def plotting_parameters(prior_filename, filename_with_fullpath, verbose):
                 # ignore prior if it is a fixed value
                 if re.match(r"^\s*-?[\d.]+\s*$", key_value[1]):
                     continue
-                latex_label_match = re.search(r"latex_label\s*=\s*(['\"])(.*?)\1", key_value[1])
+                latex_label_match = re.search(
+                    r"latex_label\s*=\s*(['\"])(.*?)\1", key_value[1]
+                )
 
                 # use latex label if it exists, otherwise use the name
                 if latex_label_match:
                     latex_label_value = latex_label_match.group(2)
                 else:
-                    latex_label_value = re.search(r"name\s*=\s*['\"]([^'\"]+)['\"]", key_value[1]).group(1)
+                    latex_label_value = re.search(
+                        r"name\s*=\s*['\"]([^'\"]+)['\"]", key_value[1]
+                    ).group(1)
 
                 parameters[key] = latex_label_value
 
@@ -84,7 +88,7 @@ def plotting_parameters(prior_filename, filename_with_fullpath, verbose):
 
     common_params = list(prior_params & posterior_params)
 
-    common_params_dict = {k: parameters[k] for k in common_params} 
+    common_params_dict = {k: parameters[k] for k in common_params}
 
     return common_params_dict
 
@@ -113,7 +117,9 @@ def load_csv(filename_with_fullpath, prior_filename, verbose):
     return samples
 
 
-def load_injection(prior_filename, injection_file_json, injection_num, filename_with_fullpath, verbose):
+def load_injection(
+    prior_filename, injection_file_json, injection_num, filename_with_fullpath, verbose
+):
     """
     Load injection data from a JSON file.
     Parameters
@@ -129,12 +135,14 @@ def load_injection(prior_filename, injection_file_json, injection_num, filename_
     """
     df = pd.read_json(injection_file_json)
     df = df.from_records(df["injections"]["content"])
-    columns = plotting_parameters(prior_filename, filename_with_fullpath, verbose).keys()
+    columns = plotting_parameters(
+        prior_filename, filename_with_fullpath, verbose
+    ).keys()
     df = df[[col for col in columns if col in df.columns]]
     truths = np.vstack(df.iloc[injection_num].values).flatten()
     if verbose:
         print("\nLoaded Injection:")
-        print(f"Truths from injection: {truths}")   
+        print(f"Truths from injection: {truths}")
     return truths
 
 
@@ -153,7 +161,9 @@ def load_bestfit(prior_filename, bestfit_file_json, filename_with_fullpath, verb
         A 1D numpy array representing the bestfit params to be used as truths.
     """
     df = pd.read_json(bestfit_file_json, typ="series")
-    columns = plotting_parameters(prior_filename, filename_with_fullpath, verbose).keys()
+    columns = plotting_parameters(
+        prior_filename, filename_with_fullpath, verbose
+    ).keys()
     df = df[[col for col in columns if col in df.keys()]]
     truths = np.vstack(df.values).flatten()
     if verbose:
@@ -282,7 +292,9 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, verbose, **kwa
                 lw=2,
             )
         )
-    axes[2 * int(np.sqrt(len(axes))) - 3].legend(lines, legendlabel, loc=3, frameon=True, fancybox=True)
+    axes[2 * int(np.sqrt(len(axes))) - 3].legend(
+        lines, legendlabel, loc=3, frameon=True, fancybox=True
+    )
     if len(data) == 2:
         title_quantiles_1 = []
         title_quantiles_2 = []
@@ -298,7 +310,9 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, verbose, **kwa
             axes[i].text(
                 x=coords[0] - 0.05,
                 y=1.05 * coords[1],
-                s=r"${{{0:.2f}}}_{{-{1:.2f}}}^{{+{2:.2f}}}$  ".format(*title_quantiles_1[i // np.sqrt(len(axes)).astype(int)]),
+                s=r"${{{0:.2f}}}_{{-{1:.2f}}}^{{+{2:.2f}}}$  ".format(
+                    *title_quantiles_1[i // np.sqrt(len(axes)).astype(int)]
+                ),
                 ha="right",
                 color=color_array[0],
                 transform=axes[i].transAxes,
@@ -306,7 +320,9 @@ def corner_plot(data, labels, filename, truths, legendlabel, ext, verbose, **kwa
             axes[i].text(
                 x=coords[0] + 0.05,
                 y=1.05 * coords[1],
-                s=r"${{{0:.2f}}}_{{-{1:.2f}}}^{{+{2:.2f}}}$".format(*title_quantiles_2[i // np.sqrt(len(axes)).astype(int)]),
+                s=r"${{{0:.2f}}}_{{-{1:.2f}}}^{{+{2:.2f}}}$".format(
+                    *title_quantiles_2[i // np.sqrt(len(axes)).astype(int)]
+                ),
                 ha="left",
                 color=color_array[1],
                 transform=axes[i].transAxes,
@@ -391,7 +407,8 @@ if __name__ == "__main__":
         "-v",
         default=False,
         action="store_true",
-        help="Print additional information")
+        help="Print additional information",
+    )
 
     args = parser.parse_args()
     posterior_files = args.posterior_files
@@ -407,11 +424,14 @@ if __name__ == "__main__":
     if not additional_kwargs:
         print("\nNo additional kwargs provided")
 
-    else: 
+    else:
         print("\nRunning with the following additional kwargs:")
-        print("\t\n".join(f" - {key}: {value}" for key, value in additional_kwargs.items()))
+        print(
+            "\t\n".join(
+                f" - {key}: {value}" for key, value in additional_kwargs.items()
+            )
+        )
 
-        
     # Generate legend labels from input file names
     legendlabel = []
     if label_name is not None:
@@ -428,7 +448,9 @@ if __name__ == "__main__":
         posteriors.append(posterior)
 
     if injection_json is not None:
-        truths = load_injection(prior_filename, injection_json, injection_num, posterior_files[0], verbose)
+        truths = load_injection(
+            prior_filename, injection_json, injection_num, posterior_files[0], verbose
+        )
     elif args.bestfit_params is not None:
         truths = load_bestfit(prior_filename, bestfit_json, posterior_files[0], verbose)
     else:
@@ -442,7 +464,6 @@ if __name__ == "__main__":
         plot_density=False,
         plot_contours=True,
         fill_contours=True,
-
         label_kwargs={"fontsize": 16},
         levels=[0.16, 0.5, 0.84],
         smooth=1,
@@ -450,14 +471,16 @@ if __name__ == "__main__":
 
     kwargs.update(additional_kwargs)
 
-    # the code assumes that the parameters in rest of the posterior files are the same as the first posterior file. and the prior file and posterior files have the same parameters which can be plotted 
+    # the code assumes that the parameters in rest of the posterior files are the same as the first posterior file. and the prior file and posterior files have the same parameters which can be plotted
 
     if verbose:
         print(f"\nParameters and Axis labels ({len(labels)} common parameters):")
         for k, v in labels.items():
-            print(f" - {k}: {v}")   
+            print(f" - {k}: {v}")
 
-    corner_plot(posteriors, labels, output_filename, truths, legendlabel, ext, verbose, **kwargs)
+    corner_plot(
+        posteriors, labels, output_filename, truths, legendlabel, ext, verbose, **kwargs
+    )
 
 ## Example usage
 # python corner_plot.py -f GRB_res12_linear2dp/injection_posterior_samples.dat GRB_res12_linear4dp/injection_posterior_samples.dat -p GRB170817A_emsys_4dp.prior -o linear2d_vs_linear4dp --kwargs "{'levels':[0.05,0.5,0.95]}"

@@ -4,16 +4,19 @@ import numpy as np
 
 from ..joint.conversion import (
     MultimessengerConversion,
-    MultimessengerConversionWithLambdas
-    )
+    MultimessengerConversionWithLambdas,
+)
 
-from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient
+from bilby.gw.likelihood import (
+    GravitationalWaveTransient,
+    ROQGravitationalWaveTransient,
+)
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Interped
 
 
 class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
-    """ A GravitationalWaveTransient likelihood object
+    """A GravitationalWaveTransient likelihood object
 
     This likelihood uses the usual gravitational-wave transient
     but include an EOS handling for parameter conversion.
@@ -93,33 +96,55 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
 
     """
 
-    def __init__(self, interferometers, waveform_generator,
-                 eos_path, Neos, eos_weight_path, binary_type, gw_likelihood_type,
-                 priors, with_eos=True,
-                 roq_weights=None, roq_params=None, roq_scale_factor=None,
-                 time_marginalization=False, distance_marginalization=False,
-                 phase_marginalization=False, distance_marginalization_lookup_table=None,
-                 jitter_time=True, reference_frame="sky", time_reference="geocenter"):
+    def __init__(
+        self,
+        interferometers,
+        waveform_generator,
+        eos_path,
+        Neos,
+        eos_weight_path,
+        binary_type,
+        gw_likelihood_type,
+        priors,
+        with_eos=True,
+        roq_weights=None,
+        roq_params=None,
+        roq_scale_factor=None,
+        time_marginalization=False,
+        distance_marginalization=False,
+        phase_marginalization=False,
+        distance_marginalization_lookup_table=None,
+        jitter_time=True,
+        reference_frame="sky",
+        time_reference="geocenter",
+    ):
 
         # construct the eos prior
         if with_eos:
             xx = np.arange(0, Neos + 1)
             eos_weight = np.loadtxt(eos_weight_path)
             yy = np.concatenate((eos_weight, [eos_weight[-1]]))
-            eos_prior = Interped(xx, yy, minimum=0, maximum=Neos, name='EOS')
-            priors['EOS'] = eos_prior
+            eos_prior = Interped(xx, yy, minimum=0, maximum=Neos, name="EOS")
+            priors["EOS"] = eos_prior
 
             # construct the eos conversion
-            parameter_conversion_class = MultimessengerConversion(eos_data_path=eos_path,
-                                                                  Neos=Neos,
-                                                                  binary_type=binary_type,
-                                                                  with_ejecta=False)
+            parameter_conversion_class = MultimessengerConversion(
+                eos_data_path=eos_path,
+                Neos=Neos,
+                binary_type=binary_type,
+                with_ejecta=False,
+            )
         else:
-            parameter_conversion_class = MultimessengerConversionWithLambdas(binary_type=binary_type,
-                                                                             with_ejecta=False)
+            parameter_conversion_class = MultimessengerConversionWithLambdas(
+                binary_type=binary_type, with_ejecta=False
+            )
 
-        priors.conversion_function = parameter_conversion_class.priors_conversion_function
-        parameter_conversion = parameter_conversion_class.convert_to_multimessenger_parameters
+        priors.conversion_function = (
+            parameter_conversion_class.priors_conversion_function
+        )
+        parameter_conversion = (
+            parameter_conversion_class.convert_to_multimessenger_parameters
+        )
         waveform_generator.parameter_conversion = parameter_conversion
 
         # initialize the GW likelihood
@@ -134,14 +159,19 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
             reference_frame=reference_frame,
             time_reference=time_reference,
         )
-        if gw_likelihood_type == 'GravitationalWaveTransient':
+        if gw_likelihood_type == "GravitationalWaveTransient":
             GWLikelihood = GravitationalWaveTransient(**gw_likelihood_kwargs)
 
-        elif gw_likelihood_type == 'ROQGravitationalWaveTransient':
+        elif gw_likelihood_type == "ROQGravitationalWaveTransient":
             gw_likelihood_kwargs.pop("time_marginalization", None)
             gw_likelihood_kwargs.pop("jitter_time", None)
-            gw_likelihood_kwargs.update(dict(weights=roq_weights, roq_params=roq_params,
-                                             roq_scale_factor=roq_scale_factor))
+            gw_likelihood_kwargs.update(
+                dict(
+                    weights=roq_weights,
+                    roq_params=roq_params,
+                    roq_scale_factor=roq_scale_factor,
+                )
+            )
             GWLikelihood = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         super(GravitationalWaveTransientLikelihoodwithEOS, self).__init__(parameters={})
@@ -154,7 +184,7 @@ class GravitationalWaveTransientLikelihoodwithEOS(Likelihood):
         self.__sync_parameters()
 
     def __repr__(self):
-        return self.__class__.__name__ + ' with ' + self.GWLikelihood.__repr__()
+        return self.__class__.__name__ + " with " + self.GWLikelihood.__repr__()
 
     def __sync_parameters(self):
         self.GWLikelihood.parameters = self.parameters

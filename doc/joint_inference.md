@@ -1,6 +1,6 @@
 ## Multi-messenger inference
 
-A joint inference on gravitational-wave and electromagnetic signals requires NMMA to run on a supercomputer cluster because large memory space are required and need to be shared across many CPU cores. Here, we consider a full joint inference on the binary neutron star merger observed on 17th August 2017. 
+A joint inference on gravitational-wave and electromagnetic signals requires NMMA to run on a supercomputer cluster because large memory space are required and need to be shared across many CPU cores. Here, we consider a full joint inference on the binary neutron star merger observed on 17th August 2017.
 
 In order to run a multi-messenger inference, we need to follow to main steps:
 
@@ -27,11 +27,11 @@ Moreover, a prior on all observed messengers is required and needs to be tailore
 
 **Electroamagnetic data and models**
 
-In order to not only sample on gravitational-wave data, we provide further electromagnetic signal related flags. The flag `with-grb=True` will turn on the sampling on a GRB data. As NMMA currently only includes one GRB model, this model does not need to be further specified. If `with-grb=False`, a joint inference of GW+KN data is possible, excluding the GRB part. With regard to the kilonova model, we need to provide a specific model under `kilonova-model`, its respective reduced model grid (if applicable) under `kilonova-model-svd` and a `kilonova-interpolation-type` which can be either `sklearn_gp` or `tensorflow`. The `light-curve-data` flag should include both GRB and kilonova data if a joint inference on GW-GRB-KN is desired (meaning use: `with-grb=True`) or should just include the kilonova data if a GW-KN inference is targeted (meaning use: `with-grb=False`). The kilonova start/end time and time steps apply to both the GRB and kilonova model which will generate light curves during the inference to match the observed data provided. 
+In order to not only sample on gravitational-wave data, we provide further electromagnetic signal related flags. The flag `with-grb=True` will turn on the sampling on a GRB data. As NMMA currently only includes one GRB model, this model does not need to be further specified. If `with-grb=False`, a joint inference of GW+KN data is possible, excluding the GRB part. With regard to the kilonova model, we need to provide a specific model under `kilonova-model`, its respective reduced model grid (if applicable) under `kilonova-model-svd` and a `kilonova-interpolation-type` which can be either `sklearn_gp` or `tensorflow`. The `light-curve-data` flag should include both GRB and kilonova data if a joint inference on GW-GRB-KN is desired (meaning use: `with-grb=True`) or should just include the kilonova data if a GW-KN inference is targeted (meaning use: `with-grb=False`). The kilonova start/end time and time steps apply to both the GRB and kilonova model which will generate light curves during the inference to match the observed data provided.
 
 **Including EOS information**
 
-NMMA enables to include nuclear information by using equations-of-state (EOS) and sample over the EOS during the inference. In order to include a set of EOSs, each EOS.dat file needs to include information on Mass, Radius and Tidal deformability. For the example shown in the `config.ini` file below, we see that `Neos = 5000` meaning that we include 5000 EOS.dat files each containing information on mass, radius and tidal deformability. We also see that a constraint from NICER measurements has been folded in and thus the `eos-weight` reflects this in a weighting. The EOS set should be sorted according to this weighting in order to reduce runtime for the sampling on the EOSs. 
+NMMA enables to include nuclear information by using equations-of-state (EOS) and sample over the EOS during the inference. In order to include a set of EOSs, each EOS.dat file needs to include information on Mass, Radius and Tidal deformability. For the example shown in the `config.ini` file below, we see that `Neos = 5000` meaning that we include 5000 EOS.dat files each containing information on mass, radius and tidal deformability. We also see that a constraint from NICER measurements has been folded in and thus the `eos-weight` reflects this in a weighting. The EOS set should be sorted according to this weighting in order to reduce runtime for the sampling on the EOSs.
 
 **Running the config.ini generation**
 
@@ -40,9 +40,9 @@ In order to prepare the joint inference, a `config.ini` file is required which s
     ################################################################################
     ## Data generation arguments
     ################################################################################
-    
+
     trigger_time = 1187008882.43
-    
+
     ################################################################################
     ## Detector arguments
     ################################################################################
@@ -52,15 +52,15 @@ In order to prepare the joint inference, a `config.ini` file is required which s
     channel_dict = {H1=LOSC-STRAIN, L1=LOSC-STRAIN, V1=LOSC-STRAIN}
     data_dict = {H1=data/GW170817/H-H1_LOSC_CLN_16_V1-1187007040-2048.gwf, L1=data/GW170817/L-L1_LOSC_CLN_16_V1-1187007040-2048.gwf, V1=data/GW170817/V-V1_LOSC_CLN_16_V1-1187007040-2048.gwf}
     duration = 128
-    
+
     ################################################################################
     ## Calibration arguments
     ################################################################################
-    
+
     calibration-model = CubicSpline
     spline-calibration-nodes = 10
     spline-calibration-envelope-dict = {H1:data/GW170817/Feb-20-2018_O2_LHO_GPSTime_1187008882_C02_RelativeResponseUncertainty_FinalResults.txt, L1:data/GW170817/Feb-20-2018_O2_LLO_GPSTime_1187008882_C02_RelativeResponseUncertainty_FinalResults.txt, V1:data/GW170817/V_calibrationUncertaintyEnvelope_magnitude5p1percent_phase40mraddeg20microsecond.txt}
-    
+
     ################################################################################
     ## Job submission arguments
     ################################################################################
@@ -75,24 +75,24 @@ In order to prepare the joint inference, a `config.ini` file is required which s
     distance-marginalization=False
     phase-marginalization=False
     time-marginalization=False
-    
+
     ################################################################################
     ## Prior arguments
     ################################################################################
-    
+
     prior-file = GW170817_AT2017gfo_GRB170817A.prior
-    
+
     ################################################################################
     ## Waveform arguments
     ################################################################################
-    
+
     frequency-domain-source-model = lal_binary_neutron_star
     waveform_approximant = IMRPhenomPv2_NRTidalv2
-    
+
     ################################################################################
     ## EM arguments
     ################################################################################
-        
+
     binary-type=BNS
     light-curve-data=data/AT2017gfo-GRB170817A/AT2017gfo_GRB170817A.dat
     kilonova-model=Bu2019lm
@@ -107,22 +107,22 @@ In order to prepare the joint inference, a `config.ini` file is required which s
     kilonova-interpolation-type=sklearn_gp
     grb-resolution=12
     with-grb=True
-    
+
     ################################################################################
     ## EOS arguments
     ################################################################################
-    
-    with-eos=True 
+
+    with-eos=True
     eos-data=eos/with_NICER_J0740/EOS_024_uniform_5k_sorted
     Neos=5000
     eos-weight=eos/with_NICER_J0740/EOS_sorted_weight.dat
 
 
 The joint inference generation can be performed by running:
-    
+
     nmma-generation config.ini
 
-This will generate a `GW170817-AT2017gfo-GRB170817A_data_dump.pickle` file under `outdir/data/` which need to be provided for the joint inference function `nmma-analysis`. 
+This will generate a `GW170817-AT2017gfo-GRB170817A_data_dump.pickle` file under `outdir/data/` which need to be provided for the joint inference function `nmma-analysis`.
 
 **Running the analysis**
 
@@ -136,7 +136,7 @@ As detailed above, running the analysis with the command `nmma-analysis --data-d
     #PBS -o ./outdir/log_data_analysis/out.txt
     #PBS -m abe
     #PBS -M <email adress>
-    
+
     module load python
     module load mpt
     module load mpi4py
@@ -144,25 +144,24 @@ As detailed above, running the analysis with the command `nmma-analysis --data-d
 
     export MPI_UNBUFFERED_STDIO=true
     export MPI_LAUNCH_TIMEOUT=240
-    
+
     cd $PBS_O_WORKDIR
     mpirun -np 512 omplace -c 0-127:st=4 nmma-analysis --data-dump <absolute path to folder>/outdir/data/GW170817-AT2017gfo-GRB170817A_data_dump.pickle --nlive 1024 --nact 10 --maxmcmc 10000 --sampling-seed 20210213 --no-plot --outdir <absolute path to outdir/result folder>
 
-Note that settings might differ from cluster to cluster and also the installation of NMMA might be changed (conda vs. python installation). 
+Note that settings might differ from cluster to cluster and also the installation of NMMA might be changed (conda vs. python installation).
 
 
 **Maximum mass constraint from a joint analysis**
 
-From a joint posterior of GW and lightcurve data from a BNS, one can derive an upper limit on the TOV mass, if one assumes that the remnant collapsed to a black hole. The idea is to determine the posterior distribution on the remnant's mass from the posterior distribution of the individual neutron star masses $m_1$, $m_2$ and the ejecta and compare this to the TOV mass of EOSs. 
+From a joint posterior of GW and lightcurve data from a BNS, one can derive an upper limit on the TOV mass, if one assumes that the remnant collapsed to a black hole. The idea is to determine the posterior distribution on the remnant's mass from the posterior distribution of the individual neutron star masses $m_1$, $m_2$ and the ejecta and compare this to the TOV mass of EOSs.
 
-This can be done via the command 
-    
+This can be done via the command
+
     maximum-mass-constraint --outdir <path to folder> --joint-posterior <path to the file with samples from GW+EM analysis>  --prior <path to a bilby prior file> --eos-path-macro <path to macroscopic EOS> --eos-path-micro <path to microscopic EOS> [--use-M-Kepler]
 
-The last flag determines whether the remnant mass is compared against the TOV mass or the maximum mass limit for a rotating NS (Kepler limit). The latter is less conservative. The joint posterior should contain the parameters chirp mass, eta_star, log10_mdisk, log10_mej_dyn as named columns. Here, eta_star is $η* = \ln(0.25-η)$ from the symmetric mass ratio $η$. The macroscopic EOS curves must have the central pressure p0 in MeV/fm³ of each NS mass as last column. 
+The last flag determines whether the remnant mass is compared against the TOV mass or the maximum mass limit for a rotating NS (Kepler limit). The latter is less conservative. The joint posterior should contain the parameters chirp mass, eta_star, log10_mdisk, log10_mej_dyn as named columns. Here, eta_star is $η* = \ln(0.25-η)$ from the symmetric mass ratio $η$. The macroscopic EOS curves must have the central pressure p0 in MeV/fm³ of each NS mass as last column.
 
-If --use-M-Kepler is set, the prior file needs to contain two additional fiducial paramters for the quasi-universal relations: 
+If --use-M-Kepler is set, the prior file needs to contain two additional fiducial paramters for the quasi-universal relations:
 
     ratio_R = Gaussian(name = "R", mu = 1.255, sigma = 0.024)
     delta = Uniform(name="delta", minimum = -0.0125, maximum = 0.0125)
-

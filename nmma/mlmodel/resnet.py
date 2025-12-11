@@ -38,9 +38,7 @@ class ChannelNorm(torch.nn.Module):
         # reshape back to full channel dimension
         if self.num_groups != self.num_channels:
             mean = torch.stack([mean, sq_mean], dim=1)
-            mean = mean.reshape(
-                -1, 2, self.num_groups, self.channels_per_group
-            )
+            mean = mean.reshape(-1, 2, self.num_groups, self.channels_per_group)
             mean = mean.mean(-1, keepdims=True)
             mean = mean.expand(-1, -1, -1, self.channels_per_group)
             mean = mean.reshape(-1, 2, self.num_channels, 1)
@@ -90,9 +88,7 @@ def convN(
 
 def conv1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv1d:
     """kernel-size 1 convolution"""
-    return nn.Conv1d(
-        in_planes, out_planes, kernel_size=1, stride=stride, bias=False
-    )
+    return nn.Conv1d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
 
 class BasicBlock(nn.Module):
@@ -115,13 +111,9 @@ class BasicBlock(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm1d
         if groups != 1 or base_width != 64:
-            raise ValueError(
-                "BasicBlock only supports groups=1 and base_width=64"
-            )
+            raise ValueError("BasicBlock only supports groups=1 and base_width=64")
         if dilation > 1:
-            raise NotImplementedError(
-                "Dilation > 1 not supported in BasicBlock"
-            )
+            raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
 
         # Both self.conv1 and self.downsample layers
         # downsample the input when stride != 1
@@ -367,9 +359,7 @@ class ResNet(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
-                nn.init.kaiming_normal_(
-                    m.weight, mode="fan_out", nonlinearity="relu"
-                )
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, (nn.BatchNorm1d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)

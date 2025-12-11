@@ -15,17 +15,21 @@ MODELS = {}
 
 try:
     from mpi4py import MPI
+
     mpi_enabled = True
 except ImportError:
     mpi_enabled = False
+
 
 def download_and_decompress(file_info):
     download(file_info)
     decompress(file_info[1])
 
+
 def mpi_barrier(comm):
     if mpi_enabled:
         comm.Barrier()
+
 
 def download_models_list(models_home=None):
     # first we load the models list from gitlab
@@ -35,6 +39,7 @@ def download_models_list(models_home=None):
     r = requests.get(f"{REPO}/raw/main/models.yaml", allow_redirects=True)
     with open(Path(models_home, "models.yaml"), "wb") as f:
         f.write(r.content)
+
 
 def load_models_list(models_home=None):
 
@@ -102,6 +107,7 @@ def load_models_list(models_home=None):
 
     return models, downloaded_if_missing is False
 
+
 def refresh_models_list(models_home=None):
     global MODELS
     models_home = get_models_home(models_home)
@@ -114,6 +120,7 @@ def refresh_models_list(models_home=None):
     except Exception as e:
         raise ValueError(f"Could not load models list: {str(e)}")
     return models
+
 
 def get_model(
     models_home=None,

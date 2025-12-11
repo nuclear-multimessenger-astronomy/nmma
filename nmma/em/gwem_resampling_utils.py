@@ -11,25 +11,33 @@ from .utils import running_in_ci
 from pymultinest.solve import Solver
 
 
-
 def luminosity_distance_to_redshift(distance):
-        from astropy import units
-        from astropy import cosmology as cosmo
-        cosmology = cosmo.Planck15
+    from astropy import units
+    from astropy import cosmology as cosmo
 
-        if hasattr(distance, '__len__') and len(distance)>50: #luminosity_distance_to_redshift gets really slow if too many distances are put in at once
-             zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance.min() * units.Mpc)
-             zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
-             zgrid = np.geomspace(zmin, zmax, 50)
-             distance_grid = cosmology.luminosity_distance(zgrid).value
-             return np.interp(distance, distance_grid, zgrid).value
-        else:
-             return cosmo.z_at_value(cosmology.luminosity_distance, distance *units.Mpc)
+    cosmology = cosmo.Planck15
+
+    if (
+        hasattr(distance, "__len__") and len(distance) > 50
+    ):  # luminosity_distance_to_redshift gets really slow if too many distances are put in at once
+        zmin = cosmo.z_at_value(
+            cosmology.luminosity_distance, distance.min() * units.Mpc
+        )
+        zmax = cosmo.z_at_value(
+            cosmology.luminosity_distance, distance.max() * units.Mpc
+        )
+        zgrid = np.geomspace(zmin, zmax, 50)
+        distance_grid = cosmology.luminosity_distance(zgrid).value
+        return np.interp(distance, distance_grid, zgrid).value
+    else:
+        return cosmo.z_at_value(cosmology.luminosity_distance, distance * units.Mpc)
 
 
 def construct_EM_KDE_seperate(EMsamples):
 
-    kde = scipy.stats.gaussian_kde((EMsamples.log10_mej_dyn.to_numpy(), EMsamples.log10_mej_wind.to_numpy()))
+    kde = scipy.stats.gaussian_kde(
+        (EMsamples.log10_mej_dyn.to_numpy(), EMsamples.log10_mej_wind.to_numpy())
+    )
 
     return kde
 
@@ -37,79 +45,125 @@ def construct_EM_KDE_seperate(EMsamples):
 def construct_EM_KDE(EMsamples):
 
     if "log10_mej" in EMsamples.columns:
-        kde = scipy.stats.gaussian_kde(10**EMsamples.log10_mej.to_numpy())
+        kde = scipy.stats.gaussian_kde(10 ** EMsamples.log10_mej.to_numpy())
 
     elif "log10_mej_dyn" in EMsamples.columns and "log10_mej_wind" in EMsamples.columns:
-        total_eject_mass = 10**EMsamples.log10_mej_dyn.to_numpy() + 10**EMsamples.log10_mej_wind.to_numpy()
+        total_eject_mass = (
+            10 ** EMsamples.log10_mej_dyn.to_numpy()
+            + 10 ** EMsamples.log10_mej_wind.to_numpy()
+        )
         kde = scipy.stats.gaussian_kde(total_eject_mass)
 
     else:
-        raise ValueError("EM samples must either contain total ejecta mass as 'log10_mej' or seperate ejecta masses as 'log10_mej_dyn' and 'log10_mej_wind'.")
+        raise ValueError(
+            "EM samples must either contain total ejecta mass as 'log10_mej' or seperate ejecta masses as 'log10_mej_dyn' and 'log10_mej_wind'."
+        )
 
     return kde
 
 
 def mceta2m1m2(mc, eta):
-    M = mc / np.power(eta, 3. / 5.)
-    q = (1 - np.sqrt(1. - 4. * eta) - 2 * eta) / (2. * eta)
+    M = mc / np.power(eta, 3.0 / 5.0)
+    q = (1 - np.sqrt(1.0 - 4.0 * eta) - 2 * eta) / (2.0 * eta)
 
-    m1 = M / (1. + q)
-    m2 = M * q / (1. + q)
+    m1 = M / (1.0 + q)
+    m2 = M * q / (1.0 + q)
 
     return m1, m2
 
 
 def lambdas2lambdaTs(lambda1, lambda2, q):
-    eta = q / np.power(1. + q, 2.)
+    eta = q / np.power(1.0 + q, 2.0)
     eta2 = eta * eta
     eta3 = eta2 * eta
-    root14eta = np.sqrt(1. - 4 * eta)
+    root14eta = np.sqrt(1.0 - 4 * eta)
 
-    lambdaT = (8. / 13.) * ((1. + 7 * eta - 31 * eta2) * (lambda1 + lambda2) + root14eta * (1. + 9 * eta - 11. * eta2) * (lambda1 - lambda2))
-    dlambdaT = 0.5 * (root14eta * (1. - 13272. * eta / 1319. + 8944. * eta2 / 1319.) * (lambda1 + lambda2) + (1. - 15910. * eta / 1319. + 32850. * eta2 / 1319. + 3380. * eta3 / 1319.) * (lambda1 - lambda2))
+    lambdaT = (8.0 / 13.0) * (
+        (1.0 + 7 * eta - 31 * eta2) * (lambda1 + lambda2)
+        + root14eta * (1.0 + 9 * eta - 11.0 * eta2) * (lambda1 - lambda2)
+    )
+    dlambdaT = 0.5 * (
+        root14eta
+        * (1.0 - 13272.0 * eta / 1319.0 + 8944.0 * eta2 / 1319.0)
+        * (lambda1 + lambda2)
+        + (
+            1.0
+            - 15910.0 * eta / 1319.0
+            + 32850.0 * eta2 / 1319.0
+            + 3380.0 * eta3 / 1319.0
+        )
+        * (lambda1 - lambda2)
+    )
 
     return lambdaT, dlambdaT
+
 
 def corner_plot(posterior_samples, solution, outdir, withNSBH):
 
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import corner
-    matplotlib.rcParams['text.usetex'] = not running_in_ci()
-    matplotlib.rcParams.update({'font.size': 16, 'font.family': 'Times New Roman'})
-    kwargs = dict(bins=50, smooth=1.3, label_kwargs=dict(fontsize=16), show_titles=True,
-                  title_kwargs=dict(fontsize=16), color='#0072C1',
-                  truth_color='tab:orange', quantiles=[0.05, 0.95],
-                  levels=(0.10, 0.32, 0.68, 0.95), median_line=True,
-                  plot_density=False, plot_datapoints=False, fill_contours=True,
-                  max_n_ticks=4, hist_kwargs={'density': True})
-    
-        
-    mc = posterior_samples['chirp_mass'].to_numpy()
-    invq = posterior_samples['mass_ratio'].to_numpy()
-    alpha = posterior_samples['alpha'].to_numpy()
-    zeta = posterior_samples['zeta'].to_numpy()
 
-    eta = invq / np.power(1. + invq, 2)
+    matplotlib.rcParams["text.usetex"] = not running_in_ci()
+    matplotlib.rcParams.update({"font.size": 16, "font.family": "Times New Roman"})
+    kwargs = dict(
+        bins=50,
+        smooth=1.3,
+        label_kwargs=dict(fontsize=16),
+        show_titles=True,
+        title_kwargs=dict(fontsize=16),
+        color="#0072C1",
+        truth_color="tab:orange",
+        quantiles=[0.05, 0.95],
+        levels=(0.10, 0.32, 0.68, 0.95),
+        median_line=True,
+        plot_density=False,
+        plot_datapoints=False,
+        fill_contours=True,
+        max_n_ticks=4,
+        hist_kwargs={"density": True},
+    )
+
+    mc = posterior_samples["chirp_mass"].to_numpy()
+    invq = posterior_samples["mass_ratio"].to_numpy()
+    alpha = posterior_samples["alpha"].to_numpy()
+    zeta = posterior_samples["zeta"].to_numpy()
+
+    eta = invq / np.power(1.0 + invq, 2)
     m1, m2 = mceta2m1m2(mc, eta)
     q = m1 / m2  # inverted
 
-
-
-    if withNSBH:#NSBH resampling result corner plot
-        labels = [r'$\mathcal{M}_c[M_{\odot}]$', r'$q$', r'$\alpha[M_{\odot}]$', r'$\zeta$']
+    if withNSBH:  # NSBH resampling result corner plot
+        labels = [
+            r"$\mathcal{M}_c[M_{\odot}]$",
+            r"$q$",
+            r"$\alpha[M_{\odot}]$",
+            r"$\zeta$",
+        ]
         plotSamples = np.vstack((mc, q, alpha, zeta))
-        limits = ((np.amin(mc), np.amax(mc)), (np.amin(q), 3), (np.amin(alpha), np.amax(alpha)), (np.amin(zeta), np.amax(zeta)))
+        limits = (
+            (np.amin(mc), np.amax(mc)),
+            (np.amin(q), 3),
+            (np.amin(alpha), np.amax(alpha)),
+            (np.amin(zeta), np.amax(zeta)),
+        )
         plt.figure(1)
         corner.corner(plotSamples.T, labels=labels, range=limits, **kwargs)
-        plt.savefig('{0}/corner.pdf'.format(outdir), bbox_inches='tight')
-        
+        plt.savefig("{0}/corner.pdf".format(outdir), bbox_inches="tight")
 
-    else: #BNS resampling result corner plot
-        labels = [r'$\mathcal{M}_c[M_{\odot}]$', r'$q$', r'$\tilde{\Lambda}$', r'$\alpha[M_{\odot}]$', r'$\zeta$', r'$M_{\rm{max}}[M_{\odot}]$']
+    else:  # BNS resampling result corner plot
+        labels = [
+            r"$\mathcal{M}_c[M_{\odot}]$",
+            r"$q$",
+            r"$\tilde{\Lambda}$",
+            r"$\alpha[M_{\odot}]$",
+            r"$\zeta$",
+            r"$M_{\rm{max}}[M_{\odot}]$",
+        ]
 
-        EOS = posterior_samples['EOS'].astype(int) + 1
+        EOS = posterior_samples["EOS"].astype(int) + 1
         lambda1 = []
         lambda2 = []
         for i in range(len(EOS)):
@@ -126,38 +180,50 @@ def corner_plot(posterior_samples, solution, outdir, withNSBH):
         MTOV = np.array(MTOV)
 
         plotSamples = np.vstack((mc, q, lambdaT, alpha, zeta, MTOV))
-        limits = ((np.amin(mc), np.amax(mc)), (np.amin(q), 3), (np.amin(lambdaT), np.amax(lambdaT)), (np.amin(alpha), np.amax(alpha)), (np.amin(zeta), np.amax(zeta)), (np.amin(MTOV), 2.7))
+        limits = (
+            (np.amin(mc), np.amax(mc)),
+            (np.amin(q), 3),
+            (np.amin(lambdaT), np.amax(lambdaT)),
+            (np.amin(alpha), np.amax(alpha)),
+            (np.amin(zeta), np.amax(zeta)),
+            (np.amin(MTOV), 2.7),
+        )
         plt.figure(1)
         corner.corner(plotSamples.T, labels=labels, range=limits, **kwargs)
-        plt.savefig('{0}/corner.pdf'.format(outdir), bbox_inches='tight')
-        print("The 90% upper bound for lambdaT is {0}".format(np.quantile(lambdaT, 0.9)))
+        plt.savefig("{0}/corner.pdf".format(outdir), bbox_inches="tight")
+        print(
+            "The 90% upper bound for lambdaT is {0}".format(np.quantile(lambdaT, 0.9))
+        )
 
 
 class TotalEjectaMassInference(Solver):
-
-    def __init__(self, GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, **kwargs):
+    def __init__(
+        self, GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, **kwargs
+    ):
         self.GWsamples = GWsamples
         self.EMsamples = EMsamples
         self.withNSBH = withNSBH
-        
-        if (withNSBH):
-            self.priors = {'chirp_mass': GWprior['chirp_mass'],
-                       'mass_ratio': GWprior['mass_ratio'],
-                       'EOS': Uniform(minimum=0, maximum=Neos + 1),
-                       'alpha': EMprior['alpha'],
-                       'zeta': EMprior['zeta'],
-                       'chi_1': GWprior['chi_1'],
-                       'chi_2': GWprior['chi_2'],
-                       }
- 
+
+        if withNSBH:
+            self.priors = {
+                "chirp_mass": GWprior["chirp_mass"],
+                "mass_ratio": GWprior["mass_ratio"],
+                "EOS": Uniform(minimum=0, maximum=Neos + 1),
+                "alpha": EMprior["alpha"],
+                "zeta": EMprior["zeta"],
+                "chi_1": GWprior["chi_1"],
+                "chi_2": GWprior["chi_2"],
+            }
+
         else:
-            self.priors = {'chirp_mass': GWprior['chirp_mass'],
-                       'mass_ratio': GWprior['mass_ratio'],
-                       'EOS': Uniform(minimum=0, maximum=Neos + 1),
-                       'alpha': EMprior['alpha'],
-                       'zeta': EMprior['zeta']}
-        
-            
+            self.priors = {
+                "chirp_mass": GWprior["chirp_mass"],
+                "mass_ratio": GWprior["mass_ratio"],
+                "EOS": Uniform(minimum=0, maximum=Neos + 1),
+                "alpha": EMprior["alpha"],
+                "zeta": EMprior["zeta"],
+            }
+
         self.priors = PriorDict(self.priors)
         self._search_parameter_keys = self.priors.keys()
         self.Neos = Neos
@@ -165,10 +231,12 @@ class TotalEjectaMassInference(Solver):
         EOS_radius_interp_dict = {}
         EOS_lambda_interp_dict = {}
         for i in range(1, Neos + 1):
-            r, m, Lambda = np.loadtxt('{0}/{1}.dat'.format(EOSpath, i), usecols=[0, 1, 2], unpack=True)
+            r, m, Lambda = np.loadtxt(
+                "{0}/{1}.dat".format(EOSpath, i), usecols=[0, 1, 2], unpack=True
+            )
 
-            interp_r_of_m = scipy.interpolate.interp1d(m, r, kind='linear')
-            interp_lambda_of_m = scipy.interpolate.interp1d(m, Lambda, kind='linear')
+            interp_r_of_m = scipy.interpolate.interp1d(m, r, kind="linear")
+            interp_lambda_of_m = scipy.interpolate.interp1d(m, Lambda, kind="linear")
 
             EOS_radius_interp_dict[i] = interp_r_of_m
             EOS_lambda_interp_dict[i] = interp_lambda_of_m
@@ -176,16 +244,18 @@ class TotalEjectaMassInference(Solver):
         self.EOS_radius_interp_dict = EOS_radius_interp_dict
         self.EOS_lambda_interp_dict = EOS_lambda_interp_dict
 
-        z = luminosity_distance_to_redshift(self.GWsamples.luminosity_distance.to_numpy())
+        z = luminosity_distance_to_redshift(
+            self.GWsamples.luminosity_distance.to_numpy()
+        )
         mc = self.GWsamples.chirp_mass.to_numpy() / (1 + z)
         q = self.GWsamples.mass_ratio.to_numpy()
-        eta = q/(1+q)**2
+        eta = q / (1 + q) ** 2
         EOS = self.GWsamples.EOS.to_numpy()
 
-        if (withNSBH):
+        if withNSBH:
             chi_1 = self.GWsamples.chi_1.to_numpy()
             chi_2 = self.GWsamples.chi_2.to_numpy()
-            chi_eff = (chi_1 + q*chi_2)/(1+q)
+            chi_eff = (chi_1 + q * chi_2) / (1 + q)
             self.priorKDE((chi_1, chi_2, mc, eta))
 
         else:
@@ -193,8 +263,8 @@ class TotalEjectaMassInference(Solver):
 
         self.EOSsamples = EOS.astype(int) + 1
         self.EMKDE = construct_EM_KDE(self.EMsamples)
-        
-        if (self.withNSBH):
+
+        if self.withNSBH:
             self.NSBHEjectaFitting = NSBHEjectaFitting()
         else:
             self.BNSEjectaFitting = BNSEjectaFitting()
@@ -207,35 +277,41 @@ class TotalEjectaMassInference(Solver):
     def LogLikelihood(self, x):
         if self.withNSBH:
             mc, q, EOS, alpha, zeta, chi_1, chi_2 = x
-            chi_eff = (chi_1 + q*chi_2)/(1+q)
+            chi_eff = (chi_1 + q * chi_2) / (1 + q)
         else:
             mc, q, EOS, alpha, zeta = x
 
         EOS = int(EOS) + 1
-        eta = q / np.power(1. + q, 2.)
+        eta = q / np.power(1.0 + q, 2.0)
         m1, m2 = mceta2m1m2(mc, eta)
         total_mass = m1 + m2
         mass_ratio = m2 / m1
 
         if len(np.where(self.EOSsamples == EOS)[0]) == 0:
             return np.nan_to_num(-np.inf)
-        
+
         if self.withNSBH:
-            logprior = self.priorKDE.logpdf(chi_1, chi_2, mc, eta) + np.log(len(np.where(self.EOSsamples == EOS)[0]))
+            logprior = self.priorKDE.logpdf(chi_1, chi_2, mc, eta) + np.log(
+                len(np.where(self.EOSsamples == EOS)[0])
+            )
             try:
                 r2 = self.EOS_radius_interp_dict[EOS](m2)
             except ValueError:
                 return np.nan_to_num(-np.inf)
-            
+
             C2 = m2 / (r2 * 1e3 / lal.MRSUN_SI)
             mdyn = self.NSBHEjectaFitting.dynamic_mass_fitting(m1, m2, C2, chi_eff)
-            mdisk = self.NSBHEjectaFitting.remnant_disk_mass_fitting(m1, m2, C2, chi_eff)
+            mdisk = self.NSBHEjectaFitting.remnant_disk_mass_fitting(
+                m1, m2, C2, chi_eff
+            )
             log10_mwind = np.log10(zeta) + np.log10(mdisk)
             total_ejecta_mass = mdyn + 10**log10_mwind + alpha
             loglikelihood = self.EMKDE.logpdf(total_ejecta_mass)
 
         else:
-            logprior = self.priorKDE.logpdf(mc, eta) + np.log(len(np.where(self.EOSsamples == EOS)[0]))
+            logprior = self.priorKDE.logpdf(mc, eta) + np.log(
+                len(np.where(self.EOSsamples == EOS)[0])
+            )
 
             try:
                 r1 = self.EOS_radius_interp_dict[EOS](m1)
@@ -248,9 +324,11 @@ class TotalEjectaMassInference(Solver):
 
             R16 = self.EOS_radius_interp_dict[EOS](1.6) * 1e3 / lal.MRSUN_SI
             MTOV = self.EOS_radius_interp_dict[EOS].x[-1]
-            
+
             mdyn = self.BNSEjectaFitting.dynamic_mass_fitting_KrFo(m1, m2, C1, C2)
-            log10_mdisk = self.BNSEjectaFitting.log10_disk_mass_fitting(total_mass, mass_ratio, MTOV, R16)
+            log10_mdisk = self.BNSEjectaFitting.log10_disk_mass_fitting(
+                total_mass, mass_ratio, MTOV, R16
+            )
             log10_mwind = np.log10(zeta) + log10_mdisk
             total_ejecta_mass = mdyn + 10**log10_mwind + alpha
             loglikelihood = self.EMKDE.logpdf(total_ejecta_mass)
@@ -259,41 +337,45 @@ class TotalEjectaMassInference(Solver):
 
 
 class EjectaMassInference(Solver):
-
-    def __init__(self, GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, **kwargs):
+    def __init__(
+        self, GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, **kwargs
+    ):
         self.GWsamples = GWsamples
         self.EMsamples = EMsamples
         self.withNSBH = withNSBH
 
-        if (withNSBH):
-            self.priors = {'chirp_mass': GWprior['chirp_mass'],
-                           'mass_ratio': GWprior['mass_ratio'],
-                           'EOS': Uniform(minimum=0, maximum=Neos + 1),
-                           'alpha': EMprior['alpha'],
-                           'zeta': EMprior['zeta'],
-                           'chi_1': GWprior['chi_1'],
-                           'chi_2': GWprior['chi_2'],
-                          }
+        if withNSBH:
+            self.priors = {
+                "chirp_mass": GWprior["chirp_mass"],
+                "mass_ratio": GWprior["mass_ratio"],
+                "EOS": Uniform(minimum=0, maximum=Neos + 1),
+                "alpha": EMprior["alpha"],
+                "zeta": EMprior["zeta"],
+                "chi_1": GWprior["chi_1"],
+                "chi_2": GWprior["chi_2"],
+            }
         else:
-            self.priors = {'chirp_mass': GWprior['chirp_mass'],
-                           'mass_ratio': GWprior['mass_ratio'],
-                           'EOS': Uniform(minimum=0, maximum=Neos + 1),
-                           'alpha': EMprior['alpha'],
-                           'zeta': EMprior['zeta'],
-                          }
+            self.priors = {
+                "chirp_mass": GWprior["chirp_mass"],
+                "mass_ratio": GWprior["mass_ratio"],
+                "EOS": Uniform(minimum=0, maximum=Neos + 1),
+                "alpha": EMprior["alpha"],
+                "zeta": EMprior["zeta"],
+            }
 
         self.priors = PriorDict(self.priors)
         self._search_parameter_keys = self.priors.keys()
         self.Neos = Neos
 
-
         EOS_radius_interp_dict = {}
         EOS_lambda_interp_dict = {}
         for i in range(1, Neos + 1):
-            r, m, Lambda = np.loadtxt('{0}/{1}.dat'.format(EOSpath, i), usecols=[0, 1, 2], unpack=True)
+            r, m, Lambda = np.loadtxt(
+                "{0}/{1}.dat".format(EOSpath, i), usecols=[0, 1, 2], unpack=True
+            )
 
-            interp_r_of_m = scipy.interpolate.interp1d(m, r, kind='linear')
-            interp_lambda_of_m = scipy.interpolate.interp1d(m, Lambda, kind='linear')
+            interp_r_of_m = scipy.interpolate.interp1d(m, r, kind="linear")
+            interp_lambda_of_m = scipy.interpolate.interp1d(m, Lambda, kind="linear")
 
             EOS_radius_interp_dict[i] = interp_r_of_m
             EOS_lambda_interp_dict[i] = interp_lambda_of_m
@@ -301,24 +383,26 @@ class EjectaMassInference(Solver):
         self.EOS_radius_interp_dict = EOS_radius_interp_dict
         self.EOS_lambda_interp_dict = EOS_lambda_interp_dict
 
-        z = luminosity_distance_to_redshift(self.GWsamples.luminosity_distance.to_numpy())
+        z = luminosity_distance_to_redshift(
+            self.GWsamples.luminosity_distance.to_numpy()
+        )
         mc = self.GWsamples.chirp_mass.to_numpy() / (1 + z)
         q = self.GWsamples.mass_ratio.to_numpy()
         EOS = self.GWsamples.EOS.to_numpy()
-        
-        if (withNSBH):
+
+        if withNSBH:
             chi_1 = self.GWsamples.chi_1.to_numpy()
             chi_2 = self.GWsamples.chi_2.to_numpy()
-            chi_eff = (chi_1 + q*chi_2)/(1+q)
+            chi_eff = (chi_1 + q * chi_2) / (1 + q)
             self.chi_1KDE = scipy.stats.gaussian_kde(chi_1)
             self.chi_2KDE = scipy.stats.gaussian_kde(chi_2)
-        
+
         self.mcKDE = scipy.stats.gaussian_kde(mc)
-        self.invqKDE = scipy.stats.gaussian_kde(1. / q)
+        self.invqKDE = scipy.stats.gaussian_kde(1.0 / q)
         self.EOSsamples = EOS.astype(int) + 1
         self.EMKDE = construct_EM_KDE_seperate(self.EMsamples)
 
-        if (withNSBH):
+        if withNSBH:
             self.NSBHEjectaFitting = NSBHEjectaFitting()
         else:
             self.BNSEjectaFitting = BNSEjectaFitting()
@@ -331,42 +415,52 @@ class EjectaMassInference(Solver):
     def LogLikelihood(self, x):
 
         if self.withNSBH:
-            mc, q, EOS, alpha, zeta, chi_1, chi_2 = x 
-            chi_eff = (chi_1 + q*chi_2)/(1+q)
+            mc, q, EOS, alpha, zeta, chi_1, chi_2 = x
+            chi_eff = (chi_1 + q * chi_2) / (1 + q)
         else:
             mc, q, EOS, alpha, zeta = x
-        
+
         EOS = int(EOS) + 1
-        eta = q / np.power(1. + q, 2.)
+        eta = q / np.power(1.0 + q, 2.0)
         m1, m2 = mceta2m1m2(mc, eta)
         total_mass = m1 + m2
         mass_ratio = m2 / m1
 
         if len(np.where(self.EOSsamples == EOS)[0]) == 0:
             return np.nan_to_num(-np.inf)
-        
-        
+
         if self.withNSBH:
-            logprior = self.chi_1KDE.logpdf(chi_1) + self.chi_2KDE.logpdf(chi_2) + self.mcKDE.logpdf(mc) + self.invqKDE.logpdf(m1 / m2) + np.log(len(np.where(self.EOSsamples == EOS)[0]))
+            logprior = (
+                self.chi_1KDE.logpdf(chi_1)
+                + self.chi_2KDE.logpdf(chi_2)
+                + self.mcKDE.logpdf(mc)
+                + self.invqKDE.logpdf(m1 / m2)
+                + np.log(len(np.where(self.EOSsamples == EOS)[0]))
+            )
             try:
                 r2 = self.EOS_radius_interp_dict[EOS](m2)
             except ValueError:
                 return np.nan_to_num(-np.inf)
             C2 = m2 / (r2 * 1e3 / lal.MRSUN_SI)
-            
-            #mdyn = self.NSBHEjectaFitting.dynamic_mass_fitting(m1, m2, C2, chi_eff)
+
+            # mdyn = self.NSBHEjectaFitting.dynamic_mass_fitting(m1, m2, C2, chi_eff)
             mdyn = self.NSBHEjectaFitting.dyn_mass2(m1, m2, C2, chi_eff)
 
-            if mdyn < 0.:
+            if mdyn < 0.0:
                 return -np.inf
 
-            mdisk = self.NSBHEjectaFitting.remnant_disk_mass_fitting(m1, m2, C2, chi_eff)
+            mdisk = self.NSBHEjectaFitting.remnant_disk_mass_fitting(
+                m1, m2, C2, chi_eff
+            )
             log10_mwind = np.log10(zeta) + np.log10(mdisk)
             loglikelihood = self.EMKDE.logpdf((np.log10(mdyn), log10_mwind))
 
-            
         else:
-            logprior = self.mcKDE.logpdf(mc) + self.invqKDE.logpdf(m1 / m2) + np.log(len(np.where(self.EOSsamples == EOS)[0]))
+            logprior = (
+                self.mcKDE.logpdf(mc)
+                + self.invqKDE.logpdf(m1 / m2)
+                + np.log(len(np.where(self.EOSsamples == EOS)[0]))
+            )
             try:
                 r1 = self.EOS_radius_interp_dict[EOS](m1)
                 r2 = self.EOS_radius_interp_dict[EOS](m2)
@@ -379,12 +473,16 @@ class EjectaMassInference(Solver):
             R16 = self.EOS_radius_interp_dict[EOS](1.6) * 1e3 / lal.MRSUN_SI
             MTOV = self.EOS_radius_interp_dict[EOS].x[-1]
 
-            mdyn = self.BNSEjectaFitting.dynamic_mass_fitting_KrFo(m1, m2, C1, C2) + alpha
-            
-            if mdyn < 0.:
+            mdyn = (
+                self.BNSEjectaFitting.dynamic_mass_fitting_KrFo(m1, m2, C1, C2) + alpha
+            )
+
+            if mdyn < 0.0:
                 return -np.inf
 
-            log10_mdisk = self.BNSEjectaFitting.log10_disk_mass_fitting(total_mass, mass_ratio, MTOV, R16)
+            log10_mdisk = self.BNSEjectaFitting.log10_disk_mass_fitting(
+                total_mass, mass_ratio, MTOV, R16
+            )
             log10_mwind = np.log10(zeta) + log10_mdisk
             loglikelihood = self.EMKDE.logpdf((np.log10(mdyn), log10_mwind))
 

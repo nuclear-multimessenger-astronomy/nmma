@@ -22,7 +22,10 @@ from bilby.gw.conversion import (
 def Hubble_constant_to_distance(converted_parameters, added_keys):
     # FIXME for future detection with high redshift
     # a proper cosmological model is needed
-    if "redshift" in converted_parameters.keys() and "Hubble_constant" in converted_parameters.keys():
+    if (
+        "redshift" in converted_parameters.keys()
+        and "Hubble_constant" in converted_parameters.keys()
+    ):
         Hubble_constant = converted_parameters["Hubble_constant"]
         redshift = converted_parameters["redshift"]
         # redshift is supposed to be dimensionless
@@ -38,17 +41,26 @@ def source_frame_masses(converted_parameters, added_keys):
 
     if "redshift" not in converted_parameters.keys():
         distance = converted_parameters["luminosity_distance"]
-        if hasattr(distance, '__len__') and len(distance)>50: #luminosity_distance_to_redshift gets really slow if too many distances are put in at once
-             from astropy import units
-             from astropy import cosmology as cosmo
-             cosmology = cosmo.Planck15
-             zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance.min() * units.Mpc)
-             zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance.max() * units.Mpc)
-             zgrid = np.geomspace(zmin, zmax, 50)
-             distance_grid = cosmology.luminosity_distance(zgrid).value
-             converted_parameters["redshift"] = np.interp(distance, distance_grid, zgrid).value
+        if (
+            hasattr(distance, "__len__") and len(distance) > 50
+        ):  # luminosity_distance_to_redshift gets really slow if too many distances are put in at once
+            from astropy import units
+            from astropy import cosmology as cosmo
+
+            cosmology = cosmo.Planck15
+            zmin = cosmo.z_at_value(
+                cosmology.luminosity_distance, distance.min() * units.Mpc
+            )
+            zmax = cosmo.z_at_value(
+                cosmology.luminosity_distance, distance.max() * units.Mpc
+            )
+            zgrid = np.geomspace(zmin, zmax, 50)
+            distance_grid = cosmology.luminosity_distance(zgrid).value
+            converted_parameters["redshift"] = np.interp(
+                distance, distance_grid, zgrid
+            ).value
         else:
-             converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
+            converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
         added_keys = added_keys + ["redshift"]
 
     if "mass_1_source" not in converted_parameters.keys():
@@ -64,22 +76,19 @@ def source_frame_masses(converted_parameters, added_keys):
     return converted_parameters, added_keys
 
 
-def EOS2Parameters(
-    mass_val, radius_val, Lambda_val, mass_1_source, mass_2_source
-):
+def EOS2Parameters(mass_val, radius_val, Lambda_val, mass_1_source, mass_2_source):
 
     TOV_mass = mass_val.max()
     TOV_radius = radius_val[np.argmax(mass_val)]
     minimum_mass = mass_val.min()
 
-    
     if mass_1_source < minimum_mass or mass_1_source > TOV_mass:
         lambda_1 = np.array([0.0])
         radius_1 = np.array([2.0 * mass_1_source * lal.MRSUN_SI / 1e3])
     else:
         lambda_1 = np.array(np.interp(mass_1_source, mass_val, Lambda_val)).reshape(1)
         radius_1 = np.array(np.interp(mass_1_source, mass_val, radius_val)).reshape(1)
-        
+
     if mass_2_source < minimum_mass or mass_2_source > TOV_mass:
         lambda_2 = np.array([0.0])
         radius_2 = np.array([2.0 * mass_2_source * lal.MRSUN_SI / 1e3])
@@ -92,16 +101,17 @@ def EOS2Parameters(
 
     return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
 
+
 class NSBHEjectaFitting(object):
     def __init__(self):
         pass
 
     def chibh2risco(self, chi_bh):
 
-        Z1 = 1.0 + (1.0 - chi_bh ** 2) ** (1.0 / 3) * (
+        Z1 = 1.0 + (1.0 - chi_bh**2) ** (1.0 / 3) * (
             (1 + chi_bh) ** (1.0 / 3) + (1 - chi_bh) ** (1.0 / 3)
         )
-        Z2 = np.sqrt(3.0 * chi_bh ** 2 + Z1 ** 2.0)
+        Z2 = np.sqrt(3.0 * chi_bh**2 + Z1**2.0)
 
         return 3.0 + Z2 - np.sign(chi_bh) * np.sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2))
 
@@ -123,9 +133,9 @@ class NSBHEjectaFitting(object):
         c=0.25512517,
         d=0.761250847,
     ):
-        '''
+        """
         equation (4) in https://arxiv.org/pdf/1807.00011
-        '''
+        """
 
         mass_ratio_invert = mass_1_source / mass_2_source
         symm_mass_ratio = mass_ratio_invert / np.power(1.0 + mass_ratio_invert, 2.0)
@@ -217,7 +227,9 @@ class NSBHEjectaFitting(object):
             converted_parameters["ratio_zeta"]
         ) + np.log10(mdisk_fit)
         # total eject mass
-        total_ejeta_mass = 10**log10_mej_dyn + 10**converted_parameters["log10_mej_wind"]
+        total_ejeta_mass = (
+            10**log10_mej_dyn + 10 ** converted_parameters["log10_mej_wind"]
+        )
         log10_mej = np.log10(total_ejeta_mass)
         converted_parameters["log10_mej"] = log10_mej
 
@@ -235,7 +247,6 @@ class NSBHEjectaFitting(object):
                 converted_parameters["log10_mej_dyn"] = -np.inf
                 converted_parameters["log10_mej_wind"] = -np.inf
                 converted_parameters["log10_mej"] = -np.inf
-
 
         added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind", "log10_mej"]
 
@@ -335,8 +346,8 @@ class BNSEjectaFitting(object):
 
         # prevent the output message flooded by these warning messages
         old = np.seterr()
-        np.seterr(invalid='ignore')
-        np.seterr(divide='ignore')
+        np.seterr(invalid="ignore")
+        np.seterr(divide="ignore")
 
         mass_1_source = converted_parameters["mass_1_source"]
         mass_2_source = converted_parameters["mass_2_source"]
@@ -452,7 +463,12 @@ class BNSEjectaFitting(object):
             converted_parameters["log10_mej"] = float(log10_mej)
             converted_parameters["log10_E0"] = float(log10_E0)
 
-        added_keys = added_keys + ["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
+        added_keys = added_keys + [
+            "log10_mej_dyn",
+            "log10_mej_wind",
+            "log10_mej",
+            "log10_E0",
+        ]
 
         np.seterr(**old)
 
@@ -509,13 +525,14 @@ class MultimessengerConversion(object):
                 R_14_list = []
                 R_16_list = []
                 EOSID = np.array(converted_parameters["EOS"]).astype(int) + 1
-                EOSdata = [None]*self.Neos
+                EOSdata = [None] * self.Neos
                 for j in np.unique(EOSID):
-                    EOSdata[j-1] = np.loadtxt(f"{self.eos_data_path}/{j}.dat", usecols = [0,1,2]).T
-
+                    EOSdata[j - 1] = np.loadtxt(
+                        f"{self.eos_data_path}/{j}.dat", usecols=[0, 1, 2]
+                    ).T
 
                 for i in range(0, len(EOSID)):
-                    radius_val, mass_val, Lambda_val = EOSdata[EOSID[i]-1]
+                    radius_val, mass_val, Lambda_val = EOSdata[EOSID[i] - 1]
 
                     (
                         TOV_mass,
@@ -525,7 +542,7 @@ class MultimessengerConversion(object):
                         radius_1,
                         radius_2,
                         R_14,
-                        R_16
+                        R_16,
                     ) = EOS2Parameters(
                         mass_val,
                         radius_val,
@@ -533,7 +550,7 @@ class MultimessengerConversion(object):
                         mass_1_source[i],
                         mass_2_source[i],
                     )
-                    
+
                     TOV_radius_list.append(TOV_radius)
                     TOV_mass_list.append(TOV_mass)
                     lambda_1_list.append(lambda_1[0])
@@ -557,7 +574,9 @@ class MultimessengerConversion(object):
 
             else:
                 EOSID = int(converted_parameters["EOS"]) + 1
-                radius_val, mass_val, Lambda_val = np.loadtxt(f"{self.eos_data_path}/{EOSID}.dat", unpack = True, usecols=[0,1,2])
+                radius_val, mass_val, Lambda_val = np.loadtxt(
+                    f"{self.eos_data_path}/{EOSID}.dat", unpack=True, usecols=[0, 1, 2]
+                )
 
                 (
                     TOV_mass,
@@ -567,15 +586,11 @@ class MultimessengerConversion(object):
                     radius_1,
                     radius_2,
                     R_14,
-                    R_16
+                    R_16,
                 ) = EOS2Parameters(
-                    mass_val,
-                    radius_val,
-                    Lambda_val,
-                    mass_1_source,
-                    mass_2_source
+                    mass_val, radius_val, Lambda_val, mass_1_source, mass_2_source
                 )
-                
+
                 converted_parameters["TOV_radius"] = TOV_radius
                 converted_parameters["TOV_mass"] = TOV_mass
 
@@ -614,13 +629,12 @@ class MultimessengerConversion(object):
                 )
 
                 added_keys = added_keys + ["KNtheta", "inclination_EM"]
-                
+
         added_keys = [
             key for key in converted_parameters.keys() if key not in original_keys
         ]
 
         return converted_parameters, added_keys
-    
 
     def generate_all_parameters(self, sample, likelihood=None, priors=None, npool=1):
         waveform_defaults = {

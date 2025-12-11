@@ -40,7 +40,6 @@ model_parameters_dict = {
     ],
     "Piro2021": ["log10_Menv", "log10_Renv", "log10_Ee"],
     "Me2017": ["log10_mej", "log10_vej", "beta", "log10_kappa_r"],
-    "HoNa2020": ["log10_mej", "vej_max", "vej_min", "vej_frac", "log10_kappa_low_vej", "log10_kappa_high_vej"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
     "blackbody_fixedT": ["bb_luminosity", "temperature"],
@@ -99,7 +98,7 @@ model_parameters_dict = {
         "KNtheta",
     ],
     "HoNa2020": [
-        "log10_Mej",
+        "log10_mej",
         "vej_max",
         "vej_min",
         "vej_frac",
@@ -150,7 +149,10 @@ class LightCurveMixin:
             "TrPi2018": ["https://arxiv.org/abs/1909.11691"],
             "Piro2021": ["https://arxiv.org/abs/2007.08543"],
             "Me2017": ["https://arxiv.org/abs/1910.01617"],
-            "HoNa2020": ["https://arxiv.org/abs/1909.02581", "https://arxiv.org/abs/1206.2379"],
+            "HoNa2020": [
+                "https://arxiv.org/abs/1909.02581",
+                "https://arxiv.org/abs/1206.2379",
+            ],
             "Sr2023": [None],  # TODO: add citation,
             "nugent-hyper": [
                 "https://sncosmo.readthedocs.io/en/stable/source-list.html"
@@ -266,9 +268,9 @@ class SVDLightCurveModel(LightCurveMixin):
         local_only=False,
     ):
         if model_parameters is None:
-            assert model in model_parameters_dict.keys(), (
-                "Unknown model,please update model_parameters_dict at em/model.py"
-            )
+            assert (
+                model in model_parameters_dict.keys()
+            ), "Unknown model,please update model_parameters_dict at em/model.py"
             self.model_parameters = model_parameters_dict[model]
         else:
             self.model_parameters = model_parameters
@@ -515,9 +517,9 @@ class GRBLightCurveModel(LightCurveMixin):
             give a set of parameters
         """
 
-        assert model in model_parameters_dict.keys(), (
-            "Unknown model,please update model_parameters_dict at em/model.py"
-        )
+        assert (
+            model in model_parameters_dict.keys()
+        ), "Unknown model,please update model_parameters_dict at em/model.py"
         self.model = model
         self.model_parameters = model_parameters_dict[model]
         self.sample_times = sample_times
@@ -925,9 +927,9 @@ class ShockCoolingLightCurveModel(LightCurveMixin):
             give a set of parameters
         """
 
-        assert model in model_parameters_dict.keys(), (
-            "Unknown model,please update model_parameters_dict at em/model.py"
-        )
+        assert (
+            model in model_parameters_dict.keys()
+        ), "Unknown model,please update model_parameters_dict at em/model.py"
         self.model = model
         self.model_parameters = model_parameters_dict[model]
         self.sample_times = sample_times
@@ -1048,9 +1050,9 @@ class SimpleKilonovaLightCurveModel(LightCurveMixin):
             give a set of parameters
         """
 
-        assert model in model_parameters_dict.keys(), (
-            "Unknown model,please update model_parameters_dict at em/model.py"
-        )
+        assert (
+            model in model_parameters_dict.keys()
+        ), "Unknown model,please update model_parameters_dict at em/model.py"
         self.model = model
         self.model_parameters = model_parameters_dict[model]
         self.sample_times = sample_times
@@ -1090,19 +1092,23 @@ class SimpleKilonovaLightCurveModel(LightCurveMixin):
             vej_max = param_dict["vej_max"]
             vej_min = param_dict["vej_min"]
             vej_range = vej_max - vej_min
-            vej = param_dict["vej_frac"] * vej_range + vej_min 
+            vej = param_dict["vej_frac"] * vej_range + vej_min
             # calculate the temperature and luminosity to feed into the blackbody radiation calculation
             L, T, _ = utils.lightcurve_HoNa(
                 sample_times,
-                10**param_dict["log10_mej"],
+                10 ** param_dict["log10_mej"],
                 [param_dict["vej_min"], vej, param_dict["vej_max"]],
-                [10**param_dict["log10_kappa_low_vej"], 
-                 10**param_dict["log10_kappa_high_vej"]],
-                param_dict["n"]
+                [
+                    10 ** param_dict["log10_kappa_low_vej"],
+                    10 ** param_dict["log10_kappa_high_vej"],
+                ],
+                param_dict["n"],
             )
             param_dict["bb_luminosity"] = L.cgs.value
             param_dict["temperature"] = T.si.value
-            _, lbol, mag = utils.blackbody_constant_temperature(sample_times, param_dict, filters=self.filters)
+            _, lbol, mag = utils.blackbody_constant_temperature(
+                sample_times, param_dict, filters=self.filters
+            )
         elif self.model == "PL_BB_fixedT":
             _, lbol, mag = utils.powerlaw_blackbody_constant_temperature_lc(
                 sample_times, param_dict, filters=self.filters

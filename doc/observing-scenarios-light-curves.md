@@ -7,7 +7,7 @@ This document provides a detailed description of how to use the **injections.dat
 Running the following command will generate a JSON file (`injection_Bu2019lm.json`) with the BILBY processing of compact binary merger events. Here, we consider binaries of type BNS (Binary Neutron Stars), although NSBH (Neutron Star-Black Hole) is also an option. This injection contains a simulation set of parameters: `luminosity_distance`, `log10_mej_wind`, `KNphi`, `inclination_EM`, `timeshift`, `geocent_time` for the Bu2019lm model.
 
 
-### Command to Run [nmma-create-injection]: 
+### Command to Run [nmma-create-injection]:
 
 Run this command to create the JSON injection file:
 

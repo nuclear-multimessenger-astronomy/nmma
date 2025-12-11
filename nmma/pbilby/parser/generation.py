@@ -4,8 +4,8 @@ import bilby_pipe.data_generation
 from .shared import (
     _create_base_nmma_gw_parser,
     _create_base_nmma_parser,
-    _add_slurm_settings_to_parser
-    )
+    _add_slurm_settings_to_parser,
+)
 
 logger = bilby.core.utils.logger
 

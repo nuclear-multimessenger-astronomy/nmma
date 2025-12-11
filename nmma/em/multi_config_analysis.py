@@ -9,8 +9,10 @@ import os
 
 
 def get_parser_here():
-    parser = argparse.ArgumentParser(description="Multi config analysis script for NMMA.")
-    
+    parser = argparse.ArgumentParser(
+        description="Multi config analysis script for NMMA."
+    )
+
     parser.add_argument(
         "--config",
         type=str,
@@ -96,7 +98,9 @@ def main(args=None):
 
             if not args.parallel:
                 print(f"{'#'*100}")
-                print(f"Running analysis set:  {analysis_set} with {processes} processes")
+                print(
+                    f"Running analysis set:  {analysis_set} with {processes} processes"
+                )
                 run_cmd_in_subprocess(cmd)
                 print(f"{'#'*100}")
             else:

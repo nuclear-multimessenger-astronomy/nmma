@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 import nmma
 
-extensions = ["myst_parser", "sphinx_copybutton","sphinx_github_changelog"]
+extensions = ["myst_parser", "sphinx_copybutton", "sphinx_github_changelog"]
 myst_enable_extensions = [
     "amsmath",
     "colon_fence",
@@ -56,7 +56,6 @@ master_doc = "index"
 project = "nmma"
 copyright = "2023, The NMMA Team"
 author = "The NMMA Team"
-
 
 
 version = nmma.__version__

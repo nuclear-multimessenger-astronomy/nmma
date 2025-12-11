@@ -13,38 +13,35 @@ def main():
     )
     parser.add_argument("--outdir", metavar="PATH", type=str, required=True)
     parser.add_argument(
-            "--GWsamples", 
-            metavar="PATH", 
-            type=str, 
-            required=True,
-            help="If no posterior files are available, use gwsamples_creation.py to generate dummy GWsamples."
+        "--GWsamples",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="If no posterior files are available, use gwsamples_creation.py to generate dummy GWsamples.",
     )
     parser.add_argument(
-            "--EMsamples", 
-            metavar="PATH", 
-            type=str, 
-            required=True,
-            help="posterior samples file from a previous Bayesian inference run on EM signals (e.g. Kilonova inference or Kilonova+GRB inference.")
-    parser.add_argument(
-            "--EOSpath", 
-            metavar="PATH", 
-            type=str, 
-            required=True,
-            help="Path of EOS folder, e.g. 15nsat_cse_uniform_R14 (located: https://zenodo.org/record/6106130#.YoysIHVBwUG)"
+        "--EMsamples",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="posterior samples file from a previous Bayesian inference run on EM signals (e.g. Kilonova inference or Kilonova+GRB inference.",
     )
     parser.add_argument(
-            "--Neos", 
-            metavar="Neos", 
-            type=int, 
-            required=True,
-            help="Number of EOS files used for the inference."
+        "--EOSpath",
+        metavar="PATH",
+        type=str,
+        required=True,
+        help="Path of EOS folder, e.g. 15nsat_cse_uniform_R14 (located: https://zenodo.org/record/6106130#.YoysIHVBwUG)",
     )
     parser.add_argument(
-            "--nlive", 
-            metavar="nlive", 
-            type=int, 
-            required=False, 
-            default=1024
+        "--Neos",
+        metavar="Neos",
+        type=int,
+        required=True,
+        help="Number of EOS files used for the inference.",
+    )
+    parser.add_argument(
+        "--nlive", metavar="nlive", type=int, required=False, default=1024
     )
     parser.add_argument(
         "--GWprior",
@@ -66,7 +63,7 @@ def main():
         help="To run with total ejecta mass, if not activated, the two ejecta are consider seperately",
     )
     parser.add_argument(
-        "--withNSBH", 
+        "--withNSBH",
         action="store_true",
         help="Compute GW-EM-resampling for NSBH source, else: for BNS source.",
     )
@@ -87,7 +84,7 @@ def main():
     # read the prior files
     GWprior = bilby.gw.prior.PriorDict(args.GWprior)
     EMprior = bilby.gw.prior.PriorDict(args.EMprior)
-    
+
     if args.withNSBH:
         try:
             os.makedirs(args.outdir + "/pm/")
@@ -140,9 +137,9 @@ def main():
             args.withNSBH,
             **pymulti_kwargs
         )
-    
+
     if args.withNSBH:
-        
+
         samples = solution.samples.T
         posterior_samples = dict()
         posterior_samples["chirp_mass"] = samples[0]
@@ -154,13 +151,17 @@ def main():
         posterior_samples["chi_2"] = samples[6]
 
         posterior_samples = pd.DataFrame.from_dict(posterior_samples)
-        posterior_samples.to_csv("{0}/posterior_samples.dat".format(args.outdir), sep=" ", index=False)
+        posterior_samples.to_csv(
+            "{0}/posterior_samples.dat".format(args.outdir), sep=" ", index=False
+        )
 
-        sampler_functions.corner_plot(posterior_samples, solution, args.outdir,args.withNSBH)
+        sampler_functions.corner_plot(
+            posterior_samples, solution, args.outdir, args.withNSBH
+        )
 
     else:
         samples = solution.samples.T
-        
+
         posterior_samples = dict()
         posterior_samples["chirp_mass"] = samples[0]
         posterior_samples["mass_ratio"] = samples[1]
@@ -169,9 +170,13 @@ def main():
         posterior_samples["zeta"] = samples[4]
 
         posterior_samples = pd.DataFrame.from_dict(posterior_samples)
-        posterior_samples.to_csv("{0}/posterior_samples.dat".format(args.outdir), sep=" ", index=False)
+        posterior_samples.to_csv(
+            "{0}/posterior_samples.dat".format(args.outdir), sep=" ", index=False
+        )
 
-        sampler_functions.corner_plot(posterior_samples, solution, args.outdir, args.withNSBH)
+        sampler_functions.corner_plot(
+            posterior_samples, solution, args.outdir, args.withNSBH
+        )
 
 
 if __name__ == "__main__":

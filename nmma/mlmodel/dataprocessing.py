@@ -28,11 +28,11 @@ days = int(round(t_max - t_min))
 time_step = 0.25
 
 def open_json(file_name, dir_path):
-    ''' 
-    Opens a json file, loads the data as a dictionary, and closes the file 
+    '''
+    Opens a json file, loads the data as a dictionary, and closes the file
     Inputs:
         file_name = /name of json file.json
-        dir_path = directory containing json files 
+        dir_path = directory containing json files
     Returns:
         data = dictionary containing json content
     '''
@@ -42,14 +42,14 @@ def open_json(file_name, dir_path):
     return data
 
 def get_names(path, label, set, num):
-    ''' 
+    '''
     Gets the file path for the fixed data
     Inputs:
         path = string, directory to point to
         label = string, label assigned during nmma light curve generation
         set = int, number in directory name
         num = int, number of files to unpack
-    Returns: 
+    Returns:
         file_names = list, contains full path file names
     '''
     file_names = [0] * num
@@ -59,7 +59,7 @@ def get_names(path, label, set, num):
     return file_names
 
 def json_to_df(file_names, num_sims, detection_limit=detection_limit, bands=bands):
-    ''' 
+    '''
     Flattens json files into a dataframe
     Inputs:
         file_names = list, contains full path file names as strings
@@ -145,7 +145,7 @@ def pad_the_data(actual_df, column_list, desired_count=num_points, filler_time_s
     Outputs:
         cat_df: padded dataframe
     '''
-    actual_df.iloc[:, actual_df.columns.get_loc('t')] = actual_df.iloc[:, actual_df.columns.get_loc('t')].apply(lambda x: x - t_min) 
+    actual_df.iloc[:, actual_df.columns.get_loc('t')] = actual_df.iloc[:, actual_df.columns.get_loc('t')].apply(lambda x: x - t_min)
     cat_df = actual_df
     cat_count = len(cat_df)
     prepended_count = 0
@@ -156,8 +156,8 @@ def pad_the_data(actual_df, column_list, desired_count=num_points, filler_time_s
         cat_df = pd.concat([prepend_filler_df, actual_df], ignore_index=True)
         cat_count = len(cat_df)
     append_count = desired_count - cat_count
-    if append_count > 0: 
-        max_t = cat_df['t'].max() 
+    if append_count > 0:
+        max_t = cat_df['t'].max()
         steps_per_count = 1/filler_time_step
         filler_min_time = int(max_t*steps_per_count)/steps_per_count + filler_time_step  # start at next time step
         append_filler_df = gen_append_filler(column_list, filler_data, filler_min_time, append_count)
@@ -169,7 +169,7 @@ def pad_the_data(actual_df, column_list, desired_count=num_points, filler_time_s
 def pad_all_dfs(df_list):
     '''
     Pads multiple dataframes at a time
-    Inputs: 
+    Inputs:
         df_list: list of dataframes to pad
     Outputs:
         padded_df_list: list of dataframes after padding
@@ -194,7 +194,7 @@ def load_in_data(data_dir, name, csv_no, num_points=num_points, num_repeats=num_
         num_points: number of data points per light curve
         num_repeats: repeats of injection parameters to determine batches
     Outputs:
-        data_df: single dataframe containing the data 
+        data_df: single dataframe containing the data
     '''
     data_list = []
     for i in range (0, csv_no):
@@ -218,7 +218,7 @@ def load_in_data(data_dir, name, csv_no, num_points=num_points, num_repeats=num_
         batch_no += 1
     data_df['batch_id'] = batch_list
     return data_df
-    
+
 def match_fix_to_var(data_dir, name1, name2, start, stop, num_points=num_points, num_repeats=num_repeats):
     '''
     Matches the shifted injection light curve data to its fixed counterpart
@@ -279,7 +279,7 @@ def match_fix_to_var(data_dir, name1, name2, start, stop, num_points=num_points,
         batch_no += 1
     fixed_data_df['batch_id'] = batch_list
     varied_data_df['batch_id'] = batch_list
-    
+
     return fixed_data_df, varied_data_df
 
 def matched(data_dir, name1, name2, start, stop, num_points=num_points, num_repeats=num_repeats):
@@ -339,14 +339,14 @@ def add_batch_sim_nums_all(df, num_points=num_points, num_repeats=num_repeats):
     df['sim_id'] = sim_list_split
 
 def get_test_names(path, label, set, num):
-    ''' 
+    '''
     Gets the file path for the fixed data
     Inputs:
         path = string, directory to point to
         label = string, label assigned during nmma light curve generation
         set = int, number in directory name
         num = int, number of files to unpack
-    Returns: 
+    Returns:
         list, contains full path file names
     '''
     file_names = [0] * num
@@ -373,13 +373,13 @@ def repeated_df_to_tensor(df_varied, df_fixed, batches):
     param_shifted_list = []
     param_unshifted_list = []
     for idx in tqdm(range(0, batches)):
-        data_shifted = torch.tensor(df_varied.loc[df_varied['batch_id'] == idx].iloc[:, 1:4].values.reshape(num_repeats, num_points, num_channels), 
+        data_shifted = torch.tensor(df_varied.loc[df_varied['batch_id'] == idx].iloc[:, 1:4].values.reshape(num_repeats, num_points, num_channels),
                                     dtype=torch.float32).transpose(1, 2)
-        data_unshifted = torch.tensor(df_fixed.loc[df_fixed['batch_id'] == idx].iloc[:, 1:4].values.reshape(num_repeats, num_points, num_channels), 
+        data_unshifted = torch.tensor(df_fixed.loc[df_fixed['batch_id'] == idx].iloc[:, 1:4].values.reshape(num_repeats, num_points, num_channels),
                                     dtype=torch.float32).transpose(1, 2)
-        param_shifted = torch.tensor(df_varied.loc[df_varied['batch_id'] == idx].iloc[::num_points, 6:11].values, 
+        param_shifted = torch.tensor(df_varied.loc[df_varied['batch_id'] == idx].iloc[::num_points, 6:11].values,
                                     dtype=torch.float32).unsqueeze(2).transpose(1,2)
-        param_unshifted = torch.tensor(df_fixed.loc[df_fixed['batch_id'] == idx].iloc[::num_points, 5:10].values, 
+        param_unshifted = torch.tensor(df_fixed.loc[df_fixed['batch_id'] == idx].iloc[::num_points, 5:10].values,
                                     dtype=torch.float32).unsqueeze(2).transpose(1,2)
         data_shifted_list.append(data_shifted)
         data_unshifted_list.append(data_unshifted)
@@ -404,7 +404,7 @@ class Paper_data(Dataset):
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-            
+
         return (
             self.param_shifted_paper[idx].to(device),
             self.param_unshifted_paper[idx].to(device),

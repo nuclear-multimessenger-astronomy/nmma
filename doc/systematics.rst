@@ -78,7 +78,7 @@ In this configuration, the ``sdssu`` and ``ztfr`` filters are sampled together f
         type: Uniform
         minimum: 0
         maximum: 2
-  
+
 
 Distribution types
 ==================

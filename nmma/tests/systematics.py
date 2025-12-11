@@ -10,7 +10,7 @@ from ..em.systematics import (
     handle_withoutTime,
     main,
     ALLOWED_FILTERS,
-    ALLOWED_DISTRIBUTIONS
+    ALLOWED_DISTRIBUTIONS,
 )
 
 
@@ -48,8 +48,12 @@ def test_validate_only_one_true_valid(sample_yaml_file):
 
 
 def test_validate_only_one_true_invalid():
-    invalid_yaml = {"config": {"withTime": {"value": True}, "withoutTime": {"value": True}}}
-    with pytest.raises(ValidationError, match="Only one configuration key can be set to True at a time"):
+    invalid_yaml = {
+        "config": {"withTime": {"value": True}, "withoutTime": {"value": True}}
+    }
+    with pytest.raises(
+        ValidationError, match="Only one configuration key can be set to True at a time"
+    ):
         validate_only_one_true(invalid_yaml)
 
 
@@ -65,7 +69,13 @@ def test_validate_filters_invalid():
 
 
 def test_handle_withTime():
-    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": [["bessellb", "bessellv"], "ztfr"]}
+    values = {
+        "type": "Uniform",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "time_nodes": 2,
+        "filters": [["bessellb", "bessellv"], "ztfr"],
+    }
     result = handle_withTime(values)
     assert "sys_err_bessellb___bessellv1" in result[0]
     assert "sys_err_ztfr2" in result[3]
@@ -75,7 +85,10 @@ def test_handle_withoutTime():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0}
     result = handle_withoutTime(values)
     assert len(result) == 1
-    assert "sys_err = Uniform(minimum=0.0, maximum=1.0, name='sys_err', latex_label='sys_err', unit=None, boundary=None)" in result[0]
+    assert (
+        "sys_err = Uniform(minimum=0.0, maximum=1.0, name='sys_err', latex_label='sys_err', unit=None, boundary=None)"
+        in result[0]
+    )
 
 
 def test_main(sample_yaml_file):
@@ -91,26 +104,37 @@ def test_main_invalid_yaml(tmp_path):
 
 
 def test_validate_only_one_true_all_false():
-    invalid_yaml = {"config": {"withTime": {"value": False}, "withoutTime": {"value": False}}}
-    with pytest.raises(ValidationError, match="At least one configuration key must be set to True"):
+    invalid_yaml = {
+        "config": {"withTime": {"value": False}, "withoutTime": {"value": False}}
+    }
+    with pytest.raises(
+        ValidationError, match="At least one configuration key must be set to True"
+    ):
         validate_only_one_true(invalid_yaml)
 
 
 def test_validate_only_one_true_missing_value():
     invalid_yaml = {"config": {"withTime": {}, "withoutTime": {"value": False}}}
-    with pytest.raises(ValidationError, match="'value' key must be present and be a boolean"):
+    with pytest.raises(
+        ValidationError, match="'value' key must be present and be a boolean"
+    ):
         validate_only_one_true(invalid_yaml)
 
 
 def test_validate_filters_duplicate_in_group():
     invalid_filters = [["bessellb", "bessellb"], "ztfr"]
-    with pytest.raises(ValidationError, match="Duplicate filter value 'bessellb' within the same group"):
+    with pytest.raises(
+        ValidationError, match="Duplicate filter value 'bessellb' within the same group"
+    ):
         validate_filters(invalid_filters)
 
 
 def test_validate_filters_duplicate_across_groups():
     invalid_filters = [["bessellb", "bessellv"], "bessellb"]
-    with pytest.raises(ValidationError, match="Duplicate filter value 'bessellb'. A filter can only be used in one group"):
+    with pytest.raises(
+        ValidationError,
+        match="Duplicate filter value 'bessellb'. A filter can only be used in one group",
+    ):
         validate_filters(invalid_filters)
 
 
@@ -134,18 +158,30 @@ def test_validate_distribution_invalid():
 
 def test_validate_distribution_case_sensitive():
     with pytest.raises(KeyError):
-        assert (ALLOWED_DISTRIBUTIONS["uniform"])  # Should be "Uniform"
+        assert ALLOWED_DISTRIBUTIONS["uniform"]  # Should be "Uniform"
 
 
 def test_handle_withTime_single_filter():
-    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": ["ztfr"]}
+    values = {
+        "type": "Uniform",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "time_nodes": 2,
+        "filters": ["ztfr"],
+    }
     result = handle_withTime(values)
     assert len(result) == 2
     assert all("sys_err_ztfr" in line for line in result)
 
 
 def test_handle_withTime_all_filters():
-    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [None]}
+    values = {
+        "type": "Uniform",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "time_nodes": 1,
+        "filters": [None],
+    }
     result = handle_withTime(values)
     assert len(result) == 1
     assert "sys_err_all1" in result[0]
@@ -179,13 +215,21 @@ config:
 """
     yaml_file = tmp_path / "empty_config.yaml"
     yaml_file.write_text(yaml_content)
-    with pytest.raises(ValidationError, match="At least one configuration key must be set to True"):
+    with pytest.raises(
+        ValidationError, match="At least one configuration key must be set to True"
+    ):
         main(yaml_file)
 
 
 @pytest.mark.parametrize("filter_name", ALLOWED_FILTERS)
 def test_all_allowed_filters(filter_name):
-    values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [filter_name]}
+    values = {
+        "type": "Uniform",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "time_nodes": 1,
+        "filters": [filter_name],
+    }
     result = handle_withTime(values)
     assert len(result) == 1
     assert f"sys_err_{filter_name}1" in result[0]

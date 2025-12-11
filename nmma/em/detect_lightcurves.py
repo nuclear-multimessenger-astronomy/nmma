@@ -45,33 +45,16 @@ def main():
         required=True,
         help="lightcurve file directory with lightcurves",
     )
+    parser.add_argument("-i", "--indices-file", type=str)
+    parser.add_argument("-d", "--detections-file", type=str)
     parser.add_argument(
-        "-i", 
-        "--indices-file", 
-        type=str
+        "--binary-type", type=str, required=True, help="Either BNS or NSBH"
     )
     parser.add_argument(
-        "-d", 
-        "--detections-file", 
-        type=str
+        "--outdir", type=str, default="outdir", help="Path to the output directory"
     )
     parser.add_argument(
-        "--binary-type",
-        type=str, 
-        required=True, 
-        help="Either BNS or NSBH"
-    )
-    parser.add_argument(
-        "--outdir", 
-        type=str, 
-        default="outdir",
-        help="Path to the output directory"
-    )
-    parser.add_argument(
-        "--telescope", 
-        type=str, 
-        default="ZTF", 
-        help="telescope to recover"
+        "--telescope", type=str, default="ZTF", help="telescope to recover"
     )
     parser.add_argument(
         "--tmin",
@@ -86,10 +69,7 @@ def main():
         help="Days to be stoped analysing from the trigger time (default: 14)",
     )
     parser.add_argument(
-        "--dt", 
-        type=float, 
-        default=0.1, 
-        help="Time step in day (default: 0.1)"
+        "--dt", type=float, default=0.1, help="Time step in day (default: 0.1)"
     )
     parser.add_argument(
         "--filters",
@@ -104,29 +84,19 @@ def main():
         default=42,
         help="Injection generation seed (default: 42)",
     )
-    parser.add_argument(
-        "--exposuretime", 
-        type=int, 
-        required=True
-    )
+    parser.add_argument("--exposuretime", type=int, required=True)
 
     parser.add_argument(
-        "--parallel", 
-        action="store_true", 
-        default=False, 
-        help="parallel the runs"
+        "--parallel", action="store_true", default=False, help="parallel the runs"
     )
     parser.add_argument(
-        "--number-of-cores", 
-        type=int, 
-        default=1, 
-        help="Number of cores"
+        "--number-of-cores", type=int, default=1, help="Number of cores"
     )
+    parser.add_argument("--label", type=str, required=True, help="Label for the run")
     parser.add_argument(
-        "--label", 
-        type=str, 
-        required=True, 
-        help="Label for the run"
+        "--plots",
+        help="comma delimited list of plot types (skymap,tiles,coverage,schedule,efficiency)",
+        default="skymap,tiles,coverage,schedule,efficiency",
     )
     args = parser.parse_args()
 
@@ -135,11 +105,11 @@ def main():
         if args.injection_file.endswith(".json"):
             with open(args.injection_file, "rb") as f:
                 injection_data = json.load(f)
-                datadict = injection_data["injections"]["content"] 
+                datadict = injection_data["injections"]["content"]
                 dataframe_from_inj = pd.DataFrame.from_dict(datadict)
-                
-                # get the injection index from the oserving scenarios simulations 
-                simulation_id = dataframe_from_inj['simulation_id']
+
+                # get the injection index from the oserving scenarios simulations
+                simulation_id = dataframe_from_inj["simulation_id"]
         else:
             print("Only json supported.")
             exit(1)
@@ -147,7 +117,7 @@ def main():
     if len(dataframe_from_inj) > 0:
         args.n_injection = len(dataframe_from_inj)
 
-    #indices = np.loadtxt(args.indices_file)
+    # indices = np.loadtxt(args.indices_file)
     indices = simulation_id
 
     commands = []
@@ -156,18 +126,22 @@ def main():
         outdir = os.path.join(args.outdir, str(index))
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
- 
+
         skymap_file = os.path.join(args.skymap_dir, "%d.fits" % indices[index])
-        lc_file = os.path.join(args.lightcurve_dir, "%s.dat" %  f"{args.label}_{indices[index]}")
-        
+        lc_file = os.path.join(
+            args.lightcurve_dir, "%s.dat" % f"{args.label}_{indices[index]}"
+        )
+
         # fixed scheduling time as observation plan
-        #number_shot = int(1 + (args.tmax - args.tmin)/args.dt)
-        
-        #lcs[index] = np.loadtxt(lc_file)[0:number_shot,]
-        
+        # number_shot = int(1 + (args.tmax - args.tmin)/args.dt)
+
+        # lcs[index] = np.loadtxt(lc_file)[0:number_shot,]
+
         lcs[index] = np.loadtxt(lc_file)
 
-        efffile = os.path.join(outdir, f"efficiency_true_{args.label}_{indices[index]}.txt")
+        efffile = os.path.join(
+            outdir, f"efficiency_true_{args.label}_{indices[index]}.txt"
+        )
         if os.path.isfile(efffile):
             continue
 
@@ -185,14 +159,14 @@ def main():
             [str(args.exposuretime) for i in args.filters.split(",")]
         )
 
-        if args.telescope.lower() == 'ultrasat': 
-            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy_slew --doTrueLocation --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --powerlaw_cl 0.9 --doObservability --doObservabilityExit --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --doPlots --doUsePrimary  --ignore_observability"
-            
+        if args.telescope.lower() == "ultrasat":
+            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy_slew --doTrueLocation --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --plots {args.plots} --doUsePrimary  --ignore_observability"
+
         else:
-            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy_slew --doTrueLocation --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist} --powerlaw_cl 0.9 --doObservability --doObservabilityExit --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --doPlots --doUsePrimary"
-        
+            command = f"gwemopt-run --telescopes {args.telescope} --geometry 3d --doTiles --doSchedule  --scheduleType greedy_slew --doTrueLocation --true_location  --true_ra {ra} --true_dec {dec} --true_distance {dist}   --timeallocationType powerlaw   --gpstime {gpstime} --event {skymap_file} --filters {args.filters} --exposuretimes {exposuretime} --doSingleExposure --doAlternatingFilters --doEfficiency --lightcurveFiles {lc_file}  -o {outdir} --modelType file --plots {args.plots} --doUsePrimary"
+
         commands.append(command)
-        
+
     print("Number of jobs remaining... %d." % len(commands))
 
     if args.parallel:
@@ -207,27 +181,29 @@ def main():
 
     absmag, effs, probs = [], [], []
     fid = open(args.detections_file, "w")
-    #fid = open('lc_skymap_detection', "w")
+    # fid = open('lc_skymap_detection', "w")
     for index, row in dataframe_from_inj.iterrows():
         outdir = os.path.join(args.outdir, str(index))
-        
-        efffile = os.path.join(outdir, f"efficiency_true_{args.label}_{indices[index]}.txt")
-        
-        ## Choose band for the best proxy
-        # for ZTF r-band give the best proxy 
-        if args.telescope == 'ZTF':
+
+        efffile = os.path.join(
+            outdir, f"efficiency_true_{args.label}_{indices[index]}.txt"
+        )
+
+        # Choose band for the best proxy
+        # for ZTF r-band give the best proxy
+        if args.telescope == "ZTF":
             absmag.append(np.min(lcs[index][:, 2]))
-            
-        # For Rubin i-band or z-band are best 
-        elif args.telescope == 'LSST':
+
+        # For Rubin i-band or z-band are best
+        elif args.telescope == "LSST":
             absmag.append(np.min(lcs[index][:, 3]))
-            
-        elif args.telescope.lower() == 'ultrasat':
+
+        elif args.telescope.lower() == "ultrasat":
             absmag.append(np.min(lcs[index][:, 1]))
-        
+
         else:
             absmag.append(np.min(lcs[index][:, 3]))
-        
+
         if not os.path.isfile(efffile):
             fid.write("0\n")
             effs.append(0.0)
@@ -243,7 +219,7 @@ def main():
             with open(efffile, "r") as file:
                 data_out = file.read()
             effs.append(float(data_out.split("\n")[1].split("\t")[4]))
-            
+
         efffile = os.path.join(outdir, f"efficiency_{args.label}_{indices[index]}.txt")
         if not os.path.isfile(efffile):
             probs.append(0.0)
@@ -382,7 +358,7 @@ def main():
 
     plt.axes(ax4)
     plt.axis("off")
-    cbar = fig.colorbar(sm, ax=ax4, orientation='horizontal')
+    cbar = fig.colorbar(sm, ax=ax4, orientation="horizontal")
     cbar.set_label(r"Detection Efficiency")
 
     plt.axes(ax3)
@@ -460,5 +436,5 @@ def main():
     ax2.set_xticklabels([])
 
     plotName = os.path.join(plotdir, f"eff_{args.binary_type}_{args.telescope}.pdf")
-    plt.savefig(plotName,bbox_inches='tight', dpi=2500)
+    plt.savefig(plotName, bbox_inches="tight", dpi=2500)
     plt.close()

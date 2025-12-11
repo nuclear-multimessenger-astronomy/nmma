@@ -79,8 +79,8 @@ class AnalysisRun(object):
 
         logger.setLevel(logging.WARNING)
         # split the likelihood for difference inference_favour
-        assert inference_favour in ['nmma', 'nmma_gw'], "Invalid inference_favour"
-        if inference_favour == 'nmma':
+        assert inference_favour in ["nmma", "nmma_gw"], "Invalid inference_favour"
+        if inference_favour == "nmma":
             light_curve_data = data_dump["light_curve_data"]
             likelihood, priors = setup_nmma_likelihood(
                 interferometers=ifo_list,
@@ -90,7 +90,7 @@ class AnalysisRun(object):
                 args=args,
             )
 
-        elif inference_favour == 'nmma_gw':
+        elif inference_favour == "nmma_gw":
             likelihood, priors = setup_nmma_gw_likelihood(
                 interferometers=ifo_list,
                 waveform_generator=waveform_generator,

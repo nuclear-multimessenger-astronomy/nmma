@@ -16,7 +16,7 @@ def args():
         outdir="outdir",
         label="lbol_test",
         trigger_time=60168.79041667,
-        data='example_files/lbol/ztf23bqun/23bqun_bbdata.csv',
+        data="example_files/lbol/ztf23bqun/23bqun_bbdata.csv",
         prior="example_files/lbol/ztf23bqun/Arnett_modified.priors",
         tmin=0.005,
         tmax=20.0,
@@ -45,7 +45,7 @@ def args():
         ra=None,
         dec=None,
         fetch_Ebv_from_dustmap=False,
-        systematics_file=None
+        systematics_file=None,
     )
 
     return args

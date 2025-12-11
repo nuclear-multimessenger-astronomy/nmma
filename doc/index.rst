@@ -138,7 +138,7 @@ Install parallel-bilby:
 
 .. code::
 
-   conda install -c conda-forge parallel-bilby
+   pip install parallel-bilby
 
 .. note::
 
@@ -161,7 +161,7 @@ specifc instructions below)
 
 .. code::
 
-   conda install -c conda-forge pymultinest
+   conda install conda-forge::pymultinest
 
 .. warning::
 
@@ -184,14 +184,14 @@ requirements.txt file which are necessary for NMMA:
 
 .. code::
 
-   pip install .
+   pip install -e .
 
 .. note::
 
    There is an issue pip installing ``pyfftw`` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
 .. code::
-   
+   pip install keras, tensorflow
    pip install importlib_resources
    pip install  extinction
    pip install dill

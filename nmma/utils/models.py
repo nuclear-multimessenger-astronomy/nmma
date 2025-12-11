@@ -2,13 +2,16 @@ from .models_tools import SOURCES, get_models_home, get_parser  # noqa
 
 try:
     from mpi4py import MPI
+
     mpi_enabled = True
 except ImportError:
     mpi_enabled = False
 
+
 def mpi_barrier(comm):
     if mpi_enabled:
         comm.Barrier()
+
 
 def refresh_models_list(models_home=None, source=None):
 

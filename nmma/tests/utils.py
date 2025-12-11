@@ -15,9 +15,9 @@ def test_lightcurve_HoNa_basic():
     n = 3.5
     L, T, r = lightcurve_HoNa(t, mass, velocities, opacities, n)
 
-    assert L.shape == T.shape == r.shape == t.shape, (
-        "Output shapes must match input time array"
-    )
+    assert (
+        L.shape == T.shape == r.shape == t.shape
+    ), "Output shapes must match input time array"
     assert np.all(L > 0), "Luminosity must be positive"
     assert np.all(T > 0), "Temperature must be positive"
     assert np.all(r > 0), "Radius must be positive"
@@ -55,6 +55,6 @@ def test_lightcurve_HoNa_types():
     n = 3.5
     with pytest.raises(
         AssertionError,
-        match=re.escape("Expected: mass=float, velocities/opacities=list[float]")
+        match=re.escape("Expected: mass=float, velocities/opacities=list[float]"),
     ):
         lightcurve_HoNa(t, mass, velocities, opacities, n)
