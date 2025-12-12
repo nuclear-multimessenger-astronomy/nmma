@@ -160,6 +160,57 @@ def pipe_inj_parsing(parser):
             "with --gps-file" ))
     return parser
 
+def slurm_setup_parser(parser):
+    parser.description="Create files from nmma injection file"
+    parser = pipe_inj_parsing(parser)
+    
+    parser.add_argument("--injection-file","--injection",
+        required=True, help="The bilby injection json file to be used")
+    parser.add_argument("-o", "--outdir", default="outdir", 
+        help="Path to the output directory")
+    parser.add_argument("--analysis-file", required=True,
+        help="The analysis bash script to be replicated")
+    parser.add_argument("--n-per-job","--lightcurves-per-job", type=int, default=100,
+        help="Number of services per job")
+    ### Dummy for intermediate setup until we decide on whether to abandon or extend these routines
+    parser.add_argument("--simple-setup", default=True, choices=[True])
+    return parser
+
+
+
+def slurm_analysis_parser(parser):
+    slurm_args = parser.add_argument_group(
+        title="Slurm arguments",
+        description="Arguments for running the lightcurve analysis on a Slurm HPC cluster",
+    )
+    # Slurm-specific arguments
+    slurm_args.add_argument("--Ncore", default=8, type=int,
+        help="number of cores for mpiexec")
+    slurm_args.add_argument("--base-dir", default=os.getcwd(),
+        help="base directory for the job")
+    slurm_args.add_argument("--job-name")
+    slurm_args.add_argument("--logs-dir-name", default="slurm_logs",
+        help="directory name for slurm logs")
+    slurm_args.add_argument("--cluster-name", default="Expanse",
+        help="Name of HPC cluster")
+    slurm_args.add_argument("--partition-type", default="shared",
+        help="Partition name to request for computing")
+    slurm_args.add_argument("--nodes", type=int, default=1,
+        help="Number of nodes to request for computing")
+    slurm_args.add_argument("--gpus", type=int, default=0,
+        help="Number of GPUs to request")
+    slurm_args.add_argument("--memory-GB", type=int, default=64,
+        help="Memory allocation to request for computing")
+    slurm_args.add_argument("--time", default="24:00:00",
+        help="Walltime for instance")
+    slurm_args.add_argument("--mail-type", default="NONE",
+        help="slurm mail type (e.g. NONE, FAIL, ALL)")
+    slurm_args.add_argument("--mail-user", help="contact email address")
+    slurm_args.add_argument("--python-env-name", default="nmma_env",
+        help="Name of python environment to activate")
+    slurm_args.add_argument("--script-name", default="slurm.sub")
+
+    return parser
 
 
 ############# UTILS #############

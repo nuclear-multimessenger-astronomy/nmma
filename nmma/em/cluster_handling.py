@@ -4,31 +4,8 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 from . import em_parsing as emp
-from ..core.parsing import nmma_base_parsing
-from ..joint.injection_handling import NMMAInjectionCreator
+from ..core.parsing import nmma_base_parsing, slurm_analysis_parser
 from ..core.utils import read_injection_file, load_yaml
-
-
-def main():
-    args = emp.parsing_and_logging(emp.slurm_lc_parser)
-    injection_creator = NMMAInjectionCreator(args)
-    dataframe = injection_creator.generate_prelim_dataframe()
-
-    for index, _ in dataframe.iterrows():
-        outdir = os.path.join(args.outdir, str(index))
-        os.makedirs(outdir, exist_ok=True)
-        injection_creator.priors.to_file(outdir, label="injection")
-        with open(args.analysis_file, "r") as file:
-            analysis = file.read()
-
-        for key, data in zip(
-            ('PRIOR', 'OUTDIR', 'INJOUT', 'INJNUM'), 
-            (os.path.join(outdir, "injection.prior"), outdir, os.path.join(outdir, "lc.csv"), str(index))
-        ):
-            analysis = analysis.replace(key, data)
-
-        with open(os.path.join(outdir, "inference.sh"), "w") as file:
-            file.write(analysis)
 
 
 def lc_creation():
@@ -36,7 +13,7 @@ def lc_creation():
     os.makedirs(os.path.join(args.outdir, "logs"), exist_ok=True)
 
     injection_df = read_injection_file(args)
-    n_jobs = int(np.ceil(len(injection_df) / args.lightcurves_per_job))
+    n_jobs = int(np.ceil(len(injection_df) / args.n_per_job))
 
     for ii in range(n_jobs):
         with open(args.analysis_file, "r") as file:
@@ -48,7 +25,9 @@ def lc_creation():
             
 
 def slurm_analysis(args=None):
-    parser = nmma_base_parsing(emp.slurm_analysis_parser, return_parser=True)
+    parser = nmma_base_parsing(
+        (slurm_analysis_parser, emp.multi_wavelength_analysis_parser),
+        return_parser=True)
     if args is None:
         args = parser.parse_args()
 
@@ -83,14 +62,14 @@ def slurm_analysis(args=None):
         for act in parser._actions if act.dest not in ignore_args
     ])
     
-
+    job_name = args.job_name if args.job_name else "lightcurve-analysis"
 
     # Write slurm script based on inputs
     sbatch_lines = [
         "#!/bin/bash",
-        f"#SBATCH --job-name={args.job_name}.job",
-        f"#SBATCH --output={args.logs_dir_name}/{args.job_name}_%A_%a.out",
-        f"#SBATCH --error={args.logs_dir_name}/{args.job_name}_%A_%a.err",
+        f"#SBATCH --job-name={job_name}.job",
+        f"#SBATCH --output={args.logs_dir_name}/{job_name}_%A_%a.out",
+        f"#SBATCH --error={args.logs_dir_name}/{job_name}_%A_%a.err",
         f"#SBATCH -p {args.partition_type}",
         f"#SBATCH --nodes {args.nodes}",
         f"#SBATCH --ntasks-per-node {args.Ncore}",

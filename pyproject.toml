@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nmma"
 authors = [
-    {name = "Peter Tsun Ho Pang, Michael Coughlin, Tim Dietrich, Ingo Tews", email = "nuclear_multimessenger_astronomy@googlegroups.com"}
+    {name = "Peter Tsun Ho Pang, Henrik Rose, Michael Coughlin, Tim Dietrich, Ingo Tews", email = "nuclear_multimessenger_astronomy@googlegroups.com"}
 ]
 description = "A nuclear physics multi-messenger Bayesian inference library"
 readme = "README.md"
@@ -46,7 +46,7 @@ nmma-generation = "nmma.joint.generation:nmma_generation"
 nmma-analysis = "nmma.joint.main:nmma_analysis"
 lightcurve-analysis = "nmma.em.analysis:main"
 lightcurve-analysis-lbol = "nmma.em.analysis:lbol_main"
-lightcurve-injection-slurm-setup = "nmma.em.cluster_handling:main"
+lightcurve-injection-slurm-setup = "nmma.joint.injection_handling:multi_run_setup"
 combine-EOS = "nmma.post_processing.ns_characteristics:main"
 create-lightcurve-slurm = "nmma.em.cluster_handling:lc_creation"
 create-svdmodel = "nmma.em.training:create_svdmodel"

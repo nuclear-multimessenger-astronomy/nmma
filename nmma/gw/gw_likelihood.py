@@ -2,7 +2,7 @@ import numpy as np
 from ast import literal_eval
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
 from ..core.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
-from ..core.conversion import bbh_source_frame, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion
+from ..core.conversion import (bbh_source_frame, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion)
 
 def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     """

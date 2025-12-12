@@ -1,4 +1,6 @@
-
+from ..em.em_parsing import (
+    basic_em_only_parsing, em_time_parsing, em_model_parsing, grb_parsing
+)
 def joint_postprocess_parser(parser):
     parser.add_argument("--outdir", metavar="PATH", required=True)
     parser.add_argument("--cred-interval", type=float, default=0.95, 
@@ -106,4 +108,28 @@ def corner_plot_parser(parser):
     parser.add_argument("--kwargs", default="{}",
         help="kwargs to be passed to corner.corner. Eg: {'plot_datapoints': False}, enclose {} in double quotes" )
 
+    return parser
+
+
+def lc_marginalisation_parser(parser):
+    parser.description="Summary analysis for nmma injection file"
+
+    parser = basic_em_only_parsing(parser)
+    parser = em_time_parsing(parser)
+    parser = em_model_parsing(parser)
+    parser = grb_parsing(parser)
+
+    # specific arguments
+    parser.add_argument(
+        "--template-file",  help="The template file to be used"
+    )
+    parser.add_argument("--hdf5-file", help="The hdf5 file to be used")
+    parser.add_argument("--coinc-file",  help="The coinc xml file to be used")
+    parser.add_argument("-g", "--gps", type=int, default=1187008882)
+    parser.add_argument("-s", "--skymap")
+    parser.add_argument("--eos-data", "--eos-dir",  
+        help="EOS file directory in (radius [km], mass [solar mass], lambda)")
+    parser.add_argument("-e", "--eos-weights", "--gw170817-eos", type=str)
+    parser.add_argument("-n", "--Nmarg", type=int, default=100)
+    parser.add_argument("--generation-seed", type=int, default=42, help="Injection generation seed (default: 42)")
     return parser

@@ -1,13 +1,11 @@
 import argparse
-import os
 
 import numpy as np
-
 from .utils import DEFAULT_FILTERS
 
 # unused imports kept for forward compatibility
 from ..core.parsing import (parsing_and_logging, single_messenger_analysis_parsing, 
-    base_injection_parsing, pipe_inj_parsing, nonefloat, noneint, nonestr )
+    base_injection_parsing, nonefloat, noneint, nonestr )
 
 
 
@@ -391,29 +389,6 @@ def lc_grid_parser(parser):
     parser.add_argument("--random-seed", type=int, default=42, help="Random seed for numpy")
     return parser
 
-def lc_marginalisation_parser(parser):
-    parser.description="Summary analysis for nmma injection file"
-
-    parser = basic_em_only_parsing(parser)
-    parser = em_time_parsing(parser)
-    parser = em_model_parsing(parser)
-    parser = grb_parsing(parser)
-
-    # specific arguments
-    parser.add_argument(
-        "--template-file",  help="The template file to be used"
-    )
-    parser.add_argument("--hdf5-file", help="The hdf5 file to be used")
-    parser.add_argument("--coinc-file",  help="The coinc xml file to be used")
-    parser.add_argument("-g", "--gps", type=int, default=1187008882)
-    parser.add_argument("-s", "--skymap")
-    parser.add_argument("--eos-data", "--eos-dir",  
-        help="EOS file directory in (radius [km], mass [solar mass], lambda)")
-    parser.add_argument("-e", "--eos-weights", "--gw170817-eos", type=str)
-    parser.add_argument("-n", "--Nmarg", type=int, default=100)
-    parser.add_argument("--generation-seed", type=int, default=42, help="Injection generation seed (default: 42)")
-    return parser
-
 def multi_config_parser(parser):
     parser.description="Multi config analysis script for NMMA."
     
@@ -431,58 +406,5 @@ def multi_config_parser(parser):
             " configurations will be run depending on the state and value of --parallel and --process. This takes precedence"
             " over --process"
         ), )
-
-    return parser
-
-def slurm_lc_parser(parser):
-    parser.description="Create lightcurve files from nmma injection file"
-    parser = pipe_inj_parsing(parser)
-    
-    parser.add_argument("--injection-file","--injection",
-        required=True, help="The bilby injection json file to be used")
-    parser.add_argument("-o", "--outdir", default="outdir", 
-        help="Path to the output directory")
-    parser.add_argument("--analysis-file", required=True,
-        help="The analysis bash script to be replicated")
-    parser.add_argument("--lightcurves-per-job", type=int, default=100,
-        help="Number of light curves per job")
-    ### Dummy for intermediate setup until we decide on whether to abandon or extend these routines
-    parser.add_argument("--simple-setup", default=True, choices=[True])
-    return parser
-
-
-
-def slurm_analysis_parser(parser):
-    parser = multi_wavelength_analysis_parser(parser)
-    slurm_args = parser.add_argument_group(
-        title="Slurm arguments",
-        description="Arguments for running the lightcurve analysis on a Slurm HPC cluster",
-    )
-    # Slurm-specific arguments
-    slurm_args.add_argument("--Ncore", default=8, type=int,
-        help="number of cores for mpiexec")
-    slurm_args.add_argument("--base-dir", default=os.getcwd(),
-        help="base directory for the job")
-    slurm_args.add_argument("--job-name", default="lightcurve-analysis")
-    slurm_args.add_argument("--logs-dir-name", default="slurm_logs",
-        help="directory name for slurm logs")
-    slurm_args.add_argument("--cluster-name", default="Expanse",
-        help="Name of HPC cluster")
-    slurm_args.add_argument("--partition-type", default="shared",
-        help="Partition name to request for computing")
-    slurm_args.add_argument("--nodes", type=int, default=1,
-        help="Number of nodes to request for computing")
-    slurm_args.add_argument("--gpus", type=int, default=0,
-        help="Number of GPUs to request")
-    slurm_args.add_argument("--memory-GB", type=int, default=64,
-        help="Memory allocation to request for computing")
-    slurm_args.add_argument("--time", default="24:00:00",
-        help="Walltime for instance")
-    slurm_args.add_argument("--mail-type", default="NONE",
-        help="slurm mail type (e.g. NONE, FAIL, ALL)")
-    slurm_args.add_argument("--mail-user", help="contact email address")
-    slurm_args.add_argument("--python-env-name", default="nmma_env",
-        help="Name of python environment to activate")
-    slurm_args.add_argument("--script-name", default="slurm.sub")
 
     return parser

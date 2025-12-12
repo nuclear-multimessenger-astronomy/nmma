@@ -1,17 +1,17 @@
 import numpy as np
 import pandas as pd
-
+import os
 import bilby
 from bilby_pipe.utils import convert_string_to_dict
 from bilby_pipe.create_injections import InjectionCreator
 import multiprocessing
 
 
-from ..core.parsing import nmma_base_parsing, process_multi_condition_string
+from ..core.parsing import (parsing_and_logging, slurm_setup_parser, nmma_base_parsing, process_multi_condition_string)
 from ..core.constants import set_cosmology, get_cosmology
 from ..core.utils import set_filename, rejection_sample, read_injection_file
 from ..core.conversion import MultimessengerConversion
-from ..em import utils, lightcurve_handling as lch
+from ..em import utils, lightcurve_handling as lch, em_parsing as emp
 from ..em.model import create_injection_model
 from ..eos.eos_processing import EoSConverter
 from .joint_parsing import injection_parsing
@@ -426,6 +426,28 @@ class NMMAInjectionCreator(InjectionCreator):
 
         injection_values = pd.DataFrame.from_dict(injection_values)
         return injection_values
+
+def multi_run_setup():
+    args = parsing_and_logging(slurm_setup_parser)
+    injection_creator = NMMAInjectionCreator(args)
+    dataframe = injection_creator.generate_prelim_dataframe()
+
+    for index, _ in dataframe.iterrows():
+        outdir = os.path.join(args.outdir, str(index))
+        os.makedirs(outdir, exist_ok=True)
+        injection_creator.priors.to_file(outdir, label="injection")
+        with open(args.analysis_file, "r") as file:
+            analysis = file.read()
+
+        for key, data in zip(
+            ('PRIOR', 'OUTDIR', 'INJOUT', 'INJNUM'), 
+            (os.path.join(outdir, "injection.prior"), outdir, os.path.join(outdir, "lc.csv"), str(index))
+        ):
+            analysis = analysis.replace(key, data)
+
+        with open(os.path.join(outdir, "inference.sh"), "w") as file:
+            file.write(analysis)
+
 
         
 #### UTILS ######

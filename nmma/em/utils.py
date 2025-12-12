@@ -687,24 +687,23 @@ class Spectrum:
         self.wavelength_arr = wavelengths.cgs
         self.flux_density_arr = flux_density.cgs
 
-    def interpolate(self):
+    def interpolate(self, vals):
         """
         Interpolate a functional form of the flux density
         array as a function of wavelength
         Returns
         -------
-        spectrum_func: scipy.interpolate.interpolate.interp1d
-            functional representation of spectrum
+        interpolated spectrum
         """
 
         # Values must be in cgs for interpolation
-        return interp.interp1d(
-            self.wavelength_arr.cgs,
-            self.flux_density_arr.cgs,
-            bounds_error=False,
-            fill_value=0,
+        return np.interp(vals,
+            self.wavelength_arr,
+            self.flux_density_arr,
+            left=0,
+            right=0
         )
-
+    
     def plot(self, ax=None, **kwargs):
         """
         Plot spectrum in format similar to Even et al. (2019)

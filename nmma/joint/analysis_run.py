@@ -595,3 +595,5 @@ class Dynesty(WorkerRun):
             result.plot_corner(parameters = injection_parameters, priors=True, dpi = 200)
             bestfit_params = read_bestfit_from_posterior(self.args)
             self.likelihood.final_diagnostics(bestfit_params, self.args, result)
+
+        return result
