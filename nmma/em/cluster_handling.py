@@ -162,6 +162,3 @@ def multi_config_analysis(args=None):
     if args.parallel:
         for future in futures:
             future.result()
-
-if __name__ == "__main__":
-    main()
