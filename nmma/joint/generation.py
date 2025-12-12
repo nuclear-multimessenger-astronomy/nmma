@@ -25,11 +25,12 @@ from ..em.model import create_injection_model
 from ..em.lightcurve_generation import create_light_curve_data
 from ..em.systematics import FilterSystematicsHandler
 from ..em import utils as em_utils
-from ..eos.eos_likelihood import compose_eos_constraints, setup_joint_eos_constraint, setup_tabulated_eos_priors
-from ..joint.constants import default_cosmology
-from ..joint.conversion import EoSConverter
-from ..joint.base import adjust_priors_for_nmma, adjust_hubble_prior
-from ..joint.utils import read_trigger_time
+from ..eos.eos_likelihood import (compose_eos_constraints, 
+        EoSConverter, JointEoSConstraint, setup_tabulated_eos_priors)
+from ..core.constants import set_cosmology
+from ..core.base import adjust_priors_for_nmma, adjust_hubble_prior
+from ..core.utils import read_trigger_time
+from .joint_likelihood import MultiMessengerLikelihood
 
 
 from .. import __version__
@@ -139,9 +140,9 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, logger=None):
 
         # nmma-defaults that might conflict with bilby/bilby_pipe defaults
-        args.cosmology = getattr(args, "cosmology", default_cosmology.name)
+        gen_cosmo = set_cosmology(getattr(args, "cosmology", None))
+        args.cosmology = gen_cosmo.name
         self.cosmology = args.cosmology
-        bilby.gw.cosmology.set_cosmology(self.cosmology)
 
         super().__init__(args, unknown_args)
         # Generic setup, ripped from bilby pipe
@@ -200,6 +201,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             self.injection_parameters=None
 
         self.trigger_time = read_trigger_time(self.injection_parameters, args, 'gps')
+        args.trigger_time = self.trigger_time
 
         self.meta_data = dict(
                 config_file=self.ini,
@@ -210,16 +212,33 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 injection_parameters= self.injection_parameters,
         )
         self.adjust_priors_and_data(args, logger)
+
+        #test-build likelihood 
+        MultiMessengerLikelihood.setup_from_args(
+            self.data_dump, self._priors, self.args, logger)
         self.save_data_dump()
 
     def adjust_priors_and_data(self, args, logger):
         messengers, analysis_modifiers = [], []
         data_dump = dict(injection_parameters = self.injection_parameters)
-        priors = self._get_priors()
-        priors = adjust_priors_for_nmma(priors, logger)
 
-        ###adjust hubble prior if applicable
-        # this may overwrite an existing Hubble prior from adjust_priors_for_nmma
+        # GW SETUP
+        if args.detectors:
+            messengers.append("gw")
+            # get a BBHPriorDict only if GW parameters are present
+            priors = super()._get_priors()
+            self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, self.unknown_args)
+            #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
+            self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)
+            args.gw_likelihood_type = self.gw_inputs.likelihood_type
+            if args.gw_likelihood_type == "ROQGravitationalWaveTransient":
+                self.gw_inputs.save_roq_weights()
+            data_dump |= dict(waveform_generator=self.gw_inputs.waveform_generator,
+                ifo_list=self.gw_inputs.interferometers)
+        else:
+            priors = self._get_priors()
+
+        priors = adjust_priors_for_nmma(priors, logger)
         priors = adjust_hubble_prior(priors, args, logger)
         if args.Hubble or any(['hubble' in key.lower() for key in priors.keys()]):
             analysis_modifiers.append("Hubble")
@@ -252,6 +271,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         # EOS Setup
         if args.emulator_metadata:
             messengers.append("eos")
+            logger.info("Setting up EOS constraints")
             data_dump |= dict(eos_constraint_dict= compose_eos_constraints(args))
 
         elif args.eos_data:
@@ -259,26 +279,10 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             eos_constraint_dict = compose_eos_constraints(args)
             if eos_constraint_dict:
                 eos_converter = EoSConverter(args, 'tabulated')
-                constraint = setup_joint_eos_constraint(eos_constraint_dict, eos_converter)
+                constraint = JointEoSConstraint(eos_constraint_dict, eos_converter=eos_converter)
                 args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weighted_eos(
                     args.Neos, args.outdir, args.eos_weight)
             priors = setup_tabulated_eos_priors(args, priors, logger)
-            
-        # GW SETUP
-        if args.detectors:
-            messengers.append("gw")
-            # get a BBHPriorDict only if GW parameters are present
-            gw_prior = super()._get_priors()
-            gw_prior.update(priors)
-            priors = gw_prior
-            self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, self.unknown_args)
-            #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
-            self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)
-            args.gw_likelihood_type = self.gw_inputs.likelihood_type
-            if args.gw_likelihood_type == "ROQGravitationalWaveTransient":
-                self.gw_inputs.save_roq_weights()
-            data_dump |= dict(waveform_generator=self.gw_inputs.waveform_generator,
-                ifo_list=self.gw_inputs.interferometers)
 
         self.args = args
         self.messengers = messengers

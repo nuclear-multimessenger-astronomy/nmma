@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .utils import autocomplete_data, interpolate_nans, setup_sample_times
-from ..utils.models import get_models_home, get_model  
+from ..core.gitlab import get_models_home, get_model  
 
 
 from . import model_parameters, plotting_utils as pu

@@ -1,36 +1,97 @@
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
-from os.path import exists
+try:
+    from yaml import CLoader as Loader, load
+except ImportError:
+    from yaml import Loader, load
+import argparse
+import shutil
+import os 
 from pathlib import Path
-from os import makedirs
+import subprocess
+
 import requests
-from requests.exceptions import ConnectionError
-from yaml import load
+from tqdm.auto import tqdm
 
-from .models_tools import SKIP_FILTERS, download, decompress, get_models_home
-
+pbar = {}
+MODELS = {}
 REPO = "https://gitlab.com/Theodlz/nmma-models"
 
-MODELS = {}
+# X-ray and Radio data
+SKIP_FILTERS = [
+    "X-ray-1keV",
+    "X-ray-5keV",
+    "radio-5.5GHz",
+    "radio-1.25GHz",
+    "radio-3GHz",
+    "radio-6GHz",
+]
 
-try:
-    from mpi4py import MPI
-    mpi_enabled = True
-except ImportError:
-    mpi_enabled = False
+
+def get_models_home(models_home=None) -> str:
+    if not models_home:
+        models_home = os.environ.get("NMMA_MODELS", os.path.join("~", "nmma_models"))
+    models_home = os.path.expanduser(models_home)
+    if not os.path.exists(models_home):
+        os.makedirs(models_home)
+    return models_home
+
+
+def clear_data_home(models_home=None):
+    models_home = get_models_home(models_home)
+    shutil.rmtree(models_home)
+
+
+def download(file_info):
+    url, filepath = file_info
+    resp = requests.get(url, stream=True)
+    total = int(resp.headers.get("content-length", 0))
+    chunk_size = 4096
+    file_content = b""
+
+    Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+    with open(filepath, "wb") as f, tqdm(
+        total=total,
+        unit="iB",
+        unit_scale=True,
+        unit_divisor=1024,
+        desc=f"{str(filepath).split('/')[-1]}",
+    ) as pbar:
+        for chunk in resp.iter_content(chunk_size=chunk_size):
+            f.write(chunk)
+            pbar.update(len(chunk))
+
+    if len(file_content) != total:
+        raise ValueError(
+            f"Downloaded file {filepath} is incomplete. "
+            f"Only {len(file_content)} of {total} bytes were downloaded."
+        )
+
+    return filepath
+
+
+def decompress(file_path):
+    if not file_path.endswith(".lzma"):
+        raise ValueError(f"File {file_path} is not a .lzma file")
+    if not os.path.exists(file_path):
+        raise ValueError(f"File {file_path} does not exist")
+
+    stdout, stderr = subprocess.Popen(
+        ["lzma", "-d", file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ).communicate()
+    if stderr.decode("utf-8") != "" and "File exists" not in stderr.decode("utf-8"):
+        raise RuntimeError(f"Error decompressing {file_path}: {stderr}")
+    return file_path
+
 
 def download_and_decompress(file_info):
     download(file_info)
     decompress(file_info[1])
 
-def mpi_barrier(comm):
-    if mpi_enabled:
-        comm.Barrier()
-
 def download_models_list(models_home=None):
     # first we load the models list from gitlab
     models_home = get_models_home(models_home)
-    makedirs(models_home, exist_ok=True)
+    os.makedirs(models_home, exist_ok=True)
     r = requests.get(f"{REPO}/raw/main/models.yaml", allow_redirects=True)
     with open(Path(models_home, "models.yaml"), "wb") as f:
         f.write(r.content)
@@ -38,41 +99,27 @@ def download_models_list(models_home=None):
 def load_models_list(models_home=None):
 
     models_home = get_models_home(models_home)
-
-    downloaded_if_missing = True
-    if not exists(Path(models_home, "models.yaml")):
-        try:
-            download_models_list(models_home=models_home)
-        except ConnectionError:
-            downloaded_if_missing = False
-            pass
-
+    models_file = Path(models_home, "models.yaml")
     models = {}
-
-    if downloaded_if_missing:
-        try:
-            from yaml import CLoader as Loader
-        except ImportError:
-            from yaml import Loader
-        try:
-            with open(Path(models_home, "models.yaml"), "r") as f:
-                models = load(f, Loader=Loader)
-        except Exception as e:
-            downloaded_if_missing = False
-            print(
-                f"Could not open the download models list, using local files instead: {str(e)}"
-            )
-
-    if not downloaded_if_missing:
-        print("Attempting to retrieve local files...")
+    
+    try:
+        if not models_file.exists():
+            download_models_list(models_home=models_home)
+        with models_file.open("r") as f:
+            models = load(f, Loader=Loader)
+        downloaded_if_missing = True
+    except Exception as e:
+        downloaded_if_missing = False
+        print(f"Could not open downloaded models list, using local files instead: {e}")
 
     files = [f for f in Path(models_home).glob("*") if f.is_dir()]
     files = [f.stem for f in files]
 
+
     for f in files:
         name = f.split("/")[-1]
         filters = []
-        if exists(Path(models_home, name)):
+        if Path(models_home, name).exists():
             filter_files = [
                 f.stem for f in Path(models_home, name).glob("*") if f.is_file()
             ]
@@ -80,15 +127,9 @@ def load_models_list(models_home=None):
                 ff = ff.split("/")[-1]
 
                 if name in ff:
-                    ff = ff.replace(name, "")
-
-                if ff.startswith("_"):
-                    ff = ff[1:]
-
-                if ff.endswith("_"):
-                    ff = ff[:-1]
-
-                if ff is not None and ff != "":
+                    ff = ff.replace(name, "")              
+                ff = ff.strip("_")
+                if ff:
                     filters.append(ff)
 
         filters = list(set(filters))
@@ -104,7 +145,7 @@ def load_models_list(models_home=None):
 def refresh_models_list(models_home=None):
     global MODELS
     models_home = get_models_home(models_home)
-    if exists(Path(models_home, "models.yaml")):
+    if Path(models_home, "models.yaml").exists():
         Path(models_home, "models.yaml").unlink()
     models = MODELS
     try:
@@ -140,7 +181,7 @@ def get_model(
         raise ValueError(f"model_name {model_name} not found in models list")
     model_info = MODELS[model_name]
 
-    makedirs(Path(models_home, model_name), exist_ok=True)
+    os.makedirs(Path(models_home, model_name), exist_ok=True)
 
     filter_synonyms = [filt.replace("_", ":") for filt in model_info["filters"]]
 
@@ -184,32 +225,75 @@ def get_model(
         [f"{base_url}/{core_model_name}.{core_format}"] if not filters_only else []
     ) + [f"{base_url}/{model_name}/{f}.{filter_format}" for f in filters]
 
-    comm = None
-    if mpi_enabled:
-        try:
-            comm = MPI.COMM_WORLD
-        except Exception as e:
-            print("MPI could not be initialized:", e)
-            comm = None
-
-    rank = 0
-    if comm:
-        try:
-            rank = comm.Get_rank()
-        except Exception as e:
-            print("Error getting MPI rank:", e)
+    try:
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+    except Exception as e:
+        print("MPI could not be initialized:", e)
+        comm = None
+        rank = 0
 
     missing = [(f"{u}", f"{f}") for u, f in zip(urls, filepaths) if not f.exists()]
     if len(missing) > 0:
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
 
-        if rank == 0 or not comm:
+        
+        if rank == 0:
             print(f"downloading {len(missing)} files for model {model_name}:")
             with ThreadPoolExecutor(
                 max_workers=min(len(missing), max(cpu_count(), 8))
             ) as executor:
                 executor.map(download_and_decompress, missing)
-        # mpi_barrier(comm)  ## this leads to pending indefinitely as we have a second barrier in models.py
 
+        if comm:
+            comm.Barrier()
     return [str(f) for f in filepaths], filters + skipped_filters
+
+
+def get_parser():
+
+    parser = argparse.ArgumentParser(description="Download SVD models from GitLab")
+    parser.add_argument("--model", help="Name the model to be used")
+    parser.add_argument("--svd-path",
+        help="Path to the SVD models directory. If not provided, will use the default path")
+    parser.add_argument("--filters",
+        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available" )
+    parser.add_argument("--refresh-models-list", action="store_true",
+        help="Refresh the list of models available on Gitlab")
+
+    return parser
+
+def main(args=None):
+
+    if args is None:
+        parser = get_parser()
+        args = parser.parse_args()
+
+    if args.refresh_models_list:
+        refresh_models_list(
+            models_home=args.svd_path if args.svd_path not in [None, ""] else None
+        )
+
+    filters = []
+    if args.filters not in [None, ""]:
+        try:
+            filters = args.filters.split(",")
+        except AttributeError:
+            pass
+
+    if args.model in [None, ""]:
+        raise ValueError("a model must be specified with --model")
+    
+    return get_model(
+        models_home=args.svd_path if args.svd_path not in [None, ""] else None,
+        model_name=args.model,
+        filters=filters,
+        download_if_missing=True,
+        filters_only=False,
+    )
+
+
+if __name__ == "__main__":
+    main()

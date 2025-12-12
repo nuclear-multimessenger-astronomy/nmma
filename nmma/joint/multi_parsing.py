@@ -3,7 +3,8 @@ from ast import literal_eval
 import bilby
 from bilby_pipe import parser as bp_parser, data_generation as data_gen
 
-from nmma.joint.base_parsing import base_analysis_parsing, nonestr
+from nmma.core.parsing import base_analysis_parsing, nonestr
+from nmma.joint.joint_parsing import joint_likelihood_parsing
 from nmma.em.em_parsing import em_analysis_parsing
 from nmma.eos.eos_parsing import eos_parsing, tabulated_eos_parsing
 from nmma.gw.gw_parsing import gw_parsing
@@ -28,6 +29,7 @@ def _create_base_nmma_parser(sampler="dynesty"):
     base_parser = base_analysis_parsing(base_parser)
     base_parser = em_analysis_parsing(base_parser)
     base_parser = gw_parsing(base_parser)
+    base_parser = joint_likelihood_parsing(base_parser)
     base_parser = tabulated_eos_parsing(base_parser)
     base_parser = eos_parsing(base_parser)
     base_parser = add_misc_settings(base_parser)

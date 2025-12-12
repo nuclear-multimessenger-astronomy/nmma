@@ -4,10 +4,9 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 from . import em_parsing as emp
-from .io import load_yaml
-from ..joint.base_parsing import nmma_base_parsing
+from ..core.parsing import nmma_base_parsing
 from ..joint.injection_handling import NMMAInjectionCreator
-from ..joint.utils import read_injection_file
+from ..core.utils import read_injection_file, load_yaml
 
 
 def main():

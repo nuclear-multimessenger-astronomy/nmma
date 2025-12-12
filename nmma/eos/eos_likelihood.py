@@ -1,4 +1,3 @@
-from __future__ import division
 from glob import glob
 from argparse import Namespace
 import os
@@ -11,9 +10,9 @@ from scipy.special import logsumexp
 from scipy.stats import norm, gaussian_kde
 from matplotlib import pyplot as plt
 from bilby.core.prior import WeightedCategorical, PriorDict
-from ..joint.base import NMMABaseLikelihood
-from ..joint.utils import fading_cmap
-from ..joint.conversion import EoSConverter
+from .eos_processing import EoSConverter
+from ..core.base import NMMABaseLikelihood
+from ..core.utils import fading_cmap
     
 def setup_tabulated_eos_priors(args, priors, logger=None):
     if logger:    
@@ -53,7 +52,7 @@ def tabulated_eos_setup(args):
    
 class EquationofStateLikelihood(NMMABaseLikelihood):
     def __init__(self, priors, constraint_dict, eos_converter, **kwargs):
-        constraint =setup_joint_eos_constraint(constraint_dict, eos_converter)
+        constraint =JointEoSConstraint(constraint_dict, eos_converter=eos_converter)
         # TODO: to be extended for more complex likelihood expressions
         super().__init__(constraint, priors, **kwargs)
 
@@ -85,7 +84,6 @@ class EquationofStateLikelihood(NMMABaseLikelihood):
 
 
 def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
-    
     try:
         with open(args.eos_constraint_json, 'r') as f:
             constraint_dict = json.load(f) 
@@ -145,45 +143,12 @@ def read_constraint_from_args(args, constraint_kind):
     else:
         return None
     
-def setup_joint_eos_constraint(constraint_dict, eos_converter=None):
-    constraint_list=[]
-    for constraint_kind, sub_constraints in constraint_dict.items():
-        if constraint_kind == 'lower_mtov':
-            for label, constraint in sub_constraints.items():
-                constraint_list.append(LowerMTOVConstraint(
-                    measured_mass=constraint['mass'],
-                    measure_error=constraint.get('error',0.),
-                    name=label,
-                    arxiv_ref=constraint.get('arxiv', None)
-                ))
-        elif constraint_kind == 'upper_mtov':
-            for label, constraint in sub_constraints.items():
-                constraint_list.append(UpperMTOVConstraint(
-                    measured_mass=constraint['mass'],
-                    measure_error=constraint.get('error',0.),
-                    name=label,
-                    arxiv_ref=constraint.get('arxiv', None)
-                ))
-        elif constraint_kind == 'mass_radius':
-            for label, constraint in sub_constraints.items():
-                constraint_list.append(MassRadiusConstraint(
-                    file_path=constraint.get('posterior', None),
-                    name=label,
-                    arxiv_ref=constraint.get('arxiv', None)
-                ))
-        else:
-            raise ValueError('Unknown type of EoS Constraint. Must be "lower_mtov", \
-                             "upper_mtov", "mass-radius" or "micro\
-                             ')
-        
-        if eos_converter is None:
-            eos_converter = Namespace(macro_parameters={})
-
-    return JointEoSConstraint(*constraint_list, eos_converter=eos_converter)
-
 class JointEoSConstraint:
     def __init__(self, *constraints, eos_converter = None):
-        self.constraints = constraints
+        self.constraints = self.initialise_constraints(constraints)
+
+        if eos_converter is None:
+            eos_converter = Namespace(macro_parameters={})
         self.eos_converter = eos_converter
 
     def __repr__(self):
@@ -194,6 +159,49 @@ class JointEoSConstraint:
         else:
             return f"{self.__class__.__name__} of {', '.join([cons.__repr__() for cons in self.constraints[:-1]])} and {self.constraints[-1].__repr__()}"
 
+    def initialise_constraints(self, constraint_tuple):
+        constraint_list=[]
+        for constraint in constraint_tuple:
+            if isinstance(constraint, EoSConstraint):
+                constraint_list.append(constraint)
+            elif isinstance(constraint, JointEoSConstraint):
+                constraint_list.extend(constraint.constraints)
+            elif isinstance(constraint, dict):
+                constraint_list.extend(self.initialise_from_dict(constraint))
+        return constraint_list
+
+    def initialise_from_dict(self, constraint_dict):
+        constraint_list=[]
+        for constraint_kind, sub_constraints in constraint_dict.items():
+            if constraint_kind == 'lower_mtov':
+                for label, constraint in sub_constraints.items():
+                    constraint_list.append(LowerMTOVConstraint(
+                        measured_mass=constraint['mass'],
+                        measure_error=constraint.get('error',0.),
+                        name=label,
+                        arxiv_ref=constraint.get('arxiv', None)
+                    ))
+            elif constraint_kind == 'upper_mtov':
+                for label, constraint in sub_constraints.items():
+                    constraint_list.append(UpperMTOVConstraint(
+                        measured_mass=constraint['mass'],
+                        measure_error=constraint.get('error',0.),
+                        name=label,
+                        arxiv_ref=constraint.get('arxiv', None)
+                    ))
+            elif constraint_kind == 'mass_radius':
+                for label, constraint in sub_constraints.items():
+                    constraint_list.append(MassRadiusConstraint(
+                        file_path=constraint.get('posterior', None),
+                        name=label,
+                        arxiv_ref=constraint.get('arxiv', None)
+                    ))
+            else:
+                raise ValueError('Unknown type of EoS Constraint. Must be "lower_mtov", \
+                                "upper_mtov", "mass-radius" or "micro\
+                                ')
+            return constraint_list
+        
     def parameter_conversion(self, parameters):
         return self.eos_converter.parameter_conversion(parameters)
     
@@ -267,13 +275,30 @@ class JointEoSConstraint:
         except ValueError:
             return None
 
-class MassConstraint:
+class EoSConstraint:
+    def __init__(self, name = None, arxiv_ref=None):
+        self.repr_add = ''
+        self.type = 'macro'
+        if name is None:
+            self.name = self.__class__.__name__
+            self.base_repr = name 
+        else:
+            self.name = name
+            self.base_repr = f'{self.__class__.__name__} based on {name}'
+        self.arxiv_ref = arxiv_ref
+
+    def __repr__(self):
+        out = f'{self.base_repr} {self.repr_add}'
+        if self.arxiv_ref:
+            out = f'{out} (see arxiv:{self.arxiv_ref})'
+        return out
+
+class MassConstraint(EoSConstraint):
     def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, lognorm_method=None):
+        super().__init__(name, arxiv_ref)
         self.mass = measured_mass
         self.error = measure_error
-        self.type = 'macro'
-        self.name= name if name else "Mass Constraint"
-        self.arxiv_ref = arxiv_ref if arxiv_ref else None
+        self.repr_add = f'of {measured_mass}+-{measure_error} M_sun'
         self.lognorm_method = lognorm_method
 
     
@@ -281,8 +306,6 @@ class MassConstraint:
         out = f'{self.__class__.__name__} of {self.mass}+-{self.error} M_sun'
         if self.name != "Mass Constraint":
             out = f'{out} based on {self.name}'
-        if self.arxiv_ref:
-            out = f'{out} (see arxiv:{self.arxiv_ref})'
         return  out
     
     def log_likelihood(self, parameters, local_parameters=None):
@@ -343,7 +366,7 @@ class UpperMTOVConstraint(MassConstraint):
         super().__init__(measured_mass, measure_error, name, arxiv_ref, lognorm_method=norm.logsf)
     
 
-class MassRadiusConstraint:
+class MassRadiusConstraint(EoSConstraint):
     '''Constraint that an EOS adheres to  certain mass-radius region'''
     def __init__(self, mass_array=None, radius_array=None, weights = None, file_path=None, name=None, arxiv_ref=None):
         """
@@ -361,8 +384,7 @@ class MassRadiusConstraint:
             Identifier of a relevant source
         """
 
-        self.type = 'macro'
-
+        super().__init__(name, arxiv_ref)
         if file_path:
             mass_array, radius_array, weights = self.read_data(file_path)
         elif mass_array is None or radius_array is None:
@@ -377,23 +399,11 @@ class MassRadiusConstraint:
         mass = mass_array[::ratio]
         if weights is not None:
             weights = weights[::ratio]
+        
         self.KDE = gaussian_kde((radius, mass), weights=weights)
-
         self.test_masses= np.linspace(start=1., stop=2.5, num=150 ) # 1 to 2.5 Msun
-
-        self.name = name if name else "Mass-Radius Constraint"
-        self.arxiv_ref = arxiv_ref if arxiv_ref else None
-
         self.rng = np.random.default_rng()
 
-    
-    def __repr__(self):
-        out = self.__class__.__name__
-        if self.name:
-            out = f'{out} based on {self.name}'
-        if self.arxiv_ref:
-            out = f'{out} (see arxiv:{self.arxiv_ref})'
-        return  out
 
     def read_data(self, file_path):
         """Read mass-radius data from a file."""

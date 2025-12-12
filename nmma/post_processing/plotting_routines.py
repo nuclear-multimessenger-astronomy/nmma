@@ -8,10 +8,11 @@ from matplotlib import gridspec, pyplot as plt
 from ast import literal_eval
 import itertools
 
-from ..joint.conversion import chirp_mass_and_eta_to_component_masses, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities
-from ..joint import utils,  j_plotting_utils as jpu, base_parsing
+from ..core.conversion import chirp_mass_and_eta_to_component_masses, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities, label_mapping
+from ..core import utils, parsing
+from ..core import plotting_utils as corepu
 from.parser import corner_plot_parser
-color_array = jpu.fig_setup()
+color_array = corepu.fig_setup()
 nmma_colors = itertools.cycle(color_array)
 
 
@@ -22,7 +23,7 @@ def plot_multi_corner(args, key_selection=None):
     fig = None
     labels = [lab for lab in args.label_name] if args.label_name is not None else [f for f in args.posterior_files]
     for i, f in enumerate(args.posterior_files):
-        plot_keys, plot_labels = jpu.plotting_parameters_from_priors(args.prior, keys=key_selection).items()
+        plot_keys, plot_labels = corepu.plotting_parameters_from_priors(args.prior, keys=key_selection).items()
         if args.injection_json is not None:
             truths = utils.read_injection_file(args.injection_json)
             truths = truths.iloc[args.injection_num].to_dict()
@@ -45,23 +46,13 @@ def plot_multi_corner(args, key_selection=None):
     print("\nSaved corner plot:", filename)
 
 
-def setup_corner_plot(posterior_samples, *messengers, limits = None, plot_keys = None, fig = None, 
-                      injection=None, post_dir = None, em_transient= False, default_labels=None, **plot_kwargs):
+def setup_corner_plot(posterior_samples,limits = None, plot_keys = None, fig = None, 
+                      injection=None, post_dir = None, default_labels=None, **plot_kwargs):
     #load samples
     posterior_samples = utils.get_posteriors(posterior_samples, post_dir)
-    # find what we could plot
-    plottable_keys, labels = [], []
-    for std_messenger, sample_func in zip(
-        ['gw', 'eos', 'kn', 'grb'], 
-        [get_gw_posterior_samples, get_eos_posterior_samples, get_kn_posterior_samples, get_grb_posterior_samples]
-    ):
-        if std_messenger in messengers:
-            posterior_samples, new_keys, new_labels = sample_func(posterior_samples)
-            plottable_keys += new_keys
-            labels += new_labels
 
     if plot_keys is None:
-        plot_keys = plottable_keys # show all we can
+        plot_keys = posterior_samples.columns.tolist() # show all we can
     if limits is None:
         limits = [(np.inf, -np.inf) for key in plot_keys] # will adjust more permissively later
     # find what to actually plot
@@ -75,13 +66,8 @@ def setup_corner_plot(posterior_samples, *messengers, limits = None, plot_keys =
             cur_min, cur_max = limits[i]
             limits[i] = (min(cur_min, np.amin(show_data)), max(cur_max, np.amax(show_data)))
 
-            lab = k
-            if k in plottable_keys:
-                lab = labels[plottable_keys.index(k)]
-            elif default_labels is not None:
-                lab = default_labels[i]
-            else: lab = k
-            plot_labels.append(lab )
+            label = label_mapping.get(k, default_labels.get(k,k))
+            plot_labels.append(label )
         except KeyError:
             print(f"key {k} was not found in the posterior samples; Inserting dummy plot.")
             cur_min, cur_max = limits[i]
@@ -100,7 +86,7 @@ def setup_corner_plot(posterior_samples, *messengers, limits = None, plot_keys =
         truths = None
     # limits = ((np.amin(posterior_samples[k]), np.amax(posterior_samples[k])) for k in plot_keys)
     color = plot_kwargs.pop('color', next(nmma_colors))
-    fig = corner_plot(plot_samples, plot_labels, limits, fig=fig, truths= truths, color = color, titles=titles, **plot_kwargs)
+    fig = corner_plot(plot_samples, plot_labels, limits, fig=fig, truths= truths, color = color, titles=titles, show_titles = False, **plot_kwargs)
 
     # allow joint legend
     if 'label' in plot_kwargs:
@@ -128,59 +114,7 @@ def corner_plot(plot_samples, labels, limits, fig = None, save=False, **kwargs):
     return fig
 
 
-def get_gw_posterior_samples(posterior_samples):
-    """
-    Extract and return the keys and labels for the gravitational wave posterior samples.
-    """
-    if "chi_eff" not in posterior_samples:
-        q = posterior_samples['mass_ratio'].to_numpy()
-        chi_1 = posterior_samples['chi_1'].to_numpy()
-        chi_2 = posterior_samples['chi_2'].to_numpy()
-        # Calculate the effective tidal deformability and chirp mass
-        posterior_samples['chi_eff'] = (chi_1 + q*chi_2)/(1+q)
-    if "lambdaT" not in posterior_samples:
-        lambda1 = posterior_samples['lambda_1'].to_numpy()
-        lambda2 = posterior_samples['lambda_2'].to_numpy()
-        q = posterior_samples['mass_ratio'].to_numpy()
-        # Calculate the effective tidal deformability
-    posterior_samples['lambdaT'], _ = tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(lambda1, lambda2, q)
-    plot_keys = ["chirp_mass", "mass_ratio", "luminosity_distance", "chi_eff", "lambdaT", "mass_1_source", "mass_2_source", 'theta_jn']
 
-    labels = [r'$\mathcal{M}_c{\rm [M_{\odot}]}$', r'$q$', r'$d_L{\rm [Mpc]}$', r'$\chi_{\rm{eff}}$', r'$\tilde{\Lambda}$', r'$m_{1,s}{\rm [M_{\odot}]}$', r'$m_{2,s}{\rm [M_{\odot}]}$', r'$\theta_{jn}$']
-    return posterior_samples, plot_keys, labels
-
-def get_eos_posterior_samples(posterior_samples):
-    """
-    Extract and return the keys and labels for the EOS posterior samples.
-    """
-    plot_keys = ["L_sym", "K_sym", "K_sat", "3n_sat", "5n_sat", "TOV_mass", "R_14"]
-    labels = [r'$L_{\rm{sym}}{\rm [MeV]}$', r'$K_{\rm{sym}}{\rm [MeV]}$', r'$K_{\rm{sat}}{\rm [MeV]}$', r'$c_{3n_{\rm{sat}}}{\rm [c]}$', r'$c_{5n_{\rm{sat}}}{\rm [c]}$', r'$M_{\rm{TOV}}{\rm [M_{\odot}]}$', r'$R_{1.4}{\rm[km]}$']
-    return posterior_samples, plot_keys, labels
-
-def get_kn_posterior_samples(posterior_samples):
-    """
-    Extract and return the keys and labels for the KN posterior samples.
-    """
-    plot_keys = ['log10_mej','log10_mej_dyn', 'log10_mej_wind', 'ratio_zeta', 'alpha', 'KNtheta', 'KNphi']
-    posterior_samples['log10_mej'] = np.log10(
-        10**(posterior_samples['log10_mej_wind'].to_numpy())
-        + 10**(posterior_samples['log10_mej_dyn'].to_numpy())
-    )
-    labels = [r'$\log_{10}(M_{\rm{ej}}{\rm [M_{\odot}]})$',r'$\log_{10}(M_{\rm{ej,dyn}}{\rm [M_{\odot}]})$', r'$\log_{10}(M_{\rm{ej,wind}}{\rm [M_{\odot}]})$', r'$\zeta$', r'$\alpha$', r'$\theta_{KN}$', r'$\phi_{KN}$']
-    return posterior_samples, plot_keys, labels
-
-def get_grb_posterior_samples(posterior_samples):
-    """
-    Extract and return the keys and labels for the GRB posterior samples.
-    """
-
-    if 'thetaWing' in posterior_samples:
-        posterior_samples['alphaWing'] = posterior_samples['thetaWing'].to_numpy() / posterior_samples['thetaCore'].to_numpy()
-    elif 'alphaWing' in posterior_samples:
-        posterior_samples['thetaWing'] = posterior_samples['alphaWing'] * posterior_samples['thetaCore']
-    plot_keys = ['ratio_epsilon', 'log10_E0', 'thetaCore', 'thetaWing', 'alphaWing', 'log10_n0', 'p', 'log10_epsilon_e', 'log10_epsilon_B']
-    labels = [r'$\epsilon$', r'$\log_{10}(E_{0})$', r'$\theta_{c}$', r'$\theta_{w}$',r'$\alpha_{w}$', r'$\log_{10}(n_{0})$', r'$p$', r'$\log_{10}(\epsilon_{e})$', r'$\log_{10}(\epsilon_{B})$']
-    return posterior_samples, plot_keys, labels
 
 def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
 
@@ -267,5 +201,5 @@ def plot_R14_trend(args):
     plt.savefig(f"{args.outdir}/R14_trend_GW_EM_{args.label}.pdf", bbox_inches="tight")
 
 if __name__ == "__main__":
-    args = base_parsing.nmma_base_parsing(corner_plot_parser)
+    args = parsing.nmma_base_parsing(corner_plot_parser)
     plot_multi_corner(args)

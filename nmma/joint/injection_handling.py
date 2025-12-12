@@ -7,13 +7,14 @@ from bilby_pipe.create_injections import InjectionCreator
 import multiprocessing
 
 
-from .base_parsing import nmma_base_parsing, process_multi_condition_string
-from .constants import default_cosmology
-from .joint_parsing import injection_parsing
-from .utils import set_filename, rejection_sample, read_injection_file
-from .conversion import MultimessengerConversion, EoSConverter
+from ..core.parsing import nmma_base_parsing, process_multi_condition_string
+from ..core.constants import set_cosmology, get_cosmology
+from ..core.utils import set_filename, rejection_sample, read_injection_file
+from ..core.conversion import MultimessengerConversion
 from ..em import utils, lightcurve_handling as lch
 from ..em.model import create_injection_model
+from ..eos.eos_processing import EoSConverter
+from .joint_parsing import injection_parsing
 
 class NMMAInjectionCreator(InjectionCreator):
     """A class to create NMMA injections, extending the bilby_pipe InjectionCreator."""
@@ -25,10 +26,7 @@ class NMMAInjectionCreator(InjectionCreator):
             # convert string to dict
             args.prior_dict = convert_string_to_dict(args.prior_dict)
 
-        cosmo = getattr(args, 'cosmology', None)
-        if cosmo is None:
-            cosmo = default_cosmology
-        bilby.gw.cosmology.set_cosmology(cosmo)
+        set_cosmology(getattr(args, 'cosmology', None))
         super().__init__(
             prior_file=args.prior_file,
             prior_dict=args.prior_dict,
@@ -40,7 +38,7 @@ class NMMAInjectionCreator(InjectionCreator):
             duration=args.duration,
             post_trigger_duration=args.post_trigger_duration,
             generation_seed=args.generation_seed,
-            cosmology=cosmo
+            cosmology=get_cosmology(),
         )
         self.rng = np.random.default_rng(self.generation_seed)
         for key, value in kwargs.items():
@@ -109,7 +107,6 @@ class NMMAInjectionCreator(InjectionCreator):
         self.test_routines = test_methods
                    
         
-
     def determine_conversion_from_args(self, args):
         """Determine the messengers and modifiers for the conversion based on the args."""
         # FIXME: To be extended
@@ -123,7 +120,7 @@ class NMMAInjectionCreator(InjectionCreator):
             gw_conversion = False
 
         return MultimessengerConversion(EoSConverter(args), 
-            gw_conversion, em_conversion, getattr(args, 'cosmology', None) )
+            gw_conversion, em_conversion)
 
     def generate_prelim_dataframe(self):
         #step 1: Check: we may want to extend a preliminary injection file

@@ -6,9 +6,9 @@ import scipy.interpolate
 from .plotting_routines import plot_R14_trend
 from .parser import R14_parser
 from .resampling import find_spread_from_resampling
-from ..joint.base_parsing import nmma_base_parsing
+from ..core.conversion import reweight_to_flat_mass_prior
+from ..core.parsing import nmma_base_parsing
 from ..eos.eos_processing import load_macro_characteristics_from_tabulated_eos_set
-from ..joint.conversion import reweight_to_flat_mass_prior
 # matplotlib.use("agg")
 
 

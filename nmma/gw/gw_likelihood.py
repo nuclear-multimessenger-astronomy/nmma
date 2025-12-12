@@ -1,9 +1,8 @@
-from __future__ import division
 import numpy as np
-from bilby_pipe.utils import convert_string_to_dict
+from ast import literal_eval
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
-from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
-from ..joint.conversion import to_bbh_parameters
+from ..core.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
+from ..core.conversion import bbh_source_frame, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion
 
 def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     """
@@ -34,7 +33,7 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
         gw_kwargs.update(roq_likelihood_kwargs(args, logger))
 
     elif args.likelihood_type == 'RelativeBinningGravitationalWaveTransient':
-        fiducial_parameters = convert_string_to_dict(args.fiducial_parameters)
+        fiducial_parameters = literal_eval(args.fiducial_parameters)
         gw_kwargs.update(
             fiducial_parameters=fiducial_parameters, epsilon=args.epsilon,
             update_fiducial_parameters=args.update_fiducial_parameters
@@ -204,7 +203,30 @@ class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
         super().__init__(gw_transient, priors)
 
     def parameter_conversion(self, parameters):
-        return to_bbh_parameters(parameters)
+        return bbh_source_frame(parameters)
+    
+    def posterior_conversion(self, posterior_samples):
+        if "chi_eff" not in posterior_samples:
+            try:
+                q = posterior_samples['mass_ratio']
+                chi_1 = posterior_samples.get('chi_1', posterior_samples.get('spin_1z'))
+                chi_2 = posterior_samples.get('chi_2', posterior_samples.get('spin_2z'))
+                posterior_samples['chi_eff'] = (chi_1 + q*chi_2)/(1+q)
+            except KeyError:
+                pass
+        if "lambda_tilde" not in posterior_samples:
+            try:
+                lambda1 = posterior_samples['lambda_1']
+                lambda2 = posterior_samples['lambda_2']
+                q = posterior_samples['mass_ratio']
+                # Calculate the effective tidal deformability
+                lambdaT, delta_lambda_t  = tidal_conversion(lambda1, lambda2, q)
+                posterior_samples['lambda_tilde'] = lambdaT
+                posterior_samples['delta_lambda_t'] = delta_lambda_t
+            except KeyError:
+                pass
+        
+        return posterior_samples
 
     def sanity_checks(self):
         #TODO: add additional checks RelativeBinning!

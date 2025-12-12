@@ -28,7 +28,8 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
         super().__init__(*messenger_likelihoods)
 
         self.priors = priors
-        self.setup_parameter_conversion(conversion_instructions)
+        self.conversion_instructions = conversion_instructions
+        self.setup_parameter_conversion()
         self._noise_logl = JointLikelihood.noise_log_likelihood(self)
 
     def __repr__(self):
@@ -38,18 +39,18 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             reprs=[lhood.__repr__() for lhood in self.likelihoods]
             return f"{self.__class__.__name__} with {', '.join(map(str, reprs[:-1]))} and {reprs[-1]}"
             
-    def setup_parameter_conversion(self, conversion_instructions):
+    def setup_parameter_conversion(self):
         """Sets up the multimessenger conversion object, based on a corresponding dict."""
         for lhood in self.likelihoods:
             if isinstance(lhood, EMTransientLikelihood):
-                conversion_instructions['em'] = lhood.parameter_conversion
+                self.conversion_instructions['em'] = lhood.parameter_conversion
             elif isinstance(lhood, GravitationalWaveTransientLikelihood):
                 # FIXME: this is currently redundant, but potentially useful in future
-                conversion_instructions['gw'] = lhood.parameter_conversion
+                self.conversion_instructions['gw'] = lhood.parameter_conversion
             elif isinstance(lhood, EquationofStateLikelihood):
-                conversion_instructions['eos'] = lhood.parameter_conversion
+                self.conversion_instructions['eos'] = lhood.parameter_conversion
 
-        self.multi_conversion = MultimessengerConversion.from_dict(conversion_instructions)
+        self.multi_conversion = MultimessengerConversion.from_dict(self.conversion_instructions)
     
     def sanity_checks(self):
         return np.prod([lhood.sanity_checks() for lhood in self.likelihoods])

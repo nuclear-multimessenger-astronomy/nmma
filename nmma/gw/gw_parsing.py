@@ -1,5 +1,5 @@
 
-from nmma.joint.base_parsing import nonestr, nonefloat
+from nmma.core.parsing import nonestr, nonefloat
 
 def gw_parsing(parser):
     gw_input_parser = parser.add_argument_group(
@@ -22,7 +22,7 @@ def gw_parsing(parser):
 
 def gw_injection_parsing(parser):
     """Parser for the gw injection arguments."""
-    parser.add_argument("--gw-detectors", type=str, default="ET,CE",
+    parser.add_argument("--gw-detectors", default="ET,CE",
         help="Comma-separated list of GW detectors to use (default: ET,CE)")
     parser.add_argument("--waveform-arguments", type=nonestr,
         help="Additional arguments to pass to the waveform generator, e.g. 'waveform_arguments={\"waveform_approximant\": \"IMRPhenomXPHM\"}'")

@@ -4,10 +4,10 @@ import scipy.stats
 
 from tqdm import tqdm
 
-from ..joint.utils import read_injection_file
-from ..joint.constants import c_kms
-from ..joint.conversion import reweight_to_flat_mass_prior
-from ..joint.base_parsing import nmma_base_parsing
+from ..core.utils import read_injection_file
+from ..core.constants import c_kms
+from ..core.conversion import reweight_to_flat_mass_prior
+from ..core.parsing import nmma_base_parsing
 from .parser import Hubble_parser
 from .resampling import  find_spread_from_resampling
 

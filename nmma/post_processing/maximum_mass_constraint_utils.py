@@ -7,7 +7,7 @@ from bilby.core.prior import Uniform
 import bilby.gw.conversion as conversion
 
 import astropy.units as u
-from nmma.joint.constants import MeV_per_fm3_to_Msun_per_km3, geom_msun_km, particle_mass
+from ..core.constants import MeV_per_fm3_to_Msun_per_km3, geom_msun_km, particle_mass
 
 import os
 import sys

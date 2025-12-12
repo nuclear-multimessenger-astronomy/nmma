@@ -16,11 +16,11 @@ from .lightcurve_generation import create_light_curve_data
 from . import io, model, utils, em_parsing as emp
 from .plotting_utils import lc_plot_with_histogram, basic_em_analysis_plot
 
-from ..joint.constants import default_cosmology, D, c_cgs
-from ..joint import conversion as conv 
-from ..joint.utils import read_injection_file, set_filename, read_trigger_time
+from ..core.constants import get_cosmology, D, c_cgs
+from ..core import conversion as conv 
+from ..core.utils import read_injection_file, set_filename, read_trigger_time
 
-from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict
+from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict, EoSConverter
 
 def post_process_bestfit(transient, bestfit_params, args, result=None):
     
@@ -252,15 +252,15 @@ class LightCurveHandler:
     def __init__(self, args):
 
         self.filters = utils.set_filters(args)
-
+        cosmology = get_cosmology()
         # Use redshift or dMpc if z is not provided
         if args.redshift is None:
             self.dMpc = args.dMpc
-            self.redshift = conv.luminosity_distance_to_redshift(self.dMpc, default_cosmology)
+            self.redshift = conv.luminosity_distance_to_redshift(self.dMpc, cosmology)
             dist_filler = f"dMpc{int(self.dMpc)}"
         else:
             self.redshift = args.redshift
-            self.dMpc = default_cosmology.luminosity_distance(self.redshift).to("Mpc").value
+            self.dMpc = cosmology.luminosity_distance(self.redshift).to("Mpc").value
             dist_filler = f"z{self.redshift}"
         
         if args.doAB:
@@ -587,9 +587,8 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     if filters is None:
         filters = 'u,g,r,i,z,y,J,H,K'
     light_curve_model = model.create_light_curve_model_from_args(args.em_model, args, filters)
-    
-    conversion = conv.MultimessengerConversion(args,messengers=['gw', 'em'], ana_modifiers=['tabulated_eos'], 
-            internal_conversions={'em': light_curve_model.parameter_conversion})
+    conversion = conv.MultimessengerConversion.basic_bns(EoSConverter(args, method = 'tabulated'),
+        light_curve_model.parameter_conversion)
 
     ## read eos and gw data
     EOS_data, weights, Neos = load_tabulated_macro_eos_set_to_dict(args.eos_data, args.eos_weights)

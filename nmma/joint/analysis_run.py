@@ -5,7 +5,6 @@ from glob import glob
 from copy import deepcopy
 import pickle
 from functools import wraps
-# import logging
 from time import time
 from datetime import timedelta
 from matplotlib import pyplot as plt
@@ -19,8 +18,9 @@ from bilby.core.sampler.dynesty import dynesty_stats_plot
 import dynesty
 from dynesty.plotting import traceplot, runplot 
 
-from ..joint.joint_likelihood import setup_nmma_likelihood
-from ..joint.utils import  rejection_sample, read_bestfit_from_posterior, logger
+from ..core.conversion import label_mapping
+from ..core.utils import  rejection_sample, read_bestfit_from_posterior, logger
+from .joint_likelihood import MultiMessengerLikelihood
 
 
 def time_storage(func):
@@ -71,14 +71,15 @@ class WorkerRun(bs.NestedSampler):
         priors = PriorDict.from_json(data_dump["prior_file"])
         
         ## Set up the likelihood
-        likelihood = setup_nmma_likelihood(data_dump,
-            priors, self.args, logger)
+        likelihood = MultiMessengerLikelihood.setup_from_args(
+            data_dump, priors, self.args, logger)
         
         super().__init__(
             likelihood, priors, outdir, label,
             injection_parameters= data_dump.get("injection_parameters", None),
             plot = self.args.plot,
             skip_import_verification = skip_import_verification,
+            soft_init=True
         )
 
     
@@ -125,6 +126,7 @@ class WorkerRun(bs.NestedSampler):
             logl = self.log_likelihood(theta)
             if logl in bad_values:
                 continue
+
             return unit, theta, logl
                 
     def checkpointing(self, checkpoint_plot=False, message=None):
@@ -138,6 +140,7 @@ class WorkerRun(bs.NestedSampler):
         message: str
             Message to log after checkpointing
         """
+        os.wait()
         pass  # only to be executed in main process
 
 class Dynesty(WorkerRun):
@@ -501,7 +504,14 @@ class Dynesty(WorkerRun):
             finally:
                 plt.close("all")
 
+    def storable_metadata(self):
 
+        meta_data = self.data_dump
+        meta_data.pop("waveform_generator", None)  # cannot be pickled
+        meta_data["args"] = vars(self.args) # convert Namespace to dict for storing
+        meta_data["likelihood"] = self.likelihood.meta_data
+        meta_data["sampler_kwargs"] = self.init_sampler_kwargs
+        meta_data["run_sampler_kwargs"] = self.sampler_kwargs
 
     def format_result(
         self,
@@ -528,18 +538,12 @@ class Dynesty(WorkerRun):
         log_noise_evidence= self.likelihood.noise_log_likelihood()
         log_bayes = sampler_result.logz[-1]
         
-        meta_data = self.data_dump
-        meta_data["args"] = vars(self.args) # convert Namespace to dict for storing
-        meta_data["likelihood"] = self.likelihood.meta_data
-        meta_data["sampler_kwargs"] = self.init_sampler_kwargs
-        meta_data["run_sampler_kwargs"] = self.sampler_kwargs
-
         result = self.result
 
         result.nested_samples = nested_samples 
-        result.sampling_time=self.sampling_time
-        logger.info(f"Sampling time = {result.sampling_time} seconds")
-        result.meta_data=meta_data
+        result.sampling_time=timedelta(seconds=self.sampling_time)
+        logger.info(f"Sampling time = {result.sampling_time}")
+        result.meta_data=self.storable_metadata()
         result.num_likelihood_evaluations=np.sum(sampler_result.ncall)
         logger.info(f"Number of lnl calls = {result.num_likelihood_evaluations}")
         result.log_noise_evidence=log_noise_evidence
@@ -554,7 +558,7 @@ class Dynesty(WorkerRun):
             logger.info(f"Rejection sampling nested samples to obtain {sum(keep)} posterior samples")
 
         else:
-            result.samples = dynesty.utils.resample_equal(sampler_result.samples, weights)
+            result.samples = dynesty.utils.resample_equal(sampler_result.samples, weights, self.rstate)
             result.log_likelihood_evaluations = self.reorder_loglikelihoods(
                 unsorted_loglikelihoods=sampler_result.logl,
                 unsorted_samples=sampler_result.samples,
@@ -566,6 +570,13 @@ class Dynesty(WorkerRun):
         result.samples_to_posterior(priors=result.priors)
         result.posterior = self.likelihood.posterior_conversion(result.posterior)
         result.save_posterior_samples()
+        extra_keys = set(result.posterior.columns) - set(self._search_parameter_keys)
+        posterior_keys = self._search_parameter_keys
+        posterior_keys.extend(extra_keys)
+        result.meta_data["posterior_keys"] = posterior_keys
+        posterior_labels = result.parameter_labels_with_unit
+        posterior_labels.extend([label_mapping.get(k, k) for k in extra_keys])
+        result.meta_data["posterior_labels"] = posterior_labels
         if os.path.isfile(self.samples_file):
             os.remove(self.samples_file)  # remove temp file after succesful run
 
@@ -581,6 +592,6 @@ class Dynesty(WorkerRun):
             injection_parameters = {
                 k: v for k, v in self.injection_parameters.items()
                 if k in self._search_parameter_keys} if self.injection_parameters else None
-            result.plot_corner(parameters = injection_parameters,priors=self.priors)
+            result.plot_corner(parameters = injection_parameters, priors=True, dpi = 200)
             bestfit_params = read_bestfit_from_posterior(self.args)
             self.likelihood.final_diagnostics(bestfit_params, self.args, result)

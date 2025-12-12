@@ -1,9 +1,8 @@
-from __future__ import division
 import numpy as np
 from scipy.stats import norm, truncnorm
-from ..joint.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
-from ..joint.conversion import convert_mtot_mni
-from ..joint.utils import read_trigger_time
+from ..core.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
+from ..core.conversion import convert_mtot_mni
+from ..core.utils import read_trigger_time
 from . import model, utils, systematics
 from .lightcurve_handling import post_process_bestfit as lch_bestfit
 from .plotting_utils import bolometric_lc_plot
@@ -120,6 +119,16 @@ class EMTransientLikelihood(NMMABaseLikelihood):
 
         """
         self.sub_model.final_diagnostics(bestfit_params, args, result)
+
+    def posterior_conversion(self, posterior_samples):
+        if 'log10_mej_dyn' in posterior_samples and 'log10_mej_wind' in posterior_samples:
+            posterior_samples['log10_mej'] = np.log10(10**(posterior_samples['log10_mej_wind'])
+                + 10**(posterior_samples['log10_mej_dyn']) )
+        if 'thetaWing' in posterior_samples and 'thetaCore' in posterior_samples:
+            posterior_samples['alphaWing'] = posterior_samples['thetaWing'] / posterior_samples['thetaCore']
+        elif 'alphaWing' in posterior_samples and 'thetaCore' in posterior_samples:
+            posterior_samples['thetaWing'] = posterior_samples['alphaWing'] * posterior_samples['thetaCore']
+        return posterior_samples
     
        
 

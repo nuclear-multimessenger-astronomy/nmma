@@ -3,7 +3,7 @@ import inspect
 import numpy as np
 from bilby.core import prior as bprior
 import warnings
-from .io import load_yaml
+from ..core.utils import load_yaml
 from .utils import autocomplete_data, set_filter_associated_dict
 
 class ValidationError(ValueError):
@@ -12,6 +12,8 @@ class ValidationError(ValueError):
 
 
 class SystematicsHandler:
+    allowed_keys = ['time_range', 'time_nodes', 'prior', 'params', 'each', 'filters']
+    
     def __init__(self, systematics_file = None, error_budget = None, base_prior_name="em_syserr"):
         """
         systematics_file: str or dict (default: None)
@@ -60,8 +62,7 @@ class SystematicsHandler:
                 return self.legacy_prior_setup(prior_dict)
 
             # case 0: only one global systematic uncertainty
-            if key in ['time', 'time_nodes', 'prior', 'params']:
-                self.base_prior_name = key
+            if key in self.allowed_keys:
                 print("Single global systematic uncertainty setup detected, applying to all filters.")
                 new_prior =self.setup_filt_prior('', self.systematics_dict)
                 prior_dict.update(new_prior)
@@ -217,7 +218,7 @@ class FilterSystematicsHandler(SystematicsHandler):
                 self.legacy_systematics_setup(self.systematics_dict)
                 break
             # case 0: only one global systematic uncertainty
-            elif key in ['time', 'time_nodes', 'prior', 'params']:
+            elif key in self.allowed_keys:
                 name, time_range = self.get_name_and_times('',self.systematics_dict)
                 for filt in self.filters:
                     self.check_names_and_times(filt, time_range, name, priors)

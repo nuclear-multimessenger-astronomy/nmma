@@ -33,7 +33,7 @@ except ImportError:
 
 
 ### some frequently used constants:
-from nmma.joint.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D 
+from ..core.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D 
 seconds_a_day = 86400.0  
 abs_mag_dist_factor = D**2
 

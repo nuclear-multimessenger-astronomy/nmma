@@ -6,8 +6,9 @@ import shutil
 from ..em import em_parsing, lightcurve_handling as lch
 from ..em.io import load_em_observations
 from ..em.model import get_lc_model_from_modelname
-from ..joint.utils import read_injection_file
-from ..joint import injection_handling, base_parsing, joint_parsing
+from ..core.utils import read_injection_file
+from ..core.parsing import nmma_base_parsing
+from ..joint import injection_handling, joint_parsing
 
 
 def lightcurveInjectionTest(model_name):
@@ -55,7 +56,7 @@ def lightcurveInjectionTest(model_name):
         injection_name = os.path.join(test_directory, model_name + "_injection.json")
         
         
-        args = base_parsing.nmma_base_parsing(joint_parsing.injection_parsing, [])
+        args = nmma_base_parsing(joint_parsing.injection_parsing, [])
         non_default_args = dict(
             prior_file=prior_path,
             simple_setup=True,

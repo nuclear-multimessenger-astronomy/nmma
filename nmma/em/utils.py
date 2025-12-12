@@ -1,7 +1,6 @@
 import numpy as np
-import os
 import pandas as pd
-import scipy.interpolate as interp
+from scipy.interpolate import UnivariateSpline
 from ast import literal_eval
 import scipy.stats
 
@@ -21,10 +20,10 @@ warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
 
 import astropy.units
-from nmma.joint.conversion import (distance_modulus_nmma, 
+from ..core.conversion import (distance_modulus_nmma, 
         luminosity_distance_to_redshift, cosmology_to_distance)
 ### some frequently used constants:
-from nmma.joint.constants import c_cgs, c_SI, eV_per_h_SI
+from ..core.constants import c_cgs, c_SI, eV_per_h_SI
 
 
 
@@ -485,7 +484,7 @@ def autocomplete_data(interp_points, ref_points, ref_data, extrapolate='linear',
       
     elif isinstance(extrapolate, str):
         if extrapolate=='spline':
-            spline = interp.UnivariateSpline(fin_ref, fin_data, s=ref_value)
+            spline = UnivariateSpline(fin_ref, fin_data, s=ref_value)
             interp_data = spline(interp_points)
 
         if extrapolate=='linear':
@@ -738,7 +737,6 @@ class Spectrum:
 
 
 def read_LANL_spectra(
-    self,
     filename,
     time_units=astropy.units.day,
     wl_units=astropy.units.cm,
@@ -768,8 +766,6 @@ def read_LANL_spectra(
         array in erg / s / cm^3
     """
 
-    assert os.path.isfile(filename)
-
     # Check that units are appropriate
     wl_units.to(astropy.units.angstrom)
     fd_units.to(
@@ -780,7 +776,7 @@ def read_LANL_spectra(
     )
 
     # Determine time steps in file
-    nrows, timesteps_in_file = self.parse_file(filename, key="time")
+    nrows, timesteps_in_file = parse_LANLfile(filename, key="time")
 
     if len(timesteps_in_file) == 0:
         raise IOError("File not read. Check file type.")

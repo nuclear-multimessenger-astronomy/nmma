@@ -13,7 +13,7 @@ from bilby.core.prior import (
     ConditionalPriorDict, PriorDict)
 from ligo.skymap import io, moc
 
-from ..joint.base import adjust_hubble_prior
+from ..core.base import adjust_hubble_prior
 
 
 class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):

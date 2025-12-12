@@ -10,7 +10,7 @@ from ..em.systematics import (
     ALLOWED_FILTERS,
     ALLOWED_DISTRIBUTIONS
 )
-from ..em.io import load_yaml
+from ..core.utils import load_yaml
 
 
 @pytest.fixture

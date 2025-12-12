@@ -59,7 +59,8 @@ def get_redshift(parameters):
         ## zeros like the first input of parameters, independent of size and keys
         return np.zeros_like(next(iter(parameters.values()))) 
 
-def cosmology_to_distance(parameters, cosmology= get_cosmology()):
+def cosmology_to_distance(parameters):
+    cosmology= get_cosmology()
     cosmo_parameters = {}
     if "Hubble_constant" in parameters:
         cosmo_parameters["H0"] = parameters["Hubble_constant"]
@@ -407,8 +408,10 @@ class BNSEjectaFitting(EjectaFitting):
         q_trans=0.886,
     ):
         """
-        See https://arxiv.org/pdf/2002.11355.pdf for the disk mass relation
-        and  https://arxiv.org/pdf/1908.05442.pdf for the threshold mass
+        See https://arxiv.org/pdf/2205.08513 Eq. (22)
+        The coefficients a0, delta_a etc. have been updated since then,
+        the ones here are the correct ones.
+        The threshold mass is from https://arxiv.org/pdf/1908.05442.pdf.
         """
         k = -3.606 * MTOV / R16 + 2.38
         threshold_mass = k * MTOV
@@ -479,6 +482,84 @@ class BNSEjectaFitting(EjectaFitting):
 
         return mdyn
 
+    def dynamic_vel_fitting_Radice2018(
+            self,
+            mass_1,
+            mass_2,
+            compactness_1,
+            compactness_2,
+            a=-0.287,
+            b=0.494,
+            c=-3.000
+    ):
+        """
+        See https://arxiv.org/pdf/1809.11161 Eq. (22)
+        """
+
+        vej_dyn = a* mass_1/mass_2 * (1+c *compactness_1)
+        vej_dyn += a* mass_2/mass_1 * (1+c* compactness_2)
+        vej_dyn += b
+
+        return vej_dyn
+    
+    def dynamic_mass_fitting_prompt_collapse(
+            self,
+            mass_1,
+            mass_2,
+            lambda_1,
+            lambda_2,
+            a=1.25e-4,
+            b=9.82e-1,
+            c=-2.44,
+    ):
+        """
+        See https://arxiv.org/pdf/2411.02342, Eq. (9)
+        """
+        q = mass_2 / mass_1
+        lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2)
+        mdyn = a*lambda_tilde*(q**(-1) -b) * np.exp(c/q) # this is always positive
+
+        return mdyn
+    
+    def dynamic_vel_fitting_prompt_collapse(
+            self,
+            mass_1,
+            mass_2,
+            compactness_1,
+            compactness_2,
+            a=-0.395,
+            b=0.798,
+            c=-1.627):
+        """
+        See https://arxiv.org/pdf/2411.02342, Eq. (10)
+        """        
+        vdyn = a * mass_1/mass_2 *(1 + c*compactness_1)
+        vdyn += a * mass_2/mass_1 * (1 + c* compactness_2)
+        vdyn += b
+
+        return vdyn
+    
+    def log10_disk_mass_fitting_prompt_collapse(
+            self,
+            mass_1,
+            mass_2,
+            lambda_1,
+            lambda_2,
+            a=7.70,
+            b=-13.4,
+            c=8.16e-3):
+        """
+        See https://arxiv.org/pdf/2411.02342, Eq. (11)
+        Typo for b, b=-13.4 confirmed through author correspondence
+        """
+        q = mass_2 / mass_1
+        lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2)
+        log10_mdisk = a + b * q + c * lambda_tilde * q**2
+
+        log10_mdisk = np.minimum(log10_mdisk, -1)
+
+        return log10_mdisk
+    
     def bns_parameter_conversion(self, converted_parameters):
 
         # prevent the output message flooded by these warning messages
@@ -497,7 +578,7 @@ class BNSEjectaFitting(EjectaFitting):
 
         compactness_1 = mass_1_source * geom_msun_km / radius_1
         compactness_2 = mass_2_source * geom_msun_km / radius_2
-
+        #FIXME: switch to prompt collapse fitting for appropriate thresholds
         mdyn_fit = self.dynamic_mass_fitting_KrFo(
             mass_1_source, mass_2_source, compactness_1, compactness_2
         )
@@ -545,14 +626,14 @@ class KilonovaEjectaFitting(BNSEjectaFitting, NSBHEjectaFitting):
         except ValueError:
             #ValueError occurs when trying to obtain truth values of arrays 
             # -> evaluate many points at once and chose conditional ejecta_fitting
-            return np.where(parameters["radius_1"]>0.,  #heavier object is a NS
-                self.bns_parameter_conversion(parameters),
-                np.where(parameters["radius_2"]>0., ## elif component 2 is a NS
-                    self.nsbh_parameter_conversion(parameters, True),
+            return  np.where(parameters["radius_1"]>0.,  #heavier object is a NS
+                        self.bns_parameter_conversion(parameters),
+                    np.where(parameters["radius_2"]>0., ## elif component 2 is a NS
+                        self.nsbh_parameter_conversion(parameters),
                     ### else assume BBH (i.e., no ejecta)
-                    np.full((4,)+ parameters["mass_1_source"].shape, -np.inf)
+                        np.full((4,)+ parameters["mass_1_source"].shape, -np.inf)
+                        )
                     )
-                )
               
 class MultimessengerConversion:
     def __init__(self, *conversions):
@@ -587,8 +668,8 @@ class MultimessengerConversion:
         return cls(*conversions)
     
     @classmethod
-    def basic_bns(cls, eos_conversion, em_conversion):
-        return cls(bbh_source_frame, eos_conversion, BNSEjectaFitting(), em_conversion)
+    def basic_cbc(cls, eos_conversion, em_conversion):
+        return cls(bbh_source_frame, eos_conversion, KilonovaEjectaFitting(), em_conversion)
     
     def convert_to_multimessenger_parameters(self, parameters, add_new_keys=False):
         original_keys = list(parameters.keys())

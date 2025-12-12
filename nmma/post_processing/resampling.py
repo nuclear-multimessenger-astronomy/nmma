@@ -7,12 +7,12 @@ from bilby.gw.prior import PriorDict
 from bilby.core.prior import Uniform
 
 from .parser import resampling_parser
-from ..joint.base_parsing import nmma_base_parsing
-from ..joint.conversion import (
+from ..core.parsing import nmma_base_parsing
+from ..core.conversion import (
     BNSEjectaFitting, NSBHEjectaFitting,
     luminosity_distance_to_redshift, chirp_mass_and_eta_to_component_masses,
         )
-from ..joint.constants import geom_msun_km
+from ..core.constants import geom_msun_km
 from .plotting_routines import resampling_corner_plot
 
 from pymultinest.solve import Solver
@@ -201,10 +201,7 @@ def main_resampling():
     GWprior = PriorDict(args.GWprior)
     EMprior = PriorDict(args.EMprior)
     
-    try:
-        os.makedirs(args.outdir + "/pm/")
-    except Exception:
-        pass
+    os.makedirs(args.outdir + "/pm/", exist_ok=True)
 
     pymulti_kwargs = dict(
         outputfiles_basename=args.outdir + "/pm/",

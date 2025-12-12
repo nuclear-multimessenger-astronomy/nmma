@@ -6,7 +6,7 @@ import numpy as np
 from .utils import DEFAULT_FILTERS
 
 # unused imports kept for forward compatibility
-from ..joint.base_parsing import (parsing_and_logging, single_messenger_analysis_parsing, 
+from ..core.parsing import (parsing_and_logging, single_messenger_analysis_parsing, 
     base_injection_parsing, pipe_inj_parsing, nonefloat, noneint, nonestr )
 
 
@@ -417,12 +417,13 @@ def lc_marginalisation_parser(parser):
 def multi_config_parser(parser):
     parser.description="Multi config analysis script for NMMA."
     
-    parser.add_argument("--config", type=str,
+    parser.add_argument("--config",
         help="Name of the configuration file containing parameter values." )
-    parser.add_argument("--parallel", action="store_true", default=False,
+    parser.add_argument("--parallel", action="store_true",
         help="To run multiple configs in parallel" )
     parser.add_argument("-p", "--process", type=int, help=(
-        "No of processess each configuration should have, if --parallel is set then process will be divided equally among all configs,"
+        "No of processess each configuration should have. \n "
+         "If --parallel is set then process will be divided equally among all configs,\n "
         "else each config will run sequentially with given no of process. Strictly required if  --process-per-config is not given" ))
     parser.add_argument("--process-per-config", type=int, help=(
             "If multiple configurations are given, how many MPI process should be assigned to each configuration. In the yaml"

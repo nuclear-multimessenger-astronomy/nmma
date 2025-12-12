@@ -8,8 +8,8 @@ from .em_likelihood import EMTransientLikelihood
 from .prior import create_prior_from_args
 from . import io, model, utils, systematics  
 from .em_parsing import parsing_and_logging, multi_wavelength_analysis_parser, bolometric_parser
-from ..joint.base import multi_analysis_loop
-from ..joint.utils import read_injection_file, set_filename, read_trigger_time
+from ..core.base import multi_analysis_loop
+from ..core.utils import read_injection_file, set_filename, read_trigger_time
 matplotlib.use("agg")
 
 def data_from_injection(args, filters, detection_limit):
@@ -100,7 +100,7 @@ def analysis_setup(args):
     except ValueError:
         # try to work with injection data instead
         data, injection_parameters = data_from_injection(args, filters, detection_limit)
-        trigger_time = injection_parameters['trigger_time']
+        trigger_time = injection_parameters.get('trigger_time',0)
     except FileNotFoundError:
         # If the injection file is not found, raise an error
         raise FileNotFoundError("Injection file not found.")

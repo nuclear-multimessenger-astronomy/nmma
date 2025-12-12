@@ -83,9 +83,11 @@ def analysis_runner(
 
     ## graceful handling of preemptive shutdowns
     def handle_sigterm(signum, frame):
-        ## no time for plotting when file_size becomes larger
-        run.checkpointing(False, 
-            "succesfully created checkpoint after termination signal.")
+        try:
+            run.checkpointing(False,
+                'Received termination signal. Checkpointing and exiting gracefully.')
+        except Exception:
+            pass
 
     signal.signal(signal.SIGTERM, handle_sigterm)
     signal.signal(signal.SIGINT , handle_sigterm)
@@ -93,7 +95,7 @@ def analysis_runner(
 
     POOL = MPIPool if pool_type == 'mpi' else MultiPool
     with POOL() as pool:
-        if pool.is_master():            
+        if pool.is_master():           
             run.start_sampler(
                 pool,
                 pooled_log_likelihood, 
@@ -103,9 +105,12 @@ def analysis_runner(
             results = run.run_sampler(
                 check_point_delta_t, n_check_point, max_its,
                 max_run_time, checkpoint_plot)
-            
-            run.format_result(results, result_format,
-                rejection_sample_posterior)
+            try:
+                run.format_result(results, result_format,
+                    rejection_sample_posterior)
+            except Exception as e:
+                # still return results even if formatting fails
+                print(f"Error formatting result: {e}")
     return 
 
 

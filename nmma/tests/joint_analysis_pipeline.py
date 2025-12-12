@@ -7,11 +7,11 @@ import shutil
 from nmma.em import em_parsing as emp, lightcurve_handling as lch, model, analysis as ema
 from nmma.eos.eos_parsing import tabulated_eos_parsing
 from nmma.eos.eos_likelihood import tabulated_eos_setup
-from nmma.joint.base import multi_analysis_loop
-from nmma.joint.base_parsing import parsing_and_logging
+from nmma.core.base import multi_analysis_loop
+from nmma.core.parsing import parsing_and_logging
 from nmma.joint.joint_likelihood import MultiMessengerLikelihood
-from nmma.joint import utils
-from nmma.pbilby import generation
+from nmma.core import utils
+from nmma.joint import generation
 WORKING_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(WORKING_DIR, "data")
 
@@ -63,15 +63,19 @@ eos_args = Namespace(
         upper_mtov={'upper_dummy':{'mass':2.23,'error':0.02 } }, 
         lower_mtov={'lower_dummy':{'mass':2.17,'error':0.02 } } 
 )
-gw_args = Namespace(
-    frequency_domain_source_model = 'binary_neutron_star_frequency_sequence',
-    waveform_approximant = 'IMRPhenomXAS_NRTidalv3',
-    likelihood_type = 'MBGravitationalWaveTransient',
-    reference_frequency = 30,
-    duration = 256,
-    detectors = ['H1', 'L1', 'V1'],
-    psd_dict = '{"H1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/h1_psd.txt", "L1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/l1_psd.txt", "V1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/v1_psd.txt"}'
+# gw_args = Namespace(
+#     frequency_domain_source_model = 'binary_neutron_star_frequency_sequence',
+#     waveform_approximant = 'IMRPhenomXAS_NRTidalv3',
+#     likelihood_type = 'MBGravitationalWaveTransient',
+#     reference_frequency = 30,
+#     duration = 256,
+#     detectors = ['H1', 'L1', 'V1'],
+#     psd_dict = '{"H1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/h1_psd.txt", "L1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/l1_psd.txt", "V1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/v1_psd.txt"}'
+# )
+joint_args = Namespace(
+    ejecta_conversion=False
 )
+
 @pytest.fixture(scope="module")
 def args():
     return merge_namespaces(
@@ -82,7 +86,8 @@ def args():
         samling_args, 
         em_prior_args,
         eos_args,
-        gw_args
+        # gw_args,
+        joint_args
     )
 
 @pytest.fixture(autouse=True)
@@ -107,12 +112,12 @@ def test_single_thread_setup(args):
         eos_priors, eos_lhood, _ = tabulated_eos_setup(args)
         injection_parameters['EOS'] = 7  # set EOS used in injection
         priors.update(eos_priors)
-        combined_likelihood = MultiMessengerLikelihood([em_lhood, eos_lhood], priors, args, connected_params=False)
+        combined_likelihood = MultiMessengerLikelihood([em_lhood, eos_lhood], priors)
         # combined_likelihood.parameter_conversion = combined_likelihood.identity_conversion
         return priors, combined_likelihood,  injection_parameters
     multi_analysis_loop(args, setup)
 
-def test_data_generation(args):
+def test_parallel_setup(args):
 
     generation_parser = generation.create_nmma_generation_parser()
     generation.generate_runner(generation_parser, **vars(args))

@@ -1,20 +1,19 @@
 import inspect
 import io
-import sys
 import contextlib
 import h5py
 from ast import literal_eval
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 
 from bilby import run_sampler
-from bilby.core.likelihood import Likelihood, ZeroLikelihood
+from bilby.core.likelihood import Likelihood
 from bilby.core.prior import (Prior, Constraint, Interped, ConditionalPriorDict, PriorDict,
                               MultivariateGaussianDist, MultivariateGaussian)
 from bilby.core.result import FileMovedError
-from bilby.gw import cosmology
-from .utils import input_obj_to_str, load_yaml, read_bestfit_from_posterior
-from .constants import default_cosmology
+from .utils import input_obj_to_str, read_bestfit_from_posterior
+from .constants import  set_cosmology
 from .conversion import cosmology_to_distance
 
 def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes = []):
@@ -71,6 +70,9 @@ class NMMALikelihoodMixin:
         return parameters
     
     
+    def __call__(self, parameters):
+        return np.exp(self.log_likelihood(parameters))
+    
     def log_likelihood(self, parameters):
         parameters = self.parameter_conversion(parameters)
         if self.evaluate_constraints(parameters) and self.sanity_checks():
@@ -124,7 +126,6 @@ class NMMALikelihoodMixin:
                 raise ValueError(f"Mutually dependent parameters found: {intersection}. Please only provide up to two of these.")
 
     
-
 class NMMABaseLikelihood(NMMALikelihoodMixin,Likelihood):
     """ The base likelihood object for modular multi-messenger analysis
 
@@ -156,16 +157,14 @@ class NMMABaseLikelihood(NMMALikelihoodMixin,Likelihood):
     def setup_parameter_conversion(self):
         # FUTURE: add more standard conversions here
         if "Hubble_constant" in self.priors:
-            def Hubble_conversion(priors):
-                params = cosmology_to_distance(priors, cosmology.COSMOLOGY[0])
-                return params
-            self.conv_functions.append(Hubble_conversion)
+            self.conv_functions.append(cosmology_to_distance)
 
     def setup_submodel_conversion(self):
         pass
         
     def parameter_conversion(self, parameters):
-        for conv in self.conv_functions:
+        #reverse because "main conversion" are added last
+        for conv in reversed(self.conv_functions):
             parameters = conv(parameters)
         return parameters
     
@@ -229,10 +228,7 @@ def adjust_priors_for_nmma(priors, logger=None):
 
 def adjust_hubble_prior(priors, args, logger=None):
     if getattr(args, 'Hubble', False) or "Hubble_constant" in priors:  
-        cosmo = getattr(args, 'cosmology', None)
-        if cosmo is None:
-            cosmo = default_cosmology
-        cosmology.set_cosmology(cosmo)
+        set_cosmology(getattr(args, 'cosmology', None))
 
     hubble_weight = input_obj_to_str(args, 'Hubble_weight')
     if hubble_weight:
@@ -287,8 +283,6 @@ def check_priors_and_likelihood_for_nmma(priors, likelihood):
 
 def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
     priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
-    if args.bilby_zero_likelihood_mode:
-        likelihood = ZeroLikelihood(likelihood)
 
     # fetch the additional sampler kwargs
     sampler_kwargs = literal_eval(args.sampler_kwargs)
@@ -327,7 +321,7 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
     )
 
     if rank != 0:
-        sys.exit()
+        return
 
     try:
         result.save_to_file()
@@ -363,7 +357,6 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
     if args.bestfit or args.plot:
         likelihood.post_process_bestfit(args, result)
 
-
 def multi_analysis_loop(args, analysis_setup):
 
     # check if it is running under mpi
@@ -372,7 +365,7 @@ def multi_analysis_loop(args, analysis_setup):
         rank = MPI.COMM_WORLD.Get_rank()
     except ImportError:
         rank = 0
-
+        
     if rank != 0:
         # Create buffers
         stdout_buffer = io.StringIO()
@@ -386,17 +379,16 @@ def multi_analysis_loop(args, analysis_setup):
         redirect_err = contextlib.nullcontext()
         
     with redirect_out, redirect_err:
-        if getattr(args, 'config', None):
-            yaml_dict = load_yaml(args.config)
-            for params in yaml_dict.values():
-                for key, value in params.items():
-                    key = key.replace("-", "_")
+        if getattr(args, 'multi', None):
+            for run_name, changes in args.multi.items():
+                run_args = deepcopy(args)
+                setattr(run_args, 'label', f"{args.label}_{run_name}")
+                for key, value in changes.items():
                     if key not in args:
-                        print(f"{key} not a known argument... please remove")
-                        exit()
-                    setattr(args, key, value)
-                priors, likelihood, injection_parameters = analysis_setup(args)
-                bilby_sampling(likelihood, priors, args, injection_parameters, rank)
+                        raise KeyError(f"{key} not a known argument... please remove")
+                    setattr(run_args, key, value)
+                priors, likelihood, injection_parameters = analysis_setup(run_args)
+                bilby_sampling(likelihood, priors, run_args, injection_parameters, rank)
         else:
             priors, likelihood, injection_parameters = analysis_setup(args)
             bilby_sampling(likelihood, priors, args, injection_parameters, rank)

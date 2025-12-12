@@ -1,16 +1,20 @@
 import argparse
 import configargparse
+import yaml
 import sys
 import os
 
 from bilby.core.utils import setup_logger
-from ..utils.models import refresh_models_list
+from .gitlab import refresh_models_list
 
 # If an argument is not specified while its type is given, 
 # it will still be parsed as None. If, however, we then reparse
 # this argument, e.g. from a stored config-file, it would raise an error.
 # These classes are a workaround to avoid this error.
 from bilby_pipe.utils import nonestr, nonefloat, noneint  # we forward import these elsewhere, do not remove
+
+def yaml_parse(s):
+    return yaml.safe_load(s)
 
 def parsing_and_logging(parser_func, args= None):
 
@@ -66,21 +70,21 @@ def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
                     print("Please check the file format and try again.")
                     sys.exit(1)
 
+    parser.add_argument("--multi", type=yaml_parse,
+        help="YAML formatted dict specifying multiple runs with different parameter changes. \n"
+             "E.g.: '{run1: {param1: value1, param2: value2}, run2: {param1: value3}}' ")
+    
     if isinstance(parsing_func, (list, tuple)):
         for pars_func in tuple(parsing_func):
             parser = pars_func(parser)
     else:
         parser = parsing_func(parser)
-        
     if return_parser:
         return parser
     return parser.parse_args(cli_args)
 
 
 def base_analysis_parsing(parser):
-    parser.add_argument("--bilby-zero-likelihood-mode",
-        action='store_true', help="enable prior run")
-
     parser.add_argument("--Hubble", "--with-Hubble", "--sample-over-Hubble", action='store_true', 
         help="To sample over Hubble constant and redshift (default:False)")
 
@@ -95,7 +99,7 @@ def single_messenger_analysis_parsing(parser):
 
     parser.add_argument("--config", help="Name of the configuration file containing parameter values.")
     parser.add_argument("-o", "--outdir", default="outdir",  help="Path to the output directory")
-    parser.add_argument("--label", default ="em_transient", help="Label for the run")
+    parser.add_argument("--label", default ="nmma_transient", help="Label for the run")
     parser.add_argument("--plot", action='store_true', help="create characteristic plot")
     parser.add_argument("--verbose", action='store_true', help="print out log likelihoods" )
     parser.add_argument("--prior-file","--prior", help="Path to the prior file")

@@ -1,4 +1,4 @@
-from ..joint.base_parsing import noneint, single_messenger_analysis_parsing
+from ..core.parsing import noneint, single_messenger_analysis_parsing
 
 def tabulated_eos_parsing(parser):
     tab_eos_input_parser = parser.add_argument_group(

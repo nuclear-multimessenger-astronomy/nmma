@@ -42,8 +42,8 @@ optional-dependencies.training = { file = ["training_requirements.txt"] }
 optional-dependencies.sampler = { file = ["sampler_requirements.txt"] }
 
 [project.scripts]
-nmma-generation = "nmma.pbilby.generation:nmma_generation"
-nmma-analysis = "nmma.pbilby.main:nmma_analysis"
+nmma-generation = "nmma.joint.generation:nmma_generation"
+nmma-analysis = "nmma.joint.main:nmma_analysis"
 lightcurve-analysis = "nmma.em.analysis:main"
 lightcurve-analysis-lbol = "nmma.em.analysis:lbol_main"
 lightcurve-injection-slurm-setup = "nmma.em.cluster_handling:main"
@@ -52,14 +52,14 @@ create-lightcurve-slurm = "nmma.em.cluster_handling:lc_creation"
 create-svdmodel = "nmma.em.training:create_svdmodel"
 svdmodel-benchmark = "nmma.em.training:benchmark"
 plot-svdmodel-benchmarks = "nmma.em.training:plot_benchmarks_cli"
-svdmodel-download = "nmma.utils.models:main"
+svdmodel-download = "nmma.core.models:main"
 lightcurve-generation = "nmma.em.lightcurve_handling:lcs_from_injection_parameters"
 nmma-create-injection = "nmma.joint.injection_handling:main"
 gwem-resampling = "nmma.post_processing.resampling:main_resampling"
 gwem-Hubble-estimate = "nmma.post_processing.hubble_estimates:main"
 convert-skyportal-lcs = "nmma.em.io:convert_skyportal_lcs"
 resample-grid = "nmma.em.lightcurve_handling:resample_lightcurve_grid"
-multi-config-analysis = "nmma.em.multi_config_analysis:main"
+multi-config-analysis = "nmma.em.cluster_handling:multi_config_analysis"
 
 [project.urls]
 Homepage = "https://github.com/nuclear-multimessenger-astronomy/nmma"

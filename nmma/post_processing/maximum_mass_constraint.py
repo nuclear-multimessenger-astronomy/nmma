@@ -1,6 +1,6 @@
 from . import maximum_mass_constraint_utils as utils
 from .parser import maximum_mass_parser
-from ..joint.base_parsing import nmma_base_parsing
+from ..core.parsing import nmma_base_parsing
 import pandas as pd
 import bilby
 import os

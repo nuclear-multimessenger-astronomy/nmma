@@ -6,14 +6,14 @@ from scipy.special import logsumexp
 import sncosmo
 from sncosmo.models import _SOURCES
 from ast import literal_eval
-
+from bilby.gw.cosmology import get_cosmology
 from . import utils
 from . import lightcurve_generation as lc_gen
 
-from nmma.joint.base import initialisation_args_from_signature_and_namespace
-from nmma.joint.constants import c_SI, default_cosmology
-from nmma.joint.conversion import observation_angle_conversion, get_redshift,  distance_modulus_nmma, get_cosmo_grids
-from nmma.utils.models import get_models_home, get_model
+from ..core.base import initialisation_args_from_signature_and_namespace
+from ..core.constants import c_SI
+from ..core.conversion import observation_angle_conversion, get_redshift,  distance_modulus_nmma, get_cosmo_grids
+from ..core.gitlab import get_models_home, get_model
 
 ln10 = np.log(10)
 
@@ -220,7 +220,7 @@ class LightCurveModelContainer:
 
         if 'redshift' not in priors and 'luminosity_distance' in priors:
             dlum_prior = priors["luminosity_distance"]
-            cosmo = getattr(dlum_prior, 'cosmology', default_cosmology)
+            cosmo = getattr(dlum_prior, 'cosmology', get_cosmology())
             dist_grid, z_grid = get_cosmo_grids(dlum_prior.minimum, dlum_prior.maximum, cosmo)
             def redshift_from_dlum(parameters):
                 return np.interp(parameters['luminosity_distance'], dist_grid, z_grid).value

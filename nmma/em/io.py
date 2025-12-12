@@ -9,7 +9,7 @@ import pandas as pd
 from bilby.core.utils import decode_bilby_json
 import scipy.signal
 
-from ..joint.utils import load_yaml, NumpyEncoder
+from ..core.utils import NumpyEncoder
 # from sncosmo.bandpasses import _BANDPASSES
 
 
