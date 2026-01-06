@@ -90,7 +90,7 @@ class SystematicsHandler:
         
         # case 1: time-dependent systematic uncertainty
         num = info_dict.get('time_nodes', info_dict.get('time_range','1').split()[-1])
-        if int(num) > 2:
+        if int(num) >= 2:
             prior_names = [f'{prior_name}_{i}' for i in range(int(num))]
             return {n: self.get_prior(info_dict, n) for n in prior_names}
              
@@ -122,15 +122,14 @@ class SystematicsHandler:
         t_range =info_dict.get('time_range', '').split()
         if num is None and t_range:
             num = t_range.pop(-1)
-        else: 
-            num =0
+
         if int(num)<=1:
             return None
         
         if len(t_range) ==3:
             grid_type, t_start, t_end = t_range
         elif len(t_range) ==2:
-            t_start, t_end = t_range      
+            t_start, t_end = t_range
             grid_type = self.default_t_grid_type
             try:
                 float(t_start)
@@ -264,7 +263,7 @@ class FilterSystematicsHandler(SystematicsHandler):
         if clean:
             self.direct_sys_map.pop(filt, None)
             self.interpolate_map.pop(filt, None)
-            self.missing_filters.remove(filt)
+            self.missing_filters.discard(filt)
         if time_range is None:
             assert prior_name in priors, "Required systematics prior missing"
             self.direct_sys_map[filt] = prior_name

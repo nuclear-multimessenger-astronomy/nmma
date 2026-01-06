@@ -245,7 +245,7 @@ class BasicEMTransient:
         gausslogsf=np.zeros(2) ##hack if len(infIdx)==0
         if infIdx.sum() > 0:
             gausslogsf = norm.logsf(
-                    data_mag[infIdx], est_mag[infIdx], upperlim_sigma
+                    data_mag[infIdx], est_mag[infIdx], upperlim_sigma[infIdx]
                 )
         return minus_chisquare, np.sum(gausslogsf)
     
