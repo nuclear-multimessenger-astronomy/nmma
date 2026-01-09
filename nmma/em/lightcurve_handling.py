@@ -37,6 +37,10 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
     chi2_dict, mismatches = compute_chisquare_dict(transient, best_mags, 
             observable_times, model_error, verbose=args.verbose)
 
+    chi2_dict_raw, _ = compute_chisquare_dict(transient, best_mags, 
+                                              observable_times, {filt: 0. for filt in model_error.keys()}, 
+                                              verbose=args.verbose)
+
     if getattr(args, "bestfit", False):
         bestfit_to_write = bestfit_params.copy()
         if result is not None:
@@ -44,11 +48,14 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
             bestfit_to_write["log_bayes_factor_err"] = result.log_evidence_err
         bestfit_to_write["Magnitudes"] = {filt: best_mags[filt].tolist() 
                                           for filt in transient.observed_filters}
+        bestfit_to_write["model_error"] = {filt: model_error[filt].tolist() for filt in transient.observed_filters}
         bestfit_to_write["obs_times"] = observable_times.tolist()
         bestfit_to_write["chi2_per_dof"] = chi2_dict["total"]
         bestfit_to_write["chi2_dict"] = chi2_dict
-        bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
+        bestfit_to_write["chi2_per_dof_raw"] = chi2_dict_raw["total"]
+        bestfit_to_write["chi2_dict_raw"] = chi2_dict_raw
 
+        bestfit_file = os.path.join(args.outdir, f"{args.label}_bestfit_params.json")
         with open(bestfit_file, "w") as file:
             json.dump(bestfit_to_write, file, indent=4)
 
