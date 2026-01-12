@@ -228,6 +228,10 @@ class BasicEMTransient:
         finiteIdx = np.isfinite(data_sigma)
         infIdx = ~finiteIdx
 
+        #TODO: this is hacky, self.systematics handler should already provide upperlim_sigma in the right format
+        if isinstance(upperlim_sigma, (float, int)):
+            upperlim_sigma = np.full_like(data_sigma, upperlim_sigma)
+
         # evaluate the chisquare
         if finiteIdx.sum() >= 1:
             minus_chisquare = np.sum(self.truncated_gaussian(data_mag[finiteIdx], 
