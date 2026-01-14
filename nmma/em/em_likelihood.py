@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import norm, truncnorm
-from ..core.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
+from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
 from ..core.conversion import convert_mtot_mni
 from ..core.utils import read_trigger_time
 from . import model, utils, systematics
@@ -38,7 +38,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     return em_kwargs | em_likelihood_kwargs
 
 
-class EMTransientLikelihood(NMMABaseLikelihood):
+class EMTransientLikelihood(NMMALikelihood):
     """A generic EM transient likelihood object
 
     Parameters
@@ -170,10 +170,8 @@ class BasicEMTransient:
         (self.light_curve_times, self.light_curves, 
          self.light_curve_uncertainties, self.trigger_time) = light_curve_data
         
+        systematics_handler.reset(self.light_curve_model.model_times, priors)
         self.systematics_handler = systematics_handler
-        t_model = light_curve_model.model_times
-        self.systematics_handler.time_range = (t_model[0], t_model[-1])
-        self.systematics_handler.reset_em_error_method(priors, self.light_curve_times)
 
         self.verbose = verbose
         self.set_detection_limit(detection_limit)
@@ -237,7 +235,7 @@ class BasicEMTransient:
             minus_chisquare = np.sum(self.truncated_gaussian(data_mag[finiteIdx], 
                 loc=est_mag[finiteIdx], scale=data_sigma[finiteIdx], upper_lim=lim))
 
-            ## santiy check:if the chisquare is ill-behaved,
+            ## sanity check: if the chisquare is ill-behaved,
             # we explicitly catch it as Bool in band_log_likelihood
             if np.isnan(minus_chisquare):
                 sanity_check_passed = False 

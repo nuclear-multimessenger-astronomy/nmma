@@ -70,7 +70,7 @@ def bolometric_setup(args):
         sample_times=utils.setup_sample_times(args),  ## usually None, defaults to model_times
     )
     systematics_handler = systematics.SystematicsHandler(
-        args.systematics_file, args.em_error_budget)
+        args.systematics_file, args.em_error_budget, light_curve_data[0])
 
     # setup the prior
     priors = create_prior_from_args(args, systematics_handler)
@@ -135,10 +135,11 @@ def analysis_setup(args):
         injection_parameters = {k: v for k, v in injection_parameters.items() 
                                 if k in injlist_all}
     
-    systematics_handler = systematics.FilterSystematicsHandler(filters_to_analyze,
-        args.systematics_file, error_budget=args.em_error_budget)
-    priors = create_prior_from_args(args, systematics_handler)
     light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
+    systematics_handler = systematics.FilterSystematicsHandler(filters_to_analyze,
+        args.systematics_file, error_budget=args.em_error_budget, 
+        light_curve_times=light_curve_data[0])
+    priors = create_prior_from_args(args, systematics_handler)
     utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
     # setup the likelihood
     likelihood_kwargs = dict(

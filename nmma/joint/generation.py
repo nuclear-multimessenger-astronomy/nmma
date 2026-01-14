@@ -32,6 +32,8 @@ from ..core.base import adjust_priors_for_nmma, adjust_hubble_prior
 from ..core.utils import read_trigger_time
 from .joint_likelihood import MultiMessengerLikelihood
 
+import matplotlib    
+matplotlib.rcParams['text.usetex'] = False
 
 from .. import __version__
 
@@ -214,8 +216,10 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self.adjust_priors_and_data(args, logger)
 
         #test-build likelihood 
-        MultiMessengerLikelihood.setup_from_args(
+        lhood = MultiMessengerLikelihood.setup_from_args(
             self.data_dump, self._priors, self.args, logger)
+        lhood.log_likelihood(self._priors.sample())
+        
         self.save_data_dump()
 
     def adjust_priors_and_data(self, args, logger):

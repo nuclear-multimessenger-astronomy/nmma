@@ -31,7 +31,7 @@ else:
 with redirect_out, redirect_err:
     from schwimmbad import MPIPool, MultiPool
     from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args, process_sampler_kwargs
-    from .analysis_run import Dynesty, WorkerRun
+    from .analysis_run import Dynesty, Worker
 
 def analysis_runner(
     data_dump,
@@ -43,6 +43,7 @@ def analysis_runner(
     init_sampler_kwargs={},
     run_sampler_kwargs={},
     sampling_seed=42,
+    plot=True,
     #
     check_point_delta_t=1800,
     n_check_point=2000,
@@ -59,16 +60,16 @@ def analysis_runner(
     API for running the analysis from Python instead of the command line.
     It takes all the same options as the CLI, specified as keyword arguments.
     """
-    # Initialise a WorkerRun. this needs a global scope to allow 
+    # Initialise a worker. this needs a global scope to allow 
     # persistence of states beyond the pool's scope.
     # Otherwise emulators retrace on each evaluation.
-    global run
+    global worker
     with redirect_out, redirect_err:
         if rank == 0:
             init_sampler_kwargs, run_sampler_kwargs = process_sampler_kwargs(
                 init_sampler_kwargs, run_sampler_kwargs, kwargs)
 
-            run = Dynesty(
+            worker = Dynesty(
                 data_dump, outdir, label,
                 maxmcmc=maxmcmc,
                 nact=nact,
@@ -76,15 +77,16 @@ def analysis_runner(
                 sampling_seed=sampling_seed,
                 sampler_kwargs = run_sampler_kwargs,
                 sampler_init_kwargs=init_sampler_kwargs,
+                plot=plot,
             )
 
         else:
-            run = WorkerRun(data_dump, outdir, label)
+            worker = Worker(data_dump, outdir, label)
 
     ## graceful handling of preemptive shutdowns
     def handle_sigterm(signum, frame):
         try:
-            run.checkpointing(False,
+            worker.checkpointing(False,
                 'Received termination signal. Checkpointing and exiting gracefully.')
         except Exception:
             pass
@@ -96,33 +98,29 @@ def analysis_runner(
     POOL = MPIPool if pool_type == 'mpi' else MultiPool
     with POOL() as pool:
         if pool.is_master():           
-            run.start_sampler(
+            worker.start_sampler(
                 pool,
                 pooled_log_likelihood, 
                 pooled_prior_transform,
                 pooled_initial_point_from_prior)
 
-            results = run.run_sampler(
+            results = worker.run_sampler(
                 check_point_delta_t, n_check_point, max_its,
                 max_run_time, checkpoint_plot)
-            try:
-                run.format_result(results, result_format,
-                    rejection_sample_posterior)
-            except Exception as e:
-                # still return results even if formatting fails
-                print(f"Error formatting result: {e}")
+            worker.format_result(results, result_format,
+                rejection_sample_posterior)
     return 
 
 
 # Worker functions. These are read in the global scope by each worker
 def pooled_initial_point_from_prior(args):
-    return run.get_initial_point_from_prior(args)
+    return worker.get_initial_point_from_prior(args)
 
 def pooled_log_likelihood(v_array):
-    return run.log_likelihood(v_array)
+    return worker.log_likelihood(v_array)
 
 def pooled_prior_transform(u_array):
-    return run.prior_transform(u_array)
+    return worker.prior_transform(u_array)
 
 def nmma_analysis():
     """

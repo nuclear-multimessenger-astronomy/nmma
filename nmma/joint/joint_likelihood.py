@@ -1,7 +1,7 @@
 import numpy as np
 from bilby.core.likelihood import JointLikelihood
 
-from ..core.base import NMMABaseLikelihood,NMMALikelihoodMixin
+from ..core.base import NMMALikelihood,NMMALikelihoodMixin
 from ..core.conversion import MultimessengerConversion
 from ..gw.gw_likelihood import GravitationalWaveTransientLikelihood, setup_gw_kwargs
 from ..eos.eos_likelihood import EquationofStateLikelihood, setup_eos_kwargs, EoSConverter
@@ -105,6 +105,11 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
         if "Hubble" in analysis_modifiers:
             conversion_instructions['cosmo'] = getattr(args, "cosmology", None)
 
+        if "gw" in messengers:
+            logger.info("Setting up GW likelihood")
+            gw_kwargs = setup_gw_kwargs(data_dump, args, logger)
+            messenger_lhoods.append(GravitationalWaveTransientLikelihood(priors, **gw_kwargs))
+
         if "eos" in messengers:
             logger.info("Sampling over EOS generated on the fly")
             eos_kwargs = setup_eos_kwargs(data_dump, args, logger)
@@ -120,10 +125,10 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             logger.info("Using universal relations for tidal deformabilities")
             conversion_instructions['eos'] = EoSConverter(args, 'qur')
 
-        if "gw" in messengers:
-            logger.info("Setting up GW likelihood")
-            gw_kwargs = setup_gw_kwargs(data_dump, args, logger)
-            messenger_lhoods.append(GravitationalWaveTransientLikelihood(priors, **gw_kwargs))
+        if "eos" in conversion_instructions and not "gw" in conversion_instructions:
+            eos_converter = conversion_instructions['eos']
+            eos_converter.parameter_conversion = eos_converter.compute_macro_parameters
+            conversion_instructions['eos'] = eos_converter
 
         if "em" in messengers:
             logger.info("Setting up EM likelihood")
@@ -133,7 +138,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
 
         if "pop" in messengers:
             pop_model = NeutronStarPopulation(args.population_model)
-            messenger_lhoods.append(NMMABaseLikelihood(pop_model))
+            messenger_lhoods.append(NMMALikelihood(pop_model, priors))
             # conversion_instructions['pop'] = 'model'
         
         # FIXME: Find a better way to check this automatically:
@@ -149,6 +154,8 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             raise ValueError("No messenger likelihoods were set up.")
         elif len(messenger_lhoods) == 1:
             lhood = messenger_lhoods[0]
+            if 'eos' in conversion_instructions:
+                lhood.conv_functions.append(conversion_instructions['eos'])
             lhood.setup_parameter_conversion()
             logger.info(f"Only {lhood} is used. Using this instead.")
         else:

@@ -14,18 +14,21 @@ class ValidationError(ValueError):
 class SystematicsHandler:
     allowed_keys = ['time_range', 'time_nodes', 'prior', 'params', 'each', 'filters']
     
-    def __init__(self, systematics_file = None, error_budget = None, base_prior_name="em_syserr"):
+    def __init__(self, systematics_file = None, error_budget = None, light_curve_times = np.linspace(0.1, 14, 10),base_prior_name="em_syserr"):
         """
         systematics_file: str or dict (default: None)
             YAML file or dictionary defining the systematic uncertainties and their priors.
         error_budget: Any (default:1)
             Additionally introduced statistical error on the light curve data,
-            so as to keep the systematic error under control. This will only be used if the parameters-dict does not containt base_prior_name.
+            so as to keep the systematic error under control. This will only be used if the parameters-dict does not contain base_prior_name.
+        lc_times: np.ndarray (default: np.linspace(0.1, 14, 10))
+            Times at which the light curve is evaluated, needed to set up the error budget.
         base_prior_name: str (default: "em_syserr")
             Base name of the systematic uncertainty prior(s).
             """
         self.base_prior_name = base_prior_name
         self.default_t_grid_type = 'linear'
+        self.light_curve_times = light_curve_times
         
         # preliminary error budget setup
         self.adjust_error_budget(error_budget)
@@ -43,7 +46,7 @@ class SystematicsHandler:
             error_budget =  0.0001                     
         if isinstance(error_budget, str):
             error_budget = float(error_budget)
-        self.error_budget  = error_budget
+        self.error_budget  = np.full_like(self.light_curve_times, error_budget)
 
     def from_budget(self, _):
         return self.error_budget
@@ -122,8 +125,7 @@ class SystematicsHandler:
         t_range =info_dict.get('time_range', '').split()
         if num is None and t_range:
             num = t_range.pop(-1)
-
-        if int(num)<=1:
+        if num is None:
             return None
         
         if len(t_range) ==3:
@@ -146,18 +148,6 @@ class SystematicsHandler:
         elif ('log' in grid_type) or ('geo' in grid_type):
             return np.geomspace(float(t_start), float(t_end), int(num))
 
-    def reset_em_error_method(self, priors, lc_times):
-        if self.systematics_dict:
-            self.light_curve_times = lc_times
-            self.setup_systematics_sampling(priors)
-        elif self.base_prior_name in priors:
-            self.compute_em_err = self.from_param
-        else:
-            pass  # keep the error budget method
-
-    def from_param(self, parameters):
-        return parameters[self.base_prior_name]
-
     def setup_systematics_sampling(self, priors):
         name, time_range = self.get_name_and_times('',self.systematics_dict)
         if time_range is None:
@@ -169,6 +159,9 @@ class SystematicsHandler:
             assert all(p in priors for p in self.err_params), "Required systematics prior missing"
             self.time_nodes = time_range
             self.compute_em_err = self.from_parameters
+
+    def from_param(self, parameters):
+        return np.full_like(self.light_curve_times, parameters[self.base_prior_name])
 
     def from_parameters(self, parameters): 
         err_params = [parameters[p] for p in self.err_params]
@@ -191,21 +184,29 @@ class SystematicsHandler:
         prior_dict.update(bprior.PriorDict(add_prior))
         return prior_dict
 
+    def reset(self, model_times, priors):
+        self.time_range = (model_times[0], model_times[-1])
+        if self.systematics_dict:
+            self.setup_systematics_sampling(priors)
+        elif self.base_prior_name in priors:
+            self.compute_em_err = self.from_param
 
 class FilterSystematicsHandler(SystematicsHandler):
     """ Systematics handler for multi-filter light curves
     """
-    def __init__(self, filters, systematics_file = None, error_budget = None, base_prior_name="em_syserr" ):
+    def __init__(self, filters, systematics_file = None, error_budget = None, light_curve_times = np.linspace(0.1, 14, 10), base_prior_name="em_syserr" ):
         self.filters = filters
-        super().__init__(systematics_file, error_budget, base_prior_name)   
+        super().__init__(systematics_file, error_budget, light_curve_times, base_prior_name)   
 
     def adjust_error_budget(self, error_budget):    
         if error_budget is None:
             error_budget = 1.0                   
         if isinstance(error_budget, str):
             error_budget = literal_eval(error_budget)
-        self.error_budget = set_filter_associated_dict(error_budget, self.filters, 1.)
-    
+        error_budget = set_filter_associated_dict(error_budget, self.filters, 1.)
+        self.error_budget = {filt: np.full_like(self.light_curve_times[filt], error_budget[filt]) 
+                             for filt in self.filters}
+
     def setup_systematics_sampling(self, priors):
         self.direct_sys_map = {}
         self.interpolate_map = {}
@@ -263,7 +264,7 @@ class FilterSystematicsHandler(SystematicsHandler):
         if clean:
             self.direct_sys_map.pop(filt, None)
             self.interpolate_map.pop(filt, None)
-            self.missing_filters.discard(filt)
+            self.missing_filters.remove(filt)
         if time_range is None:
             assert prior_name in priors, "Required systematics prior missing"
             self.direct_sys_map[filt] = prior_name
@@ -275,10 +276,11 @@ class FilterSystematicsHandler(SystematicsHandler):
  
     def from_param(self, parameters):
         em_err =  parameters[self.base_prior_name]
-        return {filt: em_err for filt in self.filters}
+        return {filt: np.full_like(self.light_curve_times[filt], em_err) 
+                for filt in self.filters}
 
     def from_single_params(self, parameters): 
-        return {filt: parameters[prior_name] 
+        return {filt: np.full_like(self.light_curve_times[filt], parameters[prior_name]) 
                 for filt, prior_name in self.direct_sys_map.items()}
     
     def from_interpolated_params(self, parameters):

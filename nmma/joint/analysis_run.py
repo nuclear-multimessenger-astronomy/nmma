@@ -34,7 +34,7 @@ def time_storage(func):
 
     return wrapper
 
-class WorkerRun(bs.NestedSampler):
+class Worker(bs.NestedSampler):
     """
     An object with methods to be called in parallelised tasks.
 
@@ -42,8 +42,7 @@ class WorkerRun(bs.NestedSampler):
     data_dump: a pickle-file containing all relevant data to create priors and likelihoods.
     """
     def __init__(self, data_dump, 
-                outdir,
-                label,
+                outdir, label, plot = False, 
                 skip_import_verification = True,
         ):
         
@@ -57,7 +56,9 @@ class WorkerRun(bs.NestedSampler):
 
         ## Set properties from the data dump
         self.data_dump = data_dump
-        self.args = data_dump["args"]
+        args = data_dump["args"]
+        args.plot = plot
+        self.args = args
 
         # If the run dir has not been specified, get it from the args
         if outdir is None:
@@ -77,9 +78,10 @@ class WorkerRun(bs.NestedSampler):
         super().__init__(
             likelihood, priors, outdir, label,
             injection_parameters= data_dump.get("injection_parameters", None),
-            plot = self.args.plot,
             skip_import_verification = skip_import_verification,
-            soft_init=True
+            plot=self.args.plot,
+            soft_init=True,
+            
         )
 
     
@@ -143,7 +145,7 @@ class WorkerRun(bs.NestedSampler):
         os.wait()
         pass  # only to be executed in main process
 
-class Dynesty(WorkerRun):
+class Dynesty(Worker):
    
     def __init__(
         self,
@@ -153,10 +155,10 @@ class Dynesty(WorkerRun):
         nact=2,
         sampling_seed=42,
         sampler_kwargs={},
-        sampler_init_kwargs={}
+        sampler_init_kwargs={},
+        plot= False,
     ):
-
-        super().__init__(data_dump, outdir, label,
+        super().__init__(data_dump, outdir, label, plot,
                         skip_import_verification = False)
         # for handler in logger.handlers:
         #     if isinstance(handler, logging.StreamHandler):
@@ -169,9 +171,7 @@ class Dynesty(WorkerRun):
         # This ensures that runs are fully deterministic, which is important
         # for reproducibility
         self.rstate = Generator(PCG64(sampling_seed))
-        logger.debug(
-            f"Setting random state = {self.rstate} (seed={sampling_seed})"
-        )
+        logger.debug(f"Setting random state = {self.rstate} (seed={sampling_seed})")
         
         # dynesty3 sampler kwargs
         self.dlogz = sampler_kwargs['dlogz']
@@ -376,8 +376,9 @@ class Dynesty(WorkerRun):
         return custom_str
     
 
-    def run_sampler(self, check_point_delta_t=300, n_check_point=1000, max_its=1e10, max_run_time=1e10, checkpoint_plot=False):
-
+    def run_sampler(self, check_point_delta_t=1800, n_check_point=1000, max_its=1e10, max_run_time=1e10, checkpoint_plot=False):
+        logger.info(f"Beginning sampling with checkpoints every {check_point_delta_t} seconds or {n_check_point} iterations \n "
+                    f" until max {max_its} iterations or max run time {timedelta(seconds=max_run_time)}.")
         run_time = 0.
         t_start = time()
         last_checkpoint_time= t_start
@@ -398,8 +399,8 @@ class Dynesty(WorkerRun):
             
             elif (
                 # checkpoint criteria
-                checkpoint_interval > check_point_delta_t
-                or (it - last_checkpoint_it > n_check_point) 
+                checkpoint_interval >= check_point_delta_t
+                or (it - last_checkpoint_it >= n_check_point) 
             ):
                 self.sampling_time +=  checkpoint_interval
                 last_checkpoint_time = time() 
@@ -451,12 +452,8 @@ class Dynesty(WorkerRun):
             The total sampling time in seconds
         """
         print("")
-        try:
-            time_elapsed = timedelta(seconds= time()-os.path.getmtime(self.resume_file))
-            logger.info(f"Start checkpoint writing (last checkpoint {time_elapsed} ago)"
-            )
-        except FileNotFoundError:
-            logger.info("Start checkpoint writing (no previous checkpoint)")
+        cp_time = time()-os.path.getmtime(self.resume_file) if os.path.isfile(self.resume_file) else self.sampling_time
+        logger.info(f"Write new checkpoint after {timedelta(cp_time)}")
 
         # avoid expensive pickling of easily rebuilt objects
         pool = self.sampler.pool
@@ -571,10 +568,10 @@ class Dynesty(WorkerRun):
         result.posterior = self.likelihood.posterior_conversion(result.posterior)
         result.save_posterior_samples()
         extra_keys = set(result.posterior.columns) - set(self._search_parameter_keys)
-        posterior_keys = self._search_parameter_keys
+        posterior_keys = self._search_parameter_keys.copy()
         posterior_keys.extend(extra_keys)
         result.meta_data["posterior_keys"] = posterior_keys
-        posterior_labels = result.parameter_labels_with_unit
+        posterior_labels = result.parameter_labels_with_unit.copy()
         posterior_labels.extend([label_mapping.get(k, k) for k in extra_keys])
         result.meta_data["posterior_labels"] = posterior_labels
         if os.path.isfile(self.samples_file):
@@ -589,11 +586,19 @@ class Dynesty(WorkerRun):
             result.save_to_file(extension="json")
 
         if self.plot:
-            injection_parameters = {
-                k: v for k, v in self.injection_parameters.items()
-                if k in self._search_parameter_keys} if self.injection_parameters else None
-            result.plot_corner(parameters = injection_parameters, priors=True, dpi = 200)
-            bestfit_params = read_bestfit_from_posterior(self.args)
-            self.likelihood.final_diagnostics(bestfit_params, self.args, result)
+            logger.info("Creating corner plot of posterior samples.")
+            try:
+                injection_parameters = {
+                    k: v for k, v in self.injection_parameters.items()
+                    if k in self._search_parameter_keys} if self.injection_parameters else None
+                result.plot_corner(parameters = injection_parameters, priors=True, dpi = 200)
+            except Exception as e:
+                logger.warning(f"Failed to create corner plot: {e}")    
+            try:
+                logger.info("Creating diagnostic plots.")
+                bestfit_params = read_bestfit_from_posterior(self.args)
+                self.likelihood.final_diagnostics(bestfit_params, self.args, result)
+            except Exception as e:
+                logger.warning(f"Failed to create diagnostic plots: {e}")
 
         return result

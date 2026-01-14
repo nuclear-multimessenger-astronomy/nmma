@@ -139,7 +139,7 @@ def write_lc_to_csv(outfile, data, format= "observations"):
             all_filters.extend([filt] * len(sub_dict['time']))
         sort_indices = np.argsort(all_times)
         out_data = [
-            [Time(all_times[i], format="mjd").mjd, all_filters[i], all_mags[i], all_errs[i]] 
+            [Time(all_times[i], format="mjd").isot, all_filters[i], all_mags[i], all_errs[i]] 
             for i in sort_indices]
         np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error", comments="#")
         

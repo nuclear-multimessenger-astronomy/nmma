@@ -11,7 +11,7 @@ from scipy.stats import norm, gaussian_kde
 from matplotlib import pyplot as plt
 from bilby.core.prior import WeightedCategorical, PriorDict
 from .eos_processing import EoSConverter
-from ..core.base import NMMABaseLikelihood
+from ..core.base import NMMALikelihood
 from ..core.utils import fading_cmap
     
 def setup_tabulated_eos_priors(args, priors, logger=None):
@@ -50,7 +50,7 @@ def tabulated_eos_setup(args):
     eos_likelihood = EquationofStateLikelihood(priors, **eos_likelihood_kwargs)
     return priors, eos_likelihood, None
    
-class EquationofStateLikelihood(NMMABaseLikelihood):
+class EquationofStateLikelihood(NMMALikelihood):
     def __init__(self, priors, constraint_dict, eos_converter, **kwargs):
         constraint =JointEoSConstraint(constraint_dict, eos_converter=eos_converter)
         # TODO: to be extended for more complex likelihood expressions

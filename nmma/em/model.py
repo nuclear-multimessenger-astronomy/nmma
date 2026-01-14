@@ -1266,31 +1266,6 @@ class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
             SupernovaLightCurveModel(filters)
         ])
 
-def lc_model_class_from_str(class_names):
-    transient_class_map = {
-        "svd"           : SVDLightCurveModel,
-        "fiesta_kn"     : FiestaKilonovaModel,
-        "fiesta_grb"    : FiestaGRBModel,
-        "grb"           : GRBLightCurveModel,
-        "host_galaxy"   : HostGalaxyLightCurveModel,
-        "supernova"     : SupernovaLightCurveModel,
-        "shock"         : ShockCoolingLightCurveModel,
-        "simple_kilonova":SimpleKilonovaLightCurveModel,
-        "combined"      : CombinedLightCurveModelContainer,
-        "kilonova_grb"  : KilonovaGRBLightCurveModel,
-        "supernova_grb" : SupernovaGRBLightCurveModel,
-        "supernova_shock":SupernovaShockCoolingLightCurveModel,
-    }
-    if class_names is None:
-        raise AttributeError("No EM transient class specified, please provide a valid class name or list of names.")
-    if len(class_names) ==1:
-        class_names = class_names[0].lower().split(",")
-    ##FIXME get more robust handling of aliases and typos
-    try:
-        classes = [transient_class_map[cn.strip()] for cn in class_names]
-    except KeyError:
-        raise KeyError(f"EM transient classes must be in {transient_class_map.keys()}, but was {class_names}")
-    return classes
 
 def get_lc_model_from_modelname(model_name):
     #FIXME This is incomplete, but identical to handling in NMMA 0.2.2
@@ -1362,36 +1337,57 @@ def create_light_curve_model_from_args(
     return CombinedLightCurveModelContainer(models_list)
 
 def identify_model_type(args):    
-    ## identify what kind of transient we are dealing with
+    """Routine to identify what kind of transient we are dealing with"""
+
+    transient_class_map = {
+        "svd"           : SVDLightCurveModel,
+        "fiesta_kn"     : FiestaKilonovaModel,
+        "fiesta_grb"    : FiestaGRBModel,
+        "grb"           : GRBLightCurveModel,
+        "host_galaxy"   : HostGalaxyLightCurveModel,
+        "supernova"     : SupernovaLightCurveModel,
+        "shock"         : ShockCoolingLightCurveModel,
+        "simple_kilonova":SimpleKilonovaLightCurveModel,
+        "combined"      : CombinedLightCurveModelContainer,
+        "kilonova_grb"  : KilonovaGRBLightCurveModel,
+        "supernova_grb" : SupernovaGRBLightCurveModel,
+        "supernova_shock":SupernovaShockCoolingLightCurveModel,
+    }
     try:
         # preferred method is to explicitly pass the desired class
-        lc_model= lc_model_class_from_str(args.em_transient_class)
+        class_name = args.em_transient_class
+        if class_name is None:
+            raise AttributeError("No EM transient class specified, please provide a valid class name or list of names.")
+        elif isinstance(class_name, str):
+            class_name = class_name.lower().split(",")
+        ##FIXME get more robust handling of aliases and typos
+        lc_model = [transient_class_map[cn.strip()] for cn in class_name]
+    except KeyError:
+        raise KeyError(f"EM transient classes must be in {list(transient_class_map.keys())}, but was {class_name}")
     except AttributeError:
         # if no class is given, we try to infer it from the model names
         lc_model = args.em_model
     return lc_model
         
 def create_injection_model(args, filters=None):
-    # step 0: by default, injection is created with the same args as the main model
+    """Routine to create an injection LightCurveModelContainer from args"""
+    # By default, injection takes same args as the main model
     injection_args = copy(args)
     
-    # step 1: find args that were parsed as "injection_..."
-    #  and place them in the injection-Namespace
+    # replace injection-specific args
     for arg, val in args.__dict__.items():
         if arg == "injection_model_args":
             if val is None:
                 injection_dict = {}
-            else:
+            elif isinstance(val, str):
                 injection_dict = literal_eval(val)
-        else:
-            arg = arg.replace("injection_", "") # replace 'injection_' prefix if necessary
-            setattr(injection_args, arg, val)
+            else: 
+                injection_dict = val
+            for arg, val in injection_dict.items():
+                arg = arg.lstrip('--').replace('-','_').replace("injection_", "")
+                setattr(injection_args, arg, val)
+        elif arg.startswith("injection_"): # replace 'injection_' prefix if necessary
+            setattr(injection_args, arg.replace("injection_", ""), val)
 
-    # step 2: we have set aside the values of injection_args, now fill them in
-    for arg, val in injection_dict.items():
-            arg = arg.lstrip('--').replace('-','_').replace("injection_", "")
-            setattr(injection_args, arg, val)
-
-    # step 3: identify the model type and create the model
     lc_model = identify_model_type(injection_args)
     return create_light_curve_model_from_args(lc_model, injection_args, filters)

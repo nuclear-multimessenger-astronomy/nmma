@@ -10,7 +10,7 @@ import multiprocessing
 from ..core.parsing import (parsing_and_logging, slurm_setup_parser, nmma_base_parsing, process_multi_condition_string)
 from ..core.constants import set_cosmology, get_cosmology
 from ..core.utils import set_filename, rejection_sample, read_injection_file
-from ..core.conversion import MultimessengerConversion
+from ..core.conversion import MultimessengerConversion, KilonovaEjectaFitting, bbh_source_frame
 from ..em import utils, lightcurve_handling as lch, em_parsing as emp
 from ..em.model import create_injection_model
 from ..eos.eos_processing import EoSConverter
@@ -51,11 +51,7 @@ class NMMAInjectionCreator(InjectionCreator):
         if args.simple_setup:
             self.include_checks = False
         else:
-            self.include_checks = True
-
-            self.messengers = set()
-            self.modifiers = set()
-            ## initialise testing methods we want to apply to the injections
+             ## initialise testing methods we want to apply to the injections
             self.setup_test_routines(args)
             self.fail_mask = None
             self.columns_to_remove = None
@@ -65,18 +61,47 @@ class NMMAInjectionCreator(InjectionCreator):
             self.setup_post_processing(args)
 
             # we need to be able to do a parameter conversion
-            self.param_conversion = self.determine_conversion_from_args(args)
+            self.param_conversion = MultimessengerConversion.from_dict(self.conv_instructions)
 
             self.original_parameters = args.original_parameters
+            self.include_checks = True
 
         # legacy
         self.gw_injection_file = getattr(args, 'gw_injection_file', self.filename)
         self.reference_frequency = getattr(args, "reference_frequency", 20.0)
 
+    def setup_test_routines(self, args):
+        self.conv_instructions = {}
+        test_methods = [self.test_initialisation]
+        tests = process_multi_condition_string(args.tests)
+
+        for test, val in tests.items():
+            if 'snr' in test:
+                self.initialise_ifos(args)
+                self.conv_instructions['gw'] = bbh_source_frame
+                self.snr_threshold = val[1]
+                test_methods.append(self.test_snr)
+            elif 'population' in test:
+                test_methods.append(self.test_population)
+            elif 'ejecta' in test:
+                test_methods.append(self.test_ejecta)
+                self.conv_instructions['ejecta'] = True
+            elif 'peak_magnitude' in test:
+                self.ref_mag = val[1]
+                self.initialise_lc_model(args)
+                self.conv_instructions['em'] = self.lc_model.parameter_conversion
+                test_methods.append(self.test_detectability)
+
+        self.conv_instructions['eos'] = EoSConverter(args) 
+        if "Hubble_constant" in self.priors:
+            self.conv_instructions['cosmo'] = self.cosmology
+        self.test_routines = test_methods
+                   
     def setup_post_processing(self, args):
         postprocess_methods = []
         if 'snr' in args.post_processing:
             self.initialise_ifos(args)
+            self.conv_instructions['gw'] = bbh_source_frame
             postprocess_methods.append(self.add_snrs)
         if 'ejecta' in args.post_processing:
             postprocess_methods.append(self.compute_ejecta)
@@ -87,40 +112,7 @@ class NMMAInjectionCreator(InjectionCreator):
         if not postprocess_methods:
             postprocess_methods.append(lambda df: df)  # No-op if no postprocessing is needed
         self.postprocessing = postprocess_methods
-
-    def setup_test_routines(self, args):
-        test_methods = [self.test_initialisation]
-        tests = process_multi_condition_string(args.tests)
-        for test, val in tests.items():
-            if 'snr' in test:
-                self.snr_threshold = val[1]
-                test_methods.append(self.test_snr)
-            elif 'population' in test:
-                test_methods.append(self.test_population)
-            elif 'ejecta' in test:
-                test_methods.append(self.test_ejecta)
-            elif 'peak_magnitude' in test:
-                self.ref_mag = val[1]
-                self.initialise_lc_model(args)
-                test_methods.append(self.test_detectability)
-
-        self.test_routines = test_methods
-                   
         
-    def determine_conversion_from_args(self, args):
-        """Determine the messengers and modifiers for the conversion based on the args."""
-        # FIXME: To be extended
-        if 'ejecta' in (args.tests or args.post_processing):
-            em_conversion = self.lc_model.parameter_conversion
-        else:
-            em_conversion = False
-        if 'snr' in (args.tests or args.post_processing):
-            gw_conversion = True
-        else:
-            gw_conversion = False
-
-        return MultimessengerConversion(EoSConverter(args), 
-            gw_conversion, em_conversion)
 
     def generate_prelim_dataframe(self):
         #step 1: Check: we may want to extend a preliminary injection file
@@ -298,7 +290,10 @@ class NMMAInjectionCreator(InjectionCreator):
 
     #################### Messenger-specific methods ########################
     def initialise_ifos(self, args):
-        detectors = args.gw_detectors.split(",")
+        if isinstance(args.gw_detectors, str):  
+            detectors = args.gw_detectors.split(",")
+        else:
+            detectors = args.gw_detectors
         dets = [bilby.gw.detector.get_empty_interferometer(det) for det in detectors 
                      if det != 'ET']
         if 'ET' in detectors:
@@ -317,7 +312,7 @@ class NMMAInjectionCreator(InjectionCreator):
 
         self.duration = 2048.
 
-        self.waveform_generator = bilby.gw.WaveformGenerator(
+        self.waveform_gen = bilby.gw.WaveformGenerator(
             sampling_frequency=self.sampling_frequency, duration=self.duration,
             start_time=2-self.duration, time_domain_source_model= None,
             frequency_domain_source_model=bilby.gw.source.binary_neutron_star_frequency_sequence,
@@ -347,7 +342,7 @@ class NMMAInjectionCreator(InjectionCreator):
             injection_parameters[k] = dataframe[k][idx]
 
         self.ifos.set_strain_data_from_zero_noise(self.sampling_frequency, duration=self.duration, start_time=2-self.duration) 
-        self.ifos.inject_signal(injection_parameters, waveform_generator=self.waveform_generator)
+        self.ifos.inject_signal(injection_parameters, waveform_generator=self.waveform_gen)
         
 
         mass_1,mass_2 = injection_parameters['mass_1'], injection_parameters['mass_2']
@@ -368,7 +363,7 @@ class NMMAInjectionCreator(InjectionCreator):
     def compute_ejecta(self, dataframe):
         """Compute the ejecta parameters for the injections."""
         # very short wrapper to avoid issues in the initialisation sequence
-        return self.param_conversion.ejecta_parameter_conversion(dataframe)
+        return KilonovaEjectaFitting(dataframe)
             
 
     ############################ Legacy functions ##########################

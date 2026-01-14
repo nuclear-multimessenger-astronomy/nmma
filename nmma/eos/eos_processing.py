@@ -35,6 +35,7 @@ def setup_eos_generator(args):
         raise ValueError(f"Unknown eos model type: {eos_model_type}")
 
 class EoSGenerator:
+    eos_parameters = None
     def __init__(self, emulator_path, eos_parameters=None, n_mass_samples = 30):
         
         # load the emulator
@@ -55,12 +56,8 @@ class EoSGenerator:
                 self.emulator =  pickle.load(f)
             self.predict = self.pickle_predict
 
-            
-
         ## set the parameter-keys to be passed to the emulator
-        if eos_parameters is None:
-            self.eos_parameters = self.identify_eos_parameters()
-        else:
+        if eos_parameters:
             self.eos_parameters = eos_parameters
         
         self.set_mass_construction(n_mass_samples) 
@@ -93,6 +90,7 @@ class EoSGenerator:
 
     
     def generate_macro_eos(self, converted_parameters):
+
         predictions = self.emulate_macro_eos(converted_parameters)
         return self.adjust_format(predictions)
 
@@ -109,11 +107,6 @@ class EoSGenerator:
         """Adjust the format of the predictions to the expected format: A n-tuple of three 1-D arrays for radius, mass lambdas, respectively"""
         #This should be implemented in the subclass
         return predictions
-
-    def identify_eos_parameters(self):
-        """Identify the parameters for the EoS model"""
-        #This should be implemented in the subclass
-        return None
 
 class NEPEoSGenerator(EoSGenerator):
     def __init__(self, metadata):
@@ -183,8 +176,7 @@ class NEPEoSGenerator(EoSGenerator):
         
 
 class NEP5EoSGenerator(NEPEoSGenerator):
-    def identify_eos_parameters(self):
-        return ['K_sat', 'L_sym', 'K_sym', '3n_sat', '5n_sat']
+    eos_parameters = ['K_sat', 'L_sym', 'K_sym', '3n_sat', '5n_sat']
 
 class LECEoSGenerator(EoSGenerator):
     def __init__(self, metadata):
@@ -197,7 +189,6 @@ class LECEoSGenerator(EoSGenerator):
         self.lambda_emulator= joblib.load(metadata['lambda_emulator'])
 
         self.set_mass_construction(metadata.get('n_mass_samples', 30))
-        self.eos_parameters = self.identify_eos_parameters()
         
     def predict(self, converted_parameters):
         # Scale the input features
@@ -231,14 +222,11 @@ class LECEoSGenerator(EoSGenerator):
         return np.stack([radius_array, mass_array, 10**lambda_array], axis=1)
     
 class LEC7EoSGenerator(LECEoSGenerator):
-    def identify_eos_parameters(self):
-        return ['d11', 'd22', 'd3', 'd4', 'd6', 'd7']
+    eos_parameters = ['d11', 'd22', 'd3', 'd4', 'd6', 'd7']
 
 class LEC13EoSGenerator(LECEoSGenerator):
-    def identify_eos_parameters(self):
-        return ['d11', 'd22', 'd3', 'd4', 'd6', 'd7', 
-                'ksat','qsat', 'zsat', 
-                'cssq1', 'cssq2', 'cssq3', 'cssq4']
+    eos_parameters = ['d11', 'd22', 'd3', 'd4', 'd6', 'd7', 
+                      'ksat','qsat', 'zsat', 'cssq1', 'cssq2', 'cssq3', 'cssq4']
     
 class EoSConverter:
     def __init__(self, args, method=None):

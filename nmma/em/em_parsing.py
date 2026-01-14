@@ -5,7 +5,7 @@ from .utils import DEFAULT_FILTERS
 
 # unused imports kept for forward compatibility
 from ..core.parsing import (parsing_and_logging, single_messenger_analysis_parsing, 
-    base_injection_parsing, nonefloat, noneint, nonestr )
+    base_injection_parsing, yaml_parse, nonefloat, noneint, nonestr )
 
 
 
@@ -142,7 +142,7 @@ def em_injection_parsing(parser):
     lc_injection_parser = parser.add_argument_group(
         title="Lightcurve injection arguments", description="Specify lightcurve injections"
     )
-    lc_injection_parser.add("--injection-model-args", type = nonestr, 
+    lc_injection_parser.add("--injection-model-args", type = yaml_parse, 
         help="Additional arguments for the injection model, given like a python-dict " \
         "e.g. --injection_args='{\"param1\": 0.5, \"param2\": 1.0}'. All other parameters " \
         "needed to create the injection should be specified in the --injection-file.")
@@ -273,8 +273,7 @@ def bolometric_parser(parser):
     # specific arguments
     parser.add_argument("--error-budget", type=float, default=0.1,
         help="Bolometric error (default: 10 percent of relative error)")
-    parser.add_argument("--em-model","--model", type=str,
-        help="Name of the transient model to be used")
+    parser.add_argument("--em-model","--model", help="Name of the transient model to be used")
     
     return parser
 
@@ -324,7 +323,7 @@ def lc_validation_parser(parser):
 
     parser = basic_em_only_parsing(parser)
 
-    parser.add_argument("--light-curve-data", "--data", type=str,
+    parser.add_argument("--light-curve-data", "--data",
         help="Path to the data file in [time(isot) filter magnitude error] format")
     parser.add_argument("--filters", nargs="*",
         help="Comma separated list of filters to validate against. If not provided, all filters in the data will be used.",
