@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import uniform, truncnorm
 
-# class NeutronStarPopulationLikelihood(NMMABaseLikelihood):
+# class NeutronStarPopulationLikelihood(NMMALikelihood):
 #     """
 #     Base class for neutron star population likelihoods.
 #     This class is intended to be subclassed for specific population models.

@@ -69,8 +69,7 @@ eos_args = Namespace(
 #     likelihood_type = 'MBGravitationalWaveTransient',
 #     reference_frequency = 30,
 #     duration = 256,
-#     detectors = ['H1', 'L1', 'V1'],
-#     psd_dict = '{"H1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/h1_psd.txt", "L1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/l1_psd.txt", "V1":"/home/hrose/Dokumente/40_nuclear/10_data/GW170817/v1_psd.txt"}'
+#     detectors = ['H1', 'L1', 'V1'],'
 # )
 joint_args = Namespace(
     ejecta_conversion=False

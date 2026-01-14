@@ -1,7 +1,7 @@
 import numpy as np
 from ast import literal_eval
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
-from ..core.base import NMMABaseLikelihood, initialisation_args_from_signature_and_namespace
+from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
 from ..core.conversion import (bbh_source_frame, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion)
 
 def setup_gw_kwargs(data_dump, args, logger, **kwargs):
@@ -33,7 +33,10 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
         gw_kwargs.update(roq_likelihood_kwargs(args, logger))
 
     elif args.likelihood_type == 'RelativeBinningGravitationalWaveTransient':
-        fiducial_parameters = literal_eval(args.fiducial_parameters)
+        if isinstance(args.fiducial_parameters, str):
+            fiducial_parameters = literal_eval(args.fiducial_parameters)
+        else:
+            fiducial_parameters = args.fiducial_parameters
         gw_kwargs.update(
             fiducial_parameters=fiducial_parameters, epsilon=args.epsilon,
             update_fiducial_parameters=args.update_fiducial_parameters
@@ -90,7 +93,7 @@ def roq_likelihood_kwargs(args, logger):
         kwargs["quadratic_matrix"] = args.roq_quadratic_matrix
     return kwargs
 
-class GravitationalWaveTransientLikelihood(NMMABaseLikelihood):
+class GravitationalWaveTransientLikelihood(NMMALikelihood):
     """ A GravitationalWaveTransient likelihood object
 
     This likelihood uses the usual gravitational-wave transient

@@ -100,7 +100,7 @@ class NMMALikelihoodMixin:
         """
         pass
 
-    def post_process_bestfit(self, args, result):
+    def post_process_bestfit(self, args, result=None):
         bestfit_params = read_bestfit_from_posterior(args)
         bestfit_params = self.parameter_conversion(bestfit_params)
         self.final_diagnostics(bestfit_params, args, result)
@@ -126,7 +126,7 @@ class NMMALikelihoodMixin:
                 raise ValueError(f"Mutually dependent parameters found: {intersection}. Please only provide up to two of these.")
 
     
-class NMMABaseLikelihood(NMMALikelihoodMixin,Likelihood):
+class NMMALikelihood(NMMALikelihoodMixin,Likelihood):
     """ The base likelihood object for modular multi-messenger analysis
 
     Parameters
@@ -285,7 +285,10 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
     priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
 
     # fetch the additional sampler kwargs
-    sampler_kwargs = literal_eval(args.sampler_kwargs)
+    if isinstance(args.sampler_kwargs, str):
+        sampler_kwargs = literal_eval(args.sampler_kwargs) 
+    else:
+        sampler_kwargs = args.sampler_kwargs
     print("Running with the following additional sampler_kwargs:")
     print(sampler_kwargs)
 

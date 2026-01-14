@@ -22,7 +22,7 @@ def gw_parsing(parser):
 
 def gw_injection_parsing(parser):
     """Parser for the gw injection arguments."""
-    parser.add_argument("--gw-detectors", default="ET,CE",
+    parser.add_argument("--gw-detectors", default=["ET", "CE"], nargs="*",
         help="Comma-separated list of GW detectors to use (default: ET,CE)")
     parser.add_argument("--waveform-arguments", type=nonestr,
         help="Additional arguments to pass to the waveform generator, e.g. 'waveform_arguments={\"waveform_approximant\": \"IMRPhenomXPHM\"}'")

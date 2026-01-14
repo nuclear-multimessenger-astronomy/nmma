@@ -139,7 +139,7 @@ def pipe_inj_parsing(parser):
               "if --gps-file or injection file is also given"), )
         
     # bilby-pipe Optional Time parameters
-    parser.add_argument( "-t", "--trigger-time", type=int, default=0,
+    parser.add_argument( "-t", "--trigger-time", type=float, default=0.,
         help=("The trigger time to use for setting a geocent_time prior "
             "(default=0). Ignored if a geocent_time prior exists in the "
             "prior_file or --gps-file is given." ), )
@@ -153,9 +153,9 @@ def pipe_inj_parsing(parser):
         help=( "A list of gps start times to use for setting a geocent_time"
             "prior. Note, the trigger time is obtained from "
             " start_time + duration - post_trigger_duration." ))
-    parser.add_argument("--duration", type=float, default=4, help=("The segment "
+    parser.add_argument("--duration", type=float, default=4., help=("The segment "
             "duration (default=4s), used only in conjunction with --gps-file" ), )
-    parser.add_argument( "--post-trigger-duration", type=float, default=2,
+    parser.add_argument( "--post-trigger-duration", type=float, default=2.,
         help=("The post trigger duration (default=2s), used only in conjunction "
             "with --gps-file" ))
     return parser
