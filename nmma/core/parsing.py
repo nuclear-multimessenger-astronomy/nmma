@@ -3,6 +3,7 @@ import configargparse
 import yaml
 import sys
 import os
+import operator
 
 from bilby.core.utils import setup_logger
 from .gitlab import refresh_models_list
@@ -216,16 +217,23 @@ def slurm_analysis_parser(parser):
 ############# UTILS #############
 def process_multi_condition_string(multi_condition_string):
     # Supported operators 
-    operators = [">=", "<=", "==", ">", "<", "="]
+    operators = {
+    "==": operator.eq,
+    "!=": operator.ne,
+    ">=": operator.ge,
+    ">": operator.gt,
+    "<=": operator.le,
+    "<": operator.lt,
+}   
 
     out = {}
 
     for item in multi_condition_string:
         matched = False
-        for op in operators: # then check for num relation
+        for op in operators.keys(): # then check for num relation
             if op in item:
-                parts = item.split(op, 1)
-                out[parts[0].strip()] = (op, parts[1].strip())
+                parts = item.split(op)
+                out[parts[0].strip()] = (operators[op], float(parts[1].strip()) )
                 matched = True
                 break
         if not matched:

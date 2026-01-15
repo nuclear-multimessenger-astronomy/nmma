@@ -4,14 +4,14 @@ import os
 import bilby
 from bilby_pipe.utils import convert_string_to_dict
 from bilby_pipe.create_injections import InjectionCreator
-import multiprocessing
+from multiprocessing.dummy import Pool
 
 
 from ..core.parsing import (parsing_and_logging, slurm_setup_parser, nmma_base_parsing, process_multi_condition_string)
 from ..core.constants import set_cosmology, get_cosmology
 from ..core.utils import set_filename, rejection_sample, read_injection_file
 from ..core.conversion import MultimessengerConversion, KilonovaEjectaFitting, bbh_source_frame
-from ..em import utils, lightcurve_handling as lch, em_parsing as emp
+from ..em import utils, lightcurve_handling as lch
 from ..em.model import create_injection_model
 from ..eos.eos_processing import EoSConverter
 from .joint_parsing import injection_parsing
@@ -79,7 +79,7 @@ class NMMAInjectionCreator(InjectionCreator):
             if 'snr' in test:
                 self.initialise_ifos(args)
                 self.conv_instructions['gw'] = bbh_source_frame
-                self.snr_threshold = val[1]
+                self.snr_op, self.snr_threshold = val
                 test_methods.append(self.test_snr)
             elif 'population' in test:
                 test_methods.append(self.test_population)
@@ -87,7 +87,7 @@ class NMMAInjectionCreator(InjectionCreator):
                 test_methods.append(self.test_ejecta)
                 self.conv_instructions['ejecta'] = True
             elif 'peak_magnitude' in test:
-                self.ref_mag = val[1]
+                self.mag_op, self.ref_mag = val
                 self.initialise_lc_model(args)
                 self.conv_instructions['em'] = self.lc_model.parameter_conversion
                 test_methods.append(self.test_detectability)
@@ -279,13 +279,13 @@ class NMMAInjectionCreator(InjectionCreator):
     def test_snr(self, df):
         """Test the SNR of the injections."""
         df = self.add_snrs(df)
-        df["tests_passed"]*=(df["snr"] >= self.snr_threshold)
+        df["tests_passed"]*= self.snr_op(df["snr"], self.snr_threshold)
         return df
     
     def test_detectability(self, df):
-        for data_row in df.itertuples():
-            times, mags = self.lc_model.gen_detector_lc(data_row)
-            if not any([(mag > self.ref_mag).any() for mag in mags]):
+        for i, data_row in df.iterrows():
+            times, mags = self.lc_model.gen_detector_lc(data_row.to_dict())
+            if not any([(self.mag_op(mag, self.ref_mag)).any() for mag in mags.values()]):
                 df.at[data_row.Index, "tests_passed"] = False
 
     #################### Messenger-specific methods ########################
@@ -315,7 +315,7 @@ class NMMAInjectionCreator(InjectionCreator):
         self.waveform_gen = bilby.gw.WaveformGenerator(
             sampling_frequency=self.sampling_frequency, duration=self.duration,
             start_time=2-self.duration, time_domain_source_model= None,
-            frequency_domain_source_model=bilby.gw.source.binary_neutron_star_frequency_sequence,
+            frequency_domain_source_model=bilby.gw.source.lal_binary_neutron_star,
             parameter_conversion=bilby.gw.conversion.convert_to_lal_binary_neutron_star_parameters,
             waveform_arguments=waveform_arguments)
 
@@ -325,7 +325,7 @@ class NMMAInjectionCreator(InjectionCreator):
         def worker(idx):
             return self.compute_snr(dataframe, idx)
 
-        with multiprocessing.Pool() as pool:
+        with Pool() as pool:
             results = pool.map(worker, range(len(dataframe.index)))
 
         for snr, duration in results:

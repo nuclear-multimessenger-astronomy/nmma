@@ -225,7 +225,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
     def adjust_priors_and_data(self, args, logger):
         messengers, analysis_modifiers = [], []
         data_dump = dict(injection_parameters = self.injection_parameters)
-
         # GW SETUP
         if args.detectors:
             messengers.append("gw")
