@@ -105,7 +105,8 @@ def basic_em_analysis_plot(
         ax_sum.set_ylim(ylim[filt])
         ax_sum.set_xlim(xlim)
         ax_delta.set_xlim(xlim)
-        ax_sum.set_xscale('log')
+        if xlim[0] > 0:
+            ax_sum.set_xscale('log')
         
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches='tight')
@@ -348,7 +349,8 @@ def basic_spec_plot(
 ##############################################
 def check_limit(lim):
     if isinstance(lim, str):
-        lim = [float(val) for val in lim.split(",")]
+        lim = lim.split(",")
+    lim = [float(val) for val in lim]
     assert len(lim) == 2, f"{lim} is no valid plot-limit." 
     return lim
 

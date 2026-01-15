@@ -196,12 +196,14 @@ class FilterSystematicsHandler(SystematicsHandler):
     """
     def __init__(self, filters, systematics_file = None, error_budget = None, light_curve_times = np.linspace(0.1, 14, 10), base_prior_name="em_syserr" ):
         self.filters = filters
+        if not isinstance(light_curve_times, dict):
+            light_curve_times = {filt: light_curve_times for filt in filters}
         super().__init__(systematics_file, error_budget, light_curve_times, base_prior_name)   
 
     def adjust_error_budget(self, error_budget):    
         if error_budget is None:
             error_budget = 1.0                   
-        if isinstance(error_budget, str):
+        elif isinstance(error_budget, str):
             error_budget = literal_eval(error_budget)
         error_budget = set_filter_associated_dict(error_budget, self.filters, 1.)
         self.error_budget = {filt: np.full_like(self.light_curve_times[filt], error_budget[filt]) 
