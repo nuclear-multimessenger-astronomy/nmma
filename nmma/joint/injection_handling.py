@@ -4,7 +4,6 @@ import os
 import bilby
 from bilby_pipe.utils import convert_string_to_dict
 from bilby_pipe.create_injections import InjectionCreator
-from multiprocessing.dummy import Pool
 
 
 from ..core.parsing import (parsing_and_logging, slurm_setup_parser, nmma_base_parsing, process_multi_condition_string)
@@ -53,7 +52,6 @@ class NMMAInjectionCreator(InjectionCreator):
         else:
              ## initialise testing methods we want to apply to the injections
             self.setup_test_routines(args)
-            self.fail_mask = None
             self.columns_to_remove = None
             self.max_redraws = args.max_redraws
 
@@ -72,7 +70,7 @@ class NMMAInjectionCreator(InjectionCreator):
 
     def setup_test_routines(self, args):
         self.conv_instructions = {}
-        test_methods = [self.test_initialisation]
+        test_methods = []
         tests = process_multi_condition_string(args.tests)
 
         for test, val in tests.items():
@@ -112,7 +110,15 @@ class NMMAInjectionCreator(InjectionCreator):
         if not postprocess_methods:
             postprocess_methods.append(lambda df: df)  # No-op if no postprocessing is needed
         self.postprocessing = postprocess_methods
-        
+    
+    def generate_injection_file(self):
+        """Generate the injection file based on the provided parameters."""   
+        dataframe = self.generate_prelim_dataframe()
+        if self.include_checks:
+            dataframe = self.testing_and_postprocessing(dataframe)
+
+        # Finally dump the whole thing back into a json injection file
+        self.write_injection_dataframe(dataframe, self.filename, self.extension )    
 
     def generate_prelim_dataframe(self):
         #step 1: Check: we may want to extend a preliminary injection file
@@ -148,7 +154,7 @@ class NMMAInjectionCreator(InjectionCreator):
     
     def testing_and_postprocessing(self, dataframe):
         # step 3: Do a test and redraw if necessary
-        dataframe = self.test_wrap(dataframe)
+        dataframe['tests_passed'] = self.test_wrap(dataframe)
 
         # step 4: redo until sufficient injections have passed the tests
         dataframe = self.refill_failed_tests(dataframe)
@@ -157,79 +163,63 @@ class NMMAInjectionCreator(InjectionCreator):
         # step 5: Wrap things up
         # do final conversion to all necessary parameters if desired
         if not self.original_parameters:
-            dataframe, _ = self.param_conversion.core_conversion(dataframe)
+            dataframe = self.param_conversion.core_conversion(dataframe)
         # or add expensive information not required for tests
         for postprocess in self.postprocessing:
-            dataframe = postprocess(dataframe)
+            postprocess(dataframe)
         return dataframe
-
-
-    def generate_injection_file(self):
-        """Generate the injection file based on the provided parameters."""   
-        dataframe = self.generate_prelim_dataframe()
-        if self.include_checks:
-            dataframe = self.testing_and_postprocessing(dataframe)
-
-        # Finally dump the whole thing back into a json injection file
-        self.write_injection_dataframe(dataframe, self.filename, self.extension )
-
 
     def adjusted_prior_draw(self):
         dataframe_from_prior = self.get_injection_dataframe()
         try: ## FIXME: This could be handled more gracefully...
             swap_mask = dataframe_from_prior["mass_1"] < dataframe_from_prior["mass_2"]    
-            dataframe_from_prior.loc[swap_mask, ['mass_1', 'mass_2']] = dataframe_from_prior.loc[swap_mask, ['mass_2','mass_1', ]].values
+            dataframe_from_prior.loc[swap_mask, ['mass_1', 'mass_2']] = dataframe_from_prior.loc[swap_mask, ['mass_2','mass_1']].values
         except KeyError:
             pass
         if self.columns_to_remove is not None:
             dataframe_from_prior.drop(columns=self.columns_to_remove, inplace=True)
         return dataframe_from_prior
 
-
     def test_wrap(self, dataframe):
-        ## test_df must be a copy since some tests require to modify the dataframe
-        if self.fail_mask is None:
-            test_df = dataframe.copy()
-        else:
-            test_df = dataframe[self.fail_mask].copy()
-
-        # transform the parameters to multimessenger parameters and test them
+        test_df = dataframe.copy()
         test_df = self.param_conversion.core_conversion(test_df)
+        test_df['tests_passed'] =self.priors.evaluate_constraints(test_df)
         for test_routine in self.test_routines:
             # run the test routine on the test_df
             # this will modify the dataframe in place
             test_routine(test_df)
         
-        dataframe.loc[test_df.index, 'tests_passed'] = test_df['tests_passed']
-        self.fail_mask = ~ dataframe['tests_passed'].astype(bool)
-        self.n_fail = self.fail_mask.sum()
-        return dataframe
+        return test_df['tests_passed']
     
     def refill_failed_tests(self, dataframe):
+        """Routine to redo tests until all conditions are fulfilled or max_redraws is reached."""
         redraws = 0
-        while True: 
-            if self.n_fail == 0:                 # if all tests passed, break
-                break
+        while redraws <= self.max_redraws: 
+            fail_mask = ~ dataframe['tests_passed'].astype(bool)
+            n_fail = fail_mask.sum()
+            if n_fail == 0:                 # if all tests passed, break
+                return dataframe
+            
             # replace the failed samples with new samples from the prior
             try:
-                assert len(redraw_from_prior) >= self.n_fail
-            except NameError:
+                assert len(redraw_from_prior) >= n_fail
+            except:
                 # unless we first need to get new samples from the prior 
                 # because the number of failed samples is larger 
                 # than the number of unused new samples
                 redraw_from_prior = self.adjusted_prior_draw()
                 redraws += 1
-                if redraws > self.max_redraws:  # try redraw only up to max_redraws times
-                    raise ValueError(f"Redrew {redraws} times, but still {self.n_fail} failed samples. "
-                        "Consider increasing the max_redraws or check your prior." )
 
-            replace_vals = redraw_from_prior.iloc[:self.n_fail][self.use_prior_columns].reset_index(drop=True)
+            replace_vals = redraw_from_prior.iloc[:n_fail][self.use_prior_columns]
+            redraw_from_prior = redraw_from_prior.iloc[n_fail:]
 
-            dataframe.loc[self.fail_mask, self.use_prior_columns]=replace_vals.values
-            redraw_from_prior = redraw_from_prior.iloc[self.n_fail:]
+            dataframe.loc[fail_mask, self.use_prior_columns]=replace_vals.to_numpy()
+            retest_df = dataframe[fail_mask].reset_index(drop=True)
+            retest_df['tests_passed'] = self.test_wrap(retest_df)
+            dataframe.loc[fail_mask, 'tests_passed'] = retest_df['tests_passed'].to_numpy()
 
-            dataframe = self.test_wrap(dataframe)
-        return dataframe
+        raise ValueError(f"Redrew {redraws} times, but still {n_fail} failed samples. "
+            "Consider increasing the max_redraws or check your prior." )
 
     def handle_incomplete_injection_file(self, gw_injection_file=None):
         # check injection file format
@@ -257,10 +247,6 @@ class NMMAInjectionCreator(InjectionCreator):
 
         return dataframe_from_file
 
-
-    def test_initialisation(self, df):
-        df["tests_passed"]=True
-
     def test_population(self, df):
         # FIXME: Allow tests on other distributions
         
@@ -269,24 +255,23 @@ class NMMAInjectionCreator(InjectionCreator):
         df["tests_passed"] *= rejection_sample(pop_prob, np.ones_like(pop_prob), self.rng)[1]
         # min mass constraint
         df["tests_passed"]*=(df["mass_2_source"] >=1.)
-        return df
 
     def test_ejecta(self, df):
         df["tests_passed"]*=np.isfinite(df["log10_mej_dyn"]) 
         df["tests_passed"]*=np.isfinite(df["log10_mej_wind"])
-        return df
     
     def test_snr(self, df):
         """Test the SNR of the injections."""
         df = self.add_snrs(df)
         df["tests_passed"]*= self.snr_op(df["snr"], self.snr_threshold)
-        return df
     
     def test_detectability(self, df):
-        for i, data_row in df.iterrows():
-            times, mags = self.lc_model.gen_detector_lc(data_row.to_dict())
-            if not any([(self.mag_op(mag, self.ref_mag)).any() for mag in mags.values()]):
-                df.at[data_row.Index, "tests_passed"] = False
+        """Test whether the injections are detectable in the light curve model."""
+        # FIXME: Extend to respect known systems / filters
+        def row_check(data_row):
+            _, mags = self.lc_model.gen_detector_lc(data_row.to_dict())
+            return any([(self.mag_op(mag, self.ref_mag)).any() for mag in mags.values()])
+        df["tests_passed"] *= df.apply(lambda row: row_check(row), axis=1)
 
     #################### Messenger-specific methods ########################
     def initialise_ifos(self, args):
@@ -299,7 +284,7 @@ class NMMAInjectionCreator(InjectionCreator):
         if 'ET' in detectors:
             dets.append(bilby.gw.detector.networks.get_empty_interferometer('ET'))
 
-        self.ifos = bilby.gw.detector.InterferometerList(dets)  # et_det,
+        self.ifos = bilby.gw.detector.InterferometerList(dets)
         self.f_min = max(ifo.minimum_frequency for ifo in self.ifos)
         f_max = min(ifo.maximum_frequency for ifo in self.ifos)
 
@@ -320,26 +305,27 @@ class NMMAInjectionCreator(InjectionCreator):
             waveform_arguments=waveform_arguments)
 
     def add_snrs(self, dataframe):
-        snr_list = []
-        duration_list = []
-        def worker(idx):
-            return self.compute_snr(dataframe, idx)
+        """Compute SNR and duration for each row in parallel using threads."""
+        # FIXME: preferable to parallelise, but ifo meta_data is not thread-safe
+        
+        # records = dataframe.to_dict("records")
+        # n_workers = min(len(records), os.cpu_count() or 1)
+        # with ThreadPool(n_workers) as pool:
+        #     results = pool.map(self.compute_snr, records)
 
-        with Pool() as pool:
-            results = pool.map(worker, range(len(dataframe.index)))
+        
+        # snrs, durations = zip(*results)
+        # dataframe[["snr", "duration"]] = np.column_stack((snrs, durations))
 
-        for snr, duration in results:
-            snr_list.append(snr)
-            duration_list.append(duration)
-        dataframe["snr"] = snr_list
-        dataframe["duration"] = duration_list
+        dataframe[["snr", "duration"]] = dataframe.apply(
+            lambda row: self.compute_snr(row), axis=1, result_type='expand')
         return dataframe
     
-    def compute_snr(self, dataframe, idx):
+    def compute_snr(self, data):
         injection_parameters = {'fiducial': 1. }
         injection_keys = ('mass_1', 'mass_2','chi_1', 'chi_2', 'luminosity_distance', 'dec', 'ra', 'theta_jn', 'phase', 'theta_jn', 'psi', 'geocent_time', 'lambda_1', 'lambda_2')
         for k in injection_keys:  
-            injection_parameters[k] = dataframe[k][idx]
+            injection_parameters[k] = data[k]
 
         self.ifos.set_strain_data_from_zero_noise(self.sampling_frequency, duration=self.duration, start_time=2-self.duration) 
         self.ifos.inject_signal(injection_parameters, waveform_generator=self.waveform_gen)
@@ -354,7 +340,7 @@ class NMMAInjectionCreator(InjectionCreator):
     
     def initialise_lc_model(self, args):
         self.lc_model = create_injection_model(args)
-        self.label = args.lc_label if args.lc_label else self.filename
+        self.args.label = args.lc_label if args.lc_label else self.filename
         self.detection_limit = utils.create_detection_limit(args, self.lc_model.filters)
 
     def prepare_lightcurves(self, dataframe):
@@ -450,8 +436,6 @@ def multi_run_setup():
 def BNS_distribution(m1, m2):
     q= m2/m1
     return np.where(q<=1., q, 1/q)
-
-
 
 
 
