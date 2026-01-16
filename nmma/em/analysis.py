@@ -122,8 +122,8 @@ def analysis_setup(args):
     if injection_parameters is not None:
         injlist_all = ["luminosity_distance"]
         for model_name in model_names:
-            add_params = model.model_parameters_dict[model_name]
-            # FIXME: This seems very unnecessary.
+            add_params = model.model_parameters_dict[model_name].copy()
+            # FIXME: This seems very unnecessary 
             # But just in case there is a hidden purpose, let's keep it for this time.
             if "Bu2019" in model_name:
                 try:

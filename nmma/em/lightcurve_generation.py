@@ -819,7 +819,6 @@ def create_light_curve_data(
     if rng is None:
         rng = np.random.default_rng(args.generation_seed)
     dmag = args.injection_error_budget
-
     ## use extra data
     ztf_sampling = getattr(args, "ztf_sampling", False)
     rubin_ToO = getattr(args, "rubin_ToO_type", False)
@@ -839,11 +838,11 @@ def create_light_curve_data(
 
     # curate data
     data = {}
-
     for filt, mag_per_filt in lc.items():
         det_lim = detection_limit.get(filt,np.inf)
 
-        data[filt] = {'time': sample_times + trigger_time, 'mag': np.full_like(sample_times, det_lim), 'mag_error': np.full_like(sample_times, np.inf)}  # defaults
+        data[filt] = {'time': sample_times + trigger_time, 'mag': np.full_like(sample_times, det_lim), 
+                      'mag_error': np.full_like(sample_times, np.inf)}  # defaults
 
         det_mask = (mag_per_filt < det_lim) * (sample_times >= 0.)
         errors = rng.normal(scale=dmag, size=np.sum(det_mask))

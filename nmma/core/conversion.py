@@ -202,7 +202,7 @@ def EOS2Parameters(radii, masses, lambdas, m1_source, m2_source):
     ## radius interpolation will raise an error if dealing with multiple sources at once
     # In that case we return all values as corresponding arrays
     except ValueError:
-        ref = np.ones_like(radius_1)
+        ref = np.ones_like(lambda_1)
         (radius_1, radius_2, R_14, R_16) = np.interp(
                 x=[m1_source, m2_source, 1.4*ref, 1.6*ref],
                 xp=masses, fp= radii, left =0, right=0)
