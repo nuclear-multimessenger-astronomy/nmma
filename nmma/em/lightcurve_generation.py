@@ -5,15 +5,12 @@ import numpy as np
 import pandas as pd
 from importlib import resources
 
+import scipy
 from scipy.integrate import quad, solve_ivp
 from scipy.special import erfc
 from scipy.interpolate import CubicSpline
 
-from .utils import (
-    estimate_mag_err, autocomplete_data, flux_to_ABmag, 
-    create_detection_limit, set_filters
-)
-
+from . import utils 
 try:
     import afterglowpy
 
@@ -52,7 +49,7 @@ def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add = lambda x: 
         F = bb_flux_from_inv_temp(nu_of_filt, inv_temp, R_photo)
         F += add(nu_of_filt)
         # F *= 1 + redshift ## correction factor for shifted flux density bin
-        mag[filt] = flux_to_ABmag(F)
+        mag[filt] = utils.flux_to_ABmag(F)
 
     return mag
 
@@ -137,7 +134,7 @@ def arnett_modified_lc(t_day, param_dict):
 ## kilonova from SVD model
 def calc_svd_lbol(sample_times, param_list, svd_lbol_model, lbol_ncoeff = None):
     tt_interp, lbol_back =eval_svd_model(svd_lbol_model, lbol_ncoeff, param_list)
-    lbol = 10**autocomplete_data(sample_times, tt_interp, lbol_back)
+    lbol = 10**utils.autocomplete_data(sample_times, tt_interp, lbol_back)
     return np.squeeze(lbol)  #* (1. + z) FIXME: shouldn't this be (1 + z)**2
 
 def calc_svd_lc(
@@ -170,7 +167,7 @@ def calc_svd_lc(
         tt_interp, mag_back = eval_svd_model(svd_mag_model[filt], mag_ncoeff, param_list)
 
         ### FIXME quick-fix to not trust lightcurve after outside training time range
-        mAB[filt] = autocomplete_data(sample_times, tt_interp, mag_back, extrapolate=np.inf)
+        mAB[filt] = utils.autocomplete_data(sample_times, tt_interp, mag_back, extrapolate=np.inf)
     return mAB
 
 def eval_svd_model(svd_model, ass_ncoeff, param_list):
@@ -269,8 +266,8 @@ def afterglowpy_lc(sample_times, param_dict, filters, obs_frequencies, flux_func
 
     mag = {}
     for filt_idx, filt in enumerate(filters):
-        mag_d = flux_to_ABmag(mJys[:, filt_idx], unit= 'mJy')
-        mag[filt] = autocomplete_data(sample_times, default_time / seconds_a_day, mag_d)
+        mag_d = utils.flux_to_ABmag(mJys[:, filt_idx], unit= 'mJy')
+        mag[filt] = utils.autocomplete_data(sample_times, default_time / seconds_a_day, mag_d)
     
     return mag
 
@@ -285,7 +282,7 @@ def host_lc(sample_times, parameters, filters, host_mag):
         a_AG = parameters[f"a_AG_{filt}"]
         f_nu_filt = parameters[f"f_nu_{filt}"]
         flux_per_filt = a_AG * np.power(sample_times, -alpha) + f_nu_filt
-        mag[filt] = flux_to_ABmag(flux_per_filt, residual_mag=host_mag[i])
+        mag[filt] = utils.flux_to_ABmag(flux_per_filt, residual_mag=host_mag[i])
     return mag
 
 ## supernova model
@@ -302,7 +299,7 @@ def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
                 flux = sn_model.flux(sample_times_stretched, [lambda_AA])[:, 0]
                 # see https://en.wikipedia.org/wiki/AB_magnitude
                 flux_jy = 3.34e4 * np.power(lambda_AA, 2.0) * flux
-                mag[filt] = flux_to_ABmag(flux_jy, unit='Jy')
+                mag[filt] = utils.flux_to_ABmag(flux_jy, unit='Jy')
             except Exception:
                 return {}
     return mag
@@ -553,7 +550,7 @@ def metzger_lc(sample_times, param_dict, nu_host, filters):
     # lbol = Ltotm * 1e40
 
     Tobs = 1e10 * (Ltot / (4 * np.pi * R_photo**2 * sigSB)) ** (0.25)
-    Tobs = autocomplete_data(sample_times, sample_times, Tobs)
+    Tobs = utils.autocomplete_data(sample_times, sample_times, Tobs)
 
     Tobs[Tobs <= 0.0] = np.nan
     one_over_T = 1.0 / Tobs
@@ -641,7 +638,7 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
     # lbol = Ltotm * 1e40
 
     Tobs = 1e10 * (Ltot / (4 * np.pi * R_photo**2 * sigSB)) ** (0.25)
-    Tobs = autocomplete_data(sample_times, sample_times, Tobs)
+    Tobs = utils.autocomplete_data(sample_times, sample_times, Tobs)
 
     Tobs[Tobs <= 0.0] = np.nan
     one_over_T = 1.0 / Tobs
@@ -763,7 +760,7 @@ def synchrotron_powerlaw(sample_times, param_dict, nu_obs, filters):
         F_pl = F_ref * np.power(nu_obs[idx], -beta) * np.power(sample_times, -alpha)
         # remove the distance modulus for the synchrotron powerlaw
         # as the reference flux is defined at the observer
-        mag[filt] = flux_to_ABmag(F_pl, unit='mJy') - param_dict["distance_modulus"]
+        mag[filt] = utils.flux_to_ABmag(F_pl, unit='mJy') - param_dict["distance_modulus"]
     return mag
 
 ## generic blackbody
@@ -813,15 +810,12 @@ def create_light_curve_data(
 ):
     
     injection_parameters = light_curve_model.parameter_conversion(injection_parameters)
-    filters = set_filters(args)
-    detection_limit = create_detection_limit(args, filters)
+    filters = utils.set_filters(args)
+    detection_limit = utils.create_detection_limit(args, filters)
     trigger_time = injection_parameters.get("trigger_time", 0.)
     if rng is None:
         rng = np.random.default_rng(args.generation_seed)
-    dmag = args.injection_error_budget
-    ## use extra data
-    ztf_sampling = getattr(args, "ztf_sampling", False)
-    rubin_ToO = getattr(args, "rubin_ToO_type", False)
+    dmag = utils.set_filter_associated_dict(args.injection_error_budget, filters, 0.1)
     if getattr(args, 'absolute', False):
         # create lightcurve_data
         if sample_times is None:
@@ -845,43 +839,110 @@ def create_light_curve_data(
                       'mag_error': np.full_like(sample_times, np.inf)}  # defaults
 
         det_mask = (mag_per_filt < det_lim) * (sample_times >= 0.)
-        errors = rng.normal(scale=dmag, size=np.sum(det_mask))
+        errors = rng.normal(scale=dmag[filt], size=np.sum(det_mask))
         data[filt]['mag'][det_mask] = mag_per_filt[det_mask] + errors
-        data[filt]['mag_error'][det_mask] = dmag
+        data[filt]['mag_error'][det_mask] = dmag[filt]
 
-    ## edit data for ztf, rubin
-    data_original = copy.deepcopy(data)
-    passbands_to_keep = []
-
-    if ztf_sampling:
-        data, passbands_to_keep = adjust_data_for_ztf(data, args, filters, 
-                    rng, sample_times, trigger_time, passbands_to_keep)
-
-    if rubin_ToO:
-        data, passbands_to_keep = adjust_data_for_rubin(
-            data, rubin_ToO, trigger_time, data_original, passbands_to_keep)
-
-    if ztf_sampling or rubin_ToO:
-        passbands_to_lose = set(data.keys()) - set(passbands_to_keep)
-        for filt in passbands_to_lose:
-            del data[filt]
-
-
+    ## edit data for telescope
+    data = adjust_data_for_telescopes(data, args, filters, rng, trigger_time)
 
     if not keep_infinite_data:
         for filt, val_dict in data.items():
+
             # NOTE: old version treated this as an "or", but was likely a bug
             keep_idx = np.isfinite(val_dict['mag']) & np.isfinite(val_dict['mag_error'])
             data[filt] = {key: val[keep_idx] for key, val in val_dict.items()}
 
     return data
 
-def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time,
-                        passbands_to_keep):
+
+def adjust_data_for_telescopes(data, args, filters, rng, trigger_time):
+    """
+    adjust the light curve data for specific telescope observations.
+    """
+    strategy = []
+    ## use realistic telescope data
+    if getattr(args, "rubin_ToO_type", False):
+        strategy.extend(rubin_strategy(args.rubin_ToO_type))
+    
+    if getattr(args, "ztf_sampling", False):
+        # strategy = adjust_data_for_ztf(data, args, filters, 
+        #             rng, sample_times, trigger_time, passbands_to_keep)
+        strategy.extend(ztf_strategy(rng))
+
+    if strategy:
+        mjds, filters = [], []
+        for (obstime, filts) in strategy:
+            for filt in filts:
+                mjds.append(obstime)
+                filters.append(filt)
+        sim = pd.DataFrame.from_dict({"mjd": mjds, "filter": filters})
+
+        data_original = copy.deepcopy(data)
+        observations = {}
+        for filt, group in sim.groupby("filter"):
+            if filt not in filters:
+                continue
+            data_per_filt = copy.deepcopy(data_original[filt])
+            times = group["mjd"].to_numpy() + trigger_time
+            observations[filt] = fill_lightcurve_data(times, data_per_filt)
+        return observations
+    else:
+        return data
+
+
+def ztf_strategy(rng):
+    # Ad hoc ZTF sampling strategy, vaguely inspired by https://arxiv.org/pdf/2203.17135
+    t0  = rng.uniform(1 / 24.0, 12./24. ) # initial latency between 1-12 hours
+    filts = ["ztfg", "ztfr", "ztfi"]
+    times = [t0, t0 + 0.2, t0 +0.2, t0 + 0.4, t0+0.4, t0 + 1.0, t0 + 2.0, t0 + 3.0, t0 + 5.0, t0 +7.0]
+
+    return ((time+ rng.normal(scale=1./24), filts) for time in times)
+
+def rubin_strategy(rubin_ToO):
+    """
+    Adjust the light curve data for Rubin observations.
+    Names taken from Rubin 2024 Workshop write-up.
+    """
+    gold_times = [1 / 24.0, 2 / 24.0, 4 / 24.0, 1.0, 2.0, 3.0]
+    if rubin_ToO == "platinum":
+        # platinum is no official name, means 90% GW skymap <30 sq deg
+        # this is the gold strategy for an event similar to GW170817 (close and well localized)
+        # Three observation on first night with grizy filters
+        # One scan Night 1,2,3 w/ same filters
+        filts = ["ps1::g", "ps1::r", "ps1::i", "ps1::z", "ps1::y"]
+        return ((time, filts) for time in gold_times)
+
+    elif "gold" in rubin_ToO:
+        # gold means 90% GW skymap <100 sq deg
+        # use gri or possibly grz if more sensitive to KNe
+        init_filts = ["ps1::g", "ps1::r"]
+        init_filts.append("ps1::z" if "gold_z" == rubin_ToO else "ps1::i")
+        # Three pointings Night 0 
+        filts = [init_filts]*3
+        # One scan Night 1,2,3 w/ r+i
+        follow_up_filts = ["ps1::r", "ps1::i"] 
+        filts.extend([follow_up_filts]*3)
+        return ((time, filt_list) for time, filt_list in zip(gold_times, filts))
+
+    elif "silver" in rubin_ToO:
+        # silver means 90% GW skymap <500 sq deg
+        # One scan Night 0 w/ g+i or g+z
+        filts = ["ps1::g", "ps1::z"] if rubin_ToO == "silver_z" else ["ps1::g", "ps1::i"]
+        # One scan each Night 1,2,3 w/ same filters
+        silver_times = [1 / 24.0, 1.0, 2.0, 3.0]
+        return ((time, filts) for time in silver_times)
+
+    else:
+        raise ValueError("args.rubin_ToO_type should be either platinum, gold, or silver")
+    
+
+
+#FIXME these binaries need to be reworked for py3.12+ envs, currently not working properly
+def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
     """
     Adjust the light curve data for ZTF observations.
     """
-
     with resources.open_binary(
         __package__ + ".data", "ZTF_revisit_kde_public.joblib"
     ) as f:
@@ -968,14 +1029,11 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time,
     sim["mag"] = np.nan         # initialize empty mags
     sim["mag_error"] = np.nan
 
-
+    observations = {}
     # interpolate the light curve data on ztf observations
     for filt, group in sim.groupby("passband"):
         if filt not in filters: # skip if we are not observing this filter
             continue
-        else:
-            # if we are observing this filter, we need to keep it
-            passbands_to_keep.append(filt)
         
         filt_data = fill_lightcurve_data( # do interpolation
             group["mjd"].tolist(),            # on additional ztf times
@@ -1004,72 +1062,37 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time,
                     df["passband"] = df["passband"].map(
                         {"ztfg": 1, "ztfr": 2, "ztfi": 3}
                     )  # estimate_mag_err maps filter numbers
-                    df = estimate_mag_err(ztfuncer, df)
+
+                    df["mag_err"] = df.apply(
+                        lambda x: (ztfuncer["band"] == x["passband"])
+                        & (pd.arrays.IntervalArray(ztfuncer["interval"]).contains(x["mag"])),
+                        axis=1,
+                    ).apply(
+                        lambda x: scipy.stats.skewnorm.rvs(
+                            ztfuncer[x]["a"], ztfuncer[x]["loc"], ztfuncer[x]["scale"]
+                        ),
+                        axis=1,
+                    )
+                    if not df["mag_err"].values:
+                        argmin_slice = np.argmin(ztfuncer["interval"])
+                        for value in df["mag"].values:
+                            if ztfuncer.iloc[argmin_slice]["interval"].left > value:
+                                print(
+                                    f'WARNING: {value} is outside of the measured uncertainty region with a lower limit of {ztfuncer.iloc[argmin_slice]["interval"].left}'
+                                )
+
                     sim.loc[row.name, "mag_error"] = float(df["mag_error"])
                     mag_err.append(df["mag_error"].tolist()[0])
 
             filt_data = {'time':sim.loc[group.index, "mjd"].tolist(),
-                         'mag': sim.loc[group.index, "mag"].tolist(),
-                         'mag_error': mag_err }
+                        'mag': sim.loc[group.index, "mag"].tolist(),
+                        'mag_error': mag_err }
             
-        data[filt] = filt_data
+        observations[filt] = filt_data
 
     
     if getattr(args, "train_stats", False):
         sim["tc"] = trigger_time
         sim.to_csv(args.outdir + "/too.csv", index=False)
 
-    return data, passbands_to_keep
-
-def adjust_data_for_rubin(
-    data, rubin_ToO, trigger_time, data_original, passbands_to_keep,
-):
-    """
-    Adjust the light curve data for Rubin observations.
-    """
-    gold_times = [1 / 24.0, 2 / 24.0, 4 / 24.0, 1.0, 2.0, 3.0]
-    if rubin_ToO == "platinum":
-        # platinum is no official name, means 90% GW skymap <30 sq deg
-        # this is the gold strategy for an event similar to GW170817 (close and well localized)
-        # Three observation on first night with grizy filters
-        # One scan Night 1,2,3 w/ same filters
-        filts = ["ps1::g", "ps1::r", "ps1::i", "ps1::z", "ps1::y"]
-        strategy= ((time, filts) for time in gold_times)
-
-    elif "gold" in rubin_ToO:
-        # gold means 90% GW skymap <100 sq deg
-        # use gri or possibly grz if more sensitive to KNe
-        init_filts = ["ps1::g", "ps1::r"]
-        init_filts.append("ps1::z" if "gold_z" == rubin_ToO else "ps1::i")
-        # Three pointings Night 0 
-        filts = [init_filts]*3
-        # One scan Night 1,2,3 w/ r+i
-        follow_up_filts = ["ps1::r", "ps1::i"] 
-        filts.extend([follow_up_filts]*3)
-        strategy = ((time, filt_list) for time, filt_list in zip(gold_times, filts))
-
-    elif "silver" in rubin_ToO:
-        # silver means 90% GW skymap <500 sq deg
-        # One scan Night 0 w/ g+i or g+z
-        filts = ["ps1::g", "ps1::z"] if rubin_ToO == "silver_z" else ["ps1::g", "ps1::i"]
-        # One scan each Night 1,2,3 w/ same filters
-        silver_times = [1 / 24.0, 1.0, 2.0, 3.0]
-        strategy = ((time, filts) for time in silver_times)
-
-    else:
-        raise ValueError("args.rubin_ToO_type should be either platinum, gold, or silver")
-    # took type names from Rubin 2024 Workshop write-up
-
-    mjds, passbands = [], []
-    for (obstime, filts) in strategy:
-        for filt in filts:
-            mjds.append(trigger_time + obstime)
-            passbands.append(filt)
-    sim = pd.DataFrame.from_dict({"mjd": mjds, "passband": passbands})
-
-    for filt, group in sim.groupby("passband"):
-        data_per_filt = copy.deepcopy(data_original[filt])
-        times = group["mjd"].tolist()
-        data[filt] = fill_lightcurve_data(times, data_per_filt)
-        passbands_to_keep.append(filt)
-    return data, passbands_to_keep
+    return observations

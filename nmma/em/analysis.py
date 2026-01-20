@@ -88,6 +88,7 @@ def bolometric_setup(args):
     return priors, likelihood, injection_parameters
 
 def analysis_setup(args):
+
     filters = utils.set_filters(args)
     detection_limit = utils.create_detection_limit(args, filters)
         
@@ -95,7 +96,6 @@ def analysis_setup(args):
         # load observational data
         data = io.load_em_observations(args, format='observations')
         trigger_time = read_trigger_time(None,args)
-        data = utils.cut_data_to_time_range(data, args, trigger_time)
         injection_parameters = None
     except ValueError:
         # try to work with injection data instead
@@ -105,6 +105,7 @@ def analysis_setup(args):
         # If the injection file is not found, raise an error
         raise FileNotFoundError("Injection file not found.")
 
+    data = utils.cut_data_to_time_range(data, args, trigger_time)
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
 
@@ -114,33 +115,15 @@ def analysis_setup(args):
     light_curve_model = model.create_light_curve_model_from_args(
         lc_model_type, args, filters=filters_to_analyze,
     )
-    try:
-        model_names = [light_curve_model.model]
-    except AttributeError:
-        model_names = [sub_model.model for sub_model in light_curve_model.models]
-
-    if injection_parameters is not None:
-        injlist_all = ["luminosity_distance"]
-        for model_name in model_names:
-            add_params = model.model_parameters_dict[model_name].copy()
-            # FIXME: This seems very unnecessary 
-            # But just in case there is a hidden purpose, let's keep it for this time.
-            if "Bu2019" in model_name:
-                try:
-                    add_params.remove("KNtheta")
-                    add_params.append("inclination_EM")
-                except:
-                    pass
-            injlist_all += add_params
-        injection_parameters = {k: v for k, v in injection_parameters.items() 
-                                if k in injlist_all}
     
     light_curve_data = utils.setup_filtered_lc_data(data, trigger_time)
     systematics_handler = systematics.FilterSystematicsHandler(filters_to_analyze,
-        args.systematics_file, error_budget=args.em_error_budget, 
-        light_curve_times=light_curve_data[0])
+        args.systematics_file, args.em_error_budget, light_curve_data[0])
     priors = create_prior_from_args(args, systematics_handler)
-    utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
+    if injection_parameters is not None:
+        injection_parameters = {k: injection_parameters.get(k, None) for k in priors.keys()}
+    light_curve_data = utils.check_model_time_consistency(light_curve_data, 
+                                light_curve_model, priors, injection_parameters)
     # setup the likelihood
     likelihood_kwargs = dict(
         light_curve_model=light_curve_model,
@@ -175,7 +158,6 @@ def nnanalysis(args):
     # only can use ztfr, ztfg, and ztfi filters in the light curve data
     print('Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters.')
     filters = 'ztfg,ztfi,ztfr'.split(",")
-
     detection_limit = utils.create_detection_limit(args, filters, 22.)
 
     # create the kilonova data if an injection set is given

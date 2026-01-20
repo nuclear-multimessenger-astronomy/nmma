@@ -97,7 +97,7 @@ class NMMAInjectionCreator(InjectionCreator):
                    
     def setup_post_processing(self, args):
         postprocess_methods = []
-        if 'snr' in args.post_processing:
+        if 'snr' in args.post_processing and not hasattr(self, 'snr_threshold'):
             self.initialise_ifos(args)
             self.conv_instructions['gw'] = bbh_source_frame
             postprocess_methods.append(self.add_snrs)
@@ -151,23 +151,6 @@ class NMMAInjectionCreator(InjectionCreator):
             dataframe = dataframe.reset_index().rename({"index": "simulation_id"}, axis=1)
         dataframe.astype({'simulation_id': 'int32'})
         return dataframe
-    
-    def testing_and_postprocessing(self, dataframe):
-        # step 3: Do a test and redraw if necessary
-        dataframe['tests_passed'] = self.test_wrap(dataframe)
-
-        # step 4: redo until sufficient injections have passed the tests
-        dataframe = self.refill_failed_tests(dataframe)
-        dataframe.drop(columns=['tests_passed'], inplace=True)
-  
-        # step 5: Wrap things up
-        # do final conversion to all necessary parameters if desired
-        if not self.original_parameters:
-            dataframe = self.param_conversion.core_conversion(dataframe)
-        # or add expensive information not required for tests
-        for postprocess in self.postprocessing:
-            postprocess(dataframe)
-        return dataframe
 
     def adjusted_prior_draw(self):
         dataframe_from_prior = self.get_injection_dataframe()
@@ -180,6 +163,26 @@ class NMMAInjectionCreator(InjectionCreator):
             dataframe_from_prior.drop(columns=self.columns_to_remove, inplace=True)
         return dataframe_from_prior
 
+    def testing_and_postprocessing(self, dataframe):
+        # step 3: redraw if necessary until all injections passed the tests
+        test_df = self.test_wrap(dataframe)
+
+        if test_df['tests_passed'].all():
+            dataframe = test_df
+        else:
+            dataframe['tests_passed'] = test_df['tests_passed']
+            dataframe = self.refill_failed_tests(dataframe)
+        dataframe.drop(columns=['tests_passed'], inplace=True)
+  
+        # step 4: Wrap things up
+        # do final conversion to all necessary parameters if desired
+        if not self.original_parameters:
+            dataframe = self.param_conversion.core_conversion(dataframe)
+        # or add expensive information not required for tests
+        for postprocess in self.postprocessing:
+            postprocess(dataframe)
+        return dataframe
+    
     def test_wrap(self, dataframe):
         test_df = dataframe.copy()
         test_df = self.param_conversion.core_conversion(test_df)
@@ -189,26 +192,22 @@ class NMMAInjectionCreator(InjectionCreator):
             # this will modify the dataframe in place
             test_routine(test_df)
         
-        return test_df['tests_passed']
+        return test_df
     
     def refill_failed_tests(self, dataframe):
         """Routine to redo tests until all conditions are fulfilled or max_redraws is reached."""
-        redraws = 0
+        redraw_from_prior = self.adjusted_prior_draw()
+        redraws = 1
         while redraws <= self.max_redraws: 
             fail_mask = ~ dataframe['tests_passed'].astype(bool)
             n_fail = fail_mask.sum()
             if n_fail == 0:                 # if all tests passed, break
                 return dataframe
             
-            # replace the failed samples with new samples from the prior
-            try:
-                assert len(redraw_from_prior) >= n_fail
-            except:
-                # unless we first need to get new samples from the prior 
-                # because the number of failed samples is larger 
-                # than the number of unused new samples
-                redraw_from_prior = self.adjusted_prior_draw()
+            if len(redraw_from_prior) < n_fail:
                 redraws += 1
+                extra_draw = self.adjusted_prior_draw()
+                redraw_from_prior = pd.concat([redraw_from_prior, extra_draw], ignore_index=True)
 
             replace_vals = redraw_from_prior.iloc[:n_fail][self.use_prior_columns]
             redraw_from_prior = redraw_from_prior.iloc[n_fail:]
@@ -269,7 +268,7 @@ class NMMAInjectionCreator(InjectionCreator):
         """Test whether the injections are detectable in the light curve model."""
         # FIXME: Extend to respect known systems / filters
         def row_check(data_row):
-            _, mags = self.lc_model.gen_detector_lc(data_row.to_dict())
+            _, mags = self.lc_model.gen_detector_lc(data_row)
             return any([(self.mag_op(mag, self.ref_mag)).any() for mag in mags.values()])
         df["tests_passed"] *= df.apply(lambda row: row_check(row), axis=1)
 

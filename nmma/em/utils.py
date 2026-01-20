@@ -57,31 +57,6 @@ DEFAULT_FILTERS = [
     "ztfi",
     "ultrasat",
 ]
-
-def set_filters(args):
-    filters = None  # default value
-    if args.filters:
-        filters = args.filters
-        if isinstance(filters, str):
-            filters = filters.split(",")
-        # do some cleaning for dirty command-line input
-        filters = [ f.replace(" ", "").split(",") for f in filters]
-        filters = [f for sublist in filters for f in sublist if f] # flatten the list
-        if len(filters) == 0:
-            raise ValueError("Need at least one valid filter.")
-    elif hasattr(args, "rubin_ToO_type"):
-        if args.rubin_ToO_type == 'platinum':
-            filters = ["ps1::g","ps1::r","ps1::i","ps1::z","ps1::y"]
-        elif args.rubin_ToO_type == 'gold':
-            filters = ["ps1::g","ps1::r","ps1::i"]
-        elif args.rubin_ToO_type == 'gold_z':
-            filters = ["ps1::g","ps1::r","ps1::z"]
-        elif args.rubin_ToO_type == 'silver':
-            filters = ["ps1::g""ps1::i"]
-        elif args.rubin_ToO_type == 'silver_z':
-            filters = ["ps1::g","ps1::z"]
-    return filters
-
 def setup_sample_times(args):
     "create an array of sample times used for generating EM model lightcurves from args"
     tmin = args.em_tmin
@@ -104,20 +79,81 @@ def setup_sample_times(args):
             f"Unknown time scale {args.em_timescale}. "
             "Please use 'lin(ear)' or 'log(arithmic)' / 'geo(metric)'."
         )
+    
+def set_filters(args):
+    filters = None  # default value
+    if args.filters:
+        filters = args.filters
+        if isinstance(filters, str):
+            filters = filters.split(",")
+        # do some cleaning for dirty command-line input
+        filters = [ f.replace(" ", "").split(",") for f in filters]
+        filters = [f for sublist in filters for f in sublist if f] # flatten the list
+        if len(filters) == 0:
+            raise ValueError("Need at least one valid filter.")
+    elif getattr(args, "em_detectors", None) or getattr(args, "rubin_ToO_type", False):
+        if isinstance(args.em_detectors, str):
+            em_detectors = args.em_detectors.split(",")
+        else: 
+            em_detectors = getattr(args, "em_detectors", []).copy()
+        filters = []
+        if 'ztf' in em_detectors:
+            em_detectors.remove('ztf')
+            filters.extend( ["ztfg", "ztfr", "ztfi"] )
+        if 'lsst' in em_detectors:
+            em_detectors.remove('lsst')
+            filters.extend( ["lsstg", "lsstr", "lssti", "lsstz", "lssty"] )
+        elif hasattr(args, "rubin_ToO_type"):
+            if args.rubin_ToO_type == 'platinum':
+                filters.extend( ["ps1::g","ps1::r","ps1::i","ps1::z","ps1::y"] )
+            elif args.rubin_ToO_type == 'gold':
+                filters.extend(["ps1::g","ps1::r","ps1::i"])
+            elif args.rubin_ToO_type == 'gold_z':
+                filters.extend(["ps1::g","ps1::r","ps1::z"])
+            elif args.rubin_ToO_type == 'silver':
+                filters.extend(["ps1::g","ps1::i"])
+            elif args.rubin_ToO_type == 'silver_z':
+                filters.extend(["ps1::g","ps1::z"])
+            if 'rubin' in em_detectors:
+                em_detectors.remove('rubin')
+        elif 'rubin' in em_detectors:
+            em_detectors.remove('rubin')
+            filters.extend( ["ps1::g","ps1::r","ps1::i","ps1::z","ps1::y"] )
+        if em_detectors:
+            raise NotImplementedError(f"{em_detectors} not implemented yet.")
+        ## to be extended
+        
+    return filters
+
+
 
 def create_detection_limit(args, filters, default_limit = np.inf):
-    if filters is None:
-        return {}
+    if getattr(args, 'detection_limit', None):
+        return set_filter_associated_dict(args.detection_limit, filters, default_limit)
     
-    elif getattr(args, 'detection_limit', None) is None:
-        if getattr(args,'rubin_ToO_type', None):
-            detection_limit = {'ps1::g':25.8,'ps1::r':25.5,'ps1::i':24.8,'ps1::z':24.1,'ps1::y':22.9}
-        else:
-            detection_limit = default_limit
-    else:
-        detection_limit = literal_eval(args.detection_limit)
-
-    return set_filter_associated_dict(detection_limit, filters, default_limit)
+    detection_limit = {filt: default_limit for filt in filters}
+    if getattr(args, "em_detectors", None):
+        if isinstance(args.em_detectors, str):
+            em_detectors = args.em_detectors.split(",")
+        else: 
+            em_detectors = getattr(args, "em_detectors", []).copy()
+        if 'lsst' in em_detectors: 
+            em_detectors.remove('lsst')
+            # https://arxiv.org/abs/2108.01683, https://rubinobservatory.org/for-scientists/rubin-101/key-numbers
+            detection_limit.update({'lsstu':23.9, 'lsstg':25.0, 'lsstr':24.7,'lssti':24.0,'lsstz':23.3,'lssty':22.1})
+        if 'ztf' in em_detectors:
+            em_detectors.remove('ztf')
+            detection_limit.update({'ztfg':21.7, 'ztfr':21.4, 'ztfi':20.9})
+        if 'rubin' in em_detectors:
+            em_detectors.remove('rubin')
+            detection_limit.update({'ps1::g':25.8,'ps1::r':25.5,'ps1::i':24.8,'ps1::z':24.1,'ps1::y':22.9} )
+        if em_detectors:
+            raise NotImplementedError(f"{em_detectors} not implemented yet.")
+        
+    if getattr(args,'rubin_ToO_type', None):
+        detection_limit.update({'ps1::g':25.8,'ps1::r':25.5,'ps1::i':24.8,'ps1::z':24.1,'ps1::y':22.9} )
+            
+    return detection_limit
 
 def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
     if isinstance(quantity, (int, float)):
@@ -133,12 +169,16 @@ def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
     elif isinstance(quantity, dict):
         # If a dict is provided, ensure it has the correct filters
         return {filt: float(quantity.get(filt, default_limit)) for filt in filters}
+    else:
+        raise ValueError(
+            f"Could not derive a dict for {quantity} and filters {filters}."
+        )
 
 
-def cut_data_to_time_range(data, args, trigger_time):
+def cut_data_to_time_range(data, args, trigger_time, tmin = 0, tmax = np.inf):
     
-    tmin = getattr(args, "data_tmin", 0.)
-    tmax = getattr(args, "data_tmax", np.inf)
+    tmin = getattr(args, "data_tmin", tmin)
+    tmax = getattr(args, "data_tmax", tmax)
 
     filts = list(data.keys()).copy()
        
@@ -186,7 +226,7 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 
     return (lc_times, lc_mags, lc_uncertainties, trigger_time)
 
-def check_model_time_consistency(light_curve_data, light_curve_model, priors):
+def check_model_time_consistency(light_curve_data, light_curve_model, priors, injection = None):
 
     (lc_times, lc_mags, lc_uncertainties, trigger_time) = light_curve_data
     
@@ -221,12 +261,19 @@ def check_model_time_consistency(light_curve_data, light_curve_model, priors):
     t_obs_start_max = (1+zmax) * t_source_min + t0_max
     t_obs_end_min = (1+zmin) * t_source_max + t0_min
     
+    if injection is not None:
+        for key, time in lc_times.items():
+            use_mask = (time >= t_obs_start_max) & (time <= t_obs_end_min)
+            lc_times[key] = time[use_mask]
+            lc_mags[key] = lc_mags[key][use_mask]
+            lc_uncertainties[key] = lc_uncertainties[key][use_mask]
     # check model compatability 
-    if data_tmin < t_obs_start_max:
+    elif data_tmin < t_obs_start_max:
         raise ValueError(f"First data point is at {data_tmin} days, but with your timeshift and redshift settings, the model time in detector frame can start as late as {t_obs_start_max}.") 
-    if t_obs_end_min < data_tmax:
+    elif t_obs_end_min < data_tmax:
         raise ValueError(f"Last data point is at {data_tmax} days, but with your timeshift and redshift settings, the model time in detector frame can end as early as {t_obs_end_min}.")
 
+    return (lc_times, lc_mags, lc_uncertainties, trigger_time)
 
 
 def setup_bolometric_lc_data(light_curve_data, trigger_time):
@@ -614,28 +661,6 @@ def flux_to_ABmag(flux, unit='cgs', residual_mag = None):
 
     mAB[suff_flux] = -2.5 * np.log10(flux[suff_flux]) + residual_magnitude
     return mAB
-
-def estimate_mag_err(uncer_params, df):
-    df["mag_err"] = df.apply(
-        lambda x: (uncer_params["band"] == x["passband"])
-        & (pd.arrays.IntervalArray(uncer_params["interval"]).contains(x["mag"])),
-        axis=1,
-    ).apply(
-        lambda x: scipy.stats.skewnorm.rvs(
-            uncer_params[x]["a"], uncer_params[x]["loc"], uncer_params[x]["scale"]
-        ),
-        axis=1,
-    )
-    if not df["mag_err"].values:
-        argmin_slice = np.argmin(uncer_params["interval"])
-        for value in df["mag"].values:
-            if uncer_params.iloc[argmin_slice]["interval"].left > value:
-                print(
-                    f'WARNING: {value} is outside of the measured uncertainty region with a lower limit of {uncer_params.iloc[argmin_slice]["interval"].left}'
-                )
-
-    return df
-
 
 
 # The following LANL File readers are taken from Eve Chase's cocteau package

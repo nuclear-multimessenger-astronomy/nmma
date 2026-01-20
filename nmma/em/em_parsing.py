@@ -57,8 +57,10 @@ def multi_wavelength_parsing(parser):
     em_input_parser = parser.add_argument_group(
         title="EM analysis input arguments", description="Specify EM analysis inputs"
     )
-    em_input_parser.add_argument("--detection-limit", 
+    em_input_parser.add_argument("--detection-limit", type=yaml_parse, 
         help="Detection limit per filter, optimally as a dict, e.g., {'r':22, 'g':23}, put a double quotation mark around the dictionary")
+    em_input_parser.add_argument( "--em-detectors", "--telescopes", type=yaml_parse, nargs="*",
+        help="A list of telescopes/detectors to be used. Can be used to infer filters and limits automatically.")
     return parser
     
 
@@ -152,11 +154,11 @@ def em_injection_parsing(parser):
 
     lc_injection_parser.add_argument("--train-stats", action='store_true', 
         help="Creates a file too.csv to derive statistics")
-    lc_injection_parser.add_argument( "--prompt-collapse", action='store_true',
+    lc_injection_parser.add_argument( "--prompt-collapse", action='store_true', # FIXME: to be deprecated!
         help="If the injection simulates prompt collapse and therefore only dynamical")
     parser.add_argument("--ignore-timeshift", action='store_true',
         help="If you want to ignore the timeshift parameter in an injection file.")
-    lc_injection_parser.add_argument("--injection-error-budget","--photometric-error-budget",  type=float, default=0.1,
+    lc_injection_parser.add_argument("--injection-error-budget","--photometric-error-budget",  type=yaml_parse, default=0.1,
         help="Photometric error (mag) on the injected lightcurve (default: 0.1)")
 
     #photometry modifiers

@@ -227,6 +227,8 @@ def process_multi_condition_string(multi_condition_string):
 }   
 
     out = {}
+    if isinstance(multi_condition_string, str):
+        multi_condition_string = multi_condition_string.split(",")
 
     for item in multi_condition_string:
         matched = False
@@ -236,8 +238,13 @@ def process_multi_condition_string(multi_condition_string):
                 out[parts[0].strip()] = (operators[op], float(parts[1].strip()) )
                 matched = True
                 break
+        
         if not matched:
-            # Treat as boolean flag
-            out[item] = True 
+            if "=" in item:
+                parts = item.split("=")
+                out[parts[0].strip()] = parts[1].strip() 
+            else:
+                # Treat as boolean flag
+                out[item] = True 
 
     return out

@@ -21,7 +21,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     light_curve_model = model.create_light_curve_model_from_args(lc_model, args, filters)
     trigger_time = read_trigger_time(None, args)
     light_curve_data = utils.setup_filtered_lc_data(light_curve_data, trigger_time)
-    utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
+    light_curve_data = utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
     sys_handler = systematics.FilterSystematicsHandler(filters, 
         data_dump['systematics_dict'], error_budget=args.em_error_budget,
         light_curve_times=light_curve_data[0])
