@@ -1,9 +1,6 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import UnivariateSpline
-from ast import literal_eval
-import scipy.stats
-
 import sncosmo
 from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
 
@@ -263,6 +260,7 @@ def check_model_time_consistency(light_curve_data, light_curve_model, priors, in
     
     if injection is not None:
         for key, time in lc_times.items():
+            print(f"Cutting light curve data for filter {key} to model time range {t_obs_start_max} - {t_obs_end_min}.")
             use_mask = (time >= t_obs_start_max) & (time <= t_obs_end_min)
             lc_times[key] = time[use_mask]
             lc_mags[key] = lc_mags[key][use_mask]

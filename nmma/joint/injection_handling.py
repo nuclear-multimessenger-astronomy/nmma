@@ -169,6 +169,7 @@ class NMMAInjectionCreator(InjectionCreator):
 
         if test_df['tests_passed'].all():
             dataframe = test_df
+            print("All injections passed all tests immediately.")
         else:
             dataframe['tests_passed'] = test_df['tests_passed']
             dataframe = self.refill_failed_tests(dataframe)
@@ -198,10 +199,14 @@ class NMMAInjectionCreator(InjectionCreator):
         """Routine to redo tests until all conditions are fulfilled or max_redraws is reached."""
         redraw_from_prior = self.adjusted_prior_draw()
         redraws = 1
+        failed_tests = 0
         while redraws <= self.max_redraws: 
             fail_mask = ~ dataframe['tests_passed'].astype(bool)
             n_fail = fail_mask.sum()
+            failed_tests += n_fail
             if n_fail == 0:                 # if all tests passed, break
+                print(f"All injections passed all tests after {redraws-1} redraws,"
+                      f" with {failed_tests} total failed samples.")
                 return dataframe
             
             if len(redraw_from_prior) < n_fail:

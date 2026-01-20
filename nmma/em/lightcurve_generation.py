@@ -793,12 +793,6 @@ def powerlaw_blackbody_constant_temperature_lc(_, param_dict, nu_host, filters):
                     nu_host, add= additive_per_freq)
 
 
-def fill_lightcurve_data(times, filt_data):
-    lc = np.interp(times, filt_data['time'], filt_data['mag'], left=np.inf,right=np.inf)
-    lcerr = np.interp(times, filt_data['time'], filt_data['mag_error'], left=np.inf,right=np.inf)
-    return { "time": times, "mag": lc, "mag_error": lcerr }
-
-
 #### lightcurve data generation
 def create_light_curve_data(
     injection_parameters,
@@ -811,11 +805,9 @@ def create_light_curve_data(
     
     injection_parameters = light_curve_model.parameter_conversion(injection_parameters)
     filters = utils.set_filters(args)
-    detection_limit = utils.create_detection_limit(args, filters)
     trigger_time = injection_parameters.get("trigger_time", 0.)
     if rng is None:
         rng = np.random.default_rng(args.generation_seed)
-    dmag = utils.set_filter_associated_dict(args.injection_error_budget, filters, 0.1)
     if getattr(args, 'absolute', False):
         # create lightcurve_data
         if sample_times is None:
@@ -829,38 +821,32 @@ def create_light_curve_data(
         sample_times, lc = light_curve_model.gen_detector_lc(injection_parameters, sample_times)
     if not lc:
         raise ValueError("Injection parameters return empty light curve.")
-
+    
     # curate data
-    data = {}
-    for filt, mag_per_filt in lc.items():
-        det_lim = detection_limit.get(filt,np.inf)
-
-        data[filt] = {'time': sample_times + trigger_time, 'mag': np.full_like(sample_times, det_lim), 
-                      'mag_error': np.full_like(sample_times, np.inf)}  # defaults
-
-        det_mask = (mag_per_filt < det_lim) * (sample_times >= 0.)
-        errors = rng.normal(scale=dmag[filt], size=np.sum(det_mask))
-        data[filt]['mag'][det_mask] = mag_per_filt[det_mask] + errors
-        data[filt]['mag_error'][det_mask] = dmag[filt]
-
+    breakpoint()
+    true_data = {filt: {'time': sample_times + trigger_time,  'mag': lc[filt]}
+                        for filt in filters}
+        
     ## edit data for telescope
-    data = adjust_data_for_telescopes(data, args, filters, rng, trigger_time)
+    observable_data = adjust_lc_for_telescopes(true_data, args, filters, rng, trigger_time)
+    observed_data = adjust_lc_for_observations(observable_data, args, filters, rng)
 
     if not keep_infinite_data:
-        for filt, val_dict in data.items():
+        for filt, val_dict in observed_data.items():
 
-            # NOTE: old version treated this as an "or", but was likely a bug
             keep_idx = np.isfinite(val_dict['mag']) & np.isfinite(val_dict['mag_error'])
-            data[filt] = {key: val[keep_idx] for key, val in val_dict.items()}
+            observed_data[filt] = {key: val[keep_idx] for key, val in val_dict.items()}
 
-    return data
+    return observed_data
 
 
-def adjust_data_for_telescopes(data, args, filters, rng, trigger_time):
+def adjust_lc_for_telescopes(true_data, args, filters, rng, trigger_time):
     """
     adjust the light curve data for specific telescope observations.
     """
     strategy = []
+    observable_data = {}
+    data_original = copy.deepcopy(true_data)
     ## use realistic telescope data
     if getattr(args, "rubin_ToO_type", False):
         strategy.extend(rubin_strategy(args.rubin_ToO_type))
@@ -878,17 +864,39 @@ def adjust_data_for_telescopes(data, args, filters, rng, trigger_time):
                 filters.append(filt)
         sim = pd.DataFrame.from_dict({"mjd": mjds, "filter": filters})
 
-        data_original = copy.deepcopy(data)
-        observations = {}
         for filt, group in sim.groupby("filter"):
             if filt not in filters:
                 continue
-            data_per_filt = copy.deepcopy(data_original[filt])
             times = group["mjd"].to_numpy() + trigger_time
-            observations[filt] = fill_lightcurve_data(times, data_per_filt)
-        return observations
+            filt_data = data_original[filt]
+            observable_data[filt] = { "time": times, 
+                "mag":np.interp(times, filt_data['time'], filt_data['mag'], left=np.inf,right=np.inf)}
     else:
-        return data
+        for filt, filt_data in true_data.items():
+            observable_data[filt] = filt_data
+            time_mask = filt_data['time'] >= trigger_time
+            observable_data[filt] = {key: val[time_mask] for key, val in filt_data.items()}
+    return observable_data
+
+def adjust_lc_for_observations(observable_data, args, filters, rng):
+    """
+    adjust the light curve data for detection limits and observational errors.
+    """
+    dmag = utils.set_filter_associated_dict(args.injection_error_budget, filters, 0.1)
+    detection_limit = utils.create_detection_limit(args, filters)
+    observations = {}
+    for filt, filt_data in observable_data.items():
+        det_lim = detection_limit.get(filt,np.inf)
+        error = rng.normal(scale=dmag[filt], size=len(filt_data['mag']))
+        obs_mags = filt_data['mag'] + error
+        observations[filt] = {'time': filt_data['time'],    
+                          'mag': np.full_like(filt_data['mag'], det_lim),# default non-detection
+                          'mag_error': np.full_like(filt_data['mag'], np.inf)}
+        det_mask = obs_mags < det_lim
+        observations[filt]['mag'][det_mask] = obs_mags[det_mask]
+        observations[filt]['mag_error'][det_mask] = dmag[filt]
+        
+    return observations
 
 
 def ztf_strategy(rng):
@@ -1035,9 +1043,13 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
         if filt not in filters: # skip if we are not observing this filter
             continue
         
-        filt_data = fill_lightcurve_data( # do interpolation
-            group["mjd"].tolist(),            # on additional ztf times
-            copy.deepcopy(data[filt])) # for the original data
+        times = group["mjd"].tolist()
+        data_dict = copy.deepcopy(data[filt])
+        filt_data = {
+            "time": times,
+            "mag": np.interp(times, data_dict['time'], data_dict['mag'], left=np.inf,right=np.inf),
+            "mag_error": np.interp(times, data_dict['time'], data_dict['mag_error'], left=np.inf,right=np.inf)
+        }
 
         if ztf_uncertainties:
             sim.loc[group.index, "mag"] , sim.loc[group.index, "mag_error"]  = filt_data["mag"], filt_data["mag_error"]
