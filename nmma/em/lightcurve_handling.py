@@ -183,7 +183,7 @@ def make_injection_lightcurve_from_parameters(
     injection_parameters, args, light_curve_model=None, rng=None, format='model'
 ):
     injection_outfile = set_filename(args.label, args, 
-                                     f"_lc_{int(injection_parameters['simulation_id'])}")
+                                     f"_{int(injection_parameters['simulation_id'])}_lc")
 
     if os.path.isfile(injection_outfile):
         try:
@@ -192,42 +192,18 @@ def make_injection_lightcurve_from_parameters(
         except ValueError:
             raise ValueError(f"The previous run generated light curves with unreadable content for {injection_outfile}. Consider removing all output files in this format, format then retry.")
 
-    data, _ = make_injection(injection_parameters, args, injection_model = light_curve_model, rng=rng, keep_infinite_data=True)
+    data, injection_parameters = make_injection(injection_parameters, args, injection_model = light_curve_model, rng=rng, keep_infinite_data=True)
 
-    if injection_outfile:
-        #store and retrieve to double check
-        io.write_em_observations(injection_outfile, data, format=format)
-        return io.load_em_observations(injection_outfile, format=format)
-    else:
-        return data
+    #store and retrieve to double check
+    io.write_em_observations(injection_outfile, data, format=format)
+    return io.load_em_observations(injection_outfile, format=format)
 
 
-def make_injection(injection_parameters, args, filters = None, injection_model = None,
-                   rng=None, keep_infinite_data=False):
+def make_injection(injection_params, args, injection_model, rng=None, keep_infinite_data=False):
     
-
-    injection_parameters["trigger_time"] = read_trigger_time(injection_parameters, args)
-    
-    if args.ignore_timeshift:
-        injection_parameters.pop('timeshift', None)
-
-    injection_parameters["trigger_time"] += injection_parameters.get("timeshift",0)
-
-    if args.prompt_collapse:
-        injection_parameters["log10_mej_wind"] = -3.0
-
-    # sanity check for eject masses
-    for key in ["log10_mej_dyn", "log10_mej_wind"]:
-        if key in injection_parameters and not np.isfinite(injection_parameters[key]):
-            injection_parameters[key] = -3.0
-
-    if injection_model is None:
-        print("Creating injection light curve model")
-        injection_model = model.create_injection_model(args, filters)
-    
-    injection_parameters = injection_model.parameter_conversion(injection_parameters)
+    injection_params = adjust_injection_parameters(injection_params, args, injection_model)
     data = create_light_curve_data(
-        injection_parameters,
+        injection_params,
         args,
         light_curve_model=injection_model,
         keep_infinite_data=keep_infinite_data,
@@ -235,7 +211,23 @@ def make_injection(injection_parameters, args, filters = None, injection_model =
     )
     print("Injection generated")
 
-    return data, injection_parameters 
+    return data, injection_params 
+
+def adjust_injection_parameters(injection_parameters, args, injection_model):
+
+    injection_parameters["trigger_time"] = read_trigger_time(injection_parameters, args)
+    if args.ignore_timeshift:
+        injection_parameters.pop('timeshift', None)
+    injection_parameters["trigger_time"] += injection_parameters.get("timeshift",0)
+
+    # sanity check for eject masses
+    if args.prompt_collapse:
+        injection_parameters["log10_mej_wind"] = -3.0
+    for key in ["log10_mej_dyn", "log10_mej_wind"]:
+        if key in injection_parameters and not np.isfinite(injection_parameters[key]):
+            injection_parameters[key] = -3.0
+    
+    return injection_model.parameter_conversion(injection_parameters)
 
 def make_lcs(args = None):
     args = emp.parsing_and_logging(emp.multi_lc_parser, args)

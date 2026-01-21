@@ -3,7 +3,7 @@ import matplotlib
 import numpy as np
 import pandas as pd
 
-from .lightcurve_handling import make_injection
+from .lightcurve_handling import create_light_curve_data, adjust_injection_parameters
 from .em_likelihood import EMTransientLikelihood
 from .prior import create_prior_from_args
 from . import io, model, utils, systematics  
@@ -14,20 +14,26 @@ matplotlib.use("agg")
 
 def data_from_injection(args, filters, detection_limit):
     injection_df = read_injection_file(args)
-    injection_parameters = injection_df.iloc[args.injection_num].to_dict()
-    data, injection_parameters = make_injection(injection_parameters, args, filters)
+    inj_model = model.create_injection_model(args, filters)
+    injection_params = injection_df.iloc[args.injection_num].to_dict()
+    injection_params = adjust_injection_parameters(injection_params, args,inj_model)
+    inj_outfile = set_filename(args.label, args, "_lc")
+    if os.path.isfile(inj_outfile):
+        print(f"Loading existing injection lc from {inj_outfile}")
+        data = io.load_em_observations(inj_outfile, format='model')
+    else:
+        data = create_light_curve_data(injection_params, args, inj_model)
+        io.write_em_observations(inj_outfile, data, format='model')
     data = inspect_detection_limit(detection_limit, data)
-    inj_outfile = set_filename(args.label, args, f"_lc_{args.injection_num}")
-    io.write_em_observations(inj_outfile, data, format='model')
-    return data, injection_parameters
+    return data, injection_params
 
 def inspect_detection_limit(detection_limit, data):
     #checking produced data for magnitudes dimmer than the detection limit
-    for filt, limit in detection_limit.items():
+    for filt, filt_dict in data.items():
         filt_dict = data[filt]
-        non_detections = filt_dict['mag'] > limit
+        non_detections = filt_dict['mag'] > detection_limit[filt]
 
-        filt_dict['mag'] = np.where(non_detections, limit, filt_dict['mag'])
+        filt_dict['mag'] = np.where(non_detections, detection_limit[filt], filt_dict['mag'])
         filt_dict['mag_error'] = np.where(non_detections, np.inf,filt_dict['mag_error'] )
     return data
 

@@ -823,11 +823,8 @@ def create_light_curve_data(
         raise ValueError("Injection parameters return empty light curve.")
     
     # curate data
-    breakpoint()
     true_data = {filt: {'time': sample_times + trigger_time,  'mag': lc[filt]}
                         for filt in filters}
-        
-    ## edit data for telescope
     observable_data = adjust_lc_for_telescopes(true_data, args, filters, rng, trigger_time)
     observed_data = adjust_lc_for_observations(observable_data, args, filters, rng)
 

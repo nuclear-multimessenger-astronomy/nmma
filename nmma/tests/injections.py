@@ -113,7 +113,7 @@ def lightcurveInjectionTest(model_name):
         lch.lcs_from_injection_parameters(args)
 
         command_line_lightcurve_file = os.path.join(
-            output_directory, f"{command_line_lightcurve_label}_lc_0.json"
+            output_directory, f"{command_line_lightcurve_label}_0_lc.json"
         )
         assert os.path.exists(
             command_line_lightcurve_file
