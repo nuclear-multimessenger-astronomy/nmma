@@ -138,10 +138,14 @@ def write_lc_to_csv(outfile, data, format= "observations"):
             all_errs.extend(sub_dict['mag_error'])
             all_filters.extend([filt] * len(sub_dict['time']))
         sort_indices = np.argsort(all_times)
-        out_data = [
-            [Time(all_times[i], format="mjd").isot, all_filters[i], all_mags[i], all_errs[i]] 
-            for i in sort_indices]
-        np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error", comments="#")
+        with open(outfile, "w") as out:
+            out.write("# time filter mag mag_error\n")
+            for i in sort_indices:
+                out.write(f"{Time(all_times[i], format='mjd').isot} {all_filters[i]} {all_mags[i]:.3f} {all_errs[i]:.3f}\n")
+        # out_data = [
+        #         [Time(all_times[i], format="mjd").isot, all_filters[i], all_mags[i], all_errs[i]] 
+        #     for i in sort_indices]
+        # np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error", comments="#")
         
     elif format == "model":
         # Lightcurve as issued by model, with or without errors

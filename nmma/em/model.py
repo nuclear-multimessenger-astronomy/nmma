@@ -674,7 +674,7 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    def __init__(self, model="Bu2025_MLP", filters=None, surrogate_dir=None, **kwargs):
+    def __init__(self, model="Bu2026_MLP", filters=None, surrogate_dir=None, **kwargs):
         if model.endswith("_lc"):
             from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
         else:

@@ -269,7 +269,8 @@ class EoSConverter:
             else:
                 eos_dir = os.path.dirname(eos_files[0])
                 for i, f in enumerate(eos_files):
-                    shutil.copy(f, os.path.join(eos_dir, f"{i+1}.dat"))
+                    if not os.path.samefile(f, os.path.join(eos_dir, f"{i+1}.dat")):   
+                        shutil.copy(f, os.path.join(eos_dir, f"{i+1}.dat"))
                 self.eos_data = eos_dir
                 self.macro_conversion = self.eos_direct_load
 
