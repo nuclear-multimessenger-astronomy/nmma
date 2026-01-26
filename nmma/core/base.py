@@ -383,15 +383,25 @@ def multi_analysis_loop(args, analysis_setup):
         
     with redirect_out, redirect_err:
         if getattr(args, 'multi', None):
-            for run_name, changes in args.multi.items():
-                run_args = deepcopy(args)
-                setattr(run_args, 'label', f"{args.label}_{run_name}")
-                for key, value in changes.items():
-                    if key not in args:
-                        raise KeyError(f"{key} not a known argument... please remove")
-                    setattr(run_args, key, value)
-                priors, likelihood, injection_parameters = analysis_setup(run_args)
-                bilby_sampling(likelihood, priors, run_args, injection_parameters, rank)
+            sub_runs = []
+            if len(args.multi) == 1:
+                arg, vals = list(args.multi.items())[0]
+                for i, val in enumerate(vals):
+                    run_args = deepcopy(args)
+                    setattr(run_args, arg, val)
+                    setattr(run_args, 'label', f"{args.label}_{i}")
+                    sub_runs.append(run_args)
+            else:
+                for run_name, changes in args.multi.items():
+                    run_args = deepcopy(args)
+                    setattr(run_args, 'label', f"{args.label}_{run_name}")
+                    for key, value in changes.items():
+                        if key not in args:
+                            raise KeyError(f"{key} not a known argument... please remove")
+                        setattr(run_args, key, value)
+                    sub_runs.append(run_args)
         else:
-            priors, likelihood, injection_parameters = analysis_setup(args)
-            bilby_sampling(likelihood, priors, args, injection_parameters, rank)
+            sub_runs = [args]
+        for run_args in sub_runs:
+            priors, likelihood, injection_parameters = analysis_setup(run_args)
+            bilby_sampling(likelihood, priors, run_args, injection_parameters, rank)

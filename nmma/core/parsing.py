@@ -41,35 +41,17 @@ def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
     """Base parsing function for nmma.
     Takes a parsing function as input and returns the corresponding namespace, 
     potentially inferred from a config file."""
-    parser = argparse.ArgumentParser() # Default
 
     # Determine if a config file is given and set up the parser accordingly
     if cli_args is None:
         cli_args = sys.argv[1:]
     elif isinstance(cli_args, str):
-        cli_args = [cli_args]
-    config_given = False
+        cli_args = cli_args.split()
+    else:
+        cli_args = list(cli_args)
     
-    if cli_args:
-        first_arg = cli_args[0]
-        if first_arg.startswith("-c") or first_arg.startswith("--config"):
-            cli_args.pop(0)  
-            config_given = True
-        if os.path.isfile(first_arg):
-            if first_arg.endswith((".yaml", ".yml")):
-                pc = configargparse.YAMLConfigFileParser
-            elif first_arg.endswith((".ini", ".toml", ".cfg", '.tml')):
-                pc = configargparse.DefaultConfigFileParser
-            try:
-                parser = configargparse.ArgumentParser(
-                    default_config_files=[first_arg],
-                    config_file_parser_class=pc )
-                cli_args.pop(0)  # Remove the config file argument
-            except Exception:
-                print(f"Tried to parse {first_arg} as a config file, but failed.")
-                if config_given:
-                    print("Please check the file format and try again.")
-                    sys.exit(1)
+    parser, cli_args = check_for_config(cli_args)
+       
 
     parser.add_argument("--multi", type=yaml_parse,
         help="YAML formatted dict specifying multiple runs with different parameter changes. \n"
@@ -84,13 +66,46 @@ def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
         return parser
     return parser.parse_args(cli_args)
 
+def check_for_config(cli_args, parents=[], drop_config =True): 
+    if cli_args:
+        first_arg = cli_args[0]
+        if first_arg.startswith("-c") or first_arg.startswith("--config") or first_arg.startswith("--ini"):
+            cli_args.pop(0)  
+            first_arg = cli_args[0]
+            config_given = True
+        else:
+            config_given = False
 
+        if os.path.isfile(first_arg):
+            if first_arg.endswith((".yaml", ".yml")):
+                pc = configargparse.YAMLConfigFileParser
+            elif first_arg.endswith((".ini", ".toml", ".cfg", '.tml')):
+                pc = configargparse.DefaultConfigFileParser
+            try:
+                parser = configargparse.ArgumentParser(
+                    add_help=False,
+                    default_config_files=[first_arg],
+                    parents=parents,
+                    config_file_parser_class=pc )
+                if drop_config:
+                    cli_args.pop(0)  # remove config file from args
+                return parser, cli_args
+            except Exception:
+                if config_given:
+                    print(f"Tried to parse {first_arg} as a config file, but failed.")
+                    print("Please check the file format and try again.")
+                    sys.exit(1)
+    if parents:
+        return configargparse.ArgumentParser(add_help=False, parents=parents), cli_args
+    return argparse.ArgumentParser( ), cli_args
+    
 def base_analysis_parsing(parser):
     parser.add_argument("--Hubble", "--with-Hubble", "--sample-over-Hubble", action='store_true', 
         help="To sample over Hubble constant and redshift (default:False)")
 
     parser.add_argument("--Hubble-weight", help="Path to the precalculated Hubble weighting")
 
+    parser.add_argument("--cosmology", help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)")
     parser.add_argument("--sampling-seed","--seed", type=int, default=42,
         help="Sampling seed (default: 42)")
     return parser

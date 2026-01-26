@@ -11,7 +11,7 @@ from nmma.core.base import multi_analysis_loop
 from nmma.core.parsing import parsing_and_logging
 from nmma.joint.joint_likelihood import MultiMessengerLikelihood
 from nmma.core import utils
-from nmma.joint import generation, main
+from nmma.joint import generation, multi_parsing
 WORKING_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(WORKING_DIR, "data")
 
@@ -117,8 +117,6 @@ def test_single_thread_setup(args):
     multi_analysis_loop(args, setup)
 
 def test_parallel_setup(args):
-
-    generation_parser = generation.create_nmma_generation_parser()
-    generation.generate_runner(generation_parser, **vars(args))
+    generation.generate_runner(**vars(args))
     # main.analysis_runner('outdir', pool_type='multi')
     

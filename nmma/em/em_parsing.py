@@ -49,7 +49,6 @@ def basic_em_only_analysis_parsing(parser):
         help="Time format of the light curve data, e.g. isot, mjd, see https://docs.astropy.org/en/stable/time/#time-format")
     parser.add_argument("--bestfit", "--best-fit", action='store_true',
         help="Save the best fit parameters and magnitudes to JSON")
-    parser.add_argument("--cosmology", help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)")
 
     return parser
 

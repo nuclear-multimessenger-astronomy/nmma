@@ -8,7 +8,6 @@ information on the run settings and data to be analysed.
 import os
 import sys
 import pickle
-from argparse import Namespace
 
 import bilby
 import bilby_pipe
@@ -18,7 +17,7 @@ import lalsimulation
 import numpy as np
 
 
-from  .multi_parsing import create_nmma_generation_parser, parse_generation_args
+from  .multi_parsing import  parse_generation_args
 from ..em.prior import extinction_prior
 from ..em.io import load_em_observations
 from ..em.model import create_injection_model
@@ -116,17 +115,12 @@ def write_complete_config_file(parser, args, inputs):
                 setattr(args, key, f"[{', '.join(val)}]")
     args.sampler_kwargs = str(inputs.sampler_kwargs)
     args.submit = False
-    parser.write_to_file(
-        filename=inputs.complete_ini_file,
-        args=args,
-        overwrite=False,
-        include_description=False,
-    )
+    parser.write_config_file(args, [inputs.complete_ini_file])
 
 def create_generation_logger(outdir, label):
     logger = bilby.core.utils.logger
     bilby.core.utils.setup_logger(
-        outdir=os.path.join(outdir, "log_data_generation"), label=label
+        outdir=os.path.join(outdir, "data"), label=label
     )
     bilby_pipe.data_generation.logger = logger
     return logger
@@ -140,7 +134,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
     """
     ###FIXME get rid of compulsory GW structure
     def __init__(self, args, unknown_args, logger=None):
-
+        
         # nmma-defaults that might conflict with bilby/bilby_pipe defaults
         gen_cosmo = set_cosmology(getattr(args, "cosmology", None))
         args.cosmology = gen_cosmo.name
@@ -150,7 +144,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         # Generic setup, ripped from bilby pipe
         # Admin arguments
         self.ini = args.ini
-        self.transfer_files = args.transfer_files
 
         # Run index arguments
         self.idx = args.idx
@@ -329,7 +322,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         return bilby.core.prior.PriorDict(self.prior_file)
     
 
-def generate_runner(parser=None, **kwargs):
+def generate_runner(cli_args=[""], **kwargs):
     """
     API for running the generation from Python instead of the command line.
     It takes all the same options as the CLI, specified as keyword arguments,
@@ -349,11 +342,9 @@ def generate_runner(parser=None, **kwargs):
     """
 
     # Get default arguments from the parser
-    default_args = parse_generation_args(parser)
-
-    # Take the union of default_args and any input arguments,
-    # and turn it into a Namespace
-    args = Namespace(**{**default_args, **kwargs})
+    args, generation_parser = parse_generation_args(cli_args)
+    for key, val in kwargs.items():
+        setattr(args, key, val)
 
     logger = create_generation_logger(outdir=args.outdir, label=args.label)
     for package, version in get_version_info().items():
@@ -361,15 +352,9 @@ def generate_runner(parser=None, **kwargs):
 
     inputs = NMMADataGenerationInput(args, [], logger)
 
-    logger.info(f"Setting sampling-seed={inputs.sampling_seed}")
-    logger.info(f"prior-file save at {inputs.prior_file}")
-    logger.info(
-        f"Initial meta_data ="
-        f"{bilby_pipe.utils.pretty_print_dictionary(inputs.meta_data)}"
-    )
-
-    write_complete_config_file(parser=parser, args=args, inputs=inputs)
+    write_complete_config_file(parser=generation_parser, args=args, inputs=inputs)
     logger.info(f"Complete ini written: {inputs.complete_ini_file}")
+    logger.info(f"Setup complete")
 
     return inputs, logger
 
@@ -383,11 +368,7 @@ def nmma_generation():
     """
     # Parse command line arguments
     cli_args = sys.argv[1:]
-    generation_parser = create_nmma_generation_parser()
-    args = parse_generation_args(generation_parser, cli_args, as_namespace=True)
 
     # Initialise run
-    inputs, logger = generate_runner(parser=generation_parser, **vars(args)
-    )
-    logger.info(f"Setup complete")
+    generate_runner(cli_args=cli_args)
 

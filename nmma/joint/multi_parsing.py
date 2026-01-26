@@ -1,9 +1,9 @@
 import argparse
 from ast import literal_eval
 import bilby
-from bilby_pipe import parser as bp_parser, data_generation as data_gen
+from bilby_pipe import parser as bp_parser
 
-from nmma.core.parsing import base_analysis_parsing, nonestr
+from nmma.core.parsing import base_analysis_parsing, check_for_config, nonestr
 from nmma.joint.joint_parsing import joint_likelihood_parsing
 from nmma.em.em_parsing import em_analysis_parsing
 from nmma.eos.eos_parsing import eos_parsing, tabulated_eos_parsing
@@ -14,8 +14,9 @@ from .. import __version__  # noqa: E402
 from numpy import inf
 logger = bilby.core.utils.logger
 
-def _create_base_nmma_parser(sampler="dynesty"):
-    base_parser = argparse.ArgumentParser("base", add_help=False)
+def _create_base_nmma_parser(sampler="dynesty", parents=[]):
+    base_parser = argparse.ArgumentParser("base", parents=parents, 
+                        conflict_handler="resolve", add_help=False)
 
     base_parser.add_argument("--version", action="version",
         version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
@@ -150,7 +151,7 @@ def remove_argument_from_parser(parser, arg):
     logger.debug(f"Request to remove arg {arg} from bilby_pipe args, but arg not found")
 
 def _create_reduced_bilby_pipe_parser():
-    bilby_pipe_parser = bp_parser.create_parser()
+    bilby_pipe_parser = bp_parser.create_parser(top_level=False)
     bilby_pipe_arguments_to_ignore = [
         "version",
         "accounting",
@@ -165,7 +166,7 @@ def _create_reduced_bilby_pipe_parser():
         "scheduler-args",
         "scheduler-module",
         "scheduler-env",
-        "transfer-files",
+        # "transfer-files",
         "online-pe",
         "osg",
         "email",
@@ -192,21 +193,21 @@ def _create_reduced_bilby_pipe_parser():
 
 def create_nmma_generation_parser():
     """Parser for nmma_generation"""
-    parser = _create_base_nmma_parser(sampler="all")
     bilby_pipe_parser = _create_reduced_bilby_pipe_parser()
-    generation_parser = bp_parser.BilbyArgParser(
-        prog="nmma_generation",
-        usage=__doc__,
-        ignore_unknown_config_file_keys=False,
-        allow_abbrev=False,
-        parents=[parser, bilby_pipe_parser],
-        add_help=False,
-    )
+    generation_parser = _create_base_nmma_parser(sampler="all", parents=[bilby_pipe_parser])
+    # generation_parser = argparse.ArgumentParser(
+    #     prog="nmma_generation",
+    #     usage=__doc__,
+    #     ignore_unknown_config_file_keys=False,
+    #     allow_abbrev=False,
+    #     parents=[parser, bilby_pipe_parser],
+    #     add_help=False,
+    # )
     generation_parser = slurm_parsing(generation_parser)
     return generation_parser
 
 
-def parse_generation_args(parser, cli_args=[""], as_namespace=False):
+def parse_generation_args(cli_args=[""]):
     """
     Returns dictionary of arguments, as specified in the
     parser.
@@ -216,27 +217,19 @@ def parse_generation_args(parser, cli_args=[""], as_namespace=False):
 
     Parameters
     ----------
-    parser: generation-parser
     cli_args: list of strings (default: [""])
         List of arguments to be parsed. If empty, returns default arguments
-    as_namespace: bool (default False)
-        If True, returns the arguments as a Namespace object. If False, returns a dict
 
     Returns
     -------
     args: dict or Namespace
 
     """
-
-    args = parser.parse_args(args=cli_args)
-
-    pipe_args, _ = data_gen.parse_args(cli_args, data_gen.create_generation_parser())
-    for key, val in vars(pipe_args).items():
-        if key not in args:
-            setattr(args, key, val)
-    if as_namespace:
-        return args
-    return vars(args)
+    breakpoint()
+    generation_parser = create_nmma_generation_parser()
+    generation_parser, cli_args = check_for_config(cli_args, [generation_parser], False)
+    args = generation_parser.parse_args(args=cli_args)
+    return args, generation_parser
 
 def process_sampler_kwargs(init_sampler_kwargs, run_sampler_kwargs, kwargs):
     # Set defaults here to avoid inconsistent values between main.py and MainRun

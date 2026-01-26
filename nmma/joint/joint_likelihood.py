@@ -40,12 +40,12 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             return f"{self.__class__.__name__} with {', '.join(map(str, reprs[:-1]))} and {reprs[-1]}"
             
     def setup_parameter_conversion(self):
-        """Sets up the multimessenger conversion object, based on a corresponding dict."""
+        """Sets up the multimessenger conversion object, based on a corresponding dict.
+        Note: this must be called after the parent likelihood has been initialised."""
         for lhood in self.likelihoods:
             if isinstance(lhood, EMTransientLikelihood):
                 self.conversion_instructions['em'] = lhood.parameter_conversion
             elif isinstance(lhood, GravitationalWaveTransientLikelihood):
-                # FIXME: this is currently redundant, but potentially useful in future
                 self.conversion_instructions['gw'] = lhood.parameter_conversion
             elif isinstance(lhood, EquationofStateLikelihood):
                 self.conversion_instructions['eos'] = lhood.parameter_conversion
@@ -109,6 +109,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             logger.info("Setting up GW likelihood")
             gw_kwargs = setup_gw_kwargs(data_dump, args, logger)
             messenger_lhoods.append(GravitationalWaveTransientLikelihood(priors, **gw_kwargs))
+            conversion_instructions['gw'] = True # placeholder
 
         if "eos" in messengers:
             logger.info("Sampling over EOS generated on the fly")
@@ -116,6 +117,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             if eos_kwargs['constraint_dict']:
                 # only evaluate if specific constraints are given
                 messenger_lhoods.append(EquationofStateLikelihood(priors,  **eos_kwargs))
+                conversion_instructions['eos'] = True  # placeholder
             else:
                 conversion_instructions['eos'] = eos_kwargs['eos_converter']
         elif "tabulated_eos" in analysis_modifiers:
@@ -134,7 +136,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             logger.info("Setting up EM likelihood")
             em_kwargs = setup_em_kwargs(priors, data_dump, args, logger)
             messenger_lhoods.append(EMTransientLikelihood(**em_kwargs))
-            conversion_instructions['em'] = 'likelihood'
+            conversion_instructions['em'] = True  # placeholder
 
         if "pop" in messengers:
             pop_model = NeutronStarPopulation(args.population_model)
@@ -143,7 +145,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
         
         # FIXME: Find a better way to check this automatically:
         #NOTE: this is nasty because we might have corresponding constraints, but do not need to...
-        if args.ejecta_conversion:
+        if "log10_mej_wind" in priors or "log10_mej_dyn" in priors or args.ejecta_conversion:
             conversion_instructions['ejecta'] = True
 
         # if "spec" in messengers:  # FUTURE
