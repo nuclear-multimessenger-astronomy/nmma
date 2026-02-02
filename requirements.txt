@@ -19,7 +19,7 @@ ligo.skymap
 healpy
 scikit-learn
 keras>=3.0
-tensorflow>=2.19; platform_system == "Darwin"
+tensorflow; platform_system == "Darwin"
 tensorflow-macos; platform_system == "Darwin"
 tensorflow>=2.19; platform_system == "Windows"
 tensorflow-cpu>=2.19; platform_system == "Linux"
