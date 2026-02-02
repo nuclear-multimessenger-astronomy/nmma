@@ -330,8 +330,7 @@ class MultiFilterTransient(BasicEMTransient):
                     helper_mags[helper_filt] = utils.autocomplete_data(
                         self.light_curve_times[filt], obs_times, obs_mags, extrapolate=np.inf)
                 expected_mags[filt] = utils.average_mags(helper_mags, filt)
-            # if not np.isfinite(expected_mags[filt]).all():
-            #     breakpoint()
+                
         return expected_mags
     
     def band_log_likelihood(self, expected_mags, obs_error):

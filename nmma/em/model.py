@@ -1303,21 +1303,26 @@ def single_model_from_args(model_class, model_name, args,
 
 def create_light_curve_model_from_args(
     em_transient, args, filters=None
-):      
+):     
     if filters is None:
         filters = utils.set_filters(args)
+    if isinstance(em_transient, str):   
+        em_transient = em_transient.split(",")
+    
     #case 1: we have the model_names and need to find the classes first
     # this is equivalent to the previous behaviour of this function for em-only analysis
-    if isinstance(em_transient, str):   
-        model_names = em_transient.split(",")
+    if isinstance(em_transient[0], str):
+        model_names = em_transient
         model_classes = [get_lc_model_from_modelname(model_name) for model_name in model_names]
 
 
     # case 2, we have transient classes, need to identify the corresponding models
-    elif isinstance(em_transient, list):
+    else:
         model_classes = em_transient
         if isinstance(args.em_model, str):
             prel_model_names = args.em_model.split(",")
+        elif isinstance(args.em_model, list):
+            prel_model_names = args.em_model
         else:
             prel_model_names = []
         model_names = []

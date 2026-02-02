@@ -158,7 +158,8 @@ def lcs_from_injection_parameters(args=None):
     mag_ds = create_multiple_injections(injection_df, args, light_curve_model)
 
     if args.plot:
-        plotpath= os.path.join(args.outdir, f"injection_{args.em_model}_{args.label}_lc.pdf")
+        identifier = f"{'_'.join(args.em_model)}_{args.label}"
+        plotpath= os.path.join(args.outdir, f"injection_{identifier}_lc.pdf")
         plot_dict = {filt: np.vstack([lc_data[filt]['mag'] 
                         for lc_data in mag_ds.values()]) for filt in filters}
         first_lc_dict = next(iter(mag_ds.values()))

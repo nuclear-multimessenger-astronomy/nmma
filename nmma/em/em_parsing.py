@@ -71,7 +71,7 @@ def em_model_parsing(parser):
         "If none is provided, will use all the filters available")
     em_model_parser.add("--em-transient-class", nargs = "*",
         help="Name of the model-type to be used, can be a comma-seperated list for joint lightcurve models" )
-    em_model_parser.add_argument("--em-model", "--kilonova-model","--model", 
+    em_model_parser.add_argument("--em-model", "--kilonova-model","--model", type=yaml_parse, nargs="*",
         help="Name of the transient model to be used")
     em_model_parser.add_argument("--interpolation-type", "--gptype", 
         default="keras", help="Interpolation library to be used for EM "\

@@ -155,7 +155,9 @@ def nnanalysis(args):
     from  nflows.flows import Flow
 
     # only continue if the Kasen model is selected
-    if args.em_model != "Ka2017":
+    if isinstance(args.em_model, str):
+        args.em_model = args.em_model.split(",")
+    if args.em_model[0] != "Ka2017":
         print(
             "WARNING: model selected is not currently compatible with this inference method"
         )
