@@ -15,8 +15,6 @@ from ..core.conversion import (
 from ..core.constants import geom_msun_km
 from .plotting_routines import resampling_corner_plot
 
-from pymultinest.solve import Solver
-
 def find_spread_from_resampling(resampling_method, cumprod, prior_dist, post_samplesize, cred_interval):
     med, uplim, lowlim = [], [], []
     for weight in cumprod:
@@ -52,7 +50,7 @@ def construct_EM_KDE(EMsamples, combine_ejecta_mass):
         raise ValueError("EM samples must either contain ejecta mass as 'log10_mej' or seperate ejecta masses as 'log10_mej_dyn' and 'log10_mej_wind'.")
 
 
-class EjectaResampler(Solver):
+class EjectaResamplerMixIn:
 
     def __init__(self, GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, combine_ejecta_mass=False, **kwargs):
         self.GWsamples = GWsamples
@@ -112,7 +110,7 @@ class EjectaResampler(Solver):
         self.NSBHEjectaFitting = NSBHEjectaFitting()
         self.BNSEjectaFitting = BNSEjectaFitting()
 
-        Solver.__init__(self, **kwargs)
+        super().__init__(**kwargs)
     
     def Prior(self, x):
         return self.priors.rescale(self._search_parameter_keys, x)
@@ -173,15 +171,6 @@ class EjectaResampler(Solver):
         return np.nan_to_num(logprior + loglikelihood)
 
 
-class TotalEjectaMassInference(EjectaResampler):
-    def __init__(self, GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, **kwargs):
-        super().__init__(GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, combine_ejecta_mass=True, **kwargs)
-
-
-class EjectaMassInference(EjectaResampler):
-    def __init__(self, GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, **kwargs):
-        super().__init__(GWsamples, EMsamples, GWprior, EMprior, Neos, EOSpath, withNSBH, combine_ejecta_mass=False, **kwargs)
-
 def main_resampling():
     args = nmma_base_parsing(resampling_parser)
 
@@ -214,6 +203,12 @@ def main_resampling():
         )
     if args.withNSBH:
         pymulti_kwargs['n_dims'] = 7
+
+    #NOTE: postpone import to avoid issues when pymultinest is not installed
+    # this probably requires a better solution in the future
+    from pymultinest.solve import Solver
+    class EjectaResampler(EjectaResamplerMixIn, Solver):
+        pass
 
     solution = EjectaResampler(
             GWsamples,

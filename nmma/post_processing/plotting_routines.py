@@ -11,7 +11,7 @@ import itertools
 from ..core.conversion import chirp_mass_and_eta_to_component_masses, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities, label_mapping
 from ..core import utils, parsing
 from ..core import plotting_utils as corepu
-from.parser import corner_plot_parser
+from .parser import corner_plot_parser
 color_array = corepu.fig_setup()
 nmma_colors = itertools.cycle(color_array)
 
@@ -47,7 +47,7 @@ def plot_multi_corner(args, key_selection=None):
 
 
 def setup_corner_plot(posterior_samples,limits = None, plot_keys = None, fig = None, 
-                      injection=None, post_dir = None, default_labels=None, **plot_kwargs):
+                      injection=None, post_dir = None, default_labels={}, **plot_kwargs):
     #load samples
     posterior_samples = utils.get_posteriors(posterior_samples, post_dir)
 
