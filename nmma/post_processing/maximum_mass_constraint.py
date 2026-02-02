@@ -152,7 +152,6 @@ class PostmergerInferenceMixIn:
         return self.priors.rescale(self._search_parameter_keys, x)
 
     def LogLikelihood(self, x):
-
         if self.use_M_max:
            chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn, ratio_R, delta = x
 
@@ -160,7 +159,7 @@ class PostmergerInferenceMixIn:
            chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn = x
 
 
-        logprior = self.KDE.logpdf((chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn)) #use the joint GW+EM posterior as "prior" here
+        logprior = self.KDE.logpdf((chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn)).item() #use the joint GW+EM posterior as "prior" here
 
         EOS = int(EOS) + 1
         R, M = np.loadtxt(self.eos_path_macro+f"/{EOS}.dat", unpack = True, usecols = [0,1], skiprows = 0)

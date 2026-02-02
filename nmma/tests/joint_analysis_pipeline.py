@@ -3,6 +3,7 @@ import os
 import pytest
 import numpy as np
 import shutil
+from bilby.core.prior import ConditionalPriorDict
 
 from nmma.em import em_parsing as emp, lightcurve_handling as lch, model, analysis as ema
 from nmma.eos.eos_parsing import tabulated_eos_parsing
@@ -113,8 +114,7 @@ def test_single_thread_setup(args):
         injection_parameters['EOS'] = 7  # set EOS used in injection
         priors.update(eos_priors)
         combined_likelihood = MultiMessengerLikelihood([em_lhood, eos_lhood], priors)
-        from bilby.core.prior import ConditionalPriorDict
-        priors = ConditionalPriorDict(priors)
+        # priors = ConditionalPriorDict(priors) # FIXME: this will only work in bilby 2.8+
         return priors, combined_likelihood, injection_parameters
     
     multi_analysis_loop(args, setup)

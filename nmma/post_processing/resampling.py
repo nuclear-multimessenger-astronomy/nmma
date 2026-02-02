@@ -167,8 +167,8 @@ class EjectaResamplerMixIn:
         else:
             ejecta_mass = (mdyn, 10**log10_mwind)
         loglikelihood = self.EMKDE.logpdf(ejecta_mass)
-
-        return np.nan_to_num(logprior + loglikelihood)
+        out = loglikelihood + logprior
+        return np.nan_to_num(out.item())
 
 
 def main_resampling():
