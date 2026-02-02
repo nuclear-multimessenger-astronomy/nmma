@@ -225,7 +225,6 @@ def parse_generation_args(cli_args=[""]):
     args: dict or Namespace
 
     """
-    breakpoint()
     generation_parser = create_nmma_generation_parser()
     generation_parser, cli_args = check_for_config(cli_args, [generation_parser], False)
     args = generation_parser.parse_args(args=cli_args)

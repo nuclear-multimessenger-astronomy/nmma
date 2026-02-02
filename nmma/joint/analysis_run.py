@@ -453,7 +453,7 @@ class Dynesty(Worker):
         """
         print("")
         cp_time = time()-os.path.getmtime(self.resume_file) if os.path.isfile(self.resume_file) else self.sampling_time
-        logger.info(f"Write new checkpoint after {timedelta(cp_time)}")
+        logger.info(f"Write new checkpoint after {timedelta(seconds = cp_time)}")
 
         # avoid expensive pickling of easily rebuilt objects
         pool = self.sampler.pool

@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from argparse import Namespace
 from bilby.core.utils import decode_bilby_json
+from bilby.core.result import read_in_result
 from astropy import time
 
 from matplotlib.colors import LinearSegmentedColormap
@@ -96,24 +97,42 @@ def get_posteriors(posterior_samples, outdir = None):
     """
     Load posterior samples from a file or DataFrame.
     """
-    lc_model = None
-    if isinstance(posterior_samples, str):
-        if not os.path.isfile(posterior_samples):
-            posterior_samples = os.path.join(outdir, posterior_samples)
-        base, ext = os.path.splitext(posterior_samples)
-        format_str = ext[1:].lower()
-        if format_str in ['csv', 'txt', 'dat']:
-            posterior_samples = pd.read_csv(posterior_samples, sep='\s+', header=0)
-        elif format_str == 'json':
-            with open(posterior_samples, 'r') as f:
-                samples_dict = json.load(f, object_hook=decode_bilby_json)
-            posterior_samples = samples_dict["posterior"]
-        elif format_str == 'hdf5':
-            with h5py.File(posterior_samples, 'r') as f:
-                posterior_group = f['posterior']
-                posterior_samples = pd.DataFrame({key: np.array(posterior_group[key]) for key in posterior_group.keys()})
-        else:
-            raise ValueError("Unsupported file format, must be csv, txt, dat, json or hdf5")
+    if isinstance(posterior_samples, pd.DataFrame):
+        return posterior_samples
+    
+    if isinstance(posterior_samples, Namespace):
+        if outdir is None:
+            outdir = posterior_samples.outdir
+        cand_files = [f"{posterior_samples.label}_result.{ext}" for ext in ['hdf5', 'json', 'h5']]
+        cand_files+= [os.path.join(outdir, f) for f in cand_files]
+        for posterior_file in cand_files:
+            if os.path.isfile(posterior_file):
+                return read_in_result(posterior_file).posterior
+        raise FileNotFoundError(f"Could not find posterior samples. Tried: {cand_files}")
+    
+    if isinstance(posterior_samples, str) and not os.path.isfile(posterior_samples):
+        posterior_samples = os.path.join(outdir, posterior_samples)
+        assert os.path.isfile(posterior_samples), f"Posterior samples file {posterior_samples} not found."
+
+    base, ext = os.path.splitext(posterior_samples)
+    format_str = ext[1:].lower()
+    
+    if base.endswith('result'):
+        result = read_in_result(posterior_samples)
+        return result.posterior
+    
+    elif format_str in ['csv', 'txt', 'dat']:
+        posterior_samples = pd.read_csv(posterior_samples, sep='\s+', header=0)
+    elif format_str == 'json':
+        with open(posterior_samples, 'r') as f:
+            samples_dict = json.load(f, object_hook=decode_bilby_json)
+        posterior_samples = samples_dict["posterior"]
+    elif format_str == 'hdf5':
+        with h5py.File(posterior_samples, 'r') as f:
+            posterior_group = f['posterior']
+            posterior_samples = pd.DataFrame({key: np.array(posterior_group[key]) for key in posterior_group.keys()})
+    else:
+        raise ValueError("Unsupported file format, must be csv, txt, dat, json or hdf5")
     return posterior_samples
 
 def set_filename(basename, args, identifier=''):
@@ -132,15 +151,16 @@ def set_filename(basename, args, identifier=''):
         return  f"{base}{identifier}{ext}"
 
 
-def read_bestfit_from_posterior(args):
-    posterior_file = os.path.join(
-        args.outdir, f"{args.label}_posterior_samples.dat"
-    )
-    posterior_samples = pd.read_csv(posterior_file, header=0, delimiter=" ")
-    bestfit_idx = np.argmax(posterior_samples.log_likelihood.to_numpy())
-    bestfit_params = posterior_samples.to_dict(orient="list")
-    for key in bestfit_params.keys():
-        bestfit_params[key] = bestfit_params[key][bestfit_idx]
+def read_bestfit_from_posterior(args, mode = 'max_likelihood'):
+    posterior_samples = get_posteriors(args)
+    if mode == 'max_likelihood':
+        bestfit = posterior_samples.loc[posterior_samples.log_likelihood.idxmax()]
+    elif mode == 'max_posterior':
+        bestfit = posterior_samples.loc[(posterior_samples.log_likelihood*posterior_samples.log_prior).idxmax()]
+    else:
+        raise ValueError(f"Mode {mode} not recognized. Use 'max_likelihood' or 'max_posterior'.")
+    bestfit_params = bestfit.to_dict()
+    bestfit_idx = bestfit.name
     print(f"Best fit parameters: {str(bestfit_params)}\nBest fit index: {bestfit_idx}")
     bestfit_params["best_fit_index"] = int(bestfit_idx)
     return bestfit_params

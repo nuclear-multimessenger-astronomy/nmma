@@ -51,7 +51,8 @@ injection_args = Namespace(
 
 samling_args = Namespace(
     nlive=64,
-    local_only=True
+    local_only=True,
+    sampler="pymultinest"
 )
 
 em_prior_args = Namespace(
@@ -112,11 +113,14 @@ def test_single_thread_setup(args):
         injection_parameters['EOS'] = 7  # set EOS used in injection
         priors.update(eos_priors)
         combined_likelihood = MultiMessengerLikelihood([em_lhood, eos_lhood], priors)
-        # combined_likelihood.parameter_conversion = combined_likelihood.identity_conversion
-        return priors, combined_likelihood,  injection_parameters
+        from bilby.core.prior import ConditionalPriorDict
+        priors = ConditionalPriorDict(priors)
+        return priors, combined_likelihood, injection_parameters
+    
     multi_analysis_loop(args, setup)
 
 def test_parallel_setup(args):
+    args.sampler = 'dynesty'
     generation.generate_runner(**vars(args))
     # main.analysis_runner('outdir', pool_type='multi')
     
