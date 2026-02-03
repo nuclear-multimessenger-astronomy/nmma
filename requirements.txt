@@ -1,18 +1,23 @@
 future
-bilby>=2.1.1
-bilby_pipe>=1.1.0
+bilby>=2.7.1
+bilby_pipe>=1.7.0
+schwimmbad
 colorcet
-numpy>=1.9
-matplotlib>=2.0,<3.8
-scipy>=1.10
-pandas>=1.3.4,<2.0
-astropy>=5.3.4
+numpy>=2.0
+matplotlib>=3.8
+scipy>=1.15
+pandas>=2.0
+astropy>=6.0
 pymultinest
 sncosmo
 dust_extinction
 arviz
-p_tqdm
 tornado
 notebook
+toml
 ligo.skymap
 healpy
+scikit-learn
+tensorflow>=2.19; platform_system == "Darwin"
+tensorflow>=2.19; platform_system == "Windows"
+tensorflow-cpu>=2.19; platform_system == "Linux"

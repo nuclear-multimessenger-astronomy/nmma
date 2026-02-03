@@ -1,0 +1,16 @@
+config:
+  withTime:
+    value: true
+    filters:
+      - ztfr
+      - null # you can keep it or remove it, it will still be parsed as None (filter independent)
+      - [sdssu, 2massks]
+    time_nodes: 4
+    type: "Uniform"
+    minimum: 0
+    maximum: 2
+  withoutTime:
+    value: false
+    type: "Uniform"
+    minimum: 0
+    maximum: 2
