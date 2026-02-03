@@ -503,9 +503,14 @@ class Dynesty(Worker):
                 plt.close("all")
 
     def storable_metadata(self):
+        meta_data = self.data_dump.copy()
+        waveform_generator = meta_data.pop("waveform_generator", None)
+        if waveform_generator is not None:
+            meta_data["waveform_generator"] = waveform_generator.__repr__()
+        ifo_list = meta_data.pop("ifo_list", None)
+        if ifo_list is not None:
+            meta_data["ifo_list"] = [ifo.__repr__() for ifo in ifo_list]
 
-        meta_data = self.data_dump
-        meta_data.pop("waveform_generator", None)  # cannot be pickled
         meta_data["args"] = vars(self.args) # convert Namespace to dict for storing
         meta_data["likelihood"] = self.likelihood.meta_data
         meta_data["sampler_kwargs"] = self.init_sampler_kwargs
@@ -580,12 +585,7 @@ class Dynesty(Worker):
             os.remove(self.samples_file)  # remove temp file after succesful run
 
         logger.info(f"Saving result to {self.outdir}/{self.label}_result.{result_format}")
-        try:
-            result.save_to_file(extension=result_format)
-        except Exception as e:
-            logger.warning(f"Failed to save result to {result_format}: {e}"
-                           "Trying to save as json instead.")
-            result.save_to_file(extension="json")
+        result.save_to_file(extension=result_format)
 
         if self.plot:
             logger.info("Creating corner plot of posterior samples.")
@@ -598,9 +598,9 @@ class Dynesty(Worker):
                 logger.warning(f"Failed to create corner plot: {e}")    
             try:
                 logger.info("Creating diagnostic plots.")
-                bestfit_params = read_bestfit_from_posterior(self.args)
+                bestfit_params = read_bestfit_from_posterior(result.posterior, 'max_posterior')
                 self.likelihood.final_diagnostics(bestfit_params, self.args, result)
             except Exception as e:
                 logger.warning(f"Failed to create diagnostic plots: {e} \n{traceback.format_exc()}")
-
+        logger.info("Finished formatting result.")
         return result

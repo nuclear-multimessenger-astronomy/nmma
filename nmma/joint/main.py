@@ -97,6 +97,7 @@ def analysis_runner(
 
     POOL = MPIPool if pool_type == 'mpi' else MultiPool
     with POOL() as pool:
+        result = None
         if pool.is_master():           
             worker.start_sampler(
                 pool,
@@ -107,9 +108,9 @@ def analysis_runner(
             results = worker.run_sampler(
                 check_point_delta_t, n_check_point, max_its,
                 max_run_time, checkpoint_plot)
-            worker.format_result(results, result_format,
+            result = worker.format_result(results, result_format,
                 rejection_sample_posterior)
-    return 
+    return result
 
 
 # Worker functions. These are read in the global scope by each worker
