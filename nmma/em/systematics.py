@@ -165,7 +165,7 @@ class SystematicsHandler:
 
     def from_parameters(self, parameters): 
         err_params = [parameters[p] for p in self.err_params]
-        return autocomplete_data(self.light_curve_times, self.time_nodes, err_params)
+        return autocomplete_data(self.light_curve_times, self.time_nodes, err_params, extrapolate='constant')
     
     def legacy_prior_setup(self, prior_dict):
         """
@@ -287,7 +287,7 @@ class FilterSystematicsHandler(SystematicsHandler):
     
     def from_interpolated_params(self, parameters):
         return {filt: autocomplete_data(self.light_curve_times[filt], 
-                    time_range, [parameters[p] for p in param_list])
+                    time_range, [parameters[p] for p in param_list], extrapolate='constant')
         for filt, (param_list, time_range) in self.interpolate_map.items()}
     
     def from_parameters(self, parameters):

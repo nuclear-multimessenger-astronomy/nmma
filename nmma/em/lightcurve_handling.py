@@ -26,7 +26,7 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
     observable_times, best_mags = lc_model.gen_detector_lc(bestfit_params)
     model_error_data = transient.systematics_handler(bestfit_params)
     model_error = {filt: utils.autocomplete_data(observable_times,
-    transient.light_curve_times[filt], data) 
+    transient.light_curve_times[filt], data, extrapolate='constant') 
         for filt, data in model_error_data.items()}
     # model may not necessarily work on observed filters:
     for filt in set(transient.observed_filters) - set(best_mags.keys()):
@@ -91,7 +91,8 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
                     except KeyError:
                         plot_mags.append(np.full_like(obs_times[i], np.nan))
                     plot_errors.append(utils.autocomplete_data(obs_times[i],
-                        transient.light_curve_times[filt], model_error_data[filt]))
+                        transient.light_curve_times[filt], 
+                        model_error_data[filt], extrapolate='constant'))
 
                 sub_model_plot_props[sub_model.model]['plot_mags'] = plot_mags
                 sub_model_plot_props[sub_model.model]['plot_errors'] = plot_errors

@@ -532,7 +532,7 @@ def autocomplete_data(interp_points, ref_points, ref_data, extrapolate='linear',
             spline = UnivariateSpline(fin_ref, fin_data, s=ref_value)
             interp_data = spline(interp_points)
 
-        if extrapolate=='linear':
+        elif extrapolate=='linear':
             interp_data = np.interp(interp_points, fin_ref, fin_data)
             x0, x1, xm, xn = fin_ref[ [0,1,-2,-1]]
             y0, y1, ym, yn = fin_data[[0,1,-2,-1]]
@@ -540,6 +540,12 @@ def autocomplete_data(interp_points, ref_points, ref_data, extrapolate='linear',
             interp_data[lower_extrap_args] = y0 + (y1-y0)/(x1-x0)*(interp_points[lower_extrap_args]-x0)
             upper_extrap_args = np.argwhere(interp_points>xn)
             interp_data[upper_extrap_args] = yn + (yn-ym)/(xn-xm)*(interp_points[upper_extrap_args]-xn)
+        
+        elif extrapolate=='constant':
+            interp_data = np.interp(interp_points, fin_ref, fin_data,
+                                 left=fin_data[0], right=fin_data[-1])   
+        else:
+            raise ValueError(f"Unknown extrapolation method: {extrapolate}.")
         ## TODO Allow more sophisticated treatment of extrapolation
     
     else:
