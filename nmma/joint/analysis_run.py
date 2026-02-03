@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 from io import BufferedWriter
 from glob import glob
 from copy import deepcopy
@@ -509,6 +510,7 @@ class Dynesty(Worker):
         meta_data["likelihood"] = self.likelihood.meta_data
         meta_data["sampler_kwargs"] = self.init_sampler_kwargs
         meta_data["run_sampler_kwargs"] = self.sampler_kwargs
+        return meta_data
 
     def format_result(
         self,
@@ -599,6 +601,6 @@ class Dynesty(Worker):
                 bestfit_params = read_bestfit_from_posterior(self.args)
                 self.likelihood.final_diagnostics(bestfit_params, self.args, result)
             except Exception as e:
-                logger.warning(f"Failed to create diagnostic plots: {e}")
+                logger.warning(f"Failed to create diagnostic plots: {e} \n{traceback.format_exc()}")
 
         return result

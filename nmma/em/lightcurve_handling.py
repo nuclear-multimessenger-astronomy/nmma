@@ -22,6 +22,7 @@ from ..core.utils import read_injection_file, set_filename, read_trigger_time
 def post_process_bestfit(transient, bestfit_params, args, result=None):
     
     lc_model = transient.light_curve_model
+    lc_model.good_parameters = True  # to avoid sanity check issues
     observable_times, best_mags = lc_model.gen_detector_lc(bestfit_params)
     model_error_data = transient.systematics_handler(bestfit_params)
     model_error = {filt: utils.autocomplete_data(observable_times,

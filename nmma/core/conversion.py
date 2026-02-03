@@ -696,15 +696,21 @@ class MultimessengerConversion:
         
         
 label_mapping = {
+    ## Cosmology parameters ##
+    'Hubble_constant'       : r'$H_0{\rm [km\,s^{-1}\,Mpc^{-1}]}$',
+    'Omega_matter'          : r'$\Omega_{m}$',
+    'redshift'              : r'$z$',
+    ## System parameters ##
+    'inclination_EM'        : r'$\theta_{obs}$',
+    'theta_jn'              : r'$\theta_{JN}$',
+    'cos_theta_jn'          : r'$\cos{\theta_{JN}}$',
+    'luminosity_distance'   : r'$d_L{\rm [Mpc]}$', 
     ## GW parameters ##
     'chirp_mass'            :r'$\mathcal{M}_c{\rm [M_{\odot}]}$',
     'mass_ratio'            : r'$q$', 
-    'luminosity_distance'   : r'$d_L{\rm [Mpc]}$', 
     'chi_eff'               : r'$\chi_{\rm{eff}}$', 
-    'lambda_tilde'          : r'$\tilde{\Lambda}$', 
     'mass_1_source'         : r'$m_{1,s}{\rm [M_{\odot}]}$', 
     'mass_2_source'         : r'$m_{2,s}{\rm [M_{\odot}]}$', 
-    'redshift'              : r'$z$',
     ## KN parameters ##
     'log10_mej'             : r'$\log_{10}(M_{\rm{ej}}{\rm [M_{\odot}]})$',
     'log10_mej_dyn'         : r'$\log_{10}(M_{\rm{ej,dyn}}{\rm [M_{\odot}]})$',
@@ -722,16 +728,14 @@ label_mapping = {
     'alphaWing'             : r'$\alpha_{w}$',
     'log10_n0'              : r'$\log_{10}(n_{0}{\rm [cm^{-3}]})$',
     'p'                     : r'$p$',
-    'log10_epsilon_e'      : r'$\log_{10}(\epsilon_{e})$',
-    'log10_epsilon_B'      : r'$\log_{10}(\epsilon_{B})$',
+    'log10_epsilon_e'       : r'$\log_{10}(\epsilon_{e})$',
+    'log10_epsilon_B'       : r'$\log_{10}(\epsilon_{B})$',
     ## Ejecta parameters ##
     'mni'                   : r'$M_{\rm{Ni}}{\rm [M_{\odot}]}$',
     'mtot'                  : r'$M_{\rm{tot}}{\rm [M_{\odot}]}$',
     'mrp'                   : r'$M_{\rm{rp}}{\rm [M_{\odot}]}$',
     'mni_c'                 : r'$M_{\rm{Ni}}/M_{\rm{tot}}$',
     'mrp_c'                 : r'$M_{\rm{rp,c}}{\rm [M_{\odot}]}$',
-    ## EM parameters ##
-    'inclination_EM'        : r'$\theta_{obs}$',
     ### EOS parameters ###
     'L_sym'                 : r'$L_{\rm{sym}}{\rm [MeV]}$',
     'K_sym'                 : r'$K_{\rm{sym}}{\rm [MeV]}$',
@@ -740,4 +744,5 @@ label_mapping = {
     '5n_sat'                : r'$c_{5n_{\rm{sat}}{\rm [c]}$',
     'TOV_mass'              : r'$M_{\rm{TOV}}{\rm [M_{\odot}]}$',
     'R_14'                  : r'$R_{1.4}{\rm[km]}$',
+    'lambda_tilde'          : r'$\tilde{\Lambda}$', 
 }

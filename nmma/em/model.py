@@ -662,7 +662,7 @@ class FiestaKilonovaModel(FiestaModel):
     Parameters
     ----------
     model: str, optional
-        Name of the model. Default is "Bu2025_CVAE".
+        Name of the model. Default is "Bu2025_MLP".
     filters: list of str, optional
         List of filters to create model for. Defaults to all available filters.
     surrogate_dir: str, optional
@@ -674,7 +674,7 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    def __init__(self, model="Bu2026_MLP", filters=None, surrogate_dir=None, **kwargs):
+    def __init__(self, model="Bu2025_MLP", filters=None, surrogate_dir=None, **kwargs):
         if model.endswith("_lc"):
             from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
         else:
@@ -1109,6 +1109,11 @@ class CombinedLightCurveModelContainer:
     @property
     def good_parameters(self):
         return np.prod([lc_model.good_parameters for lc_model in self.lc_models])
+    
+    @good_parameters.setter
+    def good_parameters(self, value):
+        for lc_model in self.lc_models:
+            lc_model.good_parameters = value
     
         
     def parameter_conversion(self, parameters):
