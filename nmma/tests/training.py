@@ -27,7 +27,7 @@ def test_training():
     filts = [
         "ztfg",
         "ztfr",
-    ]  # We will focus on these two bands; all available: ["sdssu","ztfg","ztfr","ztfi","ps1__z","ps1__y","2massj","2massh","2massks"]
+    ]  
 
     workingDir = os.path.dirname(__file__)
 

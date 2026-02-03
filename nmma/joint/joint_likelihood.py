@@ -77,7 +77,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
         return posterior.select_dtypes([np.number])
  
     @classmethod
-    def setup_from_args(cls, data_dump, priors, args, logger):
+    def setup_from_args(cls, data_dump, priors, args, logger=None):
         """Takes the kwargs and sets up and returns
         MultiMessengerLikelihood.
 
@@ -97,6 +97,10 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
         likelihood: nmma.joint.likelihood.MultiMessengerLikelihood
 
         """
+        if logger is None:
+            from nmma.core.utils import logger
+            logger = logger
+            
         messengers= data_dump["messengers"]
         analysis_modifiers = data_dump["analysis_modifiers"]
 

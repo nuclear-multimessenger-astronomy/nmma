@@ -138,14 +138,10 @@ def write_lc_to_csv(outfile, data, format= "observations"):
             all_errs.extend(sub_dict['mag_error'])
             all_filters.extend([filt] * len(sub_dict['time']))
         sort_indices = np.argsort(all_times)
-        with open(outfile, "w") as out:
-            out.write("# time filter mag mag_error\n")
-            for i in sort_indices:
-                out.write(f"{Time(all_times[i], format='mjd').isot} {all_filters[i]} {all_mags[i]:.3f} {all_errs[i]:.3f}\n")
-        # out_data = [
-        #         [Time(all_times[i], format="mjd").isot, all_filters[i], all_mags[i], all_errs[i]] 
-        #     for i in sort_indices]
-        # np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error", comments="#")
+        out_data = np.array([
+                [Time(all_times[i], format="mjd").isot, all_filters[i], all_mags[i], all_errs[i]] 
+            for i in sort_indices], dtype=object)
+        np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error", comments="#")
         
     elif format == "model":
         # Lightcurve as issued by model, with or without errors
@@ -198,12 +194,13 @@ def convert_skyportal_lcs(filepath=None):
             print(f"input data {f} is not in the expected format {e}")
 
         try: 
-            out_data = [
+            out_data = np.array([
                 [Time(row["mjd"], format="mjd").isot, row["filter"], row["mag"], row["magerr"]]
-                for row in data]
+                for row in data], dtype=object)
             base, ext = os.path.splitext(f)
             outfile = base + ".dat"
             np.savetxt(outfile, out_data, fmt="%s %s %.3f %.3f", delimiter=" ", header="time filter mag mag_error")
+
             print(f"Wrote reformatted lightcurve to {outfile}")
         except Exception as e:
             print(f"failed to format data in {f} {e}")

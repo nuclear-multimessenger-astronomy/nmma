@@ -1,4 +1,5 @@
 import os
+import shutil
 from argparse import Namespace
 from ..em.lightcurve_handling import resample_lightcurve_grid
 from ..em.io import convert_skyportal_lcs
@@ -41,3 +42,5 @@ def test_lc_conversion():
     workingDir = os.path.dirname(__file__)
     filepath = os.path.join(workingDir, "data", "ZTF23aaxeacr_partial.csv")
     convert_skyportal_lcs(filepath=filepath)
+
+    shutil.rmtree(filepath, ignore_errors=True)
