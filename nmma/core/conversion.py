@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from scipy.special import erf
+from scipy.integrate import simpson
 from astropy import units
 from astropy import cosmology as cosmo
 from .constants import geom_msun_km, msun_to_ergs, get_cosmology, set_cosmology
@@ -242,6 +244,52 @@ def lambda_to_compactness(lambda_i):
 def mass_and_compactness_to_radius(mass, comp):
     ### returns 0 if compactness is greater than 0.5, i.e. black hole
     return np.where(comp<0.5, mass / comp * geom_msun_km, 0.0)
+
+############################## GRB-related conversions ####################################
+
+def gaussian_jet_energy_to_central_isotropic_energy_equivalent(Ejet, thetaCore, alphaWing):
+    """
+    Takes the total energy of a gaussian jet as well as the angular parameters and returns the isotropic-energy equivalent 
+    on axis. This means it is assumed that the true jet energy follows some angular structure dEjet / dOmega = epsilon_c * exp(-1/2 theta^2/thetac^2).
+    Then the distribution of the isotropic energy equivalent is simply related according to E_iso(theta) = 4pi dEjet / dOmega.
+    
+    :param Ejet: Total jet energy in ergs
+    :param thetaCore: Core angle in rad
+    :param alphaWing: Ratio of the wing angle and core angle.
+    """
+    
+    # this is the analytical expression for int_{0}^{alphaWing*thetaCore} sin(x) *exp(-1/2 (x/thetac)^2) dx
+    prefactor = np.sqrt(np.pi) * 1.j*thetaCore *np.exp(-thetaCore**2/2) / 2**1.5
+    first_term = erf(0.5*(np.sqrt(2)*1.j*thetaCore + np.sqrt(2)*alphaWing))
+    second_term = erf(0.5*(np.sqrt(2)*1.j*thetaCore - np.sqrt(2)*alphaWing))
+    third_term = 2*erf(1.j*thetaCore/np.sqrt(2))
+    integral_factor = prefactor * (first_term + second_term - third_term)
+    integral_factor = integral_factor.real # this imaginary part is always 0 in this expression
+
+    epsilon_c = Ejet / (2*np.pi* integral_factor)
+    Eiso_c = 4*np.pi*epsilon_c
+
+    return Eiso_c
+
+def powerlaw_jet_energy_to_central_isotropic_energy_equivalent(Ejet, thetaCore, alphaWing, b):
+    """
+    Takes the total energy of a powerlaw jet as well as the angular parameters and returns the isotropic-energy equivalent 
+    on axis. This means it is assumed that the true jet energy follows some angular structure dEjet / dOmega = epsilon_c * (1+1/b * (theta/thetaCore)^2)^(-b/2).
+    Then the distribution of the isotropic energy equivalent is simply related according to E_iso(theta) = 4pi dEjet / dOmega.
+    
+    :param Ejet: Total jet energy in ergs
+    :param thetaCore: Core angle in rad
+    :param alphaWing: Ratio of the wing angle and core angle.
+    :param b: Power law tail of the jet.
+    """
+    x = np.linspace(0, alphaWing*thetaCore, 100)
+    y = np.sin(x)*(1+1/b*(x/thetaCore)**2)**(-b/2)
+    integral_factor = simpson(x=x, y=y)
+
+    epsilon_c = Ejet / (2*np.pi* integral_factor)
+    Eiso_c = 4*np.pi*epsilon_c
+
+    return Eiso_c
         
 class EjectaFitting:
     mass_fitting_keys =["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
@@ -621,11 +669,22 @@ class BNSEjectaFitting(EjectaFitting):
         total_ejeta_mass = 10**log10_mej_dyn + 10**log10_mej_wind
 
         # GRB afterglow energy
-        log10_E0 = converted_parameters.get("log10_E0", (
-              np.log10(converted_parameters.get("ratio_epsilon", 0.01))
+        log10_Ejet = converted_parameters.get("log10_E0", (
+              np.log10(converted_parameters.get("ratio_epsilon", 2e-4))
             + np.log10(1.0 - converted_parameters["ratio_zeta"])
             + log10_mdisk_fit + np.log10(msun_to_ergs) )
         )
+
+        thetaCore = converted_parameters.get("thetaCore", 0.105)
+
+        if "b" in converted_parameters: # power law jet
+            alphaWing = converted_parameters.get("alphaWing", converted_parameters["thetaWing"] / converted_parameters["thetaCore"])
+            log10_E0 = np.log10(powerlaw_jet_energy_to_central_isotropic_energy_equivalent(10**log10_Ejet, thetaCore, alphaWing, converted_parameters["b"]))
+        elif "b" not in converted_parameters and ("thetaWing" in converted_parameters or "alphaWing" in converted_parameters): # gaussian jet
+            alphaWing = converted_parameters.get("alphaWing", converted_parameters["thetaWing"] / converted_parameters["thetaCore"])
+            log10_E0 = np.log10(gaussian_jet_energy_to_central_isotropic_energy_equivalent(10**log10_Ejet, thetaCore, alphaWing))
+        else:
+            log10_E0 = log10_Ejet - np.log10(np.sin(thetaCore/2)**2)
         
         np.seterr(**old)
         converted_ejecta = np.stack((log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_E0 ))
