@@ -6,6 +6,7 @@ from .constants import geom_msun_km, msun_to_ergs, get_cosmology, set_cosmology
 
 from bilby.gw.conversion import (
     component_masses_to_chirp_mass,
+    component_masses_to_symmetric_mass_ratio,
     lambda_1_lambda_2_to_lambda_tilde,
     convert_to_lal_binary_black_hole_parameters,
     generate_mass_parameters,
@@ -560,6 +561,29 @@ class BNSEjectaFitting(EjectaFitting):
 
         return log10_mdisk
     
+    def chiBH_fitting(
+            self,
+            mass_1,
+            mass_2,
+            lambda_1,
+            lambda_2,
+            a = 0.537,
+            b = -0.185,
+            c = -0.514
+    ):
+        """
+        See https://arxiv.org/pdf/1812.04803, Eq. (D7)
+        nu needs to be divided by 0.25 and lambda_tilde by 400, confirmed through author correspondence
+        """
+
+        lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(lambda_1, lambda_2, mass_1, mass_2)
+        M = mass_1 + mass_2
+        nu = component_masses_to_symmetric_mass_ratio(mass_1, mass_2)
+        
+        chi_BH = np.tanh(a*(nu/0.25)**2*(M+b*lambda_tilde / 400)+ c)
+
+        return chi_BH
+
     def bns_parameter_conversion(self, converted_parameters):
 
         # prevent the output message flooded by these warning messages
