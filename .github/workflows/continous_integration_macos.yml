@@ -2,11 +2,13 @@ name: Unit Test nmma [MacOS]
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths-ignore:
       - "doc/**"
   pull_request:
-    branches: [main]
+    branches:
+      - main
     paths-ignore:
       - "doc/**"
   workflow_dispatch:
@@ -20,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.12", "3.13"]
 
     steps:
       - name: Checkout branch being tested
@@ -80,7 +82,7 @@ jobs:
 
       - name: Install Homebrew dependencies
         run: |
-          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack cmake
+          env HOMEBREW_NO_AUTO_UPDATE=1 brew install openmpi hdf5 gcc openblas lapack
           eval "$(/usr/libexec/path_helper)"
       - name: Install dependencies (macOS)
         run: |
@@ -92,7 +94,7 @@ jobs:
         run: |
           python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
           python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib "coveralls==3.3.1"
-          python -m pip install -r  ml_requirements.txt -r grb_requirements.txt -r tf_requirements.txt -r sklearn_requirements.txt
+          python -m pip install -r  ml_requirements.txt -r grb_requirements.txt
           python -m pip install .
           git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf * && cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .. && make && cd ../..
           pwd
