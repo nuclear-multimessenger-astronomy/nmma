@@ -1,7 +1,5 @@
-from pathlib import Path
 import pytest
-
-import yaml
+from yaml import YAMLError
 from ..em.systematics import (
     ValidationError,
     validate_only_one_true,
@@ -12,6 +10,7 @@ from ..em.systematics import (
     ALLOWED_FILTERS,
     ALLOWED_DISTRIBUTIONS
 )
+from ..core.utils import load_yaml
 
 
 @pytest.fixture
@@ -43,7 +42,7 @@ def sample_yaml_file(tmp_path, sample_yaml_content):
 
 
 def test_validate_only_one_true_valid(sample_yaml_file):
-    yaml_dict = yaml.safe_load(Path(sample_yaml_file).read_text())
+    yaml_dict = load_yaml(sample_yaml_file)
     validate_only_one_true(yaml_dict)  # Should not raise an exception
 
 
@@ -67,26 +66,26 @@ def test_validate_filters_invalid():
 def test_handle_withTime():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": [["bessellb", "bessellv"], "ztfr"]}
     result = handle_withTime(values)
-    assert "sys_err_bessellb___bessellv1" in result[0]
-    assert "sys_err_ztfr2" in result[3]
+    assert "em_syserr_bessellb___bessellv_0" in result[0]
+    assert "em_syserr_ztfr_1" in result[3]
 
 
 def test_handle_withoutTime():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0}
     result = handle_withoutTime(values)
     assert len(result) == 1
-    assert "sys_err = Uniform(minimum=0.0, maximum=1.0, name='sys_err', latex_label='sys_err', unit=None, boundary=None)" in result[0]
+    assert "em_syserr = Uniform(minimum=0.0, maximum=1.0, name='em_syserr', latex_label='em_syserr', unit=None, boundary=None)" in result[0]
 
 
 def test_main(sample_yaml_file):
     result = main(sample_yaml_file)
-    assert all("sys_err" in line for line in result)
+    assert all("em_syserr" in line for line in result)
 
 
 def test_main_invalid_yaml(tmp_path):
     invalid_yaml = tmp_path / "invalid_config.yaml"
     invalid_yaml.write_text("invalid: yaml: content")
-    with pytest.raises(yaml.YAMLError):
+    with pytest.raises(YAMLError):
         main(invalid_yaml)
 
 
@@ -141,14 +140,14 @@ def test_handle_withTime_single_filter():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 2, "filters": ["ztfr"]}
     result = handle_withTime(values)
     assert len(result) == 2
-    assert all("sys_err_ztfr" in line for line in result)
+    assert all("em_syserr_ztfr" in line for line in result)
 
 
 def test_handle_withTime_all_filters():
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [None]}
     result = handle_withTime(values)
     assert len(result) == 1
-    assert "sys_err_all1" in result[0]
+    assert "em_syserr_all_0" in result[0]
 
 
 def test_main_withoutTime(tmp_path):
@@ -166,7 +165,7 @@ config:
     yaml_file.write_text(yaml_content)
     result = main(yaml_file)
     assert len(result) == 1
-    assert "sys_err = Uniform" in result[0]
+    assert "em_syserr = Uniform" in result[0]
 
 
 def test_main_empty_config(tmp_path):
@@ -188,7 +187,7 @@ def test_all_allowed_filters(filter_name):
     values = {"type": "Uniform", "minimum": 0.0, "maximum": 1.0, "time_nodes": 1, "filters": [filter_name]}
     result = handle_withTime(values)
     assert len(result) == 1
-    assert f"sys_err_{filter_name}1" in result[0]
+    assert f"em_syserr_{filter_name}_0" in result[0]
 
 
 def test_load_yaml_file_not_found():
@@ -199,5 +198,5 @@ def test_load_yaml_file_not_found():
 def test_load_yaml_invalid_format(tmp_path):
     invalid_yaml = tmp_path / "invalid_format.yaml"
     invalid_yaml.write_text("{ invalid: yaml: content")
-    with pytest.raises(yaml.YAMLError):
+    with pytest.raises(YAMLError):
         main(invalid_yaml)

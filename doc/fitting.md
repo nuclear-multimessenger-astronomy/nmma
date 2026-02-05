@@ -35,21 +35,8 @@ If one is interested in realistic ZTF-like light curves, one should use:
 * --ztf-ToO: Adds realistic ToO pointings during the first one or two days (1/2 randomly chosen) for specified exposure times: either 180s (valid for skymaps <1000sq deg) or 300s (skymaps >1000sq deg). Has no effect if --ztf-sampling is not turned on.
 
 If instead one is interested in potential Rubin-like ToO light curves, one should use:
-* --rubin-ToO: Adds ToO obeservations based on the strategy presented in arxiv.org/abs/2111.01945.
-* --rubin-ToO-type: Type of ToO observation. Has no effect if --rubin-ToO is not turned on.
+* --rubin-ToO-type: Type of ToO observation based on the strategy presented in arxiv.org/abs/2111.01945. 
 
-One may also be interested in a custom strategy. For this, one can use the flags:
-* --photometry-augmentation: A flag to augment photometry to improve parameter recovery
-* --photometry-augmentation-seed: Set a seed for the augmentation
-
-There are a few different forms this may take, for example, specifying:
-* --optimal-augmentation-filters: Provide a comma seperated list of filters to use for augmentation (e.g. ztfg,ztfr,ztfi). If none is provided, will use all the filters available.
-with
-* --photometry-augmentation-N-points: Specify the number of augmented points to include taken randomly from --optimal-augmentation-filters
-
-However, if you specify:
-* --optimal-augmentation-times: Provide a comma seperated list of times to use for augmentation in days post trigger time (e.g. 0.1,0.3,0.5). If none is provided, will use random times between tmin and tmax).
-You can choose the times to simulate for a given filter.
 
 We can use these flags as follows.
 
@@ -64,7 +51,7 @@ This produces a light curve and parameter inference of the form:
 
 Taking Rubin as an example:
 
-	lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --outdir outdir --label injection --prior priors/Bu2019lm.prior --tmin 0.05 --tmax 20 --dt 0.1 --error-budget 1 --nlive 512 --Ebv-max 0 --injection ./injection.json --injection-num 0 --injection-outfile outdir/lc.csv --generation-seed 42 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y --plot --remove-nondetections --rubin-ToO --rubin-ToO-type BNS --injection-detection-limit 23.9,25.0,24.7,24.0,23.3,22.1
+	lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --outdir outdir --label injection --prior priors/Bu2019lm.prior --tmin 0.05 --tmax 20 --dt 0.1 --error-budget 1 --nlive 512 --Ebv-max 0 --injection ./injection.json --injection-num 0 --injection-outfile outdir/lc.csv --generation-seed 42 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y --plot --remove-nondetections --rubin-ToO-type  --injection-detection-limit 23.9,25.0,24.7,24.0,23.3,22.1
 
 ### Analysis of a real object
 

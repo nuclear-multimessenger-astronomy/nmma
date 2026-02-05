@@ -23,7 +23,7 @@ In addition to installing the standard requirements.txt file, you must also run 
 
 First, we will create an injection file that describes our light curves. Running the following command line will generate a json file (injection.json). For Ka2017, this will include the parameters: luminosity_distance, timeshift, log10_mej, log10_vej, log10_Xlan, and geocent_time. 
 
-	nmma_create_injection --prior-file ./priors/Ka2017 --eos-file ./example_files/eos/ALF2.dat --binary-type BNS --filename ./output/injection --n-injection 10 --original-parameters --extension json
+	nmma_create_injection --prior-file ./priors/Ka2017 --eos-file ./example_files/eos/ALF2.dat --filename ./output/injection --n-injection 10 --original-parameters --extension json
 
 We can generate light curves using this injection file with the following command. Here, we can define the start and ending time of the light curve, its filters, and we can add ztf-like noise.
 
