@@ -54,15 +54,33 @@ When using this code for a publication, kindly make a reference to the package b
       url={https://doi.org/10.1038/s41467-023-43932-6}
 }
 ```
-If you are using the systematics error, please also cite the paper [A data-driven approach for modeling the temporal and spectral evolution of kilonova systematic uncertainties](https://arxiv.org/abs/2410.21978). The BibTeX entry for the paper is:
+If you are using the systematics error, please also cite the paper [Data-driven approach for modeling the temporal and spectral evolution of kilonova systematic uncertainties](https://arxiv.org/abs/2410.21978). The BibTeX entry for the paper is:
 ```bibtex
 @article{Jhawar:2024ezm,
     author = "Jhawar, Sahil and Wouters, Thibeau and Pang, Peter T. H. and Bulla, Mattia and Coughlin, Michael W. and Dietrich, Tim",
-    title = "{A data-driven approach for modeling the temporal and spectral evolution of kilonova systematic uncertainties}",
+    title = "{Data-driven approach for modeling the temporal and spectral evolution of kilonova systematic uncertainties}",
     eprint = "2410.21978",
     archivePrefix = "arXiv",
     primaryClass = "astro-ph.HE",
-    month = "10",
+    doi = "10.1103/PhysRevD.111.043046",
+    journal = "Phys. Rev. D",
+    volume = "111",
+    number = "4",
+    pages = "043046",
+    year = "2025"
+}
+```
+
+If you are using likelihood free inference, please also cite the paper [Rapid parameter estimation for kilonovae using likelihood-free inference](https://www.arxiv.org/abs/2408.06947). The BibTeX entry for the paper is:
+```bibtex
+@article{Desai:2024hlp,
+    author = "Desai, Malina and Chatterjee, Deep and Jhawar, Sahil and Harris, Philip and Katsavounidis, Erik and Coughlin, Michael",
+    title = "{Kilonova Light Curve Parameter Estimation Using Likelihood-Free Inference}",
+    eprint = "2408.06947",
+    archivePrefix = "arXiv",
+    primaryClass = "astro-ph.IM",
+    doi = "10.1093/mnras/staf1045",
+    month = "8",
     year = "2024"
 }
 ```

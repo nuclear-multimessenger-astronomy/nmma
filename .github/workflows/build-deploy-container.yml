@@ -3,6 +3,7 @@ name: CI to Docker Hub
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 env:
   REGISTRY_IMAGE: nmma/nmma_api
 
@@ -14,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: ['linux/amd64', 'linux/arm64/v8']
+        platform: ['linux/amd64']
 
     steps:
 
@@ -57,7 +58,7 @@ jobs:
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: digests
           path: /tmp/digests/*
@@ -71,7 +72,7 @@ jobs:
       - build
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: digests
           path: /tmp/digests

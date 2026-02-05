@@ -4,6 +4,15 @@ from scipy.interpolate import UnivariateSpline
 import sncosmo
 from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
 
+try:
+    from m4opt.missions import uvex
+    M4OPT_INSTALLED = True
+except:
+    M4OPT_INSTALLED = False
+    print("Install m4opt if you want to use uvex filters")
+import healpy as hp
+from astropy.io import fits
+
 import dust_extinction.shapes as dustShp
 
 import matplotlib
@@ -54,6 +63,7 @@ DEFAULT_FILTERS = [
     "ztfi",
     "ultrasat",
 ]
+
 def setup_sample_times(args):
     "create an array of sample times used for generating EM model lightcurves from args"
     tmin = args.em_tmin
@@ -123,10 +133,12 @@ def set_filters(args):
     return filters
 
 
-
 def create_detection_limit(args, filters, default_limit = np.inf):
     if getattr(args, 'detection_limit', None):
         return set_filter_associated_dict(args.detection_limit, filters, default_limit)
+    elif getattr(args, 'detection_limit_fits_file', None):
+        detection_limit = detection_limit_from_m4opt_fits_file(args)
+        return set_filter_associated_dict(detection_limit, filters, default_limit)
     
     detection_limit = {filt: default_limit for filt in filters}
     if getattr(args, "em_detectors", None):
@@ -151,6 +163,19 @@ def create_detection_limit(args, filters, default_limit = np.inf):
         detection_limit.update({'ps1::g':25.8,'ps1::r':25.5,'ps1::i':24.8,'ps1::z':24.1,'ps1::y':22.9} )
             
     return detection_limit
+
+def detection_limit_from_m4opt_fits_file(args):
+    # Open the FITS file
+    hdul = fits.open(args.detection_limit_fits_file)
+    # Get the BinTableHDU containing the HEALPix data
+    bintable = hdul[1]  # Assuming it's the first extension
+    # Extract the LIMMAG data and flatten it
+    limmag_data = bintable.data['LIMMAG']
+    limmag_map = limmag_data.flatten()
+
+    nside = bintable.header['NSIDE']  # Should be 128 based on your header
+    pixel_idx = get_skymap_idx(args.ra, args.dec, nside)
+    return limmag_map[pixel_idx]
 
 def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
     if isinstance(quantity, (int, float)):
@@ -577,6 +602,16 @@ def get_default_filts_lambdas(filters=None):
         "radio-6GHz",
         "X-ray-1keV",
         "X-ray-5keV",
+        "sdss::u",
+        "sdss::g",
+        "sdss::r",
+        "sdss::i",
+        "sdss::z",
+        "swope2::y",
+        "swope2::J",
+        "swope2::H",
+        "FUV",
+        "NUV",
     ]
     lambdas_sloan = 1e-10 * np.array(
         [3561.8, 4866.46, 6214.6, 7687.0, 7127.0, 7544.6, 8679.5, 9633.3, 12350.0]
@@ -601,6 +636,16 @@ def get_default_filts_lambdas(filters=None):
 
     filts = filts + [band.name for band in bandpasses]
     lambdas = np.concatenate([lambdas, [1e-10 * band.wave_eff for band in bandpasses]])
+
+    if M4OPT_INSTALLED:
+        fuv_bandpass = uvex.detector.bandpasses['FUV']
+        nuv_bandpass = uvex.detector.bandpasses['NUV']
+
+        fuv_lambda = 1e-10 * fuv_bandpass.avgwave().value
+        nuv_lambda = 1e-10 * nuv_bandpass.avgwave().value
+
+        filts = filts + ['FUV', 'NUV']
+        lambdas = np.concatenate([lambdas, [fuv_lambda, nuv_lambda]])
 
     if filters is not None:
         filts_slice = []
@@ -665,6 +710,31 @@ def flux_to_ABmag(flux, unit='cgs', residual_mag = None):
 
     mAB[suff_flux] = -2.5 * np.log10(flux[suff_flux]) + residual_magnitude
     return mAB
+
+def get_skymap_idx(ra, dec, nside):
+    """
+    Get the HEALPix pixel index for given RA and Dec coordinates.
+
+    Parameters:
+    -----------
+    ra : float or array-like
+        Right Ascension in degrees.
+    dec : float or array-like
+        Declination in degrees.
+    nside : int
+        The HEALPix NSIDE parameter.
+    nest : bool, optional
+        Whether to use NESTED ordering. Default is True.
+
+    Returns:
+    --------
+    int or array-like
+        The HEALPix pixel index corresponding to the input coordinates.
+    """
+    theta = np.radians(90.0 - dec)  # Convert Dec to co-latitude
+    phi = np.radians(ra)            # RA is already longitude-like
+
+    return hp.ang2pix(nside, theta, phi, nest=True)
 
 
 # The following LANL File readers are taken from Eve Chase's cocteau package
@@ -1075,4 +1145,3 @@ def parse_LANLfile(filename, key="band"):
     nrows = count - key_count - 3
 
     return nrows, keys_in_file
-

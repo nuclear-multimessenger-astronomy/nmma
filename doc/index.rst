@@ -20,14 +20,14 @@ can install NMMA using conda as follows:
 
 .. code::
 
-   conda create --name nmma_env python=3.10
+   conda create --name nmma_env python=3.12
    conda install -c conda-forge nmma
 
 If you have an issue, such as ``Solving environment: failed with initial frozen solve``, an option could be:
 
 .. code::
 
-   conda create --name nmma_env python=3.10
+   conda create --name nmma_env python=3.12
    conda install mamba -c conda-forge
    mamba install nmma -c conda-forge
 
@@ -94,7 +94,7 @@ nmma_env in this case):
 
 .. code::
 
-   conda create --name nmma_env python=3.10
+   conda create --name nmma_env python=3.12
    conda activate nmma_env
 
 .. note::
@@ -120,7 +120,7 @@ Check python and pip version like this:
    python --version
    pip --version
 
-Python 3.9 and above and Pip 21.2 and above is ideal for this
+Python 3.12 and above and Pip 21.2 and above is ideal for this
 installation. It is recommended to update these for your installation.
 
 
@@ -134,27 +134,6 @@ Install mpi4py:
 
    We discourage installing mpi4py with pip. The installation does not work properly due to issues with MPI header files, etc.
 
-Install parallel-bilby:
-
-.. code::
-
-   conda install -c conda-forge parallel-bilby
-
-.. note::
-
-   Installing parallel-bilby takes quite some time. Please be patient. If you encounter any errors, please check the `parallel-bilby installation guide <https://lscsoft.docs.ligo.org/parallel_bilby/installation>`__ for more details.
-
-
-.. note::
-
-   For those installing on WSL with pip, you may encounter an issue with installing parallel-bilby due to a dependency on python-ligo-lw.
-   This can be resolved by installing gcc with the following command:
-
-.. code::
-
-   sudo apt-get install gcc
-
-and attempting to install parallel-bilby again.
 
 Install pymultinest (note this line may not work for arm64 Macs; see
 specifc instructions below)
@@ -317,7 +296,6 @@ Run the following commands:
    ipython
    import nmma
    import nmma.em.analysis
-   import nmma.eos.create_injection
 
 .. tip::
 
@@ -334,7 +312,7 @@ simply pinning versions such as:
 
 .. code::
 
-   pip install astropy==4.3.1
+   pip install astropy==6.3.1
 
 and then trying again is sufficient for completion of the installation.
 This instruction file will likely cover the issues you might face during
@@ -348,7 +326,7 @@ If you want to install a custom lalsuite version (e.g. with a certain GW templat
 
 .. code::
 
-   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.9
+   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.12
    conda activate YOUR_PREFIX
 
 and then installing mpi4py first before installing the required packages for the build process (here the second line):
@@ -425,21 +403,15 @@ and check that the installation was successful by running the first check for NM
 .. code::
 
    lightcurve-analysis \
-        --model LANLTP2 \
+        --em-model LANLTP2 \
         --svd-path svdmodels/ \
         --filters ztfg,ztfi,ztfr \
         --ztf-sampling \
-        --ztf-uncertainties \
-        --ztf-ToO 180 \
         --local-only \
         --interpolation-type tensorflow \
         --outdir outdir/TP2_ztf \
         --label TP2_ztf \
         --prior priors/LANL2022.prior \
-        --tmin 0. \
-        --tmax 14 \
-        --dt 0.1 \
-        --error-budget 1 \
         --nlive 1024 \
 
 

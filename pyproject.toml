@@ -108,7 +108,7 @@ ignore_errors = true
 profile = "black"
 
 [tool.pytest.ini_options]
-addopts = "-vv -s -rsxX"
+addopts = "--verbose -r s"
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
 

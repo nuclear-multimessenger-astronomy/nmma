@@ -364,6 +364,7 @@ class NMMAInjectionCreator(InjectionCreator):
         #legacy imports
         from  lalsimulation import SimInspiralTransformPrecessingWvf2PE as lalsim_conversion
         from gwpy.table import Table
+        from astropy.table import Table as AstroTable
 
         try:
             import ligo.lw  # noqa F401
@@ -374,8 +375,10 @@ class NMMAInjectionCreator(InjectionCreator):
             table = Table.read(injection_file, format="ligolw", tablename="sim_inspiral")
         elif injection_file.endswith(".dat"):
             table = Table.read(injection_file, format="csv", delimiter="\t")
+        elif injection_file.endswith(".ecsv"):
+            table = AstroTable.read(injection_file)
         else:
-            raise ValueError("Only understand xml and dat")
+            raise ValueError("Only understand xml, ecsv and dat")
 
         injection_values = {key: [] for key in ["simulation_id", "mass_1", "mass_2", 
             "luminosity_distance", "psi", "phase", "geocent_time", "ra", "dec", 

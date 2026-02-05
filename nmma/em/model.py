@@ -51,8 +51,8 @@ model_parameters_dict = {
     "Piro2021": ["log10_Menv", "log10_Renv", "log10_Ee"],
     ## analytical kilonova models
     "Me2017": ["log10_mej", "log10_vej", "beta", "log10_kappa_r"],
+    "HoNa2020": ["log10_mej", "vej_max", "vej_min", "vej_frac", "log10_kappa_low_vej", "log10_kappa_high_vej"],
     "Bu2022mv": ["log10_mej_dyn", "vej_dyn", "log10_mej_wind", "vej_wind", "KNtheta"],
-    "HoNa2020": ["log10_Mej", "vej_max", "vej_min", "vej_frac", "log10_kappa_low_vej", "log10_kappa_high_vej"],
     ## supernova models
     "PL_BB_fixedT": ["bb_luminosity", "temperature", "beta", "powerlaw_mag"],
     "blackbody_fixedT": ["bb_luminosity", "temperature"],
@@ -180,7 +180,6 @@ class LightCurveModelContainer:
         model_parameters=None,
         sample_times=None,
     ):
-
         if model_parameters is None:
             assert model in model_parameters_dict.keys(), (
                 f"{model} unknown," "please update model_parameters_dict at em/model.py"
@@ -206,10 +205,16 @@ class LightCurveModelContainer:
     def __repr__(self):
         return self.__class__.__name__ + f"(model={self.model})"
 
-    def setup_model_times(self):
-        tmin = 0.01  # minimum time in days
-        tmax = 14.0  # maximum time in days
-        nsteps = 150  # number of time steps
+    def setup_model_times(self, tmin= 0.01, tmax = 14.0, nsteps=150):
+        """Set up default model sample times if not provided.
+        Parameters:
+        tmin: float
+            Minimum time in days. Default is 0.01 days.
+        tmax: float
+            Maximum time in days. Default is 14.0 days.
+        nsteps: int
+            Number of time steps. Default is 150.
+        """
         return np.geomspace(tmin, tmax, nsteps)
     
     def check_vs_priors(self, priors):
@@ -1034,6 +1039,12 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
             "synchrotron_powerlaw"  : lc_gen.synchrotron_powerlaw
         }
         self.lc_func = lc_dict[model]
+
+        if model == "HoNa2020":
+            if sample_times is None:
+                self.model_times = self.setup_model_times(tmin= 5e-2)
+            else:
+                assert np.min(sample_times) >= 5e-2, "HoNa2020 model is only valid for times >= 0.05 days"
 
 
     def generate_lightcurve(self, sample_times, parameters):

@@ -188,6 +188,8 @@ def em_only_injection_parsing(parser):
 def skymap_parsing(parser):
     parser.add_argument("--fits-file", 
         help="Fits file output from Bayestar, to be used for constructing dL-iota prior")
+    parser.add_argument("--detection-limit-fits-file",
+        help="Fits file containing detection limit information")
     parser.add_argument(
         "--cosiota-node-num", default=10,
         help="Number of cos-iota nodes used in the Bayestar fits (default: 10)")

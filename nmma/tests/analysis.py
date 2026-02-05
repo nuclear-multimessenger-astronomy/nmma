@@ -57,8 +57,16 @@ def test_analysis_systematics_with_time(args):
     analysis.main(args)
 
 
-def test_analysis_systematics_without_time(args):
+def test_analysis_systematics_with_time_and_filters(args):
 
+    args.filters = ["ztfr", "sdssu", "2massks"]
+    args.systematics_file = f"{DATA_DIR}/systematics_with_time_combined_filters.yaml"
+    analysis.main(args)
+
+
+def test_analysis_systematics_without_time(args):
+    
+    args.filters = "ztfr"
     args.systematics_file = f"{DATA_DIR}/systematics_without_time.yaml"
     analysis.main(args)
 

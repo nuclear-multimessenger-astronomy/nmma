@@ -11,9 +11,10 @@ import matplotlib.pyplot as plt
 from bilby.core.prior import (
     Prior, DeltaFunction, Interped, ConditionalTruncatedGaussian,
     ConditionalPriorDict, PriorDict)
-from ligo.skymap import io, moc
+from ligo.skymap import io as skymap_io, moc
 
 from ..core.base import adjust_hubble_prior
+from .utils import get_skymap_idx
 
 
 class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
@@ -83,11 +84,8 @@ def inclination_prior_from_fits(priors, args):
     print("Constructing prior on inclination with fits input")
 
     # load the skymap
-    skymap = io.read_sky_map(args.fits_file, moc=True)
-    maP_idx = np.argmax(skymap['PROBDENSITY'])
-    uniq_idx = skymap[maP_idx]['UNIQ']
-    order, nest_idx = moc.uniq2nest(uniq_idx)
-    nside = hp.order2nside(order)
+    skymap = skymap_io.read_sky_map(args.fits_file, moc=True)
+    maP_idx = np.argmax(skymap['PROBDENSITY'])  
 
     # check if the sky location is input
     # if not, the maximum posterior point is taken
@@ -102,12 +100,12 @@ def inclination_prior_from_fits(priors, args):
             dec = np.rad2deg(priors['dec'].peak)
 
         print(f"Using the input sky location ra={ra}, dec={dec}")
-        # convert them back to theta and phi
-        phi = np.deg2rad(ra)
-        theta = 0.5 * np.pi - np.deg2rad(dec)
-        
-        # overwrite the nested idx for the given sky location
-        nest_idx = hp.ang2pix(nside, theta, phi, nest=True)
+
+        uniq_idx = skymap[maP_idx]['UNIQ']
+        order, nest_idx = moc.uniq2nest(uniq_idx)
+        nside = hp.order2nside(order)
+        nest_idx = get_skymap_idx(ra, dec, nside)
+
         # find the row with the closest nested index
         nest_idxs = []
         for row in skymap:
@@ -120,14 +118,7 @@ def inclination_prior_from_fits(priors, args):
         row = skymap[np.argmin(np.absolute(nest_idxs - nest_idx))]
 
     else:
-        print("Using the maP point from the fits file input")        
-        # convert to nested indexing and find the location of that index
-        theta, phi = hp.pix2ang(nside, int(nest_idx), nest=True)
-        # convert theta and phi to ra and dec
-        ra = np.rad2deg(phi)
-        dec = np.rad2deg(0.5 * np.pi - theta)
-        print(f"The maP location is ra={ra}, dec={dec}")
-        # fetching the skymap row
+        print("Using the maP point from the fits file input")
         row = skymap[maP_idx]
 
     # construct the iota prior

@@ -646,11 +646,15 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
     return mag_dict_for_blackbody(filters, one_over_T, R_photo, nu_host)
 
 def HoNa_lc(sample_times, param_dict, nu_host, filters):
-    t0 = 1e-3 
-    sample_times = sample_times [sample_times > t0] 
-    sample_times*= seconds_a_day # remove t=0, as it is not physical
-    t0*= seconds_a_day
-    mej = 10**param_dict["log10_Mej"] * msun_cgs
+
+    # calculate the temperature and luminosity to feed into the blackbody radiation calculation
+    conv_params = setup_HoNa_params(sample_times, param_dict)  
+    inv_temp, R_photo = temp_photosphere_HoNa(*conv_params, param_dict.get("n", 4.5))
+    return mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host)
+
+def setup_HoNa_params(sample_times, param_dict):
+    sample_times*= seconds_a_day 
+    mej = 10**param_dict["log10_mej"] * msun_cgs
     vej_max = param_dict["vej_max"]   
     vej_min = param_dict["vej_min"]
     vej_range = vej_max - vej_min
@@ -660,14 +664,7 @@ def HoNa_lc(sample_times, param_dict, nu_host, filters):
     # in cm**2 / g
     opacities = np.array([10**param_dict["log10_kappa_low_vej"],  
                           10**param_dict["log10_kappa_high_vej"]] )
-
-    # calculate the temperature and luminosity to feed into the blackbody radiation calculation
-    inv_temp, R_photo = temp_photosphere_HoNa(
-        sample_times, mej, velocities, opacities, param_dict.get("n", 4.5) )
-    # param_dict["z"] = 0.011188892
-    # param_dict["Ebv"] = 0
-
-    return mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host)
+    return sample_times, mej, velocities, opacities
 
 # the following functions are for the semi-analytic model using Hotokezaka & Nakar heating rate
 def luminosity_HoNa(E, t, td, be):
@@ -688,7 +685,22 @@ def dEdt_HoNa(t, E, dM, td, be):
     dEdt = -E / t - L + heat
     return dEdt
 
-def temp_photosphere_HoNa(t, mej, velocities, opacities, n, t0):
+def temp_photosphere_HoNa(t, mej, velocities, opacities, n):
+    """
+    Generates the temperature and photospheric radius evolution based on
+    the HoNa semi-analytical model.
+    # Arguments:
+        t: numpy.ndarray
+            Time array in seconds.
+        mej: float
+            Ejecta mass in grams.
+        velocities: numpy.ndarray
+            Velocity grid in units of c (speed of light).
+        opacities: numpy.ndarray
+            Opacity values in cm^2/g.
+        n: float
+            Power-law index for the density profile.
+    """
     # Prepare velocity grid
     be_0 = velocities[0]
     be_max = velocities[-1]
@@ -726,7 +738,8 @@ def temp_photosphere_HoNa(t, mej, velocities, opacities, n, t0):
     dMs_col = dMs[:, np.newaxis]
     
     # Evolve in time
-    out = solve_ivp(dEdt_HoNa, (t0, t.max()), np.zeros(len(bes)), first_step=t0,
+    t0 = 5e-2 * seconds_a_day  # initial time to start the integration
+    out = solve_ivp(dEdt_HoNa, (t[0], t[-1]), np.zeros_like(bes), first_step=t0,
         args=(dMs_col, tds_col, bes_col), vectorized=True)
     
     # Total luminosity calculation

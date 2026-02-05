@@ -63,8 +63,7 @@ def basic_em_analysis_plot(
             # plot the mismatch between the model and the data
             diff_per_data, sigma_per_data = mismatches[filt]
             ax_delta.axhline(0, linestyle='--', color='k')
-            ax_delta.scatter(det_times, diff_per_data, # / sigma_per_data,  # FIXME: Bug?
-                             color=colors[cnt])
+            ax_delta.scatter(det_times, diff_per_data, color=colors[cnt])
             
             ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_dict[filt], 2)}$')
         
