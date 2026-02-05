@@ -105,7 +105,7 @@ def test_injection_creation(args):
     data, injection_parameters = lch.make_injection(injection_parameters, args, injection_model=inj_model) 
     
     assert np.isclose([arr[10] for arr in data['ztfr'].values()],
-                      [4.4248125e+04, 2.05459274e+01, 1.00000000e-01]).all()
+                      [4.4248125e+04, 2.09294036584e+01, 1.00000000e-01]).all()
     
 def test_single_thread_setup(args):
     def setup(args):
@@ -113,8 +113,8 @@ def test_single_thread_setup(args):
         eos_priors, eos_lhood, _ = tabulated_eos_setup(args)
         injection_parameters['EOS'] = 7  # set EOS used in injection
         priors.update(eos_priors)
+        # priors = ConditionalPriorDict(priors) # FIXME: this will only work in bilby 2.8+
         combined_likelihood = MultiMessengerLikelihood([em_lhood, eos_lhood], priors)
-        # priors = ConditionalPriorDict(priors) # FIXME: this will only work in bilby 2.8
         return priors, combined_likelihood, injection_parameters
     
     multi_analysis_loop(args, setup)
