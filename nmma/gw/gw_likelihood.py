@@ -206,11 +206,10 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
 
         super().__init__(gw_transient, priors)
 
-    def parameter_conversion(self, parameters):
         if "neutron_star" in self.sub_model.waveform_generator.frequency_domain_source_model.__name__:
-            return bns_source_frame(parameters)
+            self.parameter_conversion = bns_source_frame
         else:
-            return bbh_source_frame(parameters)
+            self.parameter_conversion = bbh_source_frame
     
     def posterior_conversion(self, posterior_samples):
         if "chi_eff" not in posterior_samples:
