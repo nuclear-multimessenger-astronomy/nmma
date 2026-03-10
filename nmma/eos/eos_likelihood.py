@@ -4,10 +4,12 @@ import os
 import shutil
 import json
 from ast import literal_eval
+import matplotlib
 from tqdm.contrib.concurrent import process_map 
 import numpy as np
 from scipy.special import logsumexp
-from scipy.stats import norm, gaussian_kde
+from scipy.stats import norm
+from scipy.ndimage import gaussian_filter
 from matplotlib import pyplot as plt
 from bilby.core.prior import WeightedCategorical, PriorDict
 from .eos_processing import EoSConverter
@@ -60,27 +62,40 @@ class EquationofStateLikelihood(NMMALikelihood):
         self.conv_functions.append(self.sub_model.parameter_conversion)
         
      
-    def final_diagnostics(self, bestfit_params, args, result=None):
+    def final_diagnostics(self, bestfit_params, args, result=None, fig = None):
+        matplotlib.rcParams.update({'font.size': 16, 'font.family': 'serif'})
+        # matplotlib.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
         bestfit_params =self.parameter_conversion(bestfit_params)
         
-        color_densities = []
         radii, masses, lambdas = self.sub_model.eos_converter.macro_parameters.values()
-        x_lim = (np.min(radii)-0.3, np.max(radii)+0.3)
-        y_lim = (masses[0], masses[-1]+0.1)
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.set_xlim(x_lim)
-        ax.set_ylim(y_lim)
-        for constraint in self.sub_model.constraints:
-            color = ax._get_lines.get_next_color()
-            ax = constraint.plot(ax=ax, resolution=100, color=color)
-        ax.plot(radii, masses, label='Best fit EOS', zorder=10)
+        if fig is None:
+            x_lim = (min(np.min(radii)-0.3, 9), max(np.max(radii)+0.3, 15))
+            y_lim = (masses[0], masses[-1]+0.1)
+            fig, ax = plt.subplots(figsize=(10, 10))
+            ax.set_xlim(x_lim)
+            ax.set_ylim(y_lim)
+            ax.set_xlabel(r'Radius [km]')
+            ax.set_ylabel(r'Mass [M$_\odot$]') 
 
-        ax.set_xlabel(r'Radius [km]')
-        ax.set_ylabel(r'Mass [M$_\odot$]')
-        ax.legend()
-        fig.savefig(os.path.join(args.outdir, f"{args.label}_mr_curve.png"))
-        
-        plt.show()
+            for constraint in self.sub_model.constraints:
+                color = ax._get_lines.get_next_color()
+                ax = constraint.plot(ax=ax, color=color)
+        else:
+            ax = fig.axes[0]
+            labels = [line.get_label() for line in fig.legends[0].legend_handles]
+            for constraint in self.sub_model.constraints:
+                if constraint.name in labels:
+                    continue
+                color = ax._get_lines.get_next_color()
+                ax = constraint.plot(ax=ax, color=color)
+            fig.legends.clear() ## remove old legend to avoid duplicates
+        ax.plot(radii, masses, label=f'{args.label} Best fit EoS', zorder=10)
+
+        fig.legend(ncols=2, loc='upper center',
+                   bbox_to_anchor=(0.5, 0.00), handlelength=2)
+        fig.tight_layout()
+        fig.savefig(os.path.join(args.outdir, f"{args.label}_mr_curve.png"),bbox_inches='tight')
+        return fig
 
 
 def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
@@ -200,7 +215,7 @@ class JointEoSConstraint:
                 raise ValueError('Unknown type of EoS Constraint. Must be "lower_mtov", \
                                 "upper_mtov", "mass-radius" or "micro\
                                 ')
-            return constraint_list
+        return constraint_list
         
     def parameter_conversion(self, parameters):
         return self.eos_converter.parameter_conversion(parameters)
@@ -300,6 +315,7 @@ class MassConstraint(EoSConstraint):
         self.error = measure_error
         self.repr_add = f'of {measured_mass}+-{measure_error} M_sun'
         self.lognorm_method = lognorm_method
+        self.linestyle = '--'
 
     
     def __repr__(self):
@@ -320,15 +336,15 @@ class MassConstraint(EoSConstraint):
     def plot(self, ax, resolution = 100, **kwargs):
         """Plot the mass constraint on the given figure."""
         x_lim = ax.get_xlim()
-        y_lim = ax.get_ylim()
-        M_grid = np.linspace(*y_lim, num=resolution)
-        show_x, show_y = np.meshgrid(np.linspace(*x_lim, resolution), M_grid)
-        line = ax.hlines(self.mass, *x_lim, linestyle='--', linewidth=1.5, zorder=3, label=self.name, **kwargs)
+        dummy_line = ax.plot([], [], label=self.name, linestyle=self.linestyle, linewidth=2.5, **kwargs)
+        line = ax.hlines(self.mass, *x_lim, linestyle=self.linestyle, linewidth=2.5, zorder=3, **kwargs)
         cmap = fading_cmap(line.get_color())
-        shade_profile = norm.pdf(M_grid, loc=self.mass, scale=self.error)
-        shading_matrix = np.repeat(shade_profile[:, np.newaxis], resolution, axis=1)
-        ax.contourf(show_x, show_y, shading_matrix, levels=50, cmap=cmap)
+        levels = [0.95, 0.68]
+        for i, level in enumerate(levels):
+            ax.hlines(self.mass + (i+1)*self.error, *x_lim, color=cmap(0.9*level),  linewidth=1.5, zorder=1)
+            ax.hlines(self.mass - (i+1)*self.error, *x_lim, color=cmap(0.9*level), linewidth=1.5, zorder=1)
         return ax
+
 
 class LowerMTOVConstraint(MassConstraint):
     '''Constraint that an EOS supports at least a certain TOV mass(within Gaussian uncertainty)'''
@@ -364,6 +380,7 @@ class UpperMTOVConstraint(MassConstraint):
             Identifier of a relevant source
         """
         super().__init__(measured_mass, measure_error, name, arxiv_ref, lognorm_method=norm.logsf)
+        self.linestyle = ':'
     
 
 class MassRadiusConstraint(EoSConstraint):
@@ -389,22 +406,9 @@ class MassRadiusConstraint(EoSConstraint):
             mass_array, radius_array, weights = self.read_data(file_path)
         elif mass_array is None or radius_array is None:
             raise ValueError('Must provide data for masses and radii as arrays or file from which to load')
-
-        if len(radius_array) > 10000:
-            ratio = len(radius_array) // 10000
-        else:
-            ratio = 1
-            
-        radius = radius_array[::ratio]
-        mass = mass_array[::ratio]
-        if weights is not None:
-            weights = weights[::ratio]
-        
-        self.KDE = gaussian_kde((radius, mass), weights=weights)
-        self.test_masses= np.linspace(start=1., stop=2.5, num=150 ) # 1 to 2.5 Msun
-        self.rng = np.random.default_rng()
-
-
+        self.set_grid(mass_array, radius_array, weights)
+        self.test_masses = np.linspace(1.2, 2.5, 151) 
+   
     def read_data(self, file_path):
         """Read mass-radius data from a file."""
         data = np.loadtxt(file_path, unpack=True)
@@ -443,12 +447,45 @@ class MassRadiusConstraint(EoSConstraint):
         
         return masses, radius, weights
 
-    def log_likelihood(self, parameters, local_parameters):
+    def set_grid(self, masses, radii, weights, mass_step = 0.01, radius_step = 0.03):
+        """Set up a grid upon which to build a histogram of mass-radius data to approximate the pdf.
+        Note that when using multiple mass-radius measurements, all measurements should use the same stepsizes!
+        Parameters
+        ----------
+        masses: np.array
+            Array with mass posterior of M-R measurement
+        radii: np.array
+            Array with radius posterior of M-R measurement, must be specified along an equal-length mass_array
+        weights: np.array, optional
+            Array with weights of the M-R samples, must be specified along an equal-length mass_array
+            mass_step: float
+            step size for mass grid in solar masses, default is 0.01 Msun
+        radius_step: float  
+            step size for radius grid in km, default is 0.02 km (20 m)
         
+        """
+        mass_bins = self.set_bins(masses, mass_step)
+        rad_bins = self.set_bins(radii, radius_step)
+        if 3*len(mass_bins)*len(rad_bins) > len(masses):
+            print("Warning: The histogram might be to sparsely populated to get meaningful results.")
+
+        histogram, self.rad_edges, self.mass_edges = np.histogram2d(radii, masses, bins=[rad_bins, mass_bins], weights=weights, density=True)
+        drad = self.rad_edges[1] - self.rad_edges[0]
+        dmass = self.mass_edges[1] - self.mass_edges[0]
+
+        self.histogram = gaussian_filter(histogram*dmass*drad, sigma=3)
+
+    def set_bins(self, array, step_size, sensitivity=0.001):
+        low, high = np.quantile(array, [sensitivity, 1.- sensitivity])
+        bins = np.arange(0.95*low, 1.05*high, step_size, dtype=np.float64) 
+        return bins
+    
+    def log_likelihood(self, parameters, local_parameters):
         try:
             tov_mass = parameters.get('TOV_mass', local_parameters['masses'][-1])
             return self.single_logl(tov_mass, local_parameters['masses'], local_parameters['radii'])
         except (ValueError, IndexError):
+            self.single_logl(tov_mass, local_parameters['masses'], local_parameters['radii'])
             return [
                 self.single_logl(masses[-1], masses, local_parameters['radii'][i])
                 for i, masses in enumerate(local_parameters['masses'])
@@ -458,30 +495,31 @@ class MassRadiusConstraint(EoSConstraint):
         ## interpolate radii along equally spaced mass grid up to MTov
         test_mass_range=self.test_masses[self.test_masses<tov_mass]
         test_radii=np.interp(test_mass_range, masses, radii)
-        return logsumexp(self.KDE.pdf((test_radii, test_mass_range)))
-
-    def plot(self, ax, resolution = 100, **kwargs):
+        yi = np.searchsorted(self.mass_edges[1:], test_mass_range) -1
+        xi = np.searchsorted(self.rad_edges[1:], test_radii) -1
+        log_l = np.log(self.histogram[xi, yi].sum())
+        
+        return log_l
+    def plot(self, ax, **kwargs):
         """Plot the mass-radius constraint on the given figure."""
-        x_lim = ax.get_xlim()
-        y_lim = ax.get_ylim()
 
         # for the legend
         dummy_line = ax.plot([], [], label=self.name, linewidth=2, **kwargs) 
-        color = dummy_line[0].get_color()
+        color = dummy_line[0].get_color()      
+        Xc = 0.5 * (self.rad_edges[:-1] + self.rad_edges[1:])
+        Yc = 0.5 * (self.mass_edges[:-1] + self.mass_edges[1:])
 
-        show_x, show_y = np.meshgrid(
-            np.linspace(*x_lim, resolution), np.linspace(*y_lim, resolution))
-        # test_data = np.column_stack((show_x.flatten(), show_y.flatten()))
-        test_data = np.stack((show_x.flatten(), show_y.flatten()))
-        test_scores = self.KDE.pdf(test_data)
-        test_scores = np.exp(test_scores).reshape(resolution, resolution)
-
-        # levels = np.percentile(test_scores, [68, 95, 99.7])   
-        levels = 50  
-        # ax.contour(show_x, show_y, test_scores, levels=[level_90], colors=[color], linewidths=2) 
+        flat = self.histogram.flatten()
+        order = np.argsort(flat)[::-1]
+        cumsum = np.cumsum(flat[order])
+        levels = [0.95, 0.68]
         cmap = fading_cmap(color)
-        ax.contourf(show_x, show_y, 10*test_scores, levels=levels, cmap = cmap)
-
+        colors = cmap(levels[::-1])
+        plt.contour(
+            Xc, Yc, self.histogram.T,
+            levels=[flat[order][np.searchsorted(cumsum, p)] for p in levels], 
+            colors = colors, linewidths=2
+        )
         return ax
     
 class PulsarConstraint(LowerMTOVConstraint):
