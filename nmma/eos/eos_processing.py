@@ -6,18 +6,22 @@ import json
 import joblib
 from ast import literal_eval
 import keras as k
-from ..core.conversion import radii_from_qur, EOS2Parameters
+from ..core.conversion import radii_from_qur, EOS_to_ns_parameters, EOS_to_system_parameters
 
 def setup_eos_generator(args):
-    try:
-        with open(args.emulator_metadata, 'r') as f:
-            meta_dict = json.load(f)
-    except TypeError:
-        meta_dict = args.emulator_metadata
-    except FileNotFoundError:
-        meta_dict = literal_eval(args.emulator_metadata)
+    if isinstance(args, dict):
+        meta_dict = args
+        eos_model_type = meta_dict['micro_eos_model'].lower()
+    else:
+        try:
+            with open(args.emulator_metadata, 'r') as f:
+                meta_dict = json.load(f)
+        except TypeError:
+            meta_dict = args.emulator_metadata
+        except FileNotFoundError:
+            meta_dict = literal_eval(args.emulator_metadata)
 
-    eos_model_type = args.micro_eos_model.lower()
+        eos_model_type = args.micro_eos_model.lower()
     
     if eos_model_type == 'nep':
         return NEPEoSGenerator(meta_dict)
@@ -230,10 +234,11 @@ class LEC13EoSGenerator(LECEoSGenerator):
     
 class EoSConverter:
     def __init__(self, args, method=None):
-        if getattr(args, 'eos_file', None) or getattr(args, 'eos_data', None):
-            method = "tabulated"
-        elif getattr(args, 'emulator_metadata', None):
-            method = "emulated"
+        if method is None:
+            if getattr(args, 'eos_file', None) or getattr(args, 'eos_data', None):
+                method = "tabulated"
+            elif getattr(args, 'emulator_metadata', None):
+                method = "emulated"
 
         self.parameter_conversion = self.full_eos_conversion
         # Case 1: eos is generated from emulator on the fly
@@ -295,55 +300,62 @@ class EoSConverter:
     def single_eos_from_ram(self, _):
         return self.eos_data
 
+    def full_eos_conversion(self, parameters):
+        parameters =self.compute_macro_parameters(parameters)
+        return self.system_props_from_eos(parameters) 
+    
     def compute_macro_parameters(self, parameters):
+        eos_macro_keys = ["TOV_mass", "TOV_radius", "R_14", "R_16"]
         eos_data = self.macro_conversion(parameters)
+
         if len(eos_data) ==1:
             radii, masses, lambdas = eos_data[0]
+            for key, val in zip(eos_macro_keys, 
+            EOS_to_ns_parameters(radii, masses, lambdas)
+            ):
+                parameters[key] = val
         else:
             radii, masses, lambdas = map(list, zip(*eos_data))
+            TOV_mass_list, TOV_radius_list, R_14_list, R_16_list = [], [], [], []
+            for rad, mass, lam in zip(radii, masses, lambdas):
+                TOV_mass, TOV_radius, R_14, R_16 = EOS_to_ns_parameters(rad, mass, lam)
+                TOV_mass_list.append(TOV_mass)
+                TOV_radius_list.append(TOV_radius)
+                R_14_list.append(R_14)
+                R_16_list.append(R_16) 
+            for key, _list in zip(eos_macro_keys, [
+                TOV_mass_list, TOV_radius_list, R_14_list, R_16_list
+            ]):
+                parameters[key] = np.array(_list)
         
         self.macro_parameters = {'radii': radii, 'masses': masses, 'lambdas': lambdas}
         return parameters
-
     
-    def full_eos_conversion(self, parameters):
-        self.compute_macro_parameters(parameters)
-        return self.macro_props_from_eos(parameters) 
-    
-    def macro_props_from_eos(self, converted_parameters):
-        eos_keys = ["TOV_mass", "TOV_radius", "lambda_1", "lambda_2",
-                    "radius_1", "radius_2", "R_14", "R_16"]
+    def system_props_from_eos(self, converted_parameters):
+        system_keys = ["lambda_1", "lambda_2", "radius_1", "radius_2"]
         
         m1_source = converted_parameters["mass_1_source"]
         m2_source = converted_parameters["mass_2_source"]
         radii, masses, lambdas = self.macro_parameters.values()
 
         if isinstance(radii, np.ndarray): # single eos case
-            for key, val_array in zip(eos_keys, 
-            EOS2Parameters(radii, masses, lambdas, m1_source, m2_source)
+            for key, val_array in zip(system_keys, 
+            EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source)
             ):
                 converted_parameters[key] = val_array
         else:
-            ### assuming TOV mass and radius are the last entries of the respective arrays
-            TOV_mass_list, TOV_radius_list, R_14_list, R_16_list = [], [], [], []
             lambda_1_list, lambda_2_list, radius_1_list, radius_2_list = [], [], [], []
             for i, rad in enumerate(radii):
-                (TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1,
-                    radius_2, R_14, R_16
-                ) = EOS2Parameters(rad, masses[i], lambdas[i], m1_source[i],  m2_source[i] )
+                (lambda_1, lambda_2, radius_1, radius_2 ) = EOS_to_system_parameters(
+                    rad, masses[i], lambdas[i], m1_source[i],  m2_source[i] )
                     
-                TOV_radius_list.append(TOV_radius)
-                TOV_mass_list.append(TOV_mass)
                 lambda_1_list.append(lambda_1)
                 lambda_2_list.append(lambda_2)
                 radius_1_list.append(radius_1)
                 radius_2_list.append(radius_2)
-                R_14_list.append(R_14)
-                R_16_list.append(R_16)
-        
-            for key, _list in zip(eos_keys, [
-                TOV_mass_list, TOV_radius_list, lambda_1_list,
-                lambda_2_list, radius_1_list, radius_2_list, R_14_list, R_16_list
+
+            for key, _list in zip(system_keys, [
+                lambda_1_list, lambda_2_list, radius_1_list, radius_2_list
             ]):
                 converted_parameters[key] = np.array(_list)
 

@@ -4,7 +4,7 @@ from scipy.special import erf
 from scipy.integrate import simpson
 from astropy import units
 from astropy import cosmology as cosmo
-from .constants import geom_msun_km, msun_to_ergs, get_cosmology, set_cosmology
+from .constants import geom_msun_km, msun_to_ergs, msun_s, get_cosmology, set_cosmology
 
 from bilby.gw.conversion import (
     component_masses_to_chirp_mass,
@@ -191,32 +191,50 @@ def convert_mtot_mni(params):
     params["mrp_c"] = (params["xmix"]*(params["mtot"]-params["mni"])-params["mrp"])
     return params
 
+############################## pulsar timing conversions ####################################
+def binary_mass_function(m_obs, m_comp, sin_i):
+    return (m_comp * sin_i)**3 / (m_obs + m_comp)**2
+
+def shapiro_delay(m_comp, sin_i):
+    "see https://arxiv.org/pdf/1007.0933.pdf"
+    shapiro_range = msun_s*1.e6 * m_comp # in microseconds
+    orthometric_ratio = sin_i/(1+np.sqrt(1-sin_i**2))
+    return shapiro_range * orthometric_ratio**3
+
+def einstein_delay_orbital_factor(orbital_period, eccentricity):
+    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12 "
+    return msun_s**(2/3) * eccentricity * (orbital_period /2/np.pi)**(1/3)
+def simplified_einstein_delay(m_psr, m_comp, einstein_factor):
+    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12 "
+    return einstein_factor *m_comp * (m_psr + 2*m_comp) / (m_psr + m_comp)**(4/3)
+
+def einstein_delay(m_psr, m_comp, orbital_period, eccentricity):
+    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12 "
+    einstein_delay_factor = einstein_delay_orbital_factor(orbital_period, eccentricity)
+    return simplified_einstein_delay(m_psr, m_comp, einstein_delay_factor)
+
+def mass_parameters_to_sini(total_mass, mass_function, m_comp):
+    "Invert the binary mass function to get sin(i) for a given total mass and mass function"
+    return np.cbrt(mass_function * total_mass**2)/m_comp
+
 ############################## EOS-related conversions ####################################
 
-def EOS2Parameters(radii, masses, lambdas, m1_source, m2_source):
-    ### FIXME: Under what circumstance would these not simply be mass_val[-1], radius_val[-1]?
+def EOS_to_ns_parameters(radii, masses, lambdas):
     TOV_mass = masses.max(axis=-1)
     TOV_radius = radii[np.argmax(masses)]
+    R_14, R_16 = np.interp(x=[1.4, 1.6], xp=masses, fp=radii, left=0, right=0)
 
+    return TOV_mass, TOV_radius, R_14, R_16
+
+def EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source):
     (log_lambda_1, log_lambda_2) = np.interp(x=[m1_source, m2_source],
             xp= masses, fp=np.log(lambdas), left=-np.inf, right=-np.inf)
     lambda_1 = np.exp(log_lambda_1)
     lambda_2 = np.exp(log_lambda_2)
-    try:
-        (radius_1, radius_2, R_14, R_16) = np.interp(
-                x=[m1_source, m2_source, 1.4, 1.6],
-                xp=masses, fp= radii, left =0, right=0)
+    (radius_1, radius_2) = np.interp( x=[m1_source, m2_source],
+            xp=masses, fp= radii, left =0, right=0)
 
-        return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
-    ## radius interpolation will raise an error if dealing with multiple sources at once
-    # In that case we return all values as corresponding arrays
-    except ValueError:
-        ref = np.ones_like(lambda_1)
-        (radius_1, radius_2, R_14, R_16) = np.interp(
-                x=[m1_source, m2_source, 1.4*ref, 1.6*ref],
-                xp=masses, fp= radii, left =0, right=0)
-
-        return ref*TOV_mass, ref*TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
+    return lambda_1, lambda_2, radius_1, radius_2
 
 def radii_from_qur(parameters):
     mass_1_source = parameters["mass_1_source"]
@@ -807,8 +825,8 @@ label_mapping = {
     'log10_E0'              : r'$\log_{10}(E_0{\rm [erg]})$',
     'ratio_zeta'            : r'$\zeta$',
     'alpha'                 : r'$\alpha$',
-    'KNtheta'               : r'$\theta_{KN}$',
-    'KNphi'                 : r'$\phi_{KN}$',
+    'KNtheta'               : r'$\theta_{KN} [^\circ]$',
+    'KNphi'                 : r'$\phi_{KN} [^\circ]$',
     ## GRB parameters ##
     'log10_E0'              : r'$\log_{10}(E_0{\rm [erg]})$',
     'ratio_epsilon'         : r'$\epsilon$',
@@ -826,11 +844,11 @@ label_mapping = {
     'mni_c'                 : r'$M_{\rm{Ni}}/M_{\rm{tot}}$',
     'mrp_c'                 : r'$M_{\rm{rp,c}}{\rm [M_{\odot}]}$',
     ### EOS parameters ###
-    'L_sym'                 : r'$L_{\rm{sym}}{\rm [MeV]}$',
-    'K_sym'                 : r'$K_{\rm{sym}}{\rm [MeV]}$',
-    'K_sat'                 : r'$K_{\rm{sat}}{\rm [MeV]}$',
-    '3n_sat'                : r'$c_{3n_{\rm{sat}}{\rm [c]}$',
-    '5n_sat'                : r'$c_{5n_{\rm{sat}}{\rm [c]}$',
+    'L_sym'                 : r'$L_{\rm sym}{\rm [MeV]}$',
+    'K_sym'                 : r'$K_{\rm sym}{\rm [MeV]}$',
+    'K_sat'                 : r'$K_{\rm sat}{\rm [MeV]}$',
+    '3n_sat'                : r'$c^2_{3n_{\rm sat}}{\rm [c^2]}$',
+    '5n_sat'                : r'$c^2_{5n_{\rm sat}}{\rm [c^2]}$',
     'TOV_mass'              : r'$M_{\rm{TOV}}{\rm [M_{\odot}]}$',
     'R_14'                  : r'$R_{1.4}{\rm[km]}$',
     'lambda_tilde'          : r'$\tilde{\Lambda}$', 
