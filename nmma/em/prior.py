@@ -229,7 +229,7 @@ def create_prior_from_args(args, systematics_handler):
     lc_model : nmma.em.model.LightCurveModelContainer
         Light curve model object to compute light curves
     """
-    priors = PriorDict(args.prior_file)
+    priors = PriorDict(args.prior_file) if getattr(args, 'prior_file', None) else PriorDict(args.prior)
     priors = adjust_hubble_prior(priors, args)
     priors = extinction_prior(priors, args)
 
