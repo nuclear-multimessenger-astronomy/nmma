@@ -115,7 +115,6 @@ def analysis_setup(args):
 
     filters = utils.set_filters(args)
     detection_limit = utils.create_detection_limit(args, filters)
-
     try:
         # load observational data
         data = io.load_em_observations(args, format="observations")
@@ -128,7 +127,6 @@ def analysis_setup(args):
     except FileNotFoundError:
         # If the injection file is not found, raise an error
         raise FileNotFoundError("Injection file not found.")
-
     data = utils.cut_data_to_time_range(data, args, trigger_time)
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
@@ -315,8 +313,15 @@ def nnanalysis(args):
 
 
 def main(args=None):
+    if isinstance(args, dict):
+        non_default = args.copy()
+        args = []
+    else:
+        non_default = {}
     args = parsing_and_logging(multi_wavelength_analysis_parser, args)
-    if args.sampler == "neuralnet":
+    args.__dict__.update(non_default)
+    
+    if args.sampler == 'neuralnet':
         nnanalysis(args)
     else:
         multi_analysis_loop(args, analysis_setup)

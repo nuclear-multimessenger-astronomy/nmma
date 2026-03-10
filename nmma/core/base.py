@@ -2,6 +2,7 @@ import inspect
 import io
 import contextlib
 import h5py
+from argparse import Namespace
 from ast import literal_eval
 import numpy as np
 import pandas as pd
@@ -15,6 +16,7 @@ from bilby.core.result import FileMovedError
 from .utils import input_obj_to_str, read_bestfit_from_posterior
 from .constants import  set_cosmology
 from .conversion import cosmology_to_distance
+from .parsing import single_messenger_analysis_parsing, nmma_base_parsing
 
 def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes = []):
     prefixes.append('')
@@ -98,12 +100,15 @@ class NMMALikelihoodMixin:
             The figure object containing the plot
 
         """
-        pass
+        try:
+            self.sub_model.final_diagnostics(bestfit_params, args, result)
+        except AttributeError:
+            pass
 
     def post_process_bestfit(self, args, result=None):
         bestfit_params = read_bestfit_from_posterior(args)
         bestfit_params = self.parameter_conversion(bestfit_params)
-        self.final_diagnostics(bestfit_params, args, result)
+        return self.final_diagnostics(bestfit_params, args, result)
            
     def check_parameter_equivalencies(self, parameter_names):
         """Check for equivalent parameters and terminate if found"""
@@ -272,28 +277,32 @@ def check_priors_and_likelihood_for_nmma(priors, likelihood):
     constraints = {k: priors.pop(k) for k in priors.copy().keys()
                     if isinstance(priors[k], Constraint)}
     likelihood.constraints.update(constraints)
+
     test_draw = priors.sample(1)
     test_conversion = priors.conversion_function(test_draw)
     if len(set(test_conversion.keys()) ) != len(test_conversion.keys()):
         priors.conversion_function = priors.default_conversion_function
         likelihood.conv_functions.append(likelihood.priors.conversion_function)
+        
     # add final conversions
     likelihood.setup_parameter_conversion()
     return priors, likelihood
 
 def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
     priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
-
+    if isinstance(args, dict):
+        def_args = nmma_base_parsing(single_messenger_analysis_parsing)
+        def_args.__dict__.update(args)
+        args = def_args
     # fetch the additional sampler kwargs
-    if isinstance(args.sampler_kwargs, str):
-        sampler_kwargs = literal_eval(args.sampler_kwargs) 
-    else:
-        sampler_kwargs = args.sampler_kwargs
+    sampler_kwargs = getattr(args, "sampler_kwargs", {})
+    if isinstance(sampler_kwargs, str):
+        sampler_kwargs = literal_eval(sampler_kwargs) 
     print("Running with the following additional sampler_kwargs:")
     print(sampler_kwargs)
 
     # check if it is running with reactive sampler
-    nlive = None if args.reactive_sampling else args.nlive
+    nlive = None if getattr(args, 'reactive_sampling', False) else args.nlive
     if nlive is None and args.sampler != "ultranest":
         raise ValueError("reactive sampling is only available for ultranest, "
                          "please set nlive or use ultranest sampler")
@@ -358,7 +367,8 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         result.plot_corner(injection_parameters, priors)
         
     if args.bestfit or args.plot:
-        likelihood.post_process_bestfit(args, result)
+        result.posterior = likelihood.posterior_conversion(result.posterior)
+        return likelihood.post_process_bestfit(args, result)
 
 def multi_analysis_loop(args, analysis_setup):
 
