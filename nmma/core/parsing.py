@@ -132,7 +132,9 @@ def single_messenger_analysis_parsing(parser):
         help="To use reactive sampling in ultranest (default: False)")
     parser.add_argument("--skip-sampling", action='store_true', 
         help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
-
+    parser.add_argument("--bestfit", "--best-fit", action='store_true',
+        help="Save the best fit parameters to JSON")
+    
     return parser
 
 def base_injection_parsing(parser):

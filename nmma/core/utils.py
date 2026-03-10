@@ -190,6 +190,7 @@ def sig_lims(values, quantiles=None, sig_unc=2):
         fmt = f".{ord_error}f"
         return f"${{{q_mean:{fmt}}}}_{{-{low_err:{fmt}}}}^{{+{high_err:{fmt}}}}$"
     else:
+        q_mean, low_err, high_err =np.around([q_mean, low_err, high_err], ord_error)
         return f"${{{int(q_mean)}}}_{{-{int(low_err)}}}^{{+{int(high_err)}}}$"
 
 
