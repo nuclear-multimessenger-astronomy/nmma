@@ -1,8 +1,9 @@
 import numpy as np
 from ast import literal_eval
 from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
+from bilby.gw.source import binary_neutron_star_frequency_sequence
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
-from ..core.conversion import (bbh_source_frame, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion)
+from ..core.conversion import (bbh_source_frame, bns_source_frame, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion)
 
 def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     """
@@ -205,8 +206,10 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
 
         super().__init__(gw_transient, priors)
 
-    def parameter_conversion(self, parameters):
-        return bbh_source_frame(parameters)
+        if "neutron_star" in self.sub_model.waveform_generator.frequency_domain_source_model.__name__:
+            self.parameter_conversion = bns_source_frame
+        else:
+            self.parameter_conversion = bbh_source_frame
     
     def posterior_conversion(self, posterior_samples):
         if "chi_eff" not in posterior_samples:
