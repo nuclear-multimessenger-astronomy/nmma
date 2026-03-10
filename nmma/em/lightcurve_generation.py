@@ -288,20 +288,14 @@ def host_lc(sample_times, parameters, filters, host_mag):
 ## supernova model
 def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
     mag = {}
-
-    for filt, lambda_A in zip(filters, lambdas):
-        # convert back to AA
-        lambda_AA = 1e10 * lambda_A
-        if lambda_AA < sn_model.minwave() or lambda_AA > sn_model.maxwave():
-            mag[filt] = np.full_like(sample_times_stretched,np.inf) 
-        else:
-            try:
-                flux = sn_model.flux(sample_times_stretched, [lambda_AA])[:, 0]
-                # see https://en.wikipedia.org/wiki/AB_magnitude
-                flux_jy = 3.34e4 * np.power(lambda_AA, 2.0) * flux
-                mag[filt] = utils.flux_to_ABmag(flux_jy, unit='Jy')
-            except Exception:
-                return {}
+    for filt, lambda_ in zip(filters, lambdas):
+        try:
+            mag[filt] = sn_model.bandmag(filt, 'ab', sample_times_stretched)
+        except ValueError:
+            lambda_AA = 1e10 * lambda_
+            flux_AA = sn_model.flux(sample_times_stretched, lambda_AA)
+            # see https://en.wikipedia.org/wiki/AB_magnitude
+            mag[filt] = utils.flux_to_ABmag(flux_AA*3.34e4 * lambda_AA**2, unit='Jy')
     return mag
 
 ## shock-cooling lightcurve
