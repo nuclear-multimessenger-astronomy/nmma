@@ -96,7 +96,6 @@ def bolometric_setup(args):
 def analysis_setup(args):
 
     filters = utils.set_filters(args)
-    detection_limit = utils.create_detection_limit(args, filters)
         
     try:
         # load observational data
@@ -105,7 +104,8 @@ def analysis_setup(args):
         injection_parameters = None
     except ValueError:
         # try to work with injection data instead
-        data, injection_parameters = data_from_injection(args, filters, detection_limit)
+        detection_limit = utils.create_detection_limit(args, filters)
+        data, injection_parameters = data_from_injection(args, filters)
         trigger_time = injection_parameters.get('trigger_time',0)
     except FileNotFoundError:
         # If the injection file is not found, raise an error
@@ -114,6 +114,7 @@ def analysis_setup(args):
     data = utils.cut_data_to_time_range(data, args, trigger_time)
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
+    detection_limit = utils.create_detection_limit(args, filters_to_analyze)
 
     # initialize light curve model
     print("Creating light curve model for inference")
