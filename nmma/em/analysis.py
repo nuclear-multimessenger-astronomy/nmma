@@ -105,7 +105,7 @@ def analysis_setup(args):
     except ValueError:
         # try to work with injection data instead
         detection_limit = utils.create_detection_limit(args, filters)
-        data, injection_parameters = data_from_injection(args, filters)
+        data, injection_parameters = data_from_injection(args, filters, detection_limit)
         trigger_time = injection_parameters.get('trigger_time',0)
     except FileNotFoundError:
         # If the injection file is not found, raise an error

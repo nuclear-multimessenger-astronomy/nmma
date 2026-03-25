@@ -74,7 +74,8 @@ def read_lc_from_csv(filename, args, format):
     if "obs" in format:
         with open(filename, "r") as f:
             lines = [line.rstrip("\n") for line in f]
-            lines = filter(None, lines) #get non-empty lines
+            lines = filter(None, lines) # get non-empty lines
+            lines = filter(lambda line: not line.startswith("#"), lines) # ignore lines that start with #
 
             data = {}
             for line in lines:
