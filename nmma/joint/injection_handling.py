@@ -108,7 +108,9 @@ class NMMAInjectionCreator(InjectionCreator):
             postprocess_methods.append(self.prepare_lightcurves)
 
         if not postprocess_methods:
-            postprocess_methods.append(lambda df: df)  # No-op if no postprocessing is needed
+            def dummy_postprocess(df):
+                return df
+            postprocess_methods.append(dummy_postprocess) # No-op if no postprocessing is needed
         self.postprocessing = postprocess_methods
     
     def generate_injection_file(self):

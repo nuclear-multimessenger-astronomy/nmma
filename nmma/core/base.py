@@ -1,8 +1,6 @@
 import inspect
-import io
-import contextlib
+import os
 import h5py
-from argparse import Namespace
 from ast import literal_eval
 import numpy as np
 import pandas as pd
@@ -101,7 +99,7 @@ class NMMALikelihoodMixin:
 
         """
         try:
-            self.sub_model.final_diagnostics(bestfit_params, args, result)
+            return self.sub_model.final_diagnostics(bestfit_params, args, result)
         except AttributeError:
             pass
 
@@ -289,15 +287,12 @@ def check_priors_and_likelihood_for_nmma(priors, likelihood):
     return priors, likelihood
 
 def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
-    priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
     if isinstance(args, dict):
         def_args = nmma_base_parsing(single_messenger_analysis_parsing)
         def_args.__dict__.update(args)
         args = def_args
     # fetch the additional sampler kwargs
     sampler_kwargs = getattr(args, "sampler_kwargs", {})
-    if isinstance(sampler_kwargs, str):
-        sampler_kwargs = literal_eval(sampler_kwargs) 
     print("Running with the following additional sampler_kwargs:")
     print(sampler_kwargs)
 
@@ -368,50 +363,51 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         
     if args.bestfit or args.plot:
         result.posterior = likelihood.posterior_conversion(result.posterior)
-        return likelihood.post_process_bestfit(args, result)
+        likelihood.post_process_bestfit(args, result)
+    return result
 
 def multi_analysis_loop(args, analysis_setup):
-
+    USE_MPI = False
     # check if it is running under mpi
     try:
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.Get_rank()
+        USE_MPI = True
     except ImportError:
         rank = 0
         
-    if rank != 0:
-        # Create buffers
-        stdout_buffer = io.StringIO()
-        stderr_buffer = io.StringIO()
-
-        # Redirect python output into buffers
-        redirect_out = contextlib.redirect_stdout(stdout_buffer)
-        redirect_err = contextlib.redirect_stderr(stderr_buffer)
-    else:
-        redirect_out = contextlib.nullcontext()
-        redirect_err = contextlib.nullcontext()
+    # if rank != 0:
+    #     devnull = os.open(os.devnull, os.O_WRONLY)
+    #     os.dup2(devnull, 1)
+    #     os.dup2(devnull, 2)
         
-    with redirect_out, redirect_err:
-        if getattr(args, 'multi', None):
-            sub_runs = []
-            if len(args.multi) == 1:
-                arg, vals = list(args.multi.items())[0]
-                for i, val in enumerate(vals):
-                    run_args = deepcopy(args)
-                    setattr(run_args, arg, val)
-                    setattr(run_args, 'label', f"{args.label}_{i}")
-                    sub_runs.append(run_args)
-            else:
-                for run_name, changes in args.multi.items():
-                    run_args = deepcopy(args)
-                    setattr(run_args, 'label', f"{args.label}_{run_name}")
-                    for key, value in changes.items():
-                        if key not in args:
-                            raise KeyError(f"{key} not a known argument... please remove")
-                        setattr(run_args, key, value)
-                    sub_runs.append(run_args)
+    if getattr(args, 'multi', None):
+        sub_runs = []
+        if len(args.multi) == 1:
+            arg, vals = list(args.multi.items())[0]
+            for i, val in enumerate(vals):
+                run_args = deepcopy(args)
+                setattr(run_args, arg, val)
+                setattr(run_args, 'label', f"{args.label}_{i}")
+                sub_runs.append(run_args)
         else:
-            sub_runs = [args]
-        for run_args in sub_runs:
-            priors, likelihood, injection_parameters = analysis_setup(run_args)
-            bilby_sampling(likelihood, priors, run_args, injection_parameters, rank)
+            for run_name, changes in args.multi.items():
+                run_args = deepcopy(args)
+                setattr(run_args, 'label', f"{args.label}_{run_name}")
+                for key, value in changes.items():
+                    if key not in args:
+                        raise KeyError(f"{key} not a known argument... please remove")
+                    setattr(run_args, key, value)
+                sub_runs.append(run_args)
+    else:
+        sub_runs = [args]
+    for run_args in sub_runs:
+        priors, likelihood, injection_parameters = analysis_setup(run_args)
+        priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
+        if USE_MPI and run_args.sampler =='dynesty':
+            from .mpi_setup import pbilby_sampling
+            run_function = pbilby_sampling
+        else:
+            run_function = bilby_sampling
+        out = run_function(likelihood, priors, run_args, injection_parameters, rank)
+    return out

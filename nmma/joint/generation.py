@@ -209,9 +209,9 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self.adjust_priors_and_data(args, logger)
 
         #test-build likelihood 
-        lhood = MultiMessengerLikelihood.setup_from_args(
+        self.lhood = MultiMessengerLikelihood.setup_from_args(
             self.data_dump, self._priors, self.args, logger)
-        lhood.log_likelihood(self._priors.sample())
+        self.lhood.log_likelihood(self._priors.sample())
         
         self.save_data_dump()
 

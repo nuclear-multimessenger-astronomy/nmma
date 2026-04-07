@@ -1,127 +1,80 @@
-"""
-Module to run parallel bilby using MPI
-"""
-
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
-import signal
-import io
-import contextlib
+from glob import glob
+import pickle
+
 try:
     from mpi4py import MPI
     rank = MPI.COMM_WORLD.Get_rank()
 except ImportError:
     rank = 0
 
-if rank != 0:
-    # Create buffers
-    stdout_buffer = io.StringIO()
-    stderr_buffer = io.StringIO()
-
-    # Redirect python output into buffers
-    redirect_out = contextlib.redirect_stdout(stdout_buffer)
-    redirect_err = contextlib.redirect_stderr(stderr_buffer)
-else:
-    redirect_out = contextlib.nullcontext()
-    redirect_err = contextlib.nullcontext()
-
-
-with redirect_out, redirect_err:
-    from schwimmbad import MPIPool, MultiPool
-    from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args, process_sampler_kwargs
-    from .analysis_run import Dynesty, Worker
+if rank != 0:   
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, 1)
+    os.dup2(devnull, 2)
+    
+from bilby.core.prior import PriorDict
+from ..core.mpi_setup import pbilby_sampling 
+from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args
+from .joint_likelihood import MultiMessengerLikelihood
+from ..core.utils import logger
 
 def analysis_runner(
     data_dump,
     outdir=None,
     label=None,
-    maxmcmc=5000,
-    naccept=60,
-    nact=2,
-    init_sampler_kwargs={},
-    run_sampler_kwargs={},
-    sampling_seed=42,
-    plot=True,
-    #
-    check_point_delta_t=1800,
-    n_check_point=2000,
-    max_its=1e10,
-    max_run_time=1e10,
-    checkpoint_plot=False,
-    #
-    rejection_sample_posterior=True,
-    result_format="hdf5",
-    pool_type ='mpi',
+    plot=False,
     **kwargs,
 ):
     """
     API for running the analysis from Python instead of the command line.
     It takes all the same options as the CLI, specified as keyword arguments.
     """
-    # Initialise a worker. this needs a global scope to allow 
-    # persistence of states beyond the pool's scope.
-    # Otherwise emulators retrace on each evaluation.
-    global worker
-    with redirect_out, redirect_err:
-        if rank == 0:
-            init_sampler_kwargs, run_sampler_kwargs = process_sampler_kwargs(
-                init_sampler_kwargs, run_sampler_kwargs, kwargs)
 
-            worker = Dynesty(
-                data_dump, outdir, label,
-                maxmcmc=maxmcmc,
-                nact=nact,
-                naccept=naccept,
-                sampling_seed=sampling_seed,
-                sampler_kwargs = run_sampler_kwargs,
-                sampler_init_kwargs=init_sampler_kwargs,
-                plot=plot,
-            )
+    ## Load the data dump
+    if not data_dump.endswith("_dump.pickle"):
+        test_out = os.path.join(os.getcwd(), data_dump)
+        test_dump = glob(f"{test_out}/data/*_dump.pickle")
+        data_dump = test_dump[0]
+    with open(data_dump, "rb") as file:
+        data_dump = pickle.load(file)
 
-        else:
-            worker = Worker(data_dump, outdir, label)
+    ## Set properties from the data dump
+    args = data_dump["args"]
+    args.plot = plot
 
-    ## graceful handling of preemptive shutdowns
-    def handle_sigterm(signum, frame):
-        try:
-            worker.checkpointing(False,
-                'Received termination signal. Checkpointing and exiting gracefully.')
-        except Exception:
-            pass
+    # If the run dir has not been specified, get it from the args
+    if outdir:
+        args.outdir  = outdir
+        
+    # If the label has not been specified, get it from the args
+    if label:
+        args.label = label
 
-    signal.signal(signal.SIGTERM, handle_sigterm)
-    signal.signal(signal.SIGINT , handle_sigterm)
-    signal.signal(signal.SIGUSR1, handle_sigterm) 
+    priors = PriorDict.from_json(data_dump["prior_file"])
+    
+    ## Set up the likelihood
+    likelihood = MultiMessengerLikelihood.setup_from_args(
+        data_dump, priors, args, logger)
+    
+    ## adjust meta data to storable format
+    meta_data = data_dump.copy()
+    waveform_generator = meta_data.pop("waveform_generator", None)
+    if waveform_generator is not None:
+        meta_data["waveform_generator"] = waveform_generator.__repr__()
+    ifo_list = meta_data.pop("ifo_list", None)
+    if ifo_list is not None:
+        meta_data["ifo_list"] = [ifo.__repr__() for ifo in ifo_list]
 
-    POOL = MPIPool if pool_type == 'mpi' else MultiPool
-    with POOL() as pool:
-        result = None
-        if pool.is_master():           
-            worker.start_sampler(
-                pool,
-                pooled_log_likelihood, 
-                pooled_prior_transform,
-                pooled_initial_point_from_prior)
-
-            results = worker.run_sampler(
-                check_point_delta_t, n_check_point, max_its,
-                max_run_time, checkpoint_plot)
-            result = worker.format_result(results, result_format,
-                rejection_sample_posterior)
-    return result
-
-
-# Worker functions. These are read in the global scope by each worker
-def pooled_initial_point_from_prior(args):
-    return worker.get_initial_point_from_prior(args)
-
-def pooled_log_likelihood(v_array):
-    return worker.log_likelihood(v_array)
-
-def pooled_prior_transform(u_array):
-    return worker.prior_transform(u_array)
+    
+    pbilby_sampling(
+        likelihood, priors, args, 
+    data_dump.get("injection_parameters", None), rank,
+    plot=plot, meta_data=meta_data, 
+    **kwargs)
 
 def nmma_analysis():
     """
@@ -136,4 +89,4 @@ def nmma_analysis():
 
     # Run the analysis
     analysis_runner(**vars(input_args))
-    
+
