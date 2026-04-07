@@ -656,7 +656,7 @@ class BNSEjectaFitting(EjectaFitting):
 
         return chi_BH
 
-    def bns_parameter_conversion(self, converted_parameters):
+    def bns_ejecta_conversion(self, converted_parameters):
 
         # prevent the output message flooded by these warning messages
         old = np.seterr()
@@ -692,26 +692,48 @@ class BNSEjectaFitting(EjectaFitting):
         # total eject mass
         total_ejeta_mass = 10**log10_mej_dyn + 10**log10_mej_wind
 
-        # GRB afterglow energy
-        log10_Ejet = converted_parameters.get("log10_E0", (
-              np.log10(converted_parameters.get("ratio_epsilon", 2e-4))
-            + np.log10(1.0 - converted_parameters["ratio_zeta"])
-            + log10_mdisk_fit + np.log10(msun_to_ergs) )
-        )
-
-        thetaCore = converted_parameters.get("thetaCore", 0.105)
-
-        if "b" in converted_parameters: # power law jet
-            alphaWing = converted_parameters.get("alphaWing", converted_parameters["thetaWing"] / converted_parameters["thetaCore"])
-            log10_E0 = np.log10(powerlaw_jet_energy_to_central_isotropic_energy_equivalent(10**log10_Ejet, thetaCore, alphaWing, converted_parameters["b"]))
-        elif "b" not in converted_parameters and ("thetaWing" in converted_parameters or "alphaWing" in converted_parameters): # gaussian jet
-            alphaWing = converted_parameters.get("alphaWing", converted_parameters["thetaWing"] / converted_parameters["thetaCore"])
-            log10_E0 = np.log10(gaussian_jet_energy_to_central_isotropic_energy_equivalent(10**log10_Ejet, thetaCore, alphaWing))
-        else:
-            log10_E0 = log10_Ejet - np.log10(np.sin(thetaCore/2)**2)
-        
         np.seterr(**old)
-        converted_ejecta = np.stack((log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_E0 ))
+        return log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_mdisk_fit
+    
+    def grb_energy_conversion(self, converted_parameters, log10_mdisk_fit):
+
+        # GRB afterglow energy
+        log10_Ejet = np.log10(converted_parameters.get("ratio_epsilon", 2e-4))
+        log10_Ejet += np.log10(1.0 - converted_parameters["ratio_zeta"])
+        log10_Ejet += log10_mdisk_fit + np.log10(msun_to_ergs)
+
+        thetaCore = converted_parameters.get("thetaCore", 0.105) ## default about 6 degree, see arxiv:2210.05695
+        
+        if not any(key in converted_parameters for key in ["thetaWing", "alphaWing", "b"]):
+            return log10_Ejet - np.log10(np.sin(thetaCore/2)**2)
+
+        if "alphaWing" in converted_parameters:
+            alphaWing = converted_parameters['alphaWing'] 
+        else:
+            alphaWing = converted_parameters["thetaWing"] / converted_parameters["thetaCore"]
+
+        
+        if "b" in converted_parameters: # power law jet
+            jet_func = powerlaw_jet_energy_to_central_isotropic_energy_equivalent
+            data = np.column_stack((10**log10_Ejet, thetaCore, alphaWing, converted_parameters["b"]))
+            
+        else:
+            jet_func = gaussian_jet_energy_to_central_isotropic_energy_equivalent
+            data = np.column_stack((10**log10_Ejet, thetaCore, alphaWing))
+                
+        return np.log10([jet_func(*row) for row in data])
+    
+        
+
+    def bns_parameter_conversion(self, parameters):
+        log10_mej_dyn, log10_mej_wind, log10_mej_total, log10_mdisk_fit = self.bns_ejecta_conversion(parameters)
+
+        if "log10_E0" in parameters:
+            log10_E0 = parameters["log10_E0"]
+        else:
+            log10_E0 = self.grb_energy_conversion(parameters, log10_mdisk_fit)
+        
+        converted_ejecta = (log10_mej_dyn, log10_mej_wind, log10_mej_total, log10_E0)
 
         return  np.where(np.isfinite(converted_ejecta), converted_ejecta, -np.inf)
 
@@ -827,6 +849,8 @@ label_mapping = {
     'alpha'                 : r'$\alpha$',
     'KNtheta'               : r'$\theta_{KN} [^\circ]$',
     'KNphi'                 : r'$\phi_{KN} [^\circ]$',
+    'kappa_Ye'              : r'$\kappa_{\rm{Y_e}}$',
+    'kappa_v'               : r'$\kappa_{v}$', 
     ## GRB parameters ##
     'log10_E0'              : r'$\log_{10}(E_0{\rm [erg]})$',
     'ratio_epsilon'         : r'$\epsilon$',
