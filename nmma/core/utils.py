@@ -151,19 +151,20 @@ def set_filename(basename, args, identifier=''):
         return  f"{base}{identifier}{ext}"
 
 
-def read_bestfit_from_posterior(args, mode = 'max_likelihood'):
+def read_bestfit_from_posterior(args, mode = 'max_likelihood', return_posterior=False):
     posterior_samples = get_posteriors(args)
     if mode == 'max_likelihood':
         bestfit = posterior_samples.loc[posterior_samples.log_likelihood.idxmax()]
     elif mode == 'max_posterior':
-        bestfit = posterior_samples.loc[(posterior_samples.log_likelihood*posterior_samples.log_prior).idxmax()]
+        bestfit = posterior_samples.loc[(posterior_samples.log_likelihood + posterior_samples.log_prior).idxmax()]
     else:
         raise ValueError(f"Mode {mode} not recognized. Use 'max_likelihood' or 'max_posterior'.")
     bestfit_params = bestfit.to_dict()
     bestfit_idx = bestfit.name
     print(f"Best fit parameters: {str(bestfit_params)}\nBest fit index: {bestfit_idx}")
     bestfit_params["best_fit_index"] = int(bestfit_idx)
-    return bestfit_params
+    
+    return (bestfit_params, posterior_samples) if return_posterior else bestfit_params
 
 def read_bestfit_from_json(bestfit_file_json, cols, verbose=False):
     df = pd.read_json(bestfit_file_json, typ="series")

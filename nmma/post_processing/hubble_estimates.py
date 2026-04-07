@@ -21,7 +21,7 @@ def generate_logprob(probs, H0sample, index):
     for idx, i in enumerate(index):
         logprob_combined+= probs[i].logpdf(H0sample)
         if idx!=0:
-            logprob_combined+= + 3 * np.log(H0sample)
+            logprob_combined+=3 * np.log(H0sample)
         logprob_combined-= scipy.special.logsumexp(logprob_combined)
         log_prob_list.append(logprob_combined)
              

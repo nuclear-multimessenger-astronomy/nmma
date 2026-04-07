@@ -690,10 +690,23 @@ class FiestaKilonovaModel(FiestaModel):
             from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
         else:
             from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,**em_model_kwargs)
+        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
         fiesta_model = BullaSurrogate(**fiesta_kwargs)
 
         super().__init__(fiesta_model, filters, sample_times=em_model_kwargs.get('sample_times', None))
+
+    def parameter_conversion(self, parameters):
+        if "kappa_Ye" in parameters:
+            if "Ye_wind" in parameters:
+                parameters["Ye_dyn"] = parameters["kappa_Ye"] * parameters["Ye_wind"]
+            else:
+                parameters["Ye_wind"] = parameters["Ye_dyn"] / parameters["kappa_Ye"]
+        if "kappa_v" in parameters:
+            if "v_ej_wind" in parameters:
+                parameters["v_ej_dyn"] = parameters["kappa_v"] * parameters["v_ej_wind"]
+            else:
+                parameters["v_ej_wind"] = parameters["v_ej_dyn"] / parameters["kappa_v"]
+        return super().parameter_conversion(parameters)
 
 class GRBMixin:
     def __init__(self, *args, resolution=12, **kwargs):
@@ -754,7 +767,7 @@ class FiestaGRBModel(GRBMixin,FiestaModel):
     """
     def __init__(self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **em_model_kwargs):
         from fiesta.inference.lightcurve_model import AfterglowFlux
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir, **em_model_kwargs)
+        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
         fiesta_model = AfterglowFlux(**fiesta_kwargs)
         
         super().__init__(fiesta_model, filters, sample_times=em_model_kwargs.get('sample_times', None))

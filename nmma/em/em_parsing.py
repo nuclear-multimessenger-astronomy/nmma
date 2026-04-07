@@ -232,7 +232,8 @@ def modified_em_prior_parsing(parser):
     mod_em_prior_parser.add_argument("--em-error-budget", "--kilonova-error", 
         help="Additional statistical error (mag) to be introduced in each filter," \
         " can be passed as list or dict. Will only be used if em_syserr is not given in prior")
-    mod_em_prior_parser.add_argument("--systematics-file", help="Path to systematics configuration file")
+    mod_em_prior_parser.add_argument("--systematics-file", type=yaml_parse, 
+        help="Path to systematics configuration file")
     return parser
 
 def em_analysis_parsing(parser):
