@@ -183,7 +183,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self.plot_injection = args.plot_injection
 
 
-        self.sampler = "dynesty"
+        self.sampler = args.sampler
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
 
@@ -272,11 +272,13 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 pass
             finally:
                 # correct injection only once lambdas are properly set
-                # some routines return np.float32 which raises errors downstream in results
-                # processing, so we convert to float here. Should be handled more elegantly
+                # some routines return np.float32 which raises errors 
+                # downstream in results processing, so we convert to float
+                # here. Should be handled more elegantly
                 args.injection_dict = {k: float(v) for k, v in converted_injection.items()}
-                self.gw_inputs= NMMAGravitationalWaveInput(args, self.unknown_args)
-                data_dump |= dict(waveform_generator=self.gw_inputs.waveform_generator,
+                if 'gw' in messengers:
+                    self.gw_inputs= NMMAGravitationalWaveInput(args, self.unknown_args)
+                    data_dump |= dict(waveform_generator=self.gw_inputs.waveform_generator,
                     ifo_list=self.gw_inputs.interferometers)
 
         # EM SETUP
