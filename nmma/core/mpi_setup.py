@@ -142,7 +142,6 @@ class Dynesty(Worker):
         plot= False,
         meta_data = {},
     ):  
-        breakpoint()
         super().__init__(args, prior, likelihood, injection_parameters, 
                         plot, skip_import_verification = False)
         
