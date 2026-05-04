@@ -58,10 +58,11 @@ class Worker(bs.NestedSampler):
 
         super().__init__(
             likelihood, prior, self.outdir, self.label,
-            injection_parameters,
+            injection_parameters = injection_parameters,
             skip_import_verification = skip_import_verification,
             plot= plot,
             soft_init=True,
+            use_ratio = True,
             
         )
 
@@ -141,7 +142,7 @@ class Dynesty(Worker):
         plot= False,
         meta_data = {},
     ):  
-        
+        breakpoint()
         super().__init__(args, prior, likelihood, injection_parameters, 
                         plot, skip_import_verification = False)
         
@@ -484,12 +485,20 @@ class Dynesty(Worker):
 
     def storable_metadata(self):
         meta_data = self.meta_data
-
-        meta_data["args"] = vars(self.args) # convert Namespace to dict for storing
+        meta_data["args"] = vars(self.args).copy() # convert Namespace to dict for storing
         meta_data["likelihood"] = self.likelihood.meta_data
         meta_data["sampler_kwargs"] = self.init_sampler_kwargs
         meta_data["run_sampler_kwargs"] = self.sampler_kwargs
+        meta_data = self.floatify_dict(meta_data)
         return meta_data
+    
+    def floatify_dict(self, d):
+        for k, v in d.items():
+            if isinstance(v, dict):
+                d[k] = self.floatify_dict(v)
+            elif isinstance(v, np.floating):
+                d[k] = float(v)
+        return d
 
     def format_result(
         self,

@@ -21,8 +21,8 @@ def _create_base_nmma_parser(sampler="dynesty", parents=[]):
         version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
     )
 
+    base_parser = multi_sampler_parsing(base_parser)
     if sampler in ["all", "dynesty"]:
-        base_parser = multi_sampler_parsing(base_parser)
         base_parser = dynesty_parsing(base_parser)
 
     base_parser = em_settings_parsing(base_parser)
@@ -48,11 +48,8 @@ def em_settings_parsing(parser):
 def multi_sampler_parsing(parser):
     sampler_group = parser.add_argument_group(title = "Setting for the Sampler")
 
-    sampler_group.add_argument("--sampler", choices=["dynesty"], default="dynesty",
+    sampler_group.add_argument("--sampler", default="dynesty",
         help="The parallelised sampler to use, defaults to dynesty")
-    sampler_group.add_argument( "-n", "--nlive", default=1000, type=int, help="Number of live points" )
-    sampler_group.add_argument("--dlogz", default=0.1, type=float,
-        help="Stopping criteria: remaining evidence, (default=0.1)" )
     sampler_group.add_argument("--bound","--dynesty-bound", default="live", 
         help="Dynesty bounding method (default=live)" )
     sampler_group.add_argument( "--sample", "--dynesty-sample", default="acceptance-walk",

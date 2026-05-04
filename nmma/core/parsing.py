@@ -110,6 +110,15 @@ def base_analysis_parsing(parser):
         help="Sampling seed (default: 42)")
     parser.add_argument("--sampler-kwargs", default="{}", type = yaml_parse,
         help="Additional keyword arguments to pass to the sampler as a dictionary" )
+    parser.add_argument("--skip-sampling", action='store_true', 
+        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
+    parser.add_argument("--dlogz", default=0.1, type=float,
+        help="Stopping criteria: remaining evidence, (default=0.1)" )
+    parser.add_argument("--soft-init", action='store_true',
+        help="To start the sampler softly (without any checking, default: False)")
+    parser.add_argument("--cpus", type=int, default=1,
+        help="Number of cores to be used, only needed for dynesty (default: 1)")
+    parser.add_argument("-n","--nlive", "--n-live", type=int, default=2048, help="Number of live points (default: 2048)")
     return parser
 
 def dynesty_parsing(parser):
@@ -152,21 +161,13 @@ def single_messenger_analysis_parsing(parser):
     parser.add_argument("-o", "--outdir", default="outdir",  help="Path to the output directory")
     parser.add_argument("--label", default ="nmma_transient", help="Label for the run")
     parser.add_argument("--plot", action='store_true', help="create characteristic plot")
+    parser.add_argument("--plot-kwargs", type=yaml_parse, default={}, help="Additional keyword arguments to pass to the plotting routine as a dictionary" )
     parser.add_argument("--verbose", action='store_true', help="print out log likelihoods" )
     parser.add_argument("--prior-file","--prior", help="Path to the prior file")
     parser.add_argument("--sampler", default="pymultinest",
         help="Sampler to be used (default: pymultinest)")
-    parser.add_argument("--dlogz", default=0.1, type=float,
-        help="Stopping criteria: remaining evidence, (default=0.1)" )
-    parser.add_argument("--soft-init", action='store_true',
-        help="To start the sampler softly (without any checking, default: False)")
-    parser.add_argument("--cpus", type=int, default=1,
-        help="Number of cores to be used, only needed for dynesty (default: 1)")
-    parser.add_argument("-n","--nlive", "--n-live", type=int, default=2048, help="Number of live points (default: 2048)")
     parser.add_argument("--reactive-sampling", action='store_true',
         help="To use reactive sampling in ultranest (default: False)")
-    parser.add_argument("--skip-sampling", action='store_true', 
-        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
     parser.add_argument("--bestfit", "--best-fit", action='store_true',
         help="Save the best fit parameters to JSON")
     

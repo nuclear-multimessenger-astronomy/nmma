@@ -311,7 +311,7 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
             sampler_kwargs["niter"] = 1
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
-
+    
     result = run_sampler(
         likelihood,
         priors,
@@ -331,6 +331,7 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         return
 
     try:
+        result.posterior = likelihood.posterior_conversion(result.posterior)
         result.save_to_file()
         result.save_posterior_samples()
     except FileMovedError:
@@ -362,7 +363,6 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         result.plot_corner(injection_parameters, priors)
         
     if args.bestfit or args.plot:
-        result.posterior = likelihood.posterior_conversion(result.posterior)
         likelihood.post_process_bestfit(args, result)
     return result
 
@@ -376,10 +376,10 @@ def multi_analysis_loop(args, analysis_setup):
     except ImportError:
         rank = 0
         
-    # if rank != 0:
-    #     devnull = os.open(os.devnull, os.O_WRONLY)
-    #     os.dup2(devnull, 1)
-    #     os.dup2(devnull, 2)
+    if rank != 0 and not getattr(args, 'verbose', False):
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, 1)
+        os.dup2(devnull, 2)
         
     if getattr(args, 'multi', None):
         sub_runs = []
