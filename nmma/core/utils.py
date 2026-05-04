@@ -8,7 +8,6 @@ from bilby.core.utils import decode_bilby_json
 from bilby.core.result import read_in_result
 from astropy import time
 
-from matplotlib.colors import LinearSegmentedColormap
 from pathlib import Path
 import yaml
 
@@ -69,7 +68,8 @@ def read_trigger_time(parameters=None, args=None, out_format = 'mjd'):
                     format = 'gps'
                 trigger_time= time.Time(args.trigger_time, format=format)
                 trigger_time  # this fails if not a valid time
-    
+    elif args is not None:
+        args.trigger_time = trigger_time.mjd if out_format == 'mjd' else trigger_time.gps
     if out_format == 'mjd':
         return trigger_time.mjd
 
@@ -224,12 +224,15 @@ def input_obj_to_str(input_obj, ref_name= None):
     else:
         raise TypeError("Input object could not be identified.")
     
-def fading_cmap(color):
-    cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white",color], gamma = 2)
-
-    cdict = cmap._segmentdata.copy()
-    vals = cdict['alpha'][:, 0]
-    alpha = np.linspace(0, 1, len(vals))
-    cdict['alpha'] = np.column_stack([vals, alpha, alpha])
-
-    return LinearSegmentedColormap(cmap.name, cdict, cmap.N, cmap._gamma)
+def nan_level(data, level, weights=None):
+    nans, clean_data = np.isnan(data), data[~np.isnan(data)]
+    if weights is not None:
+        weights = np.array(weights)[~nans]
+        weights = weights / np.sum(weights)
+    nan_share = np.sum((nans)) / len(data)
+    if nan_share > level:
+        return [np.nan, np.nan]
+    rest_level = level - nan_share
+    low = np.quantile(clean_data,   (1-rest_level)/2, weights=weights, method='inverted_cdf')
+    up  = np.quantile(clean_data, 1-(1-rest_level)/2, weights=weights, method='inverted_cdf')
+    return [low, up]

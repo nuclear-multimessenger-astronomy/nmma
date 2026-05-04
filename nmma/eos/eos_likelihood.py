@@ -10,11 +10,13 @@ import numpy as np
 from scipy.special import logsumexp
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter
+# from scipy.spatial import ConvexHull
 from matplotlib import pyplot as plt
 from bilby.core.prior import WeightedCategorical, PriorDict
 from .eos_processing import EoSConverter
 from ..core.base import NMMALikelihood
-from ..core.utils import fading_cmap
+from ..core.utils import nan_level
+from ..core.plotting_utils import fading_cmap
     
 def setup_tabulated_eos_priors(args, priors, logger=None):
     if logger:    
@@ -64,10 +66,10 @@ class EquationofStateLikelihood(NMMALikelihood):
      
     def final_diagnostics(self, bestfit_params, args, result=None, fig = None):
         matplotlib.rcParams.update({'font.size': 16, 'font.family': 'serif'})
-        # matplotlib.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
+
         bestfit_params =self.parameter_conversion(bestfit_params)
-        
         radii, masses, lambdas = self.sub_model.eos_converter.macro_parameters.values()
+        
         if fig is None:
             x_lim = (min(np.min(radii)-0.3, 9), max(np.max(radii)+0.3, 15))
             y_lim = (masses[0], masses[-1]+0.1)
@@ -82,6 +84,11 @@ class EquationofStateLikelihood(NMMALikelihood):
                 ax = constraint.plot(ax=ax, color=color)
         else:
             ax = fig.axes[0]
+            xlow, xhigh = ax.get_xlim()
+            ylow, yhigh = ax.get_ylim()
+            ax.set_xlim(min(np.min(radii)-0.3, xlow), max(np.max(radii)+0.3, xhigh))
+            ax.set_ylim(min(masses[0], ylow), max(masses[-1]+0.1, yhigh))
+
             labels = [line.get_label() for line in fig.legends[0].legend_handles]
             for constraint in self.sub_model.constraints:
                 if constraint.name in labels:
@@ -89,7 +96,31 @@ class EquationofStateLikelihood(NMMALikelihood):
                 color = ax._get_lines.get_next_color()
                 ax = constraint.plot(ax=ax, color=color)
             fig.legends.clear() ## remove old legend to avoid duplicates
-        ax.plot(radii, masses, label=f'{args.label} Best fit EoS', zorder=10)
+
+        
+        line =ax.plot(radii, masses, label=f'{args.label}',linewidth=3, zorder=10)
+        
+        if result is not None:
+            cmap = fading_cmap(line[0].get_color())
+            posterior = self.parameter_conversion(result.posterior)
+            # posterior['log_post'] = posterior.log_likelihood + posterior.log_prior
+            # post_weights = np.exp(posterior.log_post)
+            post_weights = None
+            eos_data = self.sub_model.eos_converter.macro_conversion(posterior)
+            max_masses = np.max([eos[1][-1] for eos in eos_data])
+            mass_range = np.linspace(1.0, max_masses, 151)
+            show_radii = np.empty((len(mass_range), len(eos_data)))
+            
+            for i, eos in enumerate(eos_data):
+                show_radii[:,i] = np.interp(mass_range, eos[1], eos[0], right = np.nan)
+                
+            for level in [0.5, 0.9]:
+                bounds = np.array([nan_level(radii, level, post_weights) for radii in show_radii])
+                ax.fill_betweenx(mass_range, bounds[:, 0], bounds[:, 1], color=cmap(1-0.5*level), zorder=1)
+                
+            if result.injection_parameters is not None:
+                inj_eos = self.sub_model.eos_converter.macro_conversion(result.injection_parameters)
+                ax.plot(inj_eos[0], inj_eos[1], label='Injection', color='black', linestyle='dashed', linewidth=3, zorder=10)
 
         fig.legend(ncols=2, loc='upper center',
                    bbox_to_anchor=(0.5, 0.00), handlelength=2)
@@ -207,7 +238,7 @@ class JointEoSConstraint:
             elif constraint_kind == 'mass_radius':
                 for label, constraint in sub_constraints.items():
                     constraint_list.append(MassRadiusConstraint(
-                        file_path=constraint.get('posterior', None),
+                        file_path=constraint.get('posterior', constraint.get('file_path', None)),
                         name=label,
                         arxiv_ref=constraint.get('arxiv', None)
                     ))
@@ -333,16 +364,17 @@ class MassConstraint(EoSConstraint):
                 tov_mass = local_parameters['masses'][-1]
         return self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)
     
-    def plot(self, ax, resolution = 100, **kwargs):
+    def plot(self, ax, **kwargs):
         """Plot the mass constraint on the given figure."""
         x_lim = ax.get_xlim()
         dummy_line = ax.plot([], [], label=self.name, linestyle=self.linestyle, linewidth=2.5, **kwargs)
         line = ax.hlines(self.mass, *x_lim, linestyle=self.linestyle, linewidth=2.5, zorder=3, **kwargs)
-        cmap = fading_cmap(line.get_color())
+        cmap = fading_cmap(dummy_line[0].get_color())
         levels = [0.95, 0.68]
         for i, level in enumerate(levels):
-            ax.hlines(self.mass + (i+1)*self.error, *x_lim, color=cmap(0.9*level),  linewidth=1.5, zorder=1)
-            ax.hlines(self.mass - (i+1)*self.error, *x_lim, color=cmap(0.9*level), linewidth=1.5, zorder=1)
+            ax.fill_between(x_lim, self.mass - (i+1)*self.error, self.mass + (i+1)*self.error, color=cmap(0.8*level), zorder=2-i)
+            # ax.hlines(self.mass + (i+1)*self.error, *x_lim, color=cmap(0.9*level),  linewidth=1.5, zorder=1)
+            # ax.hlines(self.mass - (i+1)*self.error, *x_lim, color=cmap(0.9*level), linewidth=1.5, zorder=1)
         return ax
 
 

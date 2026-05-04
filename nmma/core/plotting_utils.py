@@ -2,8 +2,11 @@
 from bilby.core.prior import PriorDict, DeltaFunction
 import numpy as np
 import matplotlib
+from matplotlib.colors import LinearSegmentedColormap
 import os
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+import itertools
 
 def fig_setup():
     fig_width_pt = 750.0  # Get this from LaTeX using \showthe\columnwidth
@@ -18,7 +21,7 @@ def fig_setup():
         "legend.fontsize": 18,
         "xtick.labelsize": 18,
         "ytick.labelsize": 18,
-        "font.family": "Times New Roman",
+        "font.family": "serif",
         "figure.figsize": fig_size,
         "mathtext.fontset": "stix",
     }
@@ -45,7 +48,7 @@ def fig_setup():
     matplotlib.rcParams.update(params)
     matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
 
-    return  [
+    color_array = [
         "#22ADFC", # blue
         "#F42969", # red
         "#F4A429", # orange
@@ -58,7 +61,7 @@ def fig_setup():
         "#8B4513", # brown
         "#FF6347", # tomato
     ]
-
+    return itertools.cycle(color_array)
 
 def plotting_parameters_from_priors(priors, keys=None):
     """
@@ -84,3 +87,38 @@ def plotting_parameters_from_priors(priors, keys=None):
         keys = priors.keys()
 
     return {k: v.latex_label for k, v in priors.items() if k in keys and not isinstance(v, DeltaFunction)}
+
+def setup_multi_axes(num_axes, sharex=False, sharey=False, ncols=None):
+    "Set up a multi-panel figure with the specified number of axes, essentially stolen from corner.py"
+    
+    if ncols is None:
+        ncols = np.min([5, np.ceil(np.sqrt(num_axes)).astype(int)])
+    nrows = np.ceil(num_axes / ncols).astype(int)
+    
+
+    factor = 2.0  # size of one side of one panel
+    lbdim = 0.5 * factor  # size of left/bottom margin
+    trdim = 0.2 * factor  # size of top/right margin
+    whspace = 0.05  # w/hspace size
+    whspace = trdim
+    rowdim = lbdim + factor * ncols + factor * (ncols - 1.0) * whspace + trdim
+    coldim = lbdim + factor * nrows + factor * (nrows - 1.0) * whspace + trdim
+
+
+
+    # Create a new figure if one wasn't provided.
+    fig, axes = plt.subplots(nrows, ncols, figsize=(rowdim, coldim), 
+            sharex=sharex, sharey=sharey, constrained_layout=True)
+
+    return fig, axes.flatten()
+
+
+def fading_cmap(color):
+    cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white",color], gamma = 2)
+
+    cdict = cmap._segmentdata.copy()
+    vals = cdict['alpha'][:, 0]
+    alpha = np.linspace(0, 1, len(vals))
+    cdict['alpha'] = np.column_stack([vals, alpha, alpha])
+
+    return LinearSegmentedColormap(cmap.name, cdict, cmap.N, cmap._gamma)

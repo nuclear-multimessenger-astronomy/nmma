@@ -3,17 +3,112 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib
+from matplotlib.ticker import MaxNLocator
 import seaborn
 from matplotlib import gridspec, pyplot as plt
 from ast import literal_eval
-import itertools
 
 from ..core.conversion import chirp_mass_and_eta_to_component_masses, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities, label_mapping
 from ..core import utils, parsing
 from ..core import plotting_utils as corepu
 from .parser import corner_plot_parser
-color_array = corepu.fig_setup()
-nmma_colors = itertools.cycle(color_array)
+nmma_colors = corepu.fig_setup()
+
+def setup_plot_quantities(posterior_samples, limits, plot_keys, injection, post_dir = None, default_labels={}, **plot_kwargs):
+    matplotlib.rcParams.update({'font.size': 16, 'font.family': 'serif'})
+    #load samples
+    posterior_samples = utils.get_posteriors(posterior_samples, post_dir)
+    best_fit = posterior_samples.iloc[posterior_samples['log_likelihood'].idxmax()]
+
+    if plot_keys is None:
+        plot_keys = posterior_samples.columns.tolist() # show all we can
+        for key in ['log_likelihood', 'log_prior']:
+            if key in plot_keys:    
+                plot_keys.remove(key) # but not the likelihood itself
+    if limits is None:
+        limits = [(np.inf, -np.inf) for _ in plot_keys] # will adjust more permissively later
+    # find what to actually plot
+    plot_samples, plot_labels, titles = [], [], []
+    for i, k in enumerate(plot_keys):
+        try: # we have data to show
+            show_data = posterior_samples[k].to_numpy()
+            plot_samples.append(show_data)
+            titles.append(utils.sig_lims(show_data, plot_kwargs.get('quantiles', None)))
+
+            cur_min, cur_max = limits[i]
+            limits[i] = (min(cur_min, np.amin(show_data)), max(cur_max, np.amax(show_data)))
+
+            label = label_mapping.get(k, default_labels.get(k,k))
+            plot_labels.append(label )
+        except KeyError:
+            print(f"key {k} was not found in the posterior samples; Inserting dummy plot.")
+            cur_min, cur_max = limits[i]
+            if cur_min > cur_max: # meaning no data seen so far, so we have to take chances
+                cur_min, cur_max = 1e42, -1e42# just set crazy limits that we can still work on.
+                limits[i] = (cur_min, cur_max) 
+            # some dummy values that should remain out of frame
+            plot_samples.append(np.linspace(100*cur_max, 1001*cur_max, posterior_samples.shape[0]))
+            plot_labels.append('')
+            titles.append('')
+            
+    plot_samples = np.column_stack(plot_samples)
+    if injection is not None:
+        truths = [injection.get(key, None) for key in plot_keys]
+    else:
+        truths = None
+
+
+    return plot_samples, plot_labels, titles, limits, truths, best_fit
+
+def plot_histograms_only(posterior_samples,limits = None, plot_keys = None, fig = None,
+                      injection=None, post_dir = None, default_labels={}, best_fit = False, ncols=None, loc_labels='left',title_kwargs ={}, **plot_kwargs):
+    plot_samples, plot_labels, titles, limits, truths, best_fit = setup_plot_quantities(
+        posterior_samples, limits, plot_keys, injection, post_dir, default_labels, **plot_kwargs)
+    
+    if fig is None:
+        fig, axes = corepu.setup_multi_axes(len(plot_keys), ncols=ncols)
+    else:
+        axes = fig.get_axes()
+    label = plot_kwargs.pop('label', None)
+    color = plot_kwargs.pop('color', next(nmma_colors))
+    for i, ax in enumerate(axes):
+        if i >= len(plot_keys):
+            ax.axis('off')  # Hide any extra subplots
+            continue
+        ax.hist(plot_samples[:, i], bins=50, density=True, color=color, alpha=0.7,histtype = 'step', **plot_kwargs)
+        if loc_labels == 'left':
+            ax.yaxis.set_label_position("left")
+            ax.set_ylabel(plot_labels[i], fontsize=16)
+        elif loc_labels == 'top':
+            ax.xaxis.set_label_position("top")
+            ax.set_xlabel(plot_labels[i], fontsize=16)
+        # ax.xaxis.set_label_coords(0.5, -0.3)
+        ax = set_title(ax, titles[i], plot_labels[i], color, **title_kwargs)
+
+        if truths is not None and truths[i] is not None:
+            ax.axvline(truths[i], color='tab:orange', linestyle='--')
+        
+        if isinstance(best_fit, (dict, pd.Series)) and plot_keys[i] in best_fit:
+            ax.axvline(best_fit[plot_keys[i]], color=color, linestyle='-.')
+        
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=4, min_n_ticks=3, prune='both'))
+        [l.set_rotation(45) for l in ax.get_xticklabels()]
+        [l.set_rotation(45) for l in ax.get_xticklabels(minor=True)]
+        ax.autoscale(enable=True, axis='x', tight=True) 
+        ax.set_yticks([])
+        ax.set_yticklabels([])
+
+    
+    # allow joint legend
+    if label:
+        fig.legends.clear()
+        fig.axes[0].plot([], [], label = label, color= color, **plot_kwargs)
+        fig.legend(ncols=2, loc='upper center', bbox_to_anchor=(0.5, 0.), handlelength=2)
+        
+    return fig, limits
+
+    
+
 
 
 def plot_multi_corner(args, key_selection=None):
@@ -48,45 +143,19 @@ def plot_multi_corner(args, key_selection=None):
 
 def setup_corner_plot(posterior_samples,limits = None, plot_keys = None, fig = None, 
                       injection=None, post_dir = None, default_labels={}, **plot_kwargs):
-    #load samples
-    posterior_samples = utils.get_posteriors(posterior_samples, post_dir)
-
-    if plot_keys is None:
-        plot_keys = posterior_samples.columns.tolist() # show all we can
-    if limits is None:
-        limits = [(np.inf, -np.inf) for key in plot_keys] # will adjust more permissively later
-    # find what to actually plot
-    plot_samples, plot_labels, titles = [], [], []
-    for i, k in enumerate(plot_keys):
-        try: # we have data to show
-            show_data = posterior_samples[k].to_numpy()
-            plot_samples.append(show_data)
-            titles.append(utils.sig_lims(show_data, plot_kwargs.get('quantiles', None)))
-
-            cur_min, cur_max = limits[i]
-            limits[i] = (min(cur_min, np.amin(show_data)), max(cur_max, np.amax(show_data)))
-
-            label = label_mapping.get(k, default_labels.get(k,k))
-            plot_labels.append(label )
-        except KeyError:
-            print(f"key {k} was not found in the posterior samples; Inserting dummy plot.")
-            cur_min, cur_max = limits[i]
-            if cur_min > cur_max: # meaning no data seen so far, so we have to take chances
-                cur_min, cur_max = 1e42, -1e42# just set crazy limits that we can still work on.
-                limits[i] = (cur_min, cur_max) 
-            # some dummy values that should remain out of frame
-            plot_samples.append(np.linspace(100*cur_max, 1001*cur_max, posterior_samples.shape[0]))
-            plot_labels.append('')
-            titles.append('')
-    plot_samples = np.column_stack(plot_samples)
     
-    if injection is not None:
-        truths = [injection.get(key, None) for key in plot_keys]
-    else:
-        truths = None
-    # limits = ((np.amin(posterior_samples[k]), np.amax(posterior_samples[k])) for k in plot_keys)
+    plot_samples, plot_labels, titles, limits, truths, _ = setup_plot_quantities(
+        posterior_samples, limits, plot_keys, injection, post_dir, default_labels, **plot_kwargs)
+    
     color = plot_kwargs.pop('color', next(nmma_colors))
-    fig = corner_plot(plot_samples, plot_labels, limits, fig=fig, truths= truths, color = color, titles=titles, show_titles = False, **plot_kwargs)
+    fig = corner_plot(plot_samples, plot_labels, limits, fig=fig, truths= truths, color = color, show_titles = False, **plot_kwargs)
+    
+
+    # adjust titles
+    axes = fig.get_axes()
+    for i, title in enumerate(titles):
+        ax = axes[i*len(plot_labels) + i]
+        ax = set_title(ax, title, plot_labels[i], color)
 
     # allow joint legend
     if 'label' in plot_kwargs:
@@ -98,11 +167,11 @@ def setup_corner_plot(posterior_samples,limits = None, plot_keys = None, fig = N
 
 def corner_plot(plot_samples, labels, limits, fig = None, save=False, **kwargs):
 
-    matplotlib.rcParams.update({'font.size': 16, 'font.family': 'Times New Roman'})
+    matplotlib.rcParams.update({'font.size': 16, 'font.family': 'Serif'})
     matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
     default_kwargs = dict(bins=50, smooth=1.3, label_kwargs=dict(fontsize=16), show_titles=True,
-                  title_kwargs=dict(fontsize=16), color = color_array[0], #color='#0072C1',
-                  truth_color='tab:orange', quantiles=[0.05, 0.5, 0.95],
+                  title_kwargs=dict(fontsize=16), color = next(nmma_colors), #color='#0072C1',
+                  truth_color='tab:orange', quantiles=[0.16, 0.5, 0.84],
                   levels=(0.10, 0.32, 0.68, 0.95), median_line=True, title_fmt=".2f",
                   plot_density=False, plot_datapoints=False, fill_contours=True,
                   max_n_ticks=4, hist_kwargs={'density': True})
@@ -114,6 +183,27 @@ def corner_plot(plot_samples, labels, limits, fig = None, save=False, **kwargs):
     return fig
 
 
+def set_title(ax, title, label, color, **title_kwargs):
+    old_text = ax._left_title.get_text()
+    if old_text == '': # meaning no title set, so we can set our own
+        text = f'{label}={title}'
+        ax.set_title(text, loc = 'left', color=color, **title_kwargs)
+
+    elif ax._right_title.get_text() == '': # meaning only left title set yet
+        old_text_parts = old_text.split('=')
+        ax._left_title.set_text(old_text_parts[-1]) # remove old title
+        ax.set_title(title, loc='right', color=color, **title_kwargs)
+
+    elif ax.get_title() == '': # meaning only left and right title set yet
+        ax.set_title(title, loc='center', color=color, pad=10, **title_kwargs)
+    else:
+        # we already have a title in all three locations, so we rather remove all
+        print("Warning: More than three titles set for this axis, so all titles were removed to avoid confusion. ")
+        print(f"All intended title information was {label}: {old_text} (first, left), {ax._right_title.get_text()} (second, right), {ax.get_title()} (third, center), {title} (new).")
+        ax._left_title.set_text('')
+        ax._right_title.set_text('')
+        ax.set_title('', loc='center', **title_kwargs)
+    return ax
 
 
 def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
