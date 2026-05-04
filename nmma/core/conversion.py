@@ -793,6 +793,9 @@ class MultimessengerConversion:
 
         if 'em' in instruction_dict:
             conversions.append(instruction_dict['em'])
+        
+        if 'custom' in instruction_dict:
+            conversions.append(instruction_dict['custom'])
 
         return cls(*conversions)
     
@@ -849,6 +852,10 @@ label_mapping = {
     'alpha'                 : r'$\alpha$',
     'KNtheta'               : r'$\theta_{KN} [^\circ]$',
     'KNphi'                 : r'$\phi_{KN} [^\circ]$',
+    # Bu parameters ##
+    'vej_dyn'               : r'$v_{\rm{dyn}}{\rm [c]}$',
+    'vej_wind'              : r'$v_{\rm{wind}}{\rm [c]}$',
+    'Ye_dyn'                : r'$Y_{e,{\rm{dyn}}}$',
     'kappa_Ye'              : r'$\kappa_{\rm{Y_e}}$',
     'kappa_v'               : r'$\kappa_{v}$', 
     ## GRB parameters ##

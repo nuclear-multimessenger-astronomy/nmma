@@ -113,6 +113,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             logger.info("Setting up GW likelihood")
             gw_kwargs = setup_gw_kwargs(data_dump, args, logger)
             messenger_lhoods.append(GravitationalWaveTransientLikelihood(priors, **gw_kwargs))
+            priors.convert_floats_to_delta_functions()
             conversion_instructions['gw'] = True # placeholder
 
         if "eos" in messengers:
@@ -151,10 +152,6 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
         #NOTE: this is nasty because we might have corresponding constraints, but do not need to...
         if "log10_mej_wind" in priors or "log10_mej_dyn" in priors or args.ejecta_conversion:
             conversion_instructions['ejecta'] = True
-
-        # if "spec" in messengers:  # FUTURE
-        #     spec_kwargs = setup_spectroscopy_kwargs(data_dump, args, ...)
-        #     messenger_lhoods.append(SpectroscopicLikelihood(priors, **spec_kwargs))
 
         if len(messenger_lhoods) == 0:
             raise ValueError("No messenger likelihoods were set up.")
