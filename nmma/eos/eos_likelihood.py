@@ -16,7 +16,8 @@ from bilby.core.prior import WeightedCategorical, PriorDict
 from .eos_processing import EoSConverter
 from ..core.base import NMMALikelihood
 from ..core.utils import nan_level
-from ..core.plotting_utils import fading_cmap
+from ..core.plotting_utils import fading_cmap, setup_multi_axes, fig_setup
+nmma_colors = fig_setup()
     
 def setup_tabulated_eos_priors(args, priors, logger=None):
     if logger:    
@@ -64,16 +65,14 @@ class EquationofStateLikelihood(NMMALikelihood):
         self.conv_functions.append(self.sub_model.parameter_conversion)
         
      
-    def final_diagnostics(self, bestfit_params, args, result=None, fig = None):
-        matplotlib.rcParams.update({'font.size': 16, 'font.family': 'serif'})
-
+    def final_diagnostics(self, bestfit_params, args, result=None):
         bestfit_params =self.parameter_conversion(bestfit_params)
         radii, masses, lambdas = self.sub_model.eos_converter.macro_parameters.values()
-        
+        fig = getattr(args, 'fig', None)
         if fig is None:
             x_lim = (min(np.min(radii)-0.3, 9), max(np.max(radii)+0.3, 15))
             y_lim = (masses[0], masses[-1]+0.1)
-            fig, ax = plt.subplots(figsize=(10, 10))
+            fig, ax = setup_multi_axes(1, figsize=(8, 8) )
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)
             ax.set_xlabel(r'Radius [km]')
@@ -89,23 +88,20 @@ class EquationofStateLikelihood(NMMALikelihood):
             ax.set_xlim(min(np.min(radii)-0.3, xlow), max(np.max(radii)+0.3, xhigh))
             ax.set_ylim(min(masses[0], ylow), max(masses[-1]+0.1, yhigh))
 
-            labels = [line.get_label() for line in fig.legends[0].legend_handles]
+            const_labels = [t.get_text() for t in ax.texts]
             for constraint in self.sub_model.constraints:
-                if constraint.name in labels:
+                if constraint.name in const_labels:
                     continue
                 color = ax._get_lines.get_next_color()
                 ax = constraint.plot(ax=ax, color=color)
             fig.legends.clear() ## remove old legend to avoid duplicates
 
         
-        line =ax.plot(radii, masses, label=f'{args.label}',linewidth=3, zorder=10)
+        line =ax.plot(radii, masses, label=f'{args.label}',linewidth=5, zorder=10, color= next(nmma_colors))
         
         if result is not None:
             cmap = fading_cmap(line[0].get_color())
             posterior = self.parameter_conversion(result.posterior)
-            # posterior['log_post'] = posterior.log_likelihood + posterior.log_prior
-            # post_weights = np.exp(posterior.log_post)
-            post_weights = None
             eos_data = self.sub_model.eos_converter.macro_conversion(posterior)
             max_masses = np.max([eos[1][-1] for eos in eos_data])
             mass_range = np.linspace(1.0, max_masses, 151)
@@ -115,16 +111,15 @@ class EquationofStateLikelihood(NMMALikelihood):
                 show_radii[:,i] = np.interp(mass_range, eos[1], eos[0], right = np.nan)
                 
             for level in [0.5, 0.9]:
-                bounds = np.array([nan_level(radii, level, post_weights) for radii in show_radii])
-                ax.fill_betweenx(mass_range, bounds[:, 0], bounds[:, 1], color=cmap(1-0.5*level), zorder=1)
+                bounds = np.array([nan_level(radii, level) for radii in show_radii])
+                ax.fill_betweenx(mass_range, bounds[:, 0], bounds[:, 1], color=cmap(1-0.4*level), zorder=1)
                 
             if result.injection_parameters is not None:
-                inj_eos = self.sub_model.eos_converter.macro_conversion(result.injection_parameters)
+                inj_eos = self.sub_model.eos_converter.macro_conversion(result.injection_parameters)[0]
                 ax.plot(inj_eos[0], inj_eos[1], label='Injection', color='black', linestyle='dashed', linewidth=3, zorder=10)
 
-        fig.legend(ncols=2, loc='upper center',
+        fig.legend(loc='upper center',ncols=2, 
                    bbox_to_anchor=(0.5, 0.00), handlelength=2)
-        fig.tight_layout()
         fig.savefig(os.path.join(args.outdir, f"{args.label}_mr_curve.png"),bbox_inches='tight')
         return fig
 
@@ -225,7 +220,8 @@ class JointEoSConstraint:
                         measured_mass=constraint['mass'],
                         measure_error=constraint.get('error',0.),
                         name=label,
-                        arxiv_ref=constraint.get('arxiv', None)
+                        arxiv_ref=constraint.get('arxiv', None),
+                        plot_kwargs=constraint.get('plot_kwargs', None)
                     ))
             elif constraint_kind == 'upper_mtov':
                 for label, constraint in sub_constraints.items():
@@ -233,14 +229,16 @@ class JointEoSConstraint:
                         measured_mass=constraint['mass'],
                         measure_error=constraint.get('error',0.),
                         name=label,
-                        arxiv_ref=constraint.get('arxiv', None)
+                        arxiv_ref=constraint.get('arxiv', None),
+                        plot_kwargs=constraint.get('plot_kwargs', None)
                     ))
             elif constraint_kind == 'mass_radius':
                 for label, constraint in sub_constraints.items():
                     constraint_list.append(MassRadiusConstraint(
                         file_path=constraint.get('posterior', constraint.get('file_path', None)),
                         name=label,
-                        arxiv_ref=constraint.get('arxiv', None)
+                        arxiv_ref=constraint.get('arxiv', None),
+                        plot_kwargs=constraint.get('plot_kwargs', None)
                     ))
             else:
                 raise ValueError('Unknown type of EoS Constraint. Must be "lower_mtov", \
@@ -322,7 +320,7 @@ class JointEoSConstraint:
             return None
 
 class EoSConstraint:
-    def __init__(self, name = None, arxiv_ref=None):
+    def __init__(self, name = None, arxiv_ref=None, plot_kwargs=None):
         self.repr_add = ''
         self.type = 'macro'
         if name is None:
@@ -332,6 +330,7 @@ class EoSConstraint:
             self.name = name
             self.base_repr = f'{self.__class__.__name__} based on {name}'
         self.arxiv_ref = arxiv_ref
+        self.plot_kwargs = plot_kwargs if plot_kwargs is not None else {}
 
     def __repr__(self):
         out = f'{self.base_repr} {self.repr_add}'
@@ -340,8 +339,8 @@ class EoSConstraint:
         return out
 
 class MassConstraint(EoSConstraint):
-    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, lognorm_method=None):
-        super().__init__(name, arxiv_ref)
+    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None, lognorm_method=None):
+        super().__init__(name, arxiv_ref, plot_kwargs)
         self.mass = measured_mass
         self.error = measure_error
         self.repr_add = f'of {measured_mass}+-{measure_error} M_sun'
@@ -364,23 +363,21 @@ class MassConstraint(EoSConstraint):
                 tov_mass = local_parameters['masses'][-1]
         return self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)
     
-    def plot(self, ax, **kwargs):
+    def plot(self, ax, color = 'k', **kwargs):
         """Plot the mass constraint on the given figure."""
         x_lim = ax.get_xlim()
-        dummy_line = ax.plot([], [], label=self.name, linestyle=self.linestyle, linewidth=2.5, **kwargs)
-        line = ax.hlines(self.mass, *x_lim, linestyle=self.linestyle, linewidth=2.5, zorder=3, **kwargs)
-        cmap = fading_cmap(dummy_line[0].get_color())
-        levels = [0.95, 0.68]
-        for i, level in enumerate(levels):
-            ax.fill_between(x_lim, self.mass - (i+1)*self.error, self.mass + (i+1)*self.error, color=cmap(0.8*level), zorder=2-i)
-            # ax.hlines(self.mass + (i+1)*self.error, *x_lim, color=cmap(0.9*level),  linewidth=1.5, zorder=1)
-            # ax.hlines(self.mass - (i+1)*self.error, *x_lim, color=cmap(0.9*level), linewidth=1.5, zorder=1)
+        ax.hlines(self.mass, *x_lim, linestyle=self.linestyle, linewidth=2.5, zorder=3, color = color, **kwargs)
+        ax.text(x_lim[0]+0.05*(x_lim[1]-x_lim[0]), self.mass, self.name, color=color, fontsize=ax.xaxis.label.get_size(), va='center', zorder = 20, bbox=dict(facecolor='white', edgecolor='none', pad=0.5))
+        cmap = fading_cmap(color)
+        # levels = [0.95, 0.68]
+        # for i, level in enumerate(levels):
+        #     ax.fill_between(x_lim, self.mass - (i+1)*self.error, self.mass + (i+1)*self.error, color=cmap(0.8*level), zorder=2-i)
         return ax
 
 
 class LowerMTOVConstraint(MassConstraint):
     '''Constraint that an EOS supports at least a certain TOV mass(within Gaussian uncertainty)'''
-    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None):
+    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None):
         """
         Parameters
         ----------
@@ -393,12 +390,12 @@ class LowerMTOVConstraint(MassConstraint):
         arxiv_ref: str
             Identifier of a relevant source
         """
-        super().__init__(measured_mass, measure_error, name, arxiv_ref, lognorm_method=norm.logcdf)
+        super().__init__(measured_mass, measure_error, name, arxiv_ref, plot_kwargs, lognorm_method=norm.logcdf)
     
 
 class UpperMTOVConstraint(MassConstraint):
     '''Constraint that an EOS supports at most a certain TOV mass (within Gaussian uncertainty)'''
-    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None):
+    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None):
         """
         Parameters
         ----------
@@ -411,13 +408,13 @@ class UpperMTOVConstraint(MassConstraint):
         arxiv_ref: str, optional
             Identifier of a relevant source
         """
-        super().__init__(measured_mass, measure_error, name, arxiv_ref, lognorm_method=norm.logsf)
+        super().__init__(measured_mass, measure_error, name, arxiv_ref, plot_kwargs, lognorm_method=norm.logsf)
         self.linestyle = ':'
     
 
 class MassRadiusConstraint(EoSConstraint):
     '''Constraint that an EOS adheres to  certain mass-radius region'''
-    def __init__(self, mass_array=None, radius_array=None, weights = None, file_path=None, name=None, arxiv_ref=None):
+    def __init__(self, mass_array=None, radius_array=None, weights = None, file_path=None, name=None, arxiv_ref=None, plot_kwargs=None):
         """
         Parameters
         ----------
@@ -433,7 +430,7 @@ class MassRadiusConstraint(EoSConstraint):
             Identifier of a relevant source
         """
 
-        super().__init__(name, arxiv_ref)
+        super().__init__(name, arxiv_ref, plot_kwargs)
         if file_path:
             mass_array, radius_array, weights = self.read_data(file_path)
         elif mass_array is None or radius_array is None:
@@ -532,12 +529,10 @@ class MassRadiusConstraint(EoSConstraint):
         log_l = np.log(self.histogram[xi, yi].sum())
         
         return log_l
-    def plot(self, ax, **kwargs):
+    
+    def plot(self, ax, color = 'k', **kwargs):
         """Plot the mass-radius constraint on the given figure."""
-
-        # for the legend
-        dummy_line = ax.plot([], [], label=self.name, linewidth=2, **kwargs) 
-        color = dummy_line[0].get_color()      
+          
         Xc = 0.5 * (self.rad_edges[:-1] + self.rad_edges[1:])
         Yc = 0.5 * (self.mass_edges[:-1] + self.mass_edges[1:])
 
@@ -545,13 +540,32 @@ class MassRadiusConstraint(EoSConstraint):
         order = np.argsort(flat)[::-1]
         cumsum = np.cumsum(flat[order])
         levels = [0.95, 0.68]
+        clevels=[flat[order][np.searchsorted(cumsum, p)] for p in levels]
         cmap = fading_cmap(color)
         colors = cmap(levels[::-1])
-        plt.contour(
-            Xc, Yc, self.histogram.T,
-            levels=[flat[order][np.searchsorted(cumsum, p)] for p in levels], 
+        contour = ax.contour(
+            Xc, Yc, self.histogram.T,levels = clevels,
             colors = colors, linewidths=2
         )
+
+        manual = self.plot_kwargs.get('manual', False)
+        if isinstance(manual, bool) or manual is None:
+            manual = False
+        elif isinstance(manual, (list, tuple)):
+            if len(manual) ==1:
+                assert len(manual[0]) == 2, "Manual position for label must be a tuple of (x,y) coordinates"
+            elif (
+                len(manual) == 2 
+                and isinstance(manual[0], (int, float, np.floating))
+                and isinstance(manual[1], (int, float, np.floating))
+            ):
+                manual = [manual]
+
+        ax.clabel(contour, levels= [clevels[-1]], 
+                  fmt = {clevels[-1]: self.name},  
+                  inline=True, fontsize=ax.xaxis.label.get_size(), 
+                  manual = manual, 
+                    zorder = 20)
         return ax
     
 class PulsarConstraint(LowerMTOVConstraint):

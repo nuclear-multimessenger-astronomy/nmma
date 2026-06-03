@@ -5,8 +5,9 @@ import pandas as pd
 import matplotlib
 from matplotlib.ticker import MaxNLocator
 import seaborn
-from matplotlib import gridspec, pyplot as plt
+from matplotlib import pyplot as plt
 from ast import literal_eval
+import bilby
 
 from ..core.conversion import chirp_mass_and_eta_to_component_masses, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities, label_mapping
 from ..core import utils, parsing
@@ -15,10 +16,14 @@ from .parser import corner_plot_parser
 nmma_colors = corepu.fig_setup()
 
 def setup_plot_quantities(posterior_samples, limits, plot_keys, injection, post_dir = None, default_labels={}, **plot_kwargs):
+    plot_quantities = {}
     matplotlib.rcParams.update({'font.size': 16, 'font.family': 'serif'})
     #load samples
     posterior_samples = utils.get_posteriors(posterior_samples, post_dir)
-    best_fit = posterior_samples.iloc[posterior_samples['log_likelihood'].idxmax()]
+    try:
+        plot_quantities['best_fit'] = posterior_samples.iloc[posterior_samples['log_likelihood'].idxmax()]
+    except KeyError:
+        plot_quantities['best_fit'] = {k: None for k in posterior_samples.columns}
 
     if plot_keys is None:
         plot_keys = posterior_samples.columns.tolist() # show all we can
@@ -50,47 +55,65 @@ def setup_plot_quantities(posterior_samples, limits, plot_keys, injection, post_
             plot_samples.append(np.linspace(100*cur_max, 1001*cur_max, posterior_samples.shape[0]))
             plot_labels.append('')
             titles.append('')
-            
-    plot_samples = np.column_stack(plot_samples)
+
+    plot_quantities['labels'] = plot_labels 
+    plot_quantities['titles'] = titles  
+    plot_quantities['samples'] = np.column_stack(plot_samples)
+    plot_quantities['limits'] = limits
+    plot_quantities['keys'] = plot_keys
     if injection is not None:
-        truths = [injection.get(key, None) for key in plot_keys]
+        if isinstance(injection, pd.DataFrame):
+            injection = injection.iloc[0] 
+        if isinstance(injection, pd.Series):
+            injection = injection.to_dict()
+        plot_quantities['truths'] = [injection.get(k, None) for k in plot_keys]
     else:
-        truths = None
+        plot_quantities['truths'] = None
 
+    return plot_quantities
 
-    return plot_samples, plot_labels, titles, limits, truths, best_fit
-
-def plot_histograms_only(posterior_samples,limits = None, plot_keys = None, fig = None,
-                      injection=None, post_dir = None, default_labels={}, best_fit = False, ncols=None, loc_labels='left',title_kwargs ={}, **plot_kwargs):
-    plot_samples, plot_labels, titles, limits, truths, best_fit = setup_plot_quantities(
+def plot_histograms_only(posterior_samples,limits = None, plot_keys = None, 
+                         fig = None, injection=None, post_dir = None, 
+                         default_labels={}, best_fit = False, show_titles = True, 
+                         prior=None,ncols=None,
+                         title_kwargs ={}, fig_kwargs ={}, **plot_kwargs):
+    plot_quantities = setup_plot_quantities(
         posterior_samples, limits, plot_keys, injection, post_dir, default_labels, **plot_kwargs)
     
     if fig is None:
-        fig, axes = corepu.setup_multi_axes(len(plot_keys), ncols=ncols)
+        fig, axes = corepu.setup_multi_axes(len(plot_quantities['keys']), ncols=ncols, **fig_kwargs)
     else:
         axes = fig.get_axes()
     label = plot_kwargs.pop('label', None)
-    color = plot_kwargs.pop('color', next(nmma_colors))
+    
+    color = plot_kwargs.pop('color') if 'color' in plot_kwargs else next(nmma_colors)
     for i, ax in enumerate(axes):
-        if i >= len(plot_keys):
+        if i >= len(plot_quantities['keys']):
             ax.axis('off')  # Hide any extra subplots
             continue
-        ax.hist(plot_samples[:, i], bins=50, density=True, color=color, alpha=0.7,histtype = 'step', **plot_kwargs)
-        if loc_labels == 'left':
-            ax.yaxis.set_label_position("left")
-            ax.set_ylabel(plot_labels[i], fontsize=16)
-        elif loc_labels == 'top':
-            ax.xaxis.set_label_position("top")
-            ax.set_xlabel(plot_labels[i], fontsize=16)
-        # ax.xaxis.set_label_coords(0.5, -0.3)
-        ax = set_title(ax, titles[i], plot_labels[i], color, **title_kwargs)
 
-        if truths is not None and truths[i] is not None:
-            ax.axvline(truths[i], color='tab:orange', linestyle='--')
+        key = plot_quantities['keys'][i]
+        ax.hist(plot_quantities['samples'][:, i], bins=50, density=True, color=color, alpha=0.7,histtype = 'step', **plot_kwargs)
         
-        if isinstance(best_fit, (dict, pd.Series)) and plot_keys[i] in best_fit:
-            ax.axvline(best_fit[plot_keys[i]], color=color, linestyle='-.')
+        if plot_quantities['truths'] is not None:
+            injected = plot_quantities['truths'][i]
+            if injected is None:
+                pass
+            elif isinstance(injected, (int, float, np.floating)) or len(injected) == 1:
+                ax.axvline(injected, color='tab:orange', linestyle='--')
+            elif len(injected)==2:
+                ax.fill_betweenx(ax.get_ylim(), injected[0], injected[1], color='tab:orange', alpha=0.3, step='post')
         
+        if best_fit is True:
+            if plot_quantities['best_fit'][key] is not None:
+                ax.axvline(plot_quantities['best_fit'][key], color=color, linestyle='-.')
+                
+
+        if isinstance(prior, dict):
+            if key in prior and not isinstance(prior[key], bilby.core.prior.Constraint):
+                _range = np.linspace(*(ax.get_xlim()), 300)
+                ax.plot(_range, prior[key].prob(_range), color=color, alpha = 0.5, linewidth=1)
+
         ax.xaxis.set_major_locator(MaxNLocator(nbins=4, min_n_ticks=3, prune='both'))
         [l.set_rotation(45) for l in ax.get_xticklabels()]
         [l.set_rotation(45) for l in ax.get_xticklabels(minor=True)]
@@ -99,17 +122,26 @@ def plot_histograms_only(posterior_samples,limits = None, plot_keys = None, fig 
         ax.set_yticklabels([])
 
     
+        if show_titles:
+            use_kwargs = title_kwargs.copy()
+            if 'color' not in title_kwargs:
+                use_kwargs['color'] = color
+            if 'fontsize' not in title_kwargs:
+                use_kwargs['fontsize'] = ax.title.get_fontsize()
+            ax = prepare_titles(ax, plot_quantities, i, use_kwargs)
+        else:
+            ax.xaxis.set_label_position("top")
+            ax.set_xlabel(plot_quantities['labels'][i], fontsize=title_kwargs['fontsize']) 
+
     # allow joint legend
     if label:
         fig.legends.clear()
         fig.axes[0].plot([], [], label = label, color= color, **plot_kwargs)
         fig.legend(ncols=2, loc='upper center', bbox_to_anchor=(0.5, 0.), handlelength=2)
         
-    return fig, limits
+    return fig, plot_quantities['limits']
 
     
-
-
 
 def plot_multi_corner(args, key_selection=None):
 
@@ -142,68 +174,100 @@ def plot_multi_corner(args, key_selection=None):
 
 
 def setup_corner_plot(posterior_samples,limits = None, plot_keys = None, fig = None, 
-                      injection=None, post_dir = None, default_labels={}, **plot_kwargs):
+                      injection=None, post_dir = None, default_labels={}, prior = None,
+                      show_titles=True, best_fit=False, **plot_kwargs):
     
-    plot_samples, plot_labels, titles, limits, truths, _ = setup_plot_quantities(
+    plot_quantities = setup_plot_quantities(
         posterior_samples, limits, plot_keys, injection, post_dir, default_labels, **plot_kwargs)
     
     color = plot_kwargs.pop('color', next(nmma_colors))
-    fig = corner_plot(plot_samples, plot_labels, limits, fig=fig, truths= truths, color = color, show_titles = False, **plot_kwargs)
+    fig = corner_plot(plot_quantities['samples'], plot_quantities['labels'], plot_quantities['limits'], fig=fig, truths= plot_quantities['truths'], color = color, show_titles = False,  **plot_kwargs)
     
-
-    # adjust titles
     axes = fig.get_axes()
-    for i, title in enumerate(titles):
-        ax = axes[i*len(plot_labels) + i]
-        ax = set_title(ax, title, plot_labels[i], color)
+    for i, key in enumerate(plot_quantities['keys']):
+        ax = axes[i*len(plot_quantities['keys']) + i]
+        max_height = max( np.max(poly.get_xy()[:, 1])
+                            for poly in ax.patches)
+        ax.set_ylim(top=1.05 * max_height)
+        if isinstance(prior, dict):
+            if key in prior and not isinstance(prior[key], bilby.core.prior.Constraint):
+                _range = np.linspace(*(ax.get_xlim()), 300)
+                ax.plot(_range, prior[key].prob(_range), color=color, alpha = 0.6)
+
+        # adjust titles
+        title_kwargs = plot_kwargs.get('title_kwargs', {}).copy()
+        if 'color' not in title_kwargs:
+            title_kwargs['color'] = color
+        if 'fontsize' not in title_kwargs:
+            title_kwargs['fontsize'] = ax.title.get_fontsize()
+        if show_titles:
+            len_ax = len(plot_quantities['keys'])
+            offset_ax = axes[len_ax *(len_ax -1) + i]
+            ax = prepare_titles(ax, plot_quantities, i, title_kwargs, offset_ax)
+            ax.yaxis.label.set_visible(False) #
+        elif show_titles is None:
+            ax.xaxis.set_label_position("top")
+            ax.set_xlabel(plot_quantities['labels'][i], fontsize=title_kwargs['fontsize'])
+        else:
+            pass
+
+        if best_fit is True:
+            if plot_quantities['best_fit'][key] is not None:
+                ax.axvline(plot_quantities['best_fit'][key], color=color, linestyle='-.')
+        
+                
 
     # allow joint legend
     if 'label' in plot_kwargs:
         fig.legends.clear()
-        fig.axes[0].plot([], [], label = plot_kwargs['label'], color= color)
-        fig.legend()
-    return fig, limits
+        fig.axes[i].plot([], [], label = plot_kwargs['label'], color= color)
+        fig.axes[i].legend(loc='upper right', 
+            bbox_to_anchor=(1.05, 1.05), 
+            edgecolor='none',
+            handlelength=1.5, fontsize=1.5*title_kwargs['fontsize'])
+    return fig, plot_quantities['limits']
 
+def prepare_titles(ax, plot_quantities, i, title_kwargs, offset_ax=None):
+
+    title = plot_quantities['titles'][i]
+    if offset_ax is None:
+        offset_ax = ax
+    offset_ax.xaxis.get_ticklabels()
+    new_title = corepu.format_title_offset(offset_ax, title)
+    move = title_kwargs.pop('move', [])
+    ax.text(0. ,0., new_title, transform=ax.transAxes, **title_kwargs)
+    if len(ax.texts) ==1:
+        ax.set_title(f'{plot_quantities["labels"][i]}={ax.texts[0].get_text()}', color= 'black', fontsize=ax.texts[0].get_fontsize())
+        ax.texts[0].set_visible(False)
+    else:
+        do_move = True if (
+            i in move 
+            or plot_quantities['titles'][i] in move
+            or plot_quantities['labels'][i] in move
+        ) else False
+        ax.yaxis.set_label_position("left")
+        ax.set_ylabel(plot_quantities['labels'][i], fontsize=ax.texts[0].get_fontsize())
+        ax.texts[0].set_visible(True)
+        ax = corepu.arange_titles(ax, move = do_move)
+
+    return ax
+
+
+    
 
 def corner_plot(plot_samples, labels, limits, fig = None, save=False, **kwargs):
-
-    matplotlib.rcParams.update({'font.size': 16, 'font.family': 'Serif'})
-    matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
     default_kwargs = dict(bins=50, smooth=1.3, label_kwargs=dict(fontsize=16), show_titles=True,
-                  title_kwargs=dict(fontsize=16), color = next(nmma_colors), #color='#0072C1',
+                  title_kwargs=dict(fontsize=16), color = 'C1', #color='#0072C1',
                   truth_color='tab:orange', quantiles=[0.16, 0.5, 0.84],
                   levels=(0.10, 0.32, 0.68, 0.95), median_line=True, title_fmt=".2f",
                   plot_density=False, plot_datapoints=False, fill_contours=True,
                   max_n_ticks=4, hist_kwargs={'density': True})
     default_kwargs.update(kwargs) 
-    # plt.figure(1)
+
     fig = corner.corner(plot_samples, labels=labels, range=limits, fig = fig, **default_kwargs)
     if save:
         plt.savefig(save, bbox_inches='tight')
     return fig
-
-
-def set_title(ax, title, label, color, **title_kwargs):
-    old_text = ax._left_title.get_text()
-    if old_text == '': # meaning no title set, so we can set our own
-        text = f'{label}={title}'
-        ax.set_title(text, loc = 'left', color=color, **title_kwargs)
-
-    elif ax._right_title.get_text() == '': # meaning only left title set yet
-        old_text_parts = old_text.split('=')
-        ax._left_title.set_text(old_text_parts[-1]) # remove old title
-        ax.set_title(title, loc='right', color=color, **title_kwargs)
-
-    elif ax.get_title() == '': # meaning only left and right title set yet
-        ax.set_title(title, loc='center', color=color, pad=10, **title_kwargs)
-    else:
-        # we already have a title in all three locations, so we rather remove all
-        print("Warning: More than three titles set for this axis, so all titles were removed to avoid confusion. ")
-        print(f"All intended title information was {label}: {old_text} (first, left), {ax._right_title.get_text()} (second, right), {ax.get_title()} (third, center), {title} (new).")
-        ax._left_title.set_text('')
-        ax._right_title.set_text('')
-        ax.set_title('', loc='center', **title_kwargs)
-    return ax
 
 
 def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
