@@ -47,7 +47,6 @@ def load_yaml(file_path):
     return yaml.safe_load(os.path.expandvars(Path(file_path).read_text()))
 
 def read_trigger_time(parameters=None, args=None, out_format = 'mjd'):
-    breakpoint()
     trigger_time = None
     if parameters is not None:
         if "trigger_time" in parameters:
