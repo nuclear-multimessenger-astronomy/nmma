@@ -34,11 +34,11 @@ def load_em_observations(filename, args=None, format='observations'):
     Returns:
     - data (dict): Dictionary containing the lightcurve data from the file. The keys are generally 'time' and each of the filters in the file as well as their accompanying error values.
     """
-    if isinstance(filename, dict):
-        return filename     # assume it is already in the correct format
     if isinstance(filename, argparse.Namespace):
         args = filename
         filename = args.light_curve_data
+    if isinstance(filename, dict):
+        return filename     # assume it is already in the correct format
     
     if filename is None:
         raise ValueError("No filename provided for lightcurve data.")

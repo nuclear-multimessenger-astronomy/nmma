@@ -686,14 +686,15 @@ class FiestaKilonovaModel(FiestaModel):
         from a set of parameters.
     """
     def __init__(self, model="Bu2026_MLP", filters=None, surrogate_dir=None, **em_model_kwargs):
-        if model.endswith("_lc"):
-            from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
-        else:
-            from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
-        fiesta_model = BullaSurrogate(**fiesta_kwargs)
+        if isinstance(model, str):
+            if model.endswith("_lc"):
+                from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
+            else:
+                from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
+            fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
+            model = BullaSurrogate(**fiesta_kwargs)
 
-        super().__init__(fiesta_model, filters, sample_times=em_model_kwargs.get('sample_times', None))
+        super().__init__(model, filters, sample_times=em_model_kwargs.get('sample_times', None))
 
     def parameter_conversion(self, parameters):
         if "kappa_Ye" in parameters:
@@ -767,10 +768,11 @@ class FiestaGRBModel(GRBMixin,FiestaModel):
     """
     def __init__(self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **em_model_kwargs):
         from fiesta.inference.lightcurve_model import AfterglowFlux
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
-        fiesta_model = AfterglowFlux(**fiesta_kwargs)
+        if isinstance(model, str):
+            fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
+            model = AfterglowFlux(**fiesta_kwargs)
         
-        super().__init__(fiesta_model, filters, sample_times=em_model_kwargs.get('sample_times', None))
+        super().__init__(model, filters, sample_times=em_model_kwargs.get('sample_times', None))
 
     
 class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):

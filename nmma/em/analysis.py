@@ -100,7 +100,7 @@ def analysis_setup(args):
         # load observational data
         data = io.load_em_observations(args, format='observations')
         trigger_time = read_trigger_time(None,args)
-        injection_parameters = None
+        injection_parameters = getattr(args, 'injection_parameters', None)
     except ValueError:
         detection_limit = utils.create_detection_limit(args, filters)
         # try to work with injection data instead
