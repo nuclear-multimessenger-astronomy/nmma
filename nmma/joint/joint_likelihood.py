@@ -42,6 +42,10 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
     def setup_parameter_conversion(self):
         """Sets up the multimessenger conversion object, based on a corresponding dict.
         Note: this must be called after the parent likelihood has been initialised."""
+        if self.conversion_instructions is None:
+            self.parameter_conversion = self.basic_parameter_conversion
+            self.posterior_conversion = self.basic_posterior_conversion
+            return
         for lhood in self.likelihoods:
             if isinstance(lhood, EMTransientLikelihood):
                 self.conversion_instructions['em'] = lhood.parameter_conversion
@@ -69,12 +73,19 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
     def parameter_conversion(self, samples):
         return self.multi_conversion.convert_to_multimessenger_parameters(samples)
     
+    def basic_parameter_conversion(self, parameters):
+        for lhood in self.likelihoods:
+            parameters = lhood.parameter_conversion(parameters)
+        return parameters
     
     def posterior_conversion(self, posterior_samples):
         posterior = self.multi_conversion.core_conversion(posterior_samples)
+        return self.basic_posterior_conversion(posterior)
+    
+    def basic_posterior_conversion(self, posterior_samples):
         for lhood in self.likelihoods:
-            posterior = lhood.posterior_conversion(posterior)   
-        return posterior.select_dtypes([np.number])
+            posterior_samples = lhood.posterior_conversion(posterior_samples)
+        return posterior_samples.select_dtypes([np.number])
  
     @classmethod
     def setup_from_args(cls, data_dump, priors, args, logger=None):

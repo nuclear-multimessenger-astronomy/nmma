@@ -331,7 +331,9 @@ class EjectaFitting:
 
 class NSBHEjectaFitting(EjectaFitting):
     def chibh2risco(self, chi_bh):
-
+        """see, e.g., https://arxiv.org/pdf/2011.08948.pdf, eq. 2-4.
+        This expression gives the innermost stable circular orbit (ISCO) in units of the black hole mass as a function of the dimensionless spin parameter chi_bh. 
+        """
         Z1 = 1.0 + (1.0 - chi_bh ** 2) ** (1.0 / 3) * (
             (1 + chi_bh) ** (1.0 / 3) + (1 - chi_bh) ** (1.0 / 3)
         )
@@ -361,8 +363,8 @@ class NSBHEjectaFitting(EjectaFitting):
         equation (4) in https://arxiv.org/pdf/1807.00011
         '''
 
-        mass_ratio_invert = mass_1_source / mass_2_source
-        symm_mass_ratio = mass_ratio_invert / (1.0 + mass_ratio_invert)**2
+        mass_ratio = mass_2_source /mass_1_source
+        symm_mass_ratio = mass_ratio / (1.0 + mass_ratio)**2
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
@@ -390,27 +392,26 @@ class NSBHEjectaFitting(EjectaFitting):
         a1=7.11595154e-03,
         a2=1.43636803e-03,
         a4=-2.76202990e-02,
-        n1=8.63604211e-01,
-        n2=1.68399507,
+        n1=-8.63604211e-01,
+        n2=-1.68399507,
     ):
 
         """
         equation (9) in https://arxiv.org/abs/2002.07728
         """
 
-        mass_ratio_invert = mass_1_source / mass_2_source
+        mass_ratio= mass_2_source / mass_1_source
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
         baryon_mass_2 = self.baryon_mass_NS(mass_2_source, compactness_2)
 
         mdyn = (
-            a1
-            * np.power(mass_ratio_invert, n1)
+            a1 * mass_ratio**n1
             * (1.0 - 2.0 * compactness_2)
             / compactness_2
         )
-        mdyn += -a2 * np.power(mass_ratio_invert, n2) * risco + a4
+        mdyn += -a2 * mass_ratio**n2 * risco + a4
         mdyn *= baryon_mass_2
 
         mdyn = np.maximum(0.0, mdyn)
@@ -721,8 +722,8 @@ class BNSEjectaFitting(EjectaFitting):
             jet_func = gaussian_jet_energy_to_central_isotropic_energy_equivalent
             data = np.column_stack((10**log10_Ejet, thetaCore, alphaWing))
                 
-        return np.log10([jet_func(*row) for row in data])
-    
+        out = np.log10([jet_func(*row) for row in data])
+        return np.squeeze(out)    
         
 
     def bns_parameter_conversion(self, parameters):
@@ -845,12 +846,12 @@ label_mapping = {
     'mass_2_source'         : r'$m_{2,s}{\rm [M_{\odot}]}$', 
     ## KN parameters ##
     'log10_mej'             : r'$\log_{10}(M_{\rm{ej}}{\rm [M_{\odot}]})$',
-    'log10_mej_dyn'         : r'$\log_{10}(M_{\rm{ej,dyn}}{\rm [M_{\odot}]})$',
-    'log10_mej_wind'        : r'$\log_{10}(M_{\rm{ej,wind}}{\rm [M_{\odot}]})$',
+    'log10_mej_dyn'         : r'$\log_{10}(M_{\rm{dyn}}{\rm [M_{\odot}]})$',
+    'log10_mej_wind'        : r'$\log_{10}(M_{\rm{wind}}{\rm [M_{\odot}]})$',
     'log10_E0'              : r'$\log_{10}(E_0{\rm [erg]})$',
     'ratio_zeta'            : r'$\zeta$',
     'alpha'                 : r'$\alpha$',
-    'KNtheta'               : r'$\theta_{KN} [^\circ]$',
+    'KNtheta'               : r'$\theta_{\rm obs} [^\circ]$',
     'KNphi'                 : r'$\phi_{KN} [^\circ]$',
     # Bu parameters ##
     'vej_dyn'               : r'$v_{\rm{dyn}}{\rm [c]}$',

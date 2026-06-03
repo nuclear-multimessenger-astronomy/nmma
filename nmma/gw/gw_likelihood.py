@@ -215,8 +215,8 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
         if "chi_eff" not in posterior_samples:
             try:
                 q = posterior_samples['mass_ratio']
-                chi_1 = posterior_samples.get('chi_1', posterior_samples.get('spin_1z'))
-                chi_2 = posterior_samples.get('chi_2', posterior_samples.get('spin_2z'))
+                chi_1 = posterior_samples.get('chi_1', posterior_samples['spin_1z'])
+                chi_2 = posterior_samples.get('chi_2', posterior_samples['spin_2z'])
                 posterior_samples['chi_eff'] = (chi_1 + q*chi_2)/(1+q)
             except KeyError:
                 pass
