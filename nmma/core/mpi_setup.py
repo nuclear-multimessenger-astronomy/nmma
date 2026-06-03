@@ -37,10 +37,22 @@ def time_storage(func):
 
 class Worker(bs.NestedSampler):
     """
-    An object with methods to be called in parallelised tasks.
+    Worker object used for parallel sampler tasks.
 
-    Parameters: 
-    data_dump: a pickle-file containing all relevant data to create priors and likelihoods.
+    Parameters
+    ----------
+    args : Namespace
+        Configuration namespace containing output and labeling options.
+    prior : bilby.core.prior.PriorDict
+        Prior definition used by the sampler.
+    likelihood : bilby.core.likelihood.Likelihood
+        Likelihood object evaluated by the sampler.
+    injection_parameters : dict, None
+        Injection parameters passed to the sampler.
+    plot : bool, optional
+        Enable plotting output.
+    skip_import_verification : bool, optional
+        Skip import verification during initialization.
     """
     def __init__(
         self, args, prior, likelihood,
@@ -685,6 +697,7 @@ def pbilby_sampling(
             result = worker.format_result(
             results, use_kwargs['result_format'],
             use_kwargs['rejection_sample_posterior'])
+    
     return result
 
 
