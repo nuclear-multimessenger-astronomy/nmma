@@ -56,6 +56,9 @@ def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
     parser.add_argument("--multi", type=yaml_parse,
         help="YAML formatted dict specifying multiple runs with different parameter changes. \n"
              "E.g.: '{run1: {param1: value1, param2: value2}, run2: {param1: value3}}' ")
+    parser.add_argument("--matrix", type=yaml_parse,
+        help="YAML formatted dict specifying multiple runs with cross-wise parameter changes. \n"
+             "E.g.: '{run1: {param1: value1, param2: value2}, run2: {param1: value3}}' ")
     
     if isinstance(parsing_func, (list, tuple)):
         for pars_func in tuple(parsing_func):

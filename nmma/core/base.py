@@ -5,6 +5,7 @@ from ast import literal_eval
 import numpy as np
 import pandas as pd
 from copy import deepcopy
+from itertools import product
 
 from bilby import run_sampler
 from bilby.core.likelihood import Likelihood
@@ -399,6 +400,27 @@ def multi_analysis_loop(args, analysis_setup):
                         raise KeyError(f"{key} not a known argument... please remove")
                     setattr(run_args, key, value)
                 sub_runs.append(run_args)
+    elif getattr(args, 'matrix', None):
+        sub_runs = []
+        keys = args.matrix.keys()
+        vals = args.matrix.values()
+        for arg_variation in product(*vals):
+            run_args = deepcopy(args)
+            run_name = args.label
+            for i, var in enumerate(arg_variation):
+                rep = f'_{var}'
+                if len(rep)>20:
+                    key = keys[i]
+                    var_idx = vals[i].index(var)
+                    rep = f"_{key}_{var_idx}"
+                run_name += rep
+            setattr(run_args, 'label', run_name)
+            for key, val in zip(keys, arg_variation):
+                if key not in args:
+                    raise KeyError(f"{key} not a known argument... please remove")
+                setattr(run_args, key, val)
+            sub_runs.append(run_args)
+            
     else:
         sub_runs = [args]
     for run_args in sub_runs:
