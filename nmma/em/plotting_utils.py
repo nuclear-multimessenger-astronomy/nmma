@@ -182,7 +182,7 @@ def bolometric_lc_plot(transient, time, lc, save_path, color = "coral"):
         }
     )
     fig, ax = plt.subplots(1, 1)
-    ax, _ = plot_observations(ax, transient, markersize=12)
+    ax = plot_observations(ax, transient, markersize=12)
 
     ### plot the bestfit model
     ax.plot(time, lc,
