@@ -250,8 +250,11 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 def check_model_time_consistency(light_curve_data, light_curve_model, priors, injection = None):
 
     (lc_times, lc_mags, lc_uncertainties, trigger_time) = light_curve_data
-    data_tmin = np.min([lc_times[key].min() for key in lc_times.keys()])
-    data_tmax = np.max([lc_times[key].max() for key in lc_times.keys()])
+    data_tmin, data_tmax = np.inf, -np.inf
+    for key in lc_times.keys():
+        detections = np.isfinite(lc_mags[key]) & np.isfinite(lc_uncertainties[key])
+        data_tmin = np.minimum(data_tmin, lc_times[key][detections].min())
+        data_tmax = np.maximum(data_tmax, lc_times[key][detections].max())
     
     # get minimal / maximal redshift from prior
     if "redshift" in priors:

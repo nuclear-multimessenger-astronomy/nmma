@@ -240,7 +240,8 @@ class BasicEMTransient:
         else:
             minus_chisquare = 0.0
 
-        # evaluate the data with infinite error
+        # evaluate the data with infinite error, i.e. upper limits,
+        # as Gaussian survival function
         gausslogsf=np.zeros(2) ##hack if len(infIdx)==0
         if infIdx.sum() > 0:
             gausslogsf = norm.logsf(

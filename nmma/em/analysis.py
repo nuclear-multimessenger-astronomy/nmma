@@ -96,19 +96,17 @@ def bolometric_setup(args):
 def analysis_setup(args):
     
     filters = utils.set_filters(args)
-    try:
+    if getattr(args, 'light_curve_data', None):
         # load observational data
         data = io.load_em_observations(args, format='observations')
         trigger_time = read_trigger_time(None,args)
         injection_parameters = getattr(args, 'injection_parameters', None)
-    except ValueError:
+    else:
         detection_limit = utils.create_detection_limit(args, filters)
         # try to work with injection data instead
         data, injection_parameters = data_from_injection(args, filters, detection_limit)
         trigger_time = injection_parameters.get('trigger_time',0)
-    except FileNotFoundError:
-        # If the injection file is not found, raise an error
-        raise FileNotFoundError("Injection file not found.")
+        
     data = utils.cut_data_to_time_range(data, args, trigger_time)
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
