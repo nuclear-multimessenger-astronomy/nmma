@@ -1,11 +1,11 @@
 import inspect
-import io
-import contextlib
+import os
 import h5py
 from ast import literal_eval
 import numpy as np
 import pandas as pd
 from copy import deepcopy
+from itertools import product
 
 from bilby import run_sampler
 from bilby.core.likelihood import Likelihood
@@ -15,6 +15,7 @@ from bilby.core.result import FileMovedError
 from .utils import input_obj_to_str, read_bestfit_from_posterior
 from .constants import  set_cosmology
 from .conversion import cosmology_to_distance
+from .parsing import single_messenger_analysis_parsing, nmma_base_parsing
 
 def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes = []):
     prefixes.append('')
@@ -98,12 +99,15 @@ class NMMALikelihoodMixin:
             The figure object containing the plot
 
         """
-        pass
+        try:
+            return self.sub_model.final_diagnostics(bestfit_params, args, result)
+        except AttributeError:
+            pass
 
     def post_process_bestfit(self, args, result=None):
         bestfit_params = read_bestfit_from_posterior(args)
         bestfit_params = self.parameter_conversion(bestfit_params)
-        self.final_diagnostics(bestfit_params, args, result)
+        return self.final_diagnostics(bestfit_params, args, result)
            
     def check_parameter_equivalencies(self, parameter_names):
         """Check for equivalent parameters and terminate if found"""
@@ -272,28 +276,29 @@ def check_priors_and_likelihood_for_nmma(priors, likelihood):
     constraints = {k: priors.pop(k) for k in priors.copy().keys()
                     if isinstance(priors[k], Constraint)}
     likelihood.constraints.update(constraints)
+
     test_draw = priors.sample(1)
     test_conversion = priors.conversion_function(test_draw)
     if len(set(test_conversion.keys()) ) != len(test_conversion.keys()):
         priors.conversion_function = priors.default_conversion_function
         likelihood.conv_functions.append(likelihood.priors.conversion_function)
+        
     # add final conversions
     likelihood.setup_parameter_conversion()
     return priors, likelihood
 
 def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
-    priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
-
+    if isinstance(args, dict):
+        def_args = nmma_base_parsing(single_messenger_analysis_parsing)
+        def_args.__dict__.update(args)
+        args = def_args
     # fetch the additional sampler kwargs
-    if isinstance(args.sampler_kwargs, str):
-        sampler_kwargs = literal_eval(args.sampler_kwargs) 
-    else:
-        sampler_kwargs = args.sampler_kwargs
+    sampler_kwargs = getattr(args, "sampler_kwargs", {})
     print("Running with the following additional sampler_kwargs:")
     print(sampler_kwargs)
 
     # check if it is running with reactive sampler
-    nlive = None if args.reactive_sampling else args.nlive
+    nlive = None if getattr(args, 'reactive_sampling', False) else args.nlive
     if nlive is None and args.sampler != "ultranest":
         raise ValueError("reactive sampling is only available for ultranest, "
                          "please set nlive or use ultranest sampler")
@@ -307,7 +312,7 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
             sampler_kwargs["niter"] = 1
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
-
+    
     result = run_sampler(
         likelihood,
         priors,
@@ -327,6 +332,7 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         return
 
     try:
+        result.posterior = likelihood.posterior_conversion(result.posterior)
         result.save_to_file()
         result.save_posterior_samples()
     except FileMovedError:
@@ -359,49 +365,71 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         
     if args.bestfit or args.plot:
         likelihood.post_process_bestfit(args, result)
+    return result
 
 def multi_analysis_loop(args, analysis_setup):
-
+    USE_MPI = False
     # check if it is running under mpi
     try:
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.Get_rank()
+        USE_MPI = True
     except ImportError:
         rank = 0
         
-    if rank != 0:
-        # Create buffers
-        stdout_buffer = io.StringIO()
-        stderr_buffer = io.StringIO()
-
-        # Redirect python output into buffers
-        redirect_out = contextlib.redirect_stdout(stdout_buffer)
-        redirect_err = contextlib.redirect_stderr(stderr_buffer)
-    else:
-        redirect_out = contextlib.nullcontext()
-        redirect_err = contextlib.nullcontext()
+    if rank != 0 and not getattr(args, 'verbose', False):
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, 1)
+        os.dup2(devnull, 2)
         
-    with redirect_out, redirect_err:
-        if getattr(args, 'multi', None):
-            sub_runs = []
-            if len(args.multi) == 1:
-                arg, vals = list(args.multi.items())[0]
-                for i, val in enumerate(vals):
-                    run_args = deepcopy(args)
-                    setattr(run_args, arg, val)
-                    setattr(run_args, 'label', f"{args.label}_{i}")
-                    sub_runs.append(run_args)
-            else:
-                for run_name, changes in args.multi.items():
-                    run_args = deepcopy(args)
-                    setattr(run_args, 'label', f"{args.label}_{run_name}")
-                    for key, value in changes.items():
-                        if key not in args:
-                            raise KeyError(f"{key} not a known argument... please remove")
-                        setattr(run_args, key, value)
-                    sub_runs.append(run_args)
+    if getattr(args, 'multi', None):
+        sub_runs = []
+        if len(args.multi) == 1:
+            arg, vals = list(args.multi.items())[0]
+            for i, val in enumerate(vals):
+                run_args = deepcopy(args)
+                setattr(run_args, arg, val)
+                setattr(run_args, 'label', f"{args.label}_{i}")
+                sub_runs.append(run_args)
         else:
-            sub_runs = [args]
-        for run_args in sub_runs:
-            priors, likelihood, injection_parameters = analysis_setup(run_args)
-            bilby_sampling(likelihood, priors, run_args, injection_parameters, rank)
+            for run_name, changes in args.multi.items():
+                run_args = deepcopy(args)
+                setattr(run_args, 'label', f"{args.label}_{run_name}")
+                for key, value in changes.items():
+                    if key not in args:
+                        raise KeyError(f"{key} not a known argument... please remove")
+                    setattr(run_args, key, value)
+                sub_runs.append(run_args)
+    elif getattr(args, 'matrix', None):
+        sub_runs = []
+        keys = args.matrix.keys()
+        vals = args.matrix.values()
+        for arg_variation in product(*vals):
+            run_args = deepcopy(args)
+            run_name = args.label
+            for i, var in enumerate(arg_variation):
+                rep = f'_{var}'
+                if len(rep)>20:
+                    key = keys[i]
+                    var_idx = vals[i].index(var)
+                    rep = f"_{key}_{var_idx}"
+                run_name += rep
+            setattr(run_args, 'label', run_name)
+            for key, val in zip(keys, arg_variation):
+                if key not in args:
+                    raise KeyError(f"{key} not a known argument... please remove")
+                setattr(run_args, key, val)
+            sub_runs.append(run_args)
+            
+    else:
+        sub_runs = [args]
+    for run_args in sub_runs:
+        priors, likelihood, injection_parameters = analysis_setup(run_args)
+        priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
+        if USE_MPI and run_args.sampler =='dynesty':
+            from .mpi_setup import pbilby_sampling
+            run_function = pbilby_sampling
+        else:
+            run_function = bilby_sampling
+        out = run_function(likelihood, priors, run_args, injection_parameters, rank)
+    return out

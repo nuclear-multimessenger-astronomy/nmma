@@ -37,6 +37,8 @@ def load_em_observations(filename, args=None, format='observations'):
     if isinstance(filename, argparse.Namespace):
         args = filename
         filename = args.light_curve_data
+    if isinstance(filename, dict):
+        return filename     # assume it is already in the correct format
     
     if filename is None:
         raise ValueError("No filename provided for lightcurve data.")
@@ -78,7 +80,9 @@ def read_lc_from_csv(filename, args, format):
 
             data = {}
             for line in lines:
-                lineSplit = line.split(" ")
+                if line.startswith("#") or line.startswith("time") or line.startswith("mjd"):
+                    continue
+                lineSplit = line.split(None)
                 lineSplit = list(filter(None, lineSplit))
                 try:
                     mjd = Time(lineSplit[0]).mjd

@@ -2,9 +2,9 @@ import os
 import sys
 import traceback
 from io import BufferedWriter
-from glob import glob
 from copy import deepcopy
 import pickle
+import signal
 from functools import wraps
 from time import time
 from datetime import timedelta
@@ -12,16 +12,16 @@ from matplotlib import pyplot as plt
 import numpy as np
 from pandas import DataFrame
 from numpy.random import Generator, PCG64, SeedSequence
+from schwimmbad import MPIPool, MultiPool
 
-from bilby.core.prior import PriorDict
 from bilby.core.sampler import base_sampler as bs, dynesty3_utils  as dy_utils
 from bilby.core.sampler.dynesty import dynesty_stats_plot
 import dynesty
 from dynesty.plotting import traceplot, runplot 
 
-from ..core.conversion import label_mapping
-from ..core.utils import  rejection_sample, read_bestfit_from_posterior, logger
-from .joint_likelihood import MultiMessengerLikelihood
+from .conversion import label_mapping
+from .utils import  rejection_sample, read_bestfit_from_posterior, logger
+from .parsing import process_sampler_kwargs
 
 
 def time_storage(func):
@@ -37,51 +37,44 @@ def time_storage(func):
 
 class Worker(bs.NestedSampler):
     """
-    An object with methods to be called in parallelised tasks.
+    Worker object used for parallel sampler tasks.
 
-    Parameters: 
-    data_dump: a pickle-file containing all relevant data to create priors and likelihoods.
+    Parameters
+    ----------
+    args : Namespace
+        Configuration namespace containing output and labeling options.
+    prior : bilby.core.prior.PriorDict
+        Prior definition used by the sampler.
+    likelihood : bilby.core.likelihood.Likelihood
+        Likelihood object evaluated by the sampler.
+    injection_parameters : dict, None
+        Injection parameters passed to the sampler.
+    plot : bool, optional
+        Enable plotting output.
+    skip_import_verification : bool, optional
+        Skip import verification during initialization.
     """
-    def __init__(self, data_dump, 
-                outdir, label, plot = False, 
-                skip_import_verification = True,
+    def __init__(
+        self, args, prior, likelihood,
+        injection_parameters,  plot = False,  
+        skip_import_verification = True,
         ):
         
-        ## Load the data dump
-        if not data_dump.endswith("_dump.pickle"):
-            test_out = os.path.join(os.getcwd(), data_dump)
-            test_dump = glob(f"{test_out}/data/*_dump.pickle")
-            data_dump = test_dump[0]
-        with open(data_dump, "rb") as file:
-            data_dump = pickle.load(file)
-
-        ## Set properties from the data dump
-        self.data_dump = data_dump
-        args = data_dump["args"]
         args.plot = plot
         self.args = args
+        self.outdir = args.outdir
+        self.label = args.label
 
-        # If the run dir has not been specified, get it from the args
-        if outdir is None:
-            outdir = self.args.outdir
-        os.makedirs(outdir, exist_ok=True)
+        os.makedirs(args.outdir, exist_ok=True)
 
-        # If the label has not been specified, get it from the args
-        if label is None:
-            label = self.args.label
 
-        priors = PriorDict.from_json(data_dump["prior_file"])
-        
-        ## Set up the likelihood
-        likelihood = MultiMessengerLikelihood.setup_from_args(
-            data_dump, priors, self.args, logger)
-        
         super().__init__(
-            likelihood, priors, outdir, label,
-            injection_parameters= data_dump.get("injection_parameters", None),
+            likelihood, prior, self.outdir, self.label,
+            injection_parameters = injection_parameters,
             skip_import_verification = skip_import_verification,
-            plot=self.args.plot,
+            plot= plot,
             soft_init=True,
+            use_ratio = True,
             
         )
 
@@ -150,7 +143,8 @@ class Dynesty(Worker):
    
     def __init__(
         self,
-        data_dump, outdir, label,
+        args, prior, likelihood,
+        injection_parameters = None,
         maxmcmc=5000,
         naccept=60,
         nact=2,
@@ -158,13 +152,11 @@ class Dynesty(Worker):
         sampler_kwargs={},
         sampler_init_kwargs={},
         plot= False,
-    ):
-        super().__init__(data_dump, outdir, label, plot,
-                        skip_import_verification = False)
-        # for handler in logger.handlers:
-        #     if isinstance(handler, logging.StreamHandler):
-        #         handler.stream = sys.stdout  
-
+        meta_data = {},
+    ):  
+        super().__init__(args, prior, likelihood, injection_parameters, 
+                        plot, skip_import_verification = False)
+        
         self.resume_file = f"{self.outdir}/{self.label}_checkpoint_resume.pickle" 
         self.samples_file= f'{self.outdir}/{self.label}_samples.parquet'
 
@@ -177,9 +169,9 @@ class Dynesty(Worker):
         # dynesty3 sampler kwargs
         self.dlogz = sampler_kwargs['dlogz']
         self.sampler_kwargs = sampler_kwargs
-        
         self._init_sampler_kwargs(sampler_init_kwargs, nact, naccept, maxmcmc)
         self.nlive = sampler_init_kwargs['nlive']
+        self.meta_data = meta_data
 
     
     def _init_sampler_kwargs(self, kwargs, nact, naccept, maxmcmc):
@@ -503,19 +495,21 @@ class Dynesty(Worker):
                 plt.close("all")
 
     def storable_metadata(self):
-        meta_data = self.data_dump.copy()
-        waveform_generator = meta_data.pop("waveform_generator", None)
-        if waveform_generator is not None:
-            meta_data["waveform_generator"] = waveform_generator.__repr__()
-        ifo_list = meta_data.pop("ifo_list", None)
-        if ifo_list is not None:
-            meta_data["ifo_list"] = [ifo.__repr__() for ifo in ifo_list]
-
-        meta_data["args"] = vars(self.args) # convert Namespace to dict for storing
+        meta_data = self.meta_data
+        meta_data["args"] = vars(self.args).copy() # convert Namespace to dict for storing
         meta_data["likelihood"] = self.likelihood.meta_data
         meta_data["sampler_kwargs"] = self.init_sampler_kwargs
         meta_data["run_sampler_kwargs"] = self.sampler_kwargs
+        meta_data = self.floatify_dict(meta_data)
         return meta_data
+    
+    def floatify_dict(self, d):
+        for k, v in d.items():
+            if isinstance(v, dict):
+                d[k] = self.floatify_dict(v)
+            elif isinstance(v, np.floating):
+                d[k] = float(v)
+        return d
 
     def format_result(
         self,
@@ -604,3 +598,115 @@ class Dynesty(Worker):
                 logger.warning(f"Failed to create diagnostic plots: {e} \n{traceback.format_exc()}")
         logger.info("Finished formatting result.")
         return result
+
+
+
+def pbilby_sampling(
+    likelihood, prior, args, 
+    injection_parameters, rank,
+    pool_type = 'mpi',
+    meta_data = {},
+    **kwargs
+):
+    
+    default_kwargs = dict(
+        sampler_kwargs={},
+        sampling_seed=42,
+        plot=True,
+        #
+        maxmcmc=5000,
+        naccept=60,
+        nact=2,
+        check_point_delta_t=1800,
+        n_check_point=2000,
+        max_its=1e10,
+        max_run_time=1e10,
+        checkpoint_plot=False,
+        #
+        rejection_sample_posterior=True,
+        result_format="hdf5",
+    )
+
+    # priority: kwargs > args > defaults
+    use_kwargs = {}
+    for key in default_kwargs.keys():
+        if key in kwargs:
+            use_kwargs[key] = kwargs[key]
+        elif hasattr(args, key):
+            use_kwargs[key] = getattr(args, key)
+        else:
+            use_kwargs[key] = default_kwargs[key]
+
+    use_kwargs |= kwargs # in case there are additional kwargs not in default_kwargs
+
+    # Initialise a worker. this needs a global scope to allow 
+    # persistence of states beyond the pool's scope.
+    # Otherwise emulators retrace on each evaluation.
+    global worker
+    if rank == 0:
+        sampler_init_kwargs, run_kwargs = process_sampler_kwargs(
+            kwargs.pop('sampler_kwargs', {}), use_kwargs)
+
+        worker = Dynesty(
+            args, prior, likelihood,
+            injection_parameters,
+            maxmcmc=use_kwargs['maxmcmc'],
+            nact=use_kwargs['nact'],
+            naccept=use_kwargs['naccept'],
+            sampling_seed=use_kwargs['sampling_seed'],
+            sampler_kwargs = run_kwargs,
+            sampler_init_kwargs=sampler_init_kwargs,
+            plot=use_kwargs['plot'],
+            meta_data=meta_data,
+        )
+
+    else:
+        worker = Worker(args, prior, likelihood,
+            injection_parameters,  plot = use_kwargs['plot'])
+
+    ## graceful handling of preemptive shutdowns
+    def handle_sigterm(signum, frame):
+        try:
+            worker.checkpointing(False,
+                'Received termination signal. Checkpointing and exiting gracefully.')
+            sys.exit()
+        except Exception:
+            pass
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+    signal.signal(signal.SIGINT , handle_sigterm)
+    signal.signal(signal.SIGUSR1, handle_sigterm) 
+
+    POOL = MPIPool if pool_type == 'mpi' else MultiPool
+    with POOL() as pool:
+        result = None
+        if pool.is_master():           
+            worker.start_sampler(
+                pool,
+                pooled_log_likelihood, 
+                pooled_prior_transform,
+                pooled_initial_point_from_prior)
+
+            results = worker.run_sampler(
+                check_point_delta_t=use_kwargs['check_point_delta_t'],
+                n_check_point=use_kwargs['n_check_point'],
+                max_its=use_kwargs['max_its'],
+                max_run_time=use_kwargs['max_run_time'],
+                checkpoint_plot=use_kwargs['checkpoint_plot']
+            )
+            result = worker.format_result(
+            results, use_kwargs['result_format'],
+            use_kwargs['rejection_sample_posterior'])
+    
+    return result
+
+
+# Worker functions. These are read in the global scope by each worker
+def pooled_initial_point_from_prior(args):
+    return worker.get_initial_point_from_prior(args)
+
+def pooled_log_likelihood(v_array):
+    return worker.log_likelihood(v_array)
+
+def pooled_prior_transform(u_array):
+    return worker.prior_transform(u_array)

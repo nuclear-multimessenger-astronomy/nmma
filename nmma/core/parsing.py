@@ -56,6 +56,9 @@ def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
     parser.add_argument("--multi", type=yaml_parse,
         help="YAML formatted dict specifying multiple runs with different parameter changes. \n"
              "E.g.: '{run1: {param1: value1, param2: value2}, run2: {param1: value3}}' ")
+    parser.add_argument("--matrix", type=yaml_parse,
+        help="YAML formatted dict specifying multiple runs with cross-wise parameter changes. \n"
+             "E.g.: '{run1: {param1: value1, param2: value2}, run2: {param1: value3}}' ")
     
     if isinstance(parsing_func, (list, tuple)):
         for pars_func in tuple(parsing_func):
@@ -108,33 +111,72 @@ def base_analysis_parsing(parser):
     parser.add_argument("--cosmology", help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)")
     parser.add_argument("--sampling-seed","--seed", type=int, default=42,
         help="Sampling seed (default: 42)")
-    return parser
-
-def single_messenger_analysis_parsing(parser):
-    parser = base_analysis_parsing(parser)
-
-    parser.add_argument("--config", help="Name of the configuration file containing parameter values.")
-    parser.add_argument("-o", "--outdir", default="outdir",  help="Path to the output directory")
-    parser.add_argument("--label", default ="nmma_transient", help="Label for the run")
-    parser.add_argument("--plot", action='store_true', help="create characteristic plot")
-    parser.add_argument("--verbose", action='store_true', help="print out log likelihoods" )
-    parser.add_argument("--prior-file","--prior", help="Path to the prior file")
-    parser.add_argument("--sampler", default="pymultinest",
-        help="Sampler to be used (default: pymultinest)")
-    parser.add_argument("--sampler-kwargs", default="{}", 
-        help="Additional kwargs (e.g. {'evidence_tolerance':0.5}) for bilby.run_sampler, put a double quotation marks around the dictionary")
+    parser.add_argument("--sampler-kwargs", default="{}", type = yaml_parse,
+        help="Additional keyword arguments to pass to the sampler as a dictionary" )
+    parser.add_argument("--skip-sampling", action='store_true', 
+        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
+    parser.add_argument("--dlogz", default=0.1, type=float,
+        help="Stopping criteria: remaining evidence, (default=0.1)" )
     parser.add_argument("--soft-init", action='store_true',
         help="To start the sampler softly (without any checking, default: False)")
     parser.add_argument("--cpus", type=int, default=1,
         help="Number of cores to be used, only needed for dynesty (default: 1)")
     parser.add_argument("-n","--nlive", "--n-live", type=int, default=2048, help="Number of live points (default: 2048)")
-    parser.add_argument("--reactive-sampling", action='store_true',
-        help="To use reactive sampling in ultranest (default: False)")
-    parser.add_argument("--skip-sampling", action='store_true', 
-        help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.")
-
     return parser
 
+def dynesty_parsing(parser):
+    dynesty_group = parser.add_argument_group(title="Dynesty Settings")
+    dynesty_group.add_argument("--n-check-point", default=1000, type=int,
+        help="Steps to take before attempting checkpoint")
+    dynesty_group.add_argument("--max-its", default=10**10, type=int,
+        help="Maximum number of iterations to sample for (default=1.e10)")
+    dynesty_group.add_argument("--max-run-time", default=1.0e10, type=float,
+        help="Maximum time to run for (default=1.e10 s)")
+    dynesty_group.add_argument("--rejection-sample-posterior", action='store_false', help=(
+            "Whether to generate the posterior samples by rejection sampling the "
+            "nested samples or resampling with replacement" ) )
+    dynesty_group.add_argument( "--walks", default=100, type=int,
+        help="Minimum number of walks, defaults to 100" )
+    dynesty_group.add_argument( "--proposals",  action="append", 
+        help="The jump proposals to use, the options are 'diff' and 'volumetric'" )
+    dynesty_group.add_argument("--maxmcmc", default=5000, type=int,
+        help="Maximum number of walks, defaults to 5000" )
+    dynesty_group.add_argument( "--nact", default=2, type=int,
+        help="Number of autocorrelation times to take, defaults to 2")
+    dynesty_group.add_argument("--naccept", default=60, type=int,
+        help="The average number of accepted steps per MCMC chain, defaults to 60")
+    dynesty_group.add_argument("--min-eff", default=10, type=float,
+        help="The minimum efficiency at which to switch from uniform sampling.")
+    
+
+    dynesty_group.add_argument("--facc", default=0.5, type=float,
+        help="See dynesty.NestedSampler")
+    dynesty_group.add_argument("--enlarge", default=1.5, type=float,
+        help="See dynesty.NestedSampler")
+    return parser
+
+
+def single_messenger_analysis_parsing(parser):
+    parser = base_analysis_parsing(parser)
+    parser = dynesty_parsing(parser)
+
+    parser.add_argument("--config", help="Name of the configuration file containing parameter values.")
+    parser.add_argument("-o", "--outdir", default="outdir",  help="Path to the output directory")
+    parser.add_argument("--label", default ="nmma_transient", help="Label for the run")
+    parser.add_argument("--plot", action='store_true', help="create characteristic plot")
+    parser.add_argument("--plot-kwargs", type=yaml_parse, default={}, help="Additional keyword arguments to pass to the plotting routine as a dictionary" )
+    parser.add_argument("--verbose", action='store_true', help="print out log likelihoods" )
+    parser.add_argument("--prior-file","--prior", help="Path to the prior file")
+    parser.add_argument("--sampler", default="pymultinest",
+        help="Sampler to be used (default: pymultinest)")
+    parser.add_argument("--reactive-sampling", action='store_true',
+        help="To use reactive sampling in ultranest (default: False)")
+    parser.add_argument("--bestfit", "--best-fit", action='store_true',
+        help="Save the best fit parameters to JSON")
+    
+    return parser
+
+    
 def base_injection_parsing(parser):
     parser.add_argument("-f", "--injection-file","--filename", default="injection", 
         help="Path to the file with injection parameters, default: 'injection'.")
@@ -227,6 +269,27 @@ def slurm_analysis_parser(parser):
     slurm_args.add_argument("--script-name", default="slurm.sub")
 
     return parser
+
+
+def process_sampler_kwargs(sampler_kwargs, kwargs):
+    # Set defaults here to avoid inconsistent values
+    default_kwargs = dict(dlogz=0.1, save_bounds=False,
+        min_eff=10, sample="acceptance-walk", nlive=1000, bound="live",
+        walks=100, facc=0.5, enlarge=1.5)
+    
+    run_sampler_kwargs = {key: kwargs.get(key, default_kwargs[key]) 
+        for key in ['dlogz', 'save_bounds']}
+    
+
+    def_init_kwargs = {key: kwargs.get(key, default_kwargs[key]) 
+        for key in ['min_eff','sample', 'nlive', 'bound', 'walks', 'facc', 'enlarge']}
+    
+    sampler_init_kwargs = def_init_kwargs | sampler_kwargs
+    sampler_init_kwargs['first_update'] = dict(min_eff=sampler_init_kwargs.pop('min_eff'), 
+                        min_ncall= 2 * sampler_init_kwargs['nlive'])
+        
+    return sampler_init_kwargs, run_sampler_kwargs
+
 
 
 ############# UTILS #############

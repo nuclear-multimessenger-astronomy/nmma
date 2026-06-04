@@ -351,7 +351,7 @@ class LightCurveModelContainer:
                 # apparent_magnitude = utils.autocomplete_data(
                 #      observable_times,  observable_times[use_mask], apparent_magnitude[use_mask])
             else: #no meaningful inter-/extrapolation possible
-                apparent_magnitude =  np.full_like(self.model_times, np.inf)
+                apparent_magnitude =  np.full_like(observable_times, np.inf)
             lc_data[filt] = apparent_magnitude
 
         return (observable_times, lc_data)
@@ -448,6 +448,8 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
     ----------
     model: string, optional
         Name of the model. Can be either "Arnett" (default) or "Arnett_modified"
+    em_model_kwargs: optional
+        Additional keyword arguments, not used in Arnett SN model.
 
     Returns
     -------
@@ -455,7 +457,7 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
         A light curve model object to evaluate the light curve
         from a set of parameters
     """
-    def __init__(self, model="Arnett", sample_times=None):
+    def __init__(self, model="Arnett", sample_times=None, **em_model_kwargs):
         super().__init__(model, sample_times=sample_times)
         if model == "Arnett":
             self.lc_func = lc_gen.arnett_lc
@@ -504,7 +506,8 @@ class SVDLightCurveModel(LightCurveModelContainer):
         List of filters to create model for. Defaults to all available filters.
     local_only: bool, optional
         If True, only local models will be used.
-
+    em_model_kwargs: optional
+        Additional keyword arguments to be passed to the underlying emulator.
     Returns
     -------
     LightCurveModel: `nmma.em.model.SVDLightCurveModel`
@@ -523,6 +526,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
         filters=None,
         sample_times = None,
         local_only=False,
+        **em_model_kwargs
     ):
         # Some models have underscores. Keep those, but drop '_tf' if it exists
         model_name_components = model.split("_")
@@ -546,7 +550,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
             ##FIXME Does this make sense for api_gp, too?
             filters = self.get_model_data(core_model_name, filters)
         try:
-            svd_mag_model = joblib.load(modelfile)
+            svd_mag_model = joblib.load(modelfile, **em_model_kwargs)
             # temporary fix, moving towards permament setting of sncosmo filter names
             self.svd_mag_model = {k.replace("_", ":"): v for k, v in svd_mag_model.items()}
             self.svd_lbol_model= None  # FIXME: this is not yet implemented
@@ -667,11 +671,13 @@ class FiestaKilonovaModel(FiestaModel):
     Parameters
     ----------
     model: str, optional
-        Name of the model. Default is "Bu2025_MLP".
+        Name of the model. Default is "Bu2026_MLP".
     filters: list of str, optional
         List of filters to create model for. Defaults to all available filters.
     surrogate_dir: str, optional
         path to the directory containing the surrogate models.
+    em_model_kwargs: optional
+        Additional keyword arguments to be passed to the underlying fiesta model.
 
     Returns
     -------
@@ -679,19 +685,29 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    def __init__(self, model="Bu2025_MLP", filters=None, surrogate_dir=None, **kwargs):
-        if model.endswith("_lc"):
-            from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
-        else:
-            from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,)
-        try:
-            fiesta_model = BullaSurrogate(**fiesta_kwargs)
-        except OSError:
-            fiesta_kwargs['directory'] = f'{surrogate_dir}/KN/{model}/model'
-            fiesta_model = BullaSurrogate(**fiesta_kwargs)
+    def __init__(self, model="Bu2026_MLP", filters=None, surrogate_dir=None, **em_model_kwargs):
+        if isinstance(model, str):
+            if model.endswith("_lc"):
+                from fiesta.inference.lightcurve_model import BullaLightcurveModel as BullaSurrogate
+            else:
+                from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
+            fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
+            model = BullaSurrogate(**fiesta_kwargs)
 
-        super().__init__(fiesta_model, filters, sample_times=kwargs.get('sample_times', None))
+        super().__init__(model, filters, sample_times=em_model_kwargs.get('sample_times', None))
+
+    def parameter_conversion(self, parameters):
+        if "kappa_Ye" in parameters:
+            if "Ye_wind" in parameters:
+                parameters["Ye_dyn"] = parameters["kappa_Ye"] * parameters["Ye_wind"]
+            else:
+                parameters["Ye_wind"] = parameters["Ye_dyn"] / parameters["kappa_Ye"]
+        if "kappa_v" in parameters:
+            if "v_ej_wind" in parameters:
+                parameters["v_ej_dyn"] = parameters["kappa_v"] * parameters["v_ej_wind"]
+            else:
+                parameters["v_ej_wind"] = parameters["v_ej_dyn"] / parameters["kappa_v"]
+        return super().parameter_conversion(parameters)
 
 class GRBMixin:
     def __init__(self, *args, resolution=12, **kwargs):
@@ -741,6 +757,8 @@ class FiestaGRBModel(GRBMixin,FiestaModel):
         List of filters to create model for. Defaults to all available filters.
     surrogate_dir: str, optional
         path to the directory containing the surrogate models.
+    em_model_kwargs: optional
+        Additional keyword arguments to be passed to the underlying Fiesta GRB model.
 
     Returns
     -------
@@ -748,16 +766,13 @@ class FiestaGRBModel(GRBMixin,FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    def __init__(self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **kwargs):
+    def __init__(self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **em_model_kwargs):
         from fiesta.inference.lightcurve_model import AfterglowFlux
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,)
-        try:
-            fiesta_model = AfterglowFlux(**fiesta_kwargs)
-        except OSError:
-            fiesta_kwargs['directory'] = f'{surrogate_dir}/GRB/{model}/model'
-            fiesta_model = AfterglowFlux(**fiesta_kwargs)
-
-        super().__init__(fiesta_model, filters, sample_times=kwargs.get('sample_times', None))
+        if isinstance(model, str):
+            fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
+            model = AfterglowFlux(**fiesta_kwargs)
+        
+        super().__init__(model, filters, sample_times=em_model_kwargs.get('sample_times', None))
 
     
 class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
@@ -778,6 +793,8 @@ class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
         Type of jet for the GRB model. Default is 0.
     filters: list of str, optional
         List of filters to create model for. Defaults to all available filters.
+    em_model_kwargs: optional
+        Additional keyword arguments to be passed to the underlying afterglowpy model.
 
     Returns
     -------
@@ -793,10 +810,11 @@ class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
         jet_type=0,
         filters=None,
         sample_times=None,
+        **em_model_kwargs
     ):
         super().__init__(model, filters, model_parameters, sample_times, resolution=resolution)
         self.jet_type = jet_type
-        self.default_parameters = {"xi_N": 1.0, "d_L": 3.086e19, "jetType": jet_type, "specType": 0}  # d_L=10pc in cm
+        self.default_parameters = {"xi_N": 1.0, "d_L": 3.086e19, "jetType": jet_type, "specType": 0, **em_model_kwargs}  # d_L=10pc in cm
         self.def_keys = self.default_parameters.keys()
         #keys we typically sample in log space, but need to convert to linear space
         self.log_sampling_keys = ["E0", "n0", "epsilon_e", "epsilon_B"]
@@ -874,6 +892,8 @@ class HostGalaxyLightCurveModel(LightCurveModelContainer):
         Magnitude of the host galaxy. Default is 23.9.
     model_parameters: list, optional
         List of alternative model parameters. If not specified, default will be used.
+    em_model_kwargs: optional
+        Additional keyword arguments, not used, but provided for consistency.
 
     Returns
     -------
@@ -888,7 +908,8 @@ class HostGalaxyLightCurveModel(LightCurveModelContainer):
         sample_times=None,
         # host_mag is the magnitude of the host galaxy in the filters
         host_mag=23.9,  # value for case of arxiv:2303.12849
-        model_parameters=None
+        model_parameters=None,
+        **em_model_kwargs
     ):
         super().__init__(model, filters, model_parameters, sample_times=sample_times)
         if isinstance(host_mag, (float, int)):
@@ -915,6 +936,8 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         List of filters to create model for. Defaults to all available filters.
     model_parameters: list, optional
         List of alternative model parameters. If not specified, default will be used.
+    em_model_kwargs: optional
+        Additional keyword arguments to be passed to the underlying sncosmo model.
 
     Returns
     -------
@@ -927,15 +950,25 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         model="nugent-hyper",
         filters=None,
         sample_times=None,
-        model_parameters=None
+        model_parameters=None,
+        **em_model_kwargs
     ):  
-        self.sn_model = sncosmo.Model(source=model)
+        if isinstance(model, str):
+            self.sn_model = sncosmo.Model(source=model, **em_model_kwargs)
+        else:
+            self.sn_model = model
         if model_parameters is not None:
             print("Warning: model_parameters are ignored for SupernovaLightCurveModel, using sncosmo defaults.")
         model_parameters = self.sn_model.param_names
 
         if sample_times is None:
             sample_times = np.linspace(self.sn_model.mintime(), self.sn_model.maxtime(), 200)
+
+            if (sample_times < 0).any():
+                # NOTE: We assume this means the sncosmo model is relative to peak time.
+                sample_times += sample_times[0]
+                print(f"Warning: Some supernova models are relative to the peak, some relative to the explosion time, "
+                    "but nmma always expects times relative to the explosion time. Adjust your t0 prior accordingly." )
         super().__init__(model, filters, model_parameters, sample_times)
 
     def em_parameter_setup(self, parameters):
@@ -943,22 +976,37 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         self.sn_model.set(**lc_pars)
 
     def combine_lc_params(self, parameters):
-        # FIXME: This should probably be removed, use sncosmo parameters instead
+        
         self.stretch = parameters.get('supernova_mag_stretch', 1.)
+
         parameters["t0"] = parameters.get("t0", 0.)
         parameters["z"] = self.redshift
         return {p: parameters.get(p, self.sn_model.get(p)) 
                 for p in self.model_parameters}
 
-    def generate_lightcurve(self, sample_times, parameters):
+    def gen_detector_lc(self, parameters = None, sample_times=None):
+        """Generate a light curve for given parameters as observable in detector frame.
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the Supernova model.
+        sample_times: times at which to explore the light curve. If None, uses the default times for the model."""
+
+        if sample_times is None:
+            sample_times = self.model_times
+            
+        # convert the parameters to the fiesta model parameters
         self.em_parameter_setup(parameters)
-
-
-        mag = lc_gen.sn_lc(sample_times / self.stretch, self.sn_model, 
+        mag = lc_gen.sn_lc(sample_times / self.stretch/(1 + self.redshift), self.sn_model, 
                            self.default_filts, self.lambdas)
-        
-        return {filt: filt_mag for filt, filt_mag in mag.items()}
-    
+
+        # apply the extinction correction
+        ext_mag = self.get_extinction_mags()
+        obs_mags = self.apply_extinction_correction(mag, ext_mag, self.default_filts)
+            
+        # we are in observer frame, but still need to add the timeshift
+        return (sample_times + self.timeshift, obs_mags)
+            
 
 class ShockCoolingLightCurveModel(LightCurveModelContainer):
     def __init__(
@@ -974,6 +1022,10 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
         Name of the model. Default is "Piro2021".
     filters: list of str, optional
         List of filters to create model for. Defaults to all available filters.
+    model_parameters: list, optional
+        List of alternative model parameters. If not specified, default will be used.
+    em_model_kwargs: optional
+        Additional keyword arguments, not used, but provided for consistency.
 
         Returns
         -------
@@ -1020,6 +1072,8 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         Name of the model. Default is "Me2017".
     filters: list of str, optional
         List of filters to create model for. Defaults to all available filters.
+    em_model_kwargs: optional
+        Additional keyword arguments, not used, but provided for consistency.
 
     Returns
     -------
@@ -1028,7 +1082,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         from a set of parameters.
     """
     def __init__(
-        self, model="Me2017", filters=None, sample_times=None
+        self, model="Me2017", filters=None, sample_times=None, **em_model_kwargs
     ):
         super().__init__(model, filters, sample_times=sample_times)
         lc_dict={
@@ -1311,10 +1365,12 @@ def single_model_from_args(model_class, model_name, args,
 
     # update explicit args
     model_args = default_model_args | dict(filters=filters,
-        sample_times=utils.setup_sample_times(args),
+        sample_times=utils.setup_sample_times(args)
     )
-    if model_name is not None: 
+    if model_name: 
         model_args["model"] = model_name.strip()
+    if args.em_model_kwargs:
+        model_args|= args.em_model_kwargs
     return model_class(**model_args)
 
 def create_light_curve_model_from_args(

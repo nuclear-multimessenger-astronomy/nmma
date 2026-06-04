@@ -1,124 +1,188 @@
 import matplotlib.pyplot as plt
 import matplotlib
+from matplotlib.ticker import MaxNLocator
+
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from itertools import cycle
 import numpy as np
 import os
 
-matplotlib.use("agg")
 params = {
     "backend": "pdf",
     "figure.figsize": [18, 25],
 }
 matplotlib.rcParams.update(params)
 matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
+matplotlib.rcParams['figure.labelsize'] = 20
+# matplotlib.rcParams['axes.titlesize'] = 'large'
+if os.environ.get("CI") == 'true':
+    matplotlib.use("agg")
+from nmma.core.plotting_utils import fig_setup
+nmma_colors = fig_setup()
 
 ##############################################
 ################# MAIN PLOTS #################
 ##############################################
 def basic_em_analysis_plot(
-        transient, mags_to_plot, error_dict, chi2_dict, mismatches,
-        sub_model_plot_props, xlim, ylim, save_path,
-        ncol = 2):
+        transient, plot_filters, mags_to_plot, error_dict, chi2_dict, 
+        mismatches, sub_model_plot_props, xlim, ylim, save_path,
+        ncols = 2, fig = None, shared_data = True,
+        markersize = 8, **kwargs):
+
+    ### setup to get quantities
+    filter_names = list(plot_filters.keys())
+    def_data_colours = plt.cm.plasma(np.linspace(0, 1, len(filter_names)))[::-1]
+    fit_color = kwargs.pop('color', next(nmma_colors))
+    marker = kwargs.pop('marker') if 'marker' in kwargs else next(marker_cycle)
+    ### prepare figure
+    if not shared_data or not fig:
+
+        if not fig: 
+            fig = init_em_analysis_plot(plot_filters, ncols)
+
+        add_xlim = check_limit(xlim) if xlim else get_time_limits_from_obs_data(transient)
+        old_xlim = fig.axes[0].get_xlim()
+        xlim = (min(add_xlim[0], old_xlim[0]), 
+                max(add_xlim[1], old_xlim[1]))
+        fix_ylim = check_limit(ylim) if ylim else False
+        
+        for cnt, filt in enumerate(filter_names):
+            ax_sum = fig.axes[cnt]
+
+            data_c = default_filter_colours.get(
+                plot_filters[filt].lower(), 
+                def_data_colours[cnt])
+            ax_sum = plot_observations(ax_sum, transient, data_c, 
+                    filter=filt, marker=marker, markersize=markersize)
+
+            ax_sum.set_xlim(xlim)
+            # ax_delta.set_xlim(xlim)
+            if xlim[0] > 0:
+                ax_sum.set_xscale('log')
+            if fix_ylim:
+                ax_sum.set_ylim(fix_ylim)
+            else:
+                add_ylim = get_mag_limits_from_obs_data(transient, filt)
+                old_ylim = fig.axes[cnt].get_ylim()
+                use_ylim = (max(add_ylim[0], old_ylim[0]), 
+                            min(add_ylim[1], old_ylim[1]))
+                ax_sum.set_ylim(use_ylim)
+
+    ### plot lcs and residuals
 
     time = mags_to_plot.pop("time")
-    filter_names = list(mags_to_plot.keys())
-
-    if xlim is None:
-        xlim = get_time_limits_from_obs_data(transient)
-    else:
-        xlim = check_limit(xlim)
-
-    if ylim is None:
-        ylim = get_mag_limits_from_obs_data(transient, filter_names)
-    else:
-        shared_ylim = check_limit(ylim)
-        ylim = {filt: shared_ylim for filt in filter_names}
-
-    fig, axes = analysis_plot_geometry(filter_names, ncol=ncol)
-    colors = plt.cm.Spectral(np.linspace(0, 1, len(filter_names)))[::-1]
+    n_axes = (len(fig.axes)+1 )// 2
     for cnt, filt in enumerate(filter_names):
+        # plot the best-fit lc with errors
+        ax_sum = fig.axes[cnt]
+        plot_bestfit_with_errors(ax_sum, time, mags_to_plot[filt], error_dict[filt], sub_model_plot_props, cnt, fit_color)
+ 
+        ax_delta = fig.axes[cnt+n_axes]
+        
 
+        obs_times, obs_unc = transient.light_curve_times, transient.light_curve_uncertainties  
+        det_times = obs_times[filt][np.isfinite(obs_unc[filt])]
+        
+        if det_times.size>0: ## show scatter
+            ax_delta = fig.axes[cnt+n_axes]
+            diff_per_data, _ = mismatches[filt]
+
+            delta_ylim = ax_delta.get_ylim()
+            dylim = (min(delta_ylim[0], 0.9*min(diff_per_data)), 
+                    max(delta_ylim[1], 1.1*max(diff_per_data)))
+            ax_delta.set_ylim(dylim)
+
+            ax_delta.scatter(det_times, diff_per_data, color=fit_color, marker=marker)
+
+            if ax_sum.get_legend():
+                ax_sum.get_legend().remove()
+            else:
+                ax_sum.plot([], [], label=fr'$\chi^2$ / d.o.f. = {round(chi2_dict[filt], 2)}')
+                ax_sum.legend(loc='best', frameon=False, handlelength=0, handletextpad=0)
+
+
+
+
+    ### return figure
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, bbox_inches='tight', dpi = 250)
+    return fig
+
+
+def init_em_analysis_plot(plot_filters, ncols):
+
+    filter_names = list(plot_filters.keys())
+    fig, axes = analysis_plot_geometry(filter_names, ncols=ncols)
+    fig.supylabel("AB magnitude", rotation=90)
+    fig.supxlabel("Time [days]")
+    init_limits = np.array([1000, -1000])# dummy values
+    
+    for cnt, filt in enumerate(filter_names):
         # summary plot
-        row, col = divmod(cnt, ncol)
+        row, col = divmod(cnt, ncols)
         ax_sum = axes[row, col]
+        ax_sum.set_ylabel(plot_filters[filt])
+        ax_sum.set_xlim(init_limits)
+        ax_sum.set_ylim(-init_limits)
+
         # adding the ax for the Delta
         divider = make_axes_locatable(ax_sum)
         ax_delta = divider.append_axes('bottom',
-                                        size='30%',
-                                        sharex=ax_sum)
+                                        size='40%',
+                                        sharex=ax_sum,
+                                        pad=0.1)
+        ax_delta.axhline(0, linestyle='--', color='k')
+        ax_delta.set_ylabel(r"$\Delta$ mag")
+        ax_delta.set_ylim(0,1e-9)
 
-        # configuring ax_sum
-        ax_sum.set_ylabel("AB magnitude", rotation=90)
-        ax_delta.set_ylabel(r"$\Delta (\sigma)$")
-        if cnt == len(filter_names)-1:
-            ax_delta.set_xlabel("Time [days]")
+        if cnt < len(filter_names) - ncols:  
+            ax_sum.set_xticklabels([])
         else:
-            ax_delta.set_xticklabels([])
+            #still set ax_sum xticks invisible, 
+            # but keeps ax_delta visible at bottom
+            plt.setp(ax_sum.get_xticklabels(), visible=False)
+    return fig
 
-        # plot the observations
-        ax_sum, det_times = plot_observations(ax_sum, transient, colors[cnt], filter=filt)
 
-        if det_times.size>0:
+def plot_bestfit_with_errors(ax_sum, time, mag_plot, error_budget, 
+        sub_model_plot_props, cnt, color):
 
-            # plot the mismatch between the model and the data
-            diff_per_data, sigma_per_data = mismatches[filt]
-            ax_delta.axhline(0, linestyle='--', color='k')
-            ax_delta.scatter(det_times, diff_per_data, color=colors[cnt])
-            
-            ax_sum.set_title(f'{filt}: ' + fr'$\chi^2 / d.o.f. = {round(chi2_dict[filt], 2)}$')
-        
-        else:
-            ax_sum.set_title(f'{filt}')
+    label = 'combined' if sub_model_plot_props is not None else ""
+    ax_sum.plot(time, mag_plot,
+        color=color, linewidth=3, linestyle="--")
+    ax_sum.fill_between(time,
+        mag_plot + error_budget,
+        mag_plot - error_budget,
+        facecolor=color,
+        alpha=0.2,
+        label=label,
+        )
 
-        # plot the best-fit lc with errors
-        mag_plot = mags_to_plot[filt]
-        error_budget = error_dict[filt]
-        label = 'combined' if sub_model_plot_props is not None else ""
-
-        ax_sum.plot(time, mag_plot,
-            color='coral', linewidth=3, linestyle="--")
-        ax_sum.fill_between(time,
-            mag_plot + error_budget,
-            mag_plot - error_budget,
-            facecolor='coral',
-            alpha=0.2,
-            label=label,
+    if sub_model_plot_props is not None:
+        ## plot additional lcs for each sub_model
+        for model_name, prop_dict in sub_model_plot_props.items():
+            mag_plot = prop_dict['plot_mags'][cnt]
+            mag_err = prop_dict['plot_errors'][cnt]
+            plot_times = prop_dict['plot_times']
+            ax_sum.plot(plot_times, mag_plot,
+                color=color, linewidth=3, linestyle="--")
+            ax_sum.fill_between(plot_times,
+                mag_plot + mag_err,
+                mag_plot - mag_err,
+                facecolor=prop_dict['color'],
+                alpha=0.2,
+                label=model_name,
             )
 
-        if sub_model_plot_props is not None:
-            ## plot additional lcs for each sub_model
-            for model_name, prop_dict in sub_model_plot_props.items():
-                mag_plot = prop_dict['plot_mags'][cnt]
-                mag_err = prop_dict['plot_errors'][cnt]
-                plot_times = prop_dict['plot_times']
-                ax_sum.plot(plot_times, mag_plot,
-                    color='coral', linewidth=3, linestyle="--")
-                ax_sum.fill_between(plot_times,
-                    mag_plot + mag_err,
-                    mag_plot - mag_err,
-                    facecolor=prop_dict['color'],
-                    alpha=0.2,
-                    label=model_name,
-                )
-
-        ax_sum.set_ylim(ylim[filt])
-        ax_sum.set_xlim(xlim)
-        ax_delta.set_xlim(xlim)
-        if xlim[0] > 0:
-            ax_sum.set_xscale('log')
-        
-    plt.tight_layout()
-    plt.savefig(save_path, bbox_inches='tight')
-    plt.close()
 
 def bolometric_lc_plot(transient, time, lc, save_path, color = "coral"):
     matplotlib.rcParams.update(
-        {'font.size': 12,
-        # 'font.family': 'Times New Roman'
+        {'font.size': 12, 'font.family': 'serif'
         }
     )
     fig, ax = plt.subplots(1, 1)
-    ax, _ = plot_observations(ax, transient, markersize=12)
+    ax = plot_observations(ax, transient, markersize=12)
 
     ### plot the bestfit model
     ax.plot(time, lc,
@@ -181,7 +245,7 @@ def visualise_model_performance(training_data, training_model, light_curve_model
 
 def chi2_hists_from_dict(chi2_dict, outpath):
     matplotlib.rcParams.update(
-        {"font.size": 16, "font.family": "Times New Roman"}
+        {"font.size": 16, "font.family": "Serif"}
     )
     for filt, chi2_array in chi2_dict.items():
         plt.figure()
@@ -292,7 +356,7 @@ def lc_plot_with_histogram(filters, data_dict, sample_times, save_path, percenti
             hist, _ = np.histogram(x, bins=bins)
             return hist
 
-        hist = np.apply_along_axis(lambda x: return_hist(x), -1, plot_data.T)
+        hist = np.apply_along_axis(return_hist, -1, plot_data.T)
         bins = (bins[1:] + bins[:-1]) / 2.0
 
         X, Y = np.meshgrid(sample_times, bins)
@@ -353,28 +417,7 @@ def check_limit(lim):
     assert len(lim) == 2, f"{lim} is no valid plot-limit." 
     return lim
 
-def get_time_limits_from_obs_data(transient):
-    """
-    A function that goes through the lc data and finds the time range that encompasses all data points.
-    """
-
-    xmin = np.min([t_arr.min() for t_arr in transient.light_curve_times.values()])
-    xmax = np.max([t_arr.max() for t_arr in transient.light_curve_times.values()])
-
-    return (0.8*xmin, 1.2*xmax)
-
-def get_mag_limits_from_obs_data(transient, filter_names):
-    """
-    A function that goes through the lc data and finds the magnitude range for each filter.
-    """
-
-    ylim = {}
-    for filt in filter_names:
-        ylim[filt] = (1.2*transient.light_curves[filt].max(), 0.8*transient.light_curves[filt].min())
-
-    return ylim
-
-def plot_observations(ax, transient, color="k",**kwargs):
+def plot_observations(ax, transient, color="k", marker = "D", **kwargs):
     obs_times, obs_lc, obs_unc = transient.light_curve_times, transient.light_curves, transient.light_curve_uncertainties
     if 'filter' in kwargs:
         filt = kwargs.pop('filter')
@@ -383,13 +426,13 @@ def plot_observations(ax, transient, color="k",**kwargs):
         obs_times = obs_times[filt]
     # obs_times+= transient.trigger_time 
     detections = np.isfinite(obs_unc) ## does not include nans or infs
-    ax.errorbar(obs_times[detections], obs_lc[detections], obs_unc[detections], fmt="o", color =color, **kwargs)
+    ax.errorbar(obs_times[detections], obs_lc[detections], obs_unc[detections], fmt=marker, color =color, **kwargs)
 
     non_detections = np.isinf(obs_unc) ## does only include +-inf, not nans
     ax.errorbar(obs_times[non_detections], obs_lc[non_detections], fmt="v", color=color, **kwargs)
-    return ax, obs_times[detections]
+    return ax
 
-def analysis_plot_geometry(filters_to_plot, ncol=2):
+def analysis_plot_geometry(filters_to_plot, ncols=2):
     # NOTE Should this be the preferred geometry for the plots?
     # set up the geometry for the all-in-one figure
     wspace = 0.6  # All in inches.
@@ -400,43 +443,53 @@ def analysis_plot_geometry(filters_to_plot, ncol=2):
     hpanel = 2.25
     wpanel = 3.
 
-    nrow = int(np.ceil(len(filters_to_plot) / ncol))
-    fig, axes = plt.subplots(nrow, ncol)
+    nrow = int(np.ceil(len(filters_to_plot) / ncols))
 
-    figsize = (1.5 * (lspace + wpanel * ncol + wspace * (ncol - 1) + trspace),
+    figsize = (1.5 * (lspace + wpanel * ncols + wspace * (ncols - 1) + trspace),
                 1.5 * (bspace + hpanel * nrow + hspace * (nrow - 1) + trspace))
     # Create the figure and axes.
-    fig, axes = plt.subplots(nrow, ncol, figsize=figsize, squeeze=False)
+    fig, axes = plt.subplots(nrow, ncols, figsize=figsize, squeeze=False)
     fig.subplots_adjust(left=lspace / figsize[0],
                         bottom=bspace / figsize[1],
-                        right=1. - trspace / figsize[0],
-                        top=1. - trspace / figsize[1],
+                        right = 1. - trspace / figsize[0],
+                        top =   1. - trspace / figsize[1],
                         wspace=wspace / wpanel,
                         hspace=hspace / hpanel)
 
-    if len(filters_to_plot) % 2:
-        axes[-1, -1].axis('off')
+    if len(filters_to_plot) % ncols:
+        for i in range(len(filters_to_plot) % ncols, ncols):
+            axes[-1, i-ncols].axis('off')
     return fig, axes
+
 
 
 def get_time_limits_from_obs_data(transient):
     """
     A function that goes through the lc data and finds the time range that encompasses all data points.
     """
-    
-    xmin = np.min([t_arr.min() for t_arr in transient.light_curve_times.values()])    
-    xmax = np.max([t_arr.max() for t_arr in transient.light_curve_times.values()])    
 
-    return (0.8*xmin, 1.2*xmax)
+    xmin = np.min([t_arr.min() for t_arr in transient.light_curve_times.values()])
+    xmax = np.max([t_arr.max() for t_arr in transient.light_curve_times.values()])
 
-def get_mag_limits_from_obs_data(transient, filter_names):
+    return (0.9*xmin, 1.1*xmax)
+
+def get_mag_limits_from_obs_data(transient, filt):
     """
     A function that goes through the lc data and finds the magnitude range for each filter.
     """
 
-    ylim = {}
-    for filt in filter_names:
-        ylim[filt] = (1.2*transient.light_curves[filt].max(), 0.8*transient.light_curves[filt].min())
-
+    min_mag = transient.light_curves[filt].min()
+    max_mag = transient.light_curves[filt].max()
+    ylim = (min(1.05*max_mag, 1+ max_mag), max(min_mag-1, 0.95*min_mag))
     return ylim
 
+default_filter_colours = {
+        "u": "purple",
+        "g": "green",
+        "r": "red",
+        "i": "orange",
+        "z": "brown",
+        "y": "olive",
+    }
+
+marker_cycle = cycle(("o", "D", "s", "P", "X", "*"))

@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 
 
 from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict, EoSConverter
-from gwpy.table import Table
 
 from ..em.lightcurve_generation import create_light_curve_data
 from ..em import io, model, utils, em_parsing as emp
@@ -16,6 +15,8 @@ from ..core.utils import read_trigger_time
 
 def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     """Routine to generate a marginalized set of light curves from a set of GW samples. These need to be parsed as template-files, h5-file or coincidence files."""
+    
+    from gwpy.table import Table #gwpy is nasty in overwriting matplotlib, so we should only load it if truly needed
     args = emp.parsing_and_logging(emp.lc_marginalisation_parser, args)
 
     rng = np.random.default_rng(args.generation_seed)
@@ -24,7 +25,7 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     if filters is None:
         filters = 'u,g,r,i,z,y,J,H,K'
     light_curve_model = model.create_light_curve_model_from_args(args.em_model, args, filters)
-    conversion = conv.MultimessengerConversion.basic_bns(EoSConverter(args, method = 'tabulated'),
+    conversion = conv.MultimessengerConversion.basic_cbc(EoSConverter(args, method = 'tabulated'),
         light_curve_model.parameter_conversion)
 
     ## read eos and gw data
