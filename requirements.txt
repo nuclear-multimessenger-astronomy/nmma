@@ -1,6 +1,8 @@
 future
 bilby>=2.7.1
 bilby_pipe>=1.7.0
+fiesta
+huggingface_hub
 schwimmbad
 colorcet
 numpy>=2.0

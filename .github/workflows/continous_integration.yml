@@ -38,12 +38,12 @@ jobs:
           activate-environment: nmma_env
           channels: defaults
 
-      - name: Restore SVD models from cache
-        uses: actions/cache/restore@v4
+      - name: Cache fiesta-surrogates
+        uses: actions/cache@v4
         with:
-          path: svdmodels
-          key: svdmodels-${{ hashFiles('**/LICENSE') }}
-          restore-keys: svdmodels-
+          path: fiesta-surrogates
+          key: fiesta-surrogates-${{ hashFiles('**/LICENSE') }}
+          restore-keys: fiesta-surrogates-
 
       - name: Get pip cache dir
         id: pip-cache
@@ -86,6 +86,12 @@ jobs:
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude docs,versioneer.py,nmma/_version.py,nmma/tests,nmma/*/__init__.py
 
+      - name: Download fiesta-surrogates from HuggingFace
+        run: |
+          hf download nuclear-multimessenger-astronomy/fiesta-surrogates \
+            --repo-type model --local-dir fiesta-surrogates
+          echo "NMMA_FIESTA_SURROGATES=$GITHUB_WORKSPACE/fiesta-surrogates" >> $GITHUB_ENV
+
       - name: Test with pytest
         run: |
           echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
@@ -94,6 +100,7 @@ jobs:
         env:
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
           DYLD_LIBRARY_PATH: ${{ env.DYLD_LIBRARY_PATH }}
+          NMMA_FIESTA_SURROGATES: ${{ env.NMMA_FIESTA_SURROGATES }}
 
       - name: Run Coveralls
         if: ${{ success() }}
@@ -101,13 +108,6 @@ jobs:
           coveralls --service=github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Save SVD models cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: svdmodels
-          key: svdmodels-${{ hashFiles('**/LICENSE') }}
 
       - name: Save pip cache
         uses: actions/cache/save@v4

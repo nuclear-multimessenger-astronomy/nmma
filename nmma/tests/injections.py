@@ -23,11 +23,11 @@ def lightcurveInjectionTest(model_name):
     print(
         "current working directory: ", os.getcwd()
     )  # assumes run in root nmma folder, will need to modify if this is not true
-    workingDir=os.path.dirname(__file__)
-    dataDir = os.path.join(workingDir, 'data')
+    workingDir = os.path.dirname(__file__)
+    dataDir = os.path.join(workingDir, "data")
     test_directory = os.path.join(dataDir, model_name)
-    priorDir=os.path.join(workingDir, '../../priors/')
-    svdmodels=os.path.join(workingDir, '../../svdmodels/')
+    priorDir = os.path.join(workingDir, "../../priors/")
+    svdmodels = os.path.join(workingDir, "../../svdmodels/")
     if os.path.isdir(test_directory):
         shutil.rmtree(test_directory, ignore_errors=True)
     os.makedirs(test_directory, exist_ok=True)
@@ -47,21 +47,22 @@ def lightcurveInjectionTest(model_name):
         """
 
         if model_name == "nugent-hyper":
-            prior_path = os.path.join( priorDir, "sncosmo-generic" + ".prior")
+            prior_path = os.path.join(priorDir, "sncosmo-generic" + ".prior")
         elif model_name == "TrPi2018":
-            prior_path = os.path.join( dataDir, "TrPi2018_pinned_parameters" + ".prior") #pinning the parameter svalues in the prior file
+            prior_path = os.path.join(
+                dataDir, "TrPi2018_pinned_parameters" + ".prior"
+            )  # pinning the parameter svalues in the prior file
         else:
-            prior_path = os.path.join( priorDir, model_name + ".prior")
+            prior_path = os.path.join(priorDir, model_name + ".prior")
         assert os.path.exists(prior_path), "prior file does not exist"
         injection_name = os.path.join(test_directory, model_name + "_injection.json")
-        
-        
+
         args = nmma_base_parsing(joint_parsing.injection_parsing, [])
         non_default_args = dict(
             prior_file=prior_path,
             simple_setup=True,
             injection_file=injection_name,
-            post_processing=['ejecta'],
+            post_processing=["ejecta"],
             n_injection=1,
             eos_file="example_files/eos/ALF2.dat",
             original_parameters=True,
@@ -106,7 +107,7 @@ def lightcurveInjectionTest(model_name):
             outdir=output_directory,
             interpolation_type="sklearn_gp",
             injection_error_budget=0.0,
-            ignore_timeshift = True,
+            ignore_timeshift=True,
         )
         args.__dict__.update(non_default_args)
 
@@ -137,20 +138,20 @@ def lightcurveInjectionTest(model_name):
         """
         assert os.path.exists(injection_file), "injection file does not exist"
         injection_dict = read_injection_file(injection_file)
-        lightcurve_parameters = {k:v[0] for k, v in injection_dict.items()}
+        lightcurve_parameters = {k: v[0] for k, v in injection_dict.items()}
         init_kwargs = dict(
             model=model_name,
             filters=["sdssu"],
-            sample_times = np.arange(0.01, 20.0 + 0.5, 0.5)
+            sample_times=np.arange(0.01, 20.0 + 0.5, 0.5),
         )
         if model_name == "Ka2017":
-            init_kwargs['interpolation_type'] = "sklearn_gp"
+            init_kwargs["interpolation_type"] = "sklearn_gp"
         model_class = get_lc_model_from_modelname(model_name)
         lightcurve_model = model_class(**init_kwargs)
         lc_params = lightcurve_model.parameter_conversion(lightcurve_parameters)
-        _, func_lc = lightcurve_model.gen_detector_lc(lc_params )
-        #lightcurve_from_function["t"] = obs_times
- 
+        _, func_lc = lightcurve_model.gen_detector_lc(lc_params)
+        # lightcurve_from_function["t"] = obs_times
+
         return func_lc
 
     def compare_lightcurves(lightcurve_from_function, lightcurve_from_command_line):
@@ -175,12 +176,15 @@ def lightcurveInjectionTest(model_name):
         ), "filters from function and command line do not match"
         # goes filter by filter and checks that each array matches
         for filter_name in filters_from_function:
-            cli_mags = lightcurve_from_command_line[filter_name]['mag']
+            cli_mags = lightcurve_from_command_line[filter_name]["mag"]
             gen_mags = lightcurve_from_function[filter_name]
-            assert all(np.isclose(
-                cli_mags[~np.isnan(cli_mags)],
-                gen_mags[~np.isnan(gen_mags)],
-                rtol=1e-3)), f"lightcurve tolerance for {filter_name} exceeded"
+            assert all(
+                np.isclose(
+                    cli_mags[~np.isnan(cli_mags)],
+                    gen_mags[~np.isnan(gen_mags)],
+                    rtol=1e-3,
+                )
+            ), f"lightcurve tolerance for {filter_name} exceeded"
 
     def cleanup_files():
         """
@@ -188,12 +192,14 @@ def lightcurveInjectionTest(model_name):
         """
         shutil.rmtree(test_directory, ignore_errors=True)
         assert not os.path.exists(test_directory), "test directory has not been deleted"
-   
+
     injection_file = create_injection_from_command_line(model_name)
     command_line_lightcurve_dictionary = create_lightcurve_from_command_line(
-                                            model_name, injection_file )
+        model_name, injection_file
+    )
     function_lightcurve_dictionary = create_lightcurve_from_function(
-                                            model_name, injection_file )
+        model_name, injection_file
+    )
 
     compare_lightcurves(
         function_lightcurve_dictionary, command_line_lightcurve_dictionary
@@ -204,34 +210,46 @@ def lightcurveInjectionTest(model_name):
 
 
 def test_injections():
-    for model_name in ["nugent-hyper", "salt2", "Me2017",
-                        "Piro2021", "TrPi2018", "Ka2017"]:
+    # Ka2017 is an SVD model whose download path is retired with the GitLab fetch
+    # path; the fiesta-surrogate Bu2025 exercises that pipeline in fiesta_smoke.
+    for model_name in ["nugent-hyper", "salt2", "Me2017", "Piro2021", "TrPi2018"]:
         lightcurveInjectionTest(model_name)
+
 
 def test_validate_lightcurves():
     print("validate_lightcurve test")
 
-    ## initialize args, check a file that is known to have 3 observations in the ztf g filter and 1 in the ztf r filter. All detections occur within 9 days of the original observation.
+    # initialize args, check a file that is known to have 3 observations in the ztf g filter and 1 in the ztf r filter. All detections occur within 9 days of the original observation.
     args = Namespace(
-        data_file='example_files/candidate_data/ZTF20abwysqy.dat',
+        data_file="example_files/candidate_data/ZTF20abwysqy.dat",
         filters=["ztfg"],
         min_obs=3,
         cutoff_time=0,
         verbose=True,
     )
-    assert lch.validate_lightcurve(**vars(args)) == True, "Test for 3 observations in the ztf g filter failed"
+    assert lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for 3 observations in the ztf g filter failed"
 
     args.filters = ["ztfr"]
     args.min_obs = 1
-    assert lch.validate_lightcurve(**vars(args)) == True, "Test for 1 observation in the ztf r filter failed"
+    assert lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for 1 observation in the ztf r filter failed"
 
     args.filters = ["ztfg", "ztfr"]
-    assert lch.validate_lightcurve(**vars(args)) == True, "Test for  passing multiple filters failed"
+    assert lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for  passing multiple filters failed"
 
     args.filters = None
     args.min_obs = 0
-    assert lch.validate_lightcurve(**vars(args)) == True, "Test for automatic filter selection failed"
+    assert lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for automatic filter selection failed"
 
     args.cutoff_time = 1
     args.min_obs = 1
-    assert lch.validate_lightcurve(**vars(args)) == False, "Test for setting cutoff time failed"
+    assert not lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for setting cutoff time failed"
