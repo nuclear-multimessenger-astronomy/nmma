@@ -45,19 +45,11 @@ jobs:
           key: fiesta-surrogates-${{ hashFiles('**/LICENSE') }}
           restore-keys: fiesta-surrogates-
 
-      - name: Get pip cache dir
-        id: pip-cache
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
-
-      - name: Restore pip cache
-        uses: actions/cache/restore@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          path: ${{ steps.pip-cache.outputs.dir }}
-          key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-2-
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
 
       - name: Install dependencies (Ubuntu)
         run: |
@@ -68,10 +60,8 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
-          python -m pip install pytest pytest-cov flake8 pytest-aiohttp sqlparse freezegun PyJWT joblib "coveralls==3.3.1"
-          python -m pip install -r  ml_requirements.txt -r grb_requirements.txt
-          python -m pip install .
+          uv pip install --system --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
+          uv pip install --system -e ".[grb,neuralnet,dev]"
           git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf *  && cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .. && make && cd ../..
 
       - name: Export Libraries
@@ -108,10 +98,3 @@ jobs:
           coveralls --service=github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Save pip cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: ${{ steps.pip-cache.outputs.dir }}
-          key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}

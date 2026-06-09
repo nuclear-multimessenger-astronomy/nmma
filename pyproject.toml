@@ -27,18 +27,84 @@ classifiers = [
     'Operating System :: MacOS',
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 ]
-dynamic = ["dependencies", "optional-dependencies", "version"]
+dynamic = ["version"]
+dependencies = [
+    "future",
+    "bilby>=2.7.1",
+    "bilby_pipe>=1.7.0",
+    "fiestaEM @ git+https://github.com/nuclear-multimessenger-astronomy/fiestaEM.git",
+    "huggingface_hub",
+    "schwimmbad",
+    "colorcet",
+    "numpy>=2.0",
+    "matplotlib>=3.8",
+    "scipy>=1.15",
+    "pandas>=2.0",
+    "astropy>=6.0",
+    "pymultinest",
+    "sncosmo",
+    "dust_extinction",
+    "arviz",
+    "tornado",
+    "notebook",
+    "toml",
+    "ligo.skymap",
+    "healpy",
+    "scikit-learn",
+    'tensorflow>=2.19; platform_system == "Darwin"',
+    'tensorflow>=2.19; platform_system == "Windows"',
+    'tensorflow-cpu>=2.19; platform_system == "Linux"',
+]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-aiohttp",
+    "flake8",
+    "sqlparse",
+    "freezegun",
+    "PyJWT",
+    "joblib",
+    "coveralls==3.3.1",
+]
+doc = [
+    "sphinx>=5.0",
+    "sphinx_math_dollar",
+    "recommonmark",
+    "numpydoc",
+    "sphinx-rtd-theme",
+    "notedown",
+    "jsx-lexer",
+    "linkify-it-py",
+    "linkify",
+    "myst-parser",
+    "sphinx-book-theme",
+    "sphinx_copybutton",
+    "sphinx-github-changelog",
+]
+grb = [
+    "afterglowpy>=0.7.3",
+    "wrapt_timeout_decorator",
+]
+neuralnet = [
+    "torch",
+    "nflows",
+    "torchvision",
+]
+production = [
+    "nestcheck",
+    "mpi4py",
+    "pyarrow",
+    "parquet",
+    "dynesty>=3.0.0",
+]
+sampler = [
+    "ultranest",
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "nmma.__version__"}
-dependencies = {file = ["requirements.txt"]}
-optional-dependencies.doc = { file = ["doc_requirements.txt"] }
-optional-dependencies.grb = { file = ["grb_requirements.txt"] }
-optional-dependencies.production = { file = ["production_requirements.txt"] }
-optional-dependencies.neuralnet = { file = ["ml_requirements.txt"] }
-optional-dependencies.training = { file = ["training_requirements.txt"] }
-optional-dependencies.sampler = { file = ["sampler_requirements.txt"] }
 
 [project.scripts]
 nmma-generation = "nmma.joint.generation:nmma_generation"
