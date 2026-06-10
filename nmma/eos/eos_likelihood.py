@@ -110,9 +110,15 @@ class EquationofStateLikelihood(NMMALikelihood):
             for i, eos in enumerate(eos_data):
                 show_radii[:,i] = np.interp(mass_range, eos[1], eos[0], right = np.nan)
                 
-            for level in [0.5, 0.9]:
+            for i, level in enumerate([0.5, 0.9]):
                 bounds = np.array([nan_level(radii, level) for radii in show_radii])
-                ax.fill_betweenx(mass_range, bounds[:, 0], bounds[:, 1], color=cmap(1-0.4*level), zorder=1)
+                # color=cmap(1-0.4*level)
+                color = cmap(0.75)
+                if i == 0:
+                    kwargs = dict(color = color,  zorder=1)
+                else:
+                    kwargs = dict(facecolor = 'none', edgecolor=color, zorder=0, hatch='//')
+                ax.fill_betweenx(mass_range, bounds[:, 0], bounds[:, 1], **kwargs)
                 
             if result.injection_parameters is not None:
                 inj_eos = self.sub_model.eos_converter.macro_conversion(result.injection_parameters)[0]
@@ -539,7 +545,7 @@ class MassRadiusConstraint(EoSConstraint):
         flat = self.histogram.flatten()
         order = np.argsort(flat)[::-1]
         cumsum = np.cumsum(flat[order])
-        levels = [0.95, 0.68]
+        levels = [0.9, 0.5]
         clevels=[flat[order][np.searchsorted(cumsum, p)] for p in levels]
         cmap = fading_cmap(color)
         colors = cmap(levels[::-1])

@@ -67,9 +67,8 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             return np.nan_to_num(-np.inf)
         
     def final_diagnostics(self, bestfit_params, args, result=None):
-        for lhood in self.likelihoods:
-            lhood.final_diagnostics(bestfit_params, args, result)
-            
+        return [lhood.final_diagnostics(bestfit_params, args, result) for lhood in self.likelihoods]
+
     def parameter_conversion(self, samples):
         return self.multi_conversion.convert_to_multimessenger_parameters(samples)
     

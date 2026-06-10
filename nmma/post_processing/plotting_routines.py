@@ -137,7 +137,9 @@ def plot_histograms_only(posterior_samples,limits = None, plot_keys = None,
     if label:
         fig.legends.clear()
         fig.axes[0].plot([], [], label = label, color= color, **plot_kwargs)
-        fig.legend(ncols=2, loc='upper center', bbox_to_anchor=(0.5, 0.), handlelength=2)
+        leg_elements = len(fig.axes[0].get_legend_handles_labels()[0])
+        leg_ncols = leg_elements if leg_elements < 4 else 2
+        fig.legend(ncols=leg_ncols, loc='upper center', bbox_to_anchor=(0.5, 0.), handlelength=2)
         
     return fig, plot_quantities['limits']
 
@@ -179,7 +181,6 @@ def setup_corner_plot(posterior_samples,limits = None, plot_keys = None, fig = N
     
     plot_quantities = setup_plot_quantities(
         posterior_samples, limits, plot_keys, injection, post_dir, default_labels, **plot_kwargs)
-    
     color = plot_kwargs.pop('color', next(nmma_colors))
     fig = corner_plot(plot_quantities['samples'], plot_quantities['labels'], plot_quantities['limits'], fig=fig, truths= plot_quantities['truths'], color = color, show_titles = False,  **plot_kwargs)
     

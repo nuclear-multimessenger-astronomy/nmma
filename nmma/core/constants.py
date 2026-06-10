@@ -11,12 +11,12 @@ G_per_c2 = const.G/const.c**2
 seconds_a_day = 24*3600
 
 
-
 ## fundamental constants
 msun_cgs = const.M_sun.cgs.value
 c_cgs = const.c.cgs.value
 c_SI = const.c.si.value
 c_kms = c_SI / 1000.
+G_in_ns_units = (const.G).to(u.km**3 /u.solMass/ u.second**2).value
 h = const.h.cgs.value
 kb = const.k_B.cgs.value
 

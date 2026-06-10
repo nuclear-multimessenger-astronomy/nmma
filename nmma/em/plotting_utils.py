@@ -33,7 +33,8 @@ def basic_em_analysis_plot(
     filter_names = list(plot_filters.keys())
     def_data_colours = plt.cm.plasma(np.linspace(0, 1, len(filter_names)))[::-1]
     fit_color = kwargs.pop('color', next(nmma_colors))
-    marker = kwargs.pop('marker') if 'marker' in kwargs else next(marker_cycle)
+    marker = kwargs.pop('marker', next(marker_cycle)) 
+    
     ### prepare figure
     if not shared_data or not fig:
 
@@ -52,24 +53,19 @@ def basic_em_analysis_plot(
             data_c = default_filter_colours.get(
                 plot_filters[filt].lower(), 
                 def_data_colours[cnt])
-            ax_sum = plot_observations(ax_sum, transient, data_c, 
-                    filter=filt, marker=marker, markersize=markersize)
+            plot_observations(ax_sum, transient, data_c, 
+                filter=filt, marker=marker, markersize=markersize)
+            adjust_observations(ax_sum, transient, filt, xlim,  fix_ylim)
 
-            ax_sum.set_xlim(xlim)
-            # ax_delta.set_xlim(xlim)
-            if xlim[0] > 0:
-                ax_sum.set_xscale('log')
-            if fix_ylim:
-                ax_sum.set_ylim(fix_ylim)
+            if cnt < len(filter_names) - ncols: 
+                # needs to be done after xscale is set 
+                ax_sum.set_xticklabels([])
             else:
-                add_ylim = get_mag_limits_from_obs_data(transient, filt)
-                old_ylim = fig.axes[cnt].get_ylim()
-                use_ylim = (max(add_ylim[0], old_ylim[0]), 
-                            min(add_ylim[1], old_ylim[1]))
-                ax_sum.set_ylim(use_ylim)
+                #still set ax_sum xticks invisible, 
+                # but keeps ax_delta visible at bottom
+                plt.setp(ax_sum.get_xticklabels(), visible=False)
 
     ### plot lcs and residuals
-
     time = mags_to_plot.pop("time")
     n_axes = (len(fig.axes)+1 )// 2
     for cnt, filt in enumerate(filter_names):
@@ -99,9 +95,6 @@ def basic_em_analysis_plot(
             else:
                 ax_sum.plot([], [], label=fr'$\chi^2$ / d.o.f. = {round(chi2_dict[filt], 2)}')
                 ax_sum.legend(loc='best', frameon=False, handlelength=0, handletextpad=0)
-
-
-
 
     ### return figure
     fig.tight_layout()
@@ -135,15 +128,7 @@ def init_em_analysis_plot(plot_filters, ncols):
         ax_delta.axhline(0, linestyle='--', color='k')
         ax_delta.set_ylabel(r"$\Delta$ mag")
         ax_delta.set_ylim(0,1e-9)
-
-        if cnt < len(filter_names) - ncols:  
-            ax_sum.set_xticklabels([])
-        else:
-            #still set ax_sum xticks invisible, 
-            # but keeps ax_delta visible at bottom
-            plt.setp(ax_sum.get_xticklabels(), visible=False)
     return fig
-
 
 def plot_bestfit_with_errors(ax_sum, time, mag_plot, error_budget, 
         sub_model_plot_props, cnt, color):
@@ -431,6 +416,21 @@ def plot_observations(ax, transient, color="k", marker = "D", **kwargs):
     non_detections = np.isinf(obs_unc) ## does only include +-inf, not nans
     ax.errorbar(obs_times[non_detections], obs_lc[non_detections], fmt="v", color=color, **kwargs)
     return ax
+
+def adjust_observations(ax, transient, filt, xlim, fix_ylim):
+
+    ax.set_xlim(xlim)
+    # ax_delta.set_xlim(xlim)
+    if xlim[0] > 0:
+        ax.set_xscale('log')
+    if fix_ylim:
+        ax.set_ylim(fix_ylim)
+    else:
+        add_ylim = get_mag_limits_from_obs_data(transient, filt)
+        old_ylim = ax.get_ylim()
+        use_ylim = (max(add_ylim[0], old_ylim[0]), 
+                    min(add_ylim[1], old_ylim[1]))
+        ax.set_ylim(use_ylim)
 
 def analysis_plot_geometry(filters_to_plot, ncols=2):
     # NOTE Should this be the preferred geometry for the plots?

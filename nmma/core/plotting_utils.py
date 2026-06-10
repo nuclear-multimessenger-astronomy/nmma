@@ -54,12 +54,12 @@ def fig_setup():
         "#F4A429", # orange
         "#4635CE", # purple
         "#008080", # teal
-        "#FFD700", # gold
-        "#00FFFF", # cyan
         "#8B4513", # brown
         "#4CAF50", # green
         "#FF6347", # tomato
         "#00008B", # deep blue
+        "#00FFFF", # cyan
+        "#FFD700", # gold
     ]
     return itertools.cycle(color_array)
 
