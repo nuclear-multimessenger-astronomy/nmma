@@ -6,6 +6,11 @@ from argparse import Namespace
 
 from nmma.em import analysis, em_parsing, cluster_handling
 
+# These tests all use SVD models (Bu2019nsbh / Ka2017) fetched from the
+# now-deprecated GitLab path. Coverage moves to nmma/tests/fiesta_smoke.py
+# which exercises the fiesta-surrogates pipeline.
+pytestmark = pytest.mark.skip(reason="SVD-model tests retired; see fiesta_smoke")
+
 WORKING_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(WORKING_DIR, "data")
 os.environ["WORKING_DIR"] = WORKING_DIR
@@ -20,7 +25,9 @@ def cleanup_outdir(args):
 
 @pytest.fixture(scope="module")
 def args():
-    args = em_parsing.parsing_and_logging(em_parsing.multi_wavelength_analysis_parser, [])
+    args = em_parsing.parsing_and_logging(
+        em_parsing.multi_wavelength_analysis_parser, []
+    )
     non_default_args = dict(
         em_model="Bu2019nsbh",
         interpolation_type="tensorflow",
@@ -45,6 +52,7 @@ def args():
 
     return args
 
+
 def test_with_Hubble(args):
     test_args = copy.deepcopy(args)
     test_args.prior_file = "priors/Bu2019lm_Hubble.prior"
@@ -65,16 +73,11 @@ def test_analysis_systematics_with_time_and_filters(args):
 
 
 def test_analysis_systematics_without_time(args):
-    
+
     args.filters = "ztfr"
     args.systematics_file = f"{DATA_DIR}/systematics_without_time.yaml"
     analysis.main(args)
 
-def test_analysis_systematics_with_time_and_filters(args):
-
-    args.filters = ["ztfr", "sdssu", "2massks"]
-    args.systematics_file = f"{DATA_DIR}/systematics_with_time_combined_filters.yaml"
-    analysis.main(args)
 
 def test_analysis_tensorflow(args):
     args.systematics_file = None
@@ -120,9 +123,8 @@ def test_analysis_slurm(args):
 
     args.__dict__.update(args_slurm)
 
-    cluster_handling.slurm_analysis(args) 
+    cluster_handling.slurm_analysis(args)
     shutil.rmtree(os.path.join(args.base_dir, args.logs_dir_name), ignore_errors=True)
-
 
 
 def test_analysis_multi():

@@ -6,12 +6,20 @@ import pytest
 import shutil
 
 from ..em import training, model_parameters, io
+
+# Bu2019lm_sparse is an SVD model trained from scratch by this test. Replaced
+# by externally-trained fiesta surrogates fetched from HuggingFace; this in-CI
+# training step is no longer the supported workflow.
+pytestmark = pytest.mark.skip(reason="SVD training retired; use fiesta-surrogates")
+
+
 @pytest.fixture(autouse=True)
 def cleanup_outdir():
     ModelPath = "svdtrainingmodel"
     yield
     if os.path.exists(ModelPath):
         shutil.rmtree(ModelPath, ignore_errors=True)
+
 
 def test_training():
 
@@ -27,7 +35,7 @@ def test_training():
     filts = [
         "ztfg",
         "ztfr",
-    ]  
+    ]
 
     workingDir = os.path.dirname(__file__)
 

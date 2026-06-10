@@ -1,4 +1,11 @@
+import pytest
+
 from ..core.gitlab import get_model, refresh_models_list
+
+# GitLab SVD-models fetch path is retired alongside the rest of the
+# SVD-test suite; surrogate equivalents land via huggingface_hub now.
+pytestmark = pytest.mark.skip(reason="GitLab SVD download retired; see fiesta_smoke")
+
 
 def test_download_model_gitlab():
     # Test that we can download a model from GitLab

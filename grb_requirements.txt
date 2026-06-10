@@ -1,2 +1,0 @@
-afterglowpy>=0.7.3
-wrapt_timeout_decorator

@@ -1,12 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
+
 try:
     from yaml import CLoader as Loader, load
 except ImportError:
     from yaml import Loader, load
 import argparse
 import shutil
-import os 
+import os
 from pathlib import Path
 import subprocess
 
@@ -88,6 +89,7 @@ def download_and_decompress(file_info):
     download(file_info)
     decompress(file_info[1])
 
+
 def download_models_list(models_home=None):
     # first we load the models list from gitlab
     models_home = get_models_home(models_home)
@@ -96,12 +98,13 @@ def download_models_list(models_home=None):
     with open(Path(models_home, "models.yaml"), "wb") as f:
         f.write(r.content)
 
+
 def load_models_list(models_home=None):
 
     models_home = get_models_home(models_home)
     models_file = Path(models_home, "models.yaml")
     models = {}
-    
+
     try:
         if not models_file.exists():
             download_models_list(models_home=models_home)
@@ -115,7 +118,6 @@ def load_models_list(models_home=None):
     files = [f for f in Path(models_home).glob("*") if f.is_dir()]
     files = [f.stem for f in files]
 
-
     for f in files:
         name = f.split("/")[-1]
         filters = []
@@ -127,7 +129,7 @@ def load_models_list(models_home=None):
                 ff = ff.split("/")[-1]
 
                 if name in ff:
-                    ff = ff.replace(name, "")              
+                    ff = ff.replace(name, "")
                 ff = ff.strip("_")
                 if ff:
                     filters.append(ff)
@@ -142,6 +144,7 @@ def load_models_list(models_home=None):
 
     return models, downloaded_if_missing is False
 
+
 def refresh_models_list(models_home=None):
     global MODELS
     models_home = get_models_home(models_home)
@@ -154,6 +157,7 @@ def refresh_models_list(models_home=None):
     except Exception as e:
         raise ValueError(f"Could not load models list: {str(e)}")
     return models
+
 
 def get_model(
     models_home=None,
@@ -227,6 +231,7 @@ def get_model(
 
     try:
         from mpi4py import MPI
+
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
     except Exception as e:
@@ -239,13 +244,22 @@ def get_model(
         if not download_if_missing:
             raise OSError("Data not found and `download_if_missing` is False")
 
-        
         if rank == 0:
             print(f"downloading {len(missing)} files for model {model_name}:")
             with ThreadPoolExecutor(
                 max_workers=min(len(missing), max(cpu_count(), 8))
             ) as executor:
-                executor.map(download_and_decompress, missing)
+                # Consume the iterator so URLError / OSError from worker threads
+                # surfaces instead of being silently swallowed.
+                list(executor.map(download_and_decompress, missing))
+            still_missing = [str(f) for _, f in missing if not Path(f).exists()]
+            if still_missing:
+                raise OSError(
+                    f"failed to download {len(still_missing)} model file(s) for "
+                    f"{model_name}: "
+                    + ", ".join(still_missing[:3])
+                    + (" ..." if len(still_missing) > 3 else "")
+                )
 
         if comm:
             comm.Barrier()
@@ -256,14 +270,22 @@ def get_parser():
 
     parser = argparse.ArgumentParser(description="Download SVD models from GitLab")
     parser.add_argument("--model", help="Name the model to be used")
-    parser.add_argument("--svd-path",
-        help="Path to the SVD models directory. If not provided, will use the default path")
-    parser.add_argument("--filters",
-        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available" )
-    parser.add_argument("--refresh-models-list", action="store_true",
-        help="Refresh the list of models available on Gitlab")
+    parser.add_argument(
+        "--svd-path",
+        help="Path to the SVD models directory. If not provided, will use the default path",
+    )
+    parser.add_argument(
+        "--filters",
+        help="A comma seperated list of filters to use (e.g. g,r,i). If none is provided, will use all the filters available",
+    )
+    parser.add_argument(
+        "--refresh-models-list",
+        action="store_true",
+        help="Refresh the list of models available on Gitlab",
+    )
 
     return parser
+
 
 def main(args=None):
 
@@ -285,7 +307,7 @@ def main(args=None):
 
     if args.model in [None, ""]:
         raise ValueError("a model must be specified with --model")
-    
+
     return get_model(
         models_home=args.svd_path if args.svd_path not in [None, ""] else None,
         model_name=args.model,
