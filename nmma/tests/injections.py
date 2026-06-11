@@ -3,8 +3,6 @@ import numpy as np
 import os
 import shutil
 
-import pytest
-
 from ..em import em_parsing, lightcurve_handling as lch
 from ..em.io import load_em_observations
 from ..em.model import get_lc_model_from_modelname
@@ -211,15 +209,9 @@ def lightcurveInjectionTest(model_name):
     cleanup_files()
 
 
-@pytest.mark.skip(
-    reason=(
-        "Even the analytic models reach into sncosmo for bandpass data "
-        "(e.g. sdssu) which downloads from an external URL that intermittently "
-        "times out on GH runners. Pre-cache the sncosmo bandpasses before "
-        "re-enabling."
-    )
-)
 def test_injections():
+    # Reaches into sncosmo for bandpass data. CI's "Pre-fetch sncosmo
+    # bandpasses" step warms the cache so this doesn't hit the network here.
     for model_name in ["nugent-hyper", "salt2", "Me2017", "Piro2021", "TrPi2018"]:
         lightcurveInjectionTest(model_name)
 
