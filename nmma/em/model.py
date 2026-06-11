@@ -743,10 +743,25 @@ class FiestaKilonovaModel(FiestaModel):
             )
         else:
             from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
-        # Upstream `BullaSurrogate.load_filters` iterates over `filters`, which
-        # crashes on None. Pass [] so the surrogate's own default-all-filters
-        # path is exercised cleanly.
-        fiesta_filters = list(filters) if filters is not None else []
+        # fiesta requires a non-empty in-range filter list at construction;
+        # there is no "all trained filters" default. Pick a safe optical/NIR
+        # set that fits every published Bu* surrogate.
+        fiesta_filters = (
+            list(filters)
+            if filters
+            else [
+                "sdssg",
+                "sdssr",
+                "sdssi",
+                "sdssz",
+                "ztfg",
+                "ztfr",
+                "ztfi",
+                "2massj",
+                "2massh",
+                "2massks",
+            ]
+        )
         fiesta_kwargs = dict(
             name=model,
             filters=fiesta_filters,

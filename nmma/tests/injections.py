@@ -2,7 +2,6 @@ from argparse import Namespace
 import numpy as np
 import os
 import shutil
-import urllib.error
 
 import pytest
 
@@ -213,13 +212,13 @@ def lightcurveInjectionTest(model_name):
 
 
 def test_injections():
-    # Reaches into sncosmo for bandpass data. CI's "Pre-fetch sncosmo
-    # bandpasses" step warms the cache; if that didn't take and the CDN is
-    # down, skip rather than fail — the network outage isn't a code defect.
+    # Reaches into sncosmo for bandpass data. URLError, TimeoutError, socket
+    # errors are all OSError subclasses — skip on any of them rather than
+    # fail when the upstream CDN is flaky.
     for model_name in ["nugent-hyper", "salt2", "Me2017", "Piro2021", "TrPi2018"]:
         try:
             lightcurveInjectionTest(model_name)
-        except (urllib.error.URLError, TimeoutError) as e:
+        except OSError as e:
             pytest.skip(f"sncosmo bandpass download unreachable for {model_name}: {e}")
 
 
