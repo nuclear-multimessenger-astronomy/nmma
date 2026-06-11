@@ -82,17 +82,23 @@ jobs:
             --repo-type model --local-dir fiesta-surrogates
           echo "NMMA_FIESTA_SURROGATES=$GITHUB_WORKSPACE/fiesta-surrogates" >> $GITHUB_ENV
 
-      - name: Pre-fetch sncosmo bandpasses
-        # Tests reach into sncosmo for bandpasses (e.g. sdssu, ztfr); fetch
-        # them ahead of time so the runner's flaky external network doesn't
-        # show up as a numpy "zero-size array" cascade deep in a test.
+      - name: Pre-fetch sncosmo bandpasses (best-effort)
+        # Warm sncosmo's bandpass cache so test_injections doesn't hit the
+        # network during pytest. The data lives on a sometimes-flaky CDN, so
+        # retry a few times and don't fail CI if it stays unreachable — the
+        # test itself will pytest.skip on URLError.
+        continue-on-error: true
         run: |
-          python -c "import sncosmo; [sncosmo.get_bandpass(f) for f in (
-            'sdssu','sdssg','sdssr','sdssi','sdssz',
-            'ztfg','ztfr','ztfi',
-            '2massh','2massj','2massks',
-            'bessellb','bessellr','bessellv','bessellux','besselli',
-          )]"
+          for i in 1 2 3; do
+            python -c "import sncosmo; [sncosmo.get_bandpass(f) for f in (
+              'sdssu','sdssg','sdssr','sdssi','sdssz',
+              'ztfg','ztfr','ztfi',
+              '2massh','2massj','2massks',
+              'bessellb','bessellr','bessellv','bessellux','besselli',
+            )]" && break
+            echo "retry $i/3"
+            sleep 5
+          done
 
       - name: Test with pytest
         run: |
