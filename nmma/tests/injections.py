@@ -3,8 +3,6 @@ import numpy as np
 import os
 import shutil
 
-import pytest
-
 from ..em import em_parsing, lightcurve_handling as lch
 from ..em.io import load_em_observations
 from ..em.model import get_lc_model_from_modelname
@@ -212,14 +210,8 @@ def lightcurveInjectionTest(model_name):
 
 
 def test_injections():
-    # Reaches into sncosmo for bandpass data. URLError, TimeoutError, socket
-    # errors are all OSError subclasses — skip on any of them rather than
-    # fail when the upstream CDN is flaky.
     for model_name in ["nugent-hyper", "salt2", "Me2017", "Piro2021", "TrPi2018"]:
-        try:
-            lightcurveInjectionTest(model_name)
-        except OSError as e:
-            pytest.skip(f"sncosmo bandpass download unreachable for {model_name}: {e}")
+        lightcurveInjectionTest(model_name)
 
 
 def test_validate_lightcurves():
