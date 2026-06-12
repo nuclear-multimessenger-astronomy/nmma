@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout branch being tested
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Python with Conda ${{ matrix.python-version }}
         uses: conda-incubator/setup-miniconda@v3

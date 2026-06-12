@@ -26,16 +26,12 @@ FIESTA_SURROGATES = os.environ.get("NMMA_FIESTA_SURROGATES")
     reason="NMMA_FIESTA_SURROGATES not set or not a directory",
 )
 def test_fiesta_kilonova_loads():
-    """Instantiate the canonical kilonova surrogate; verify the model advertises parameters.
-
-    Skipped (not failed) if the HuggingFace layout doesn't match what
-    ``FiestaKilonovaModel`` expects — the exact directory schema still
-    drifts, and we don't want a layout mismatch blocking CI.
-    """
+    """Instantiate the canonical kilonova surrogate; verify it advertises parameters and filters."""
     from nmma.em.model import FiestaKilonovaModel
 
     # Try the most recent surrogate first; fall back to Bu2025 if the runtime
-    # doesn't have Bu2026 yet.
+    # doesn't have Bu2026 yet. OSError covers "metadata file not found", which
+    # means the directory layout drifted; anything else is a real bug.
     last_err = None
     for model_name in ("Bu2026_MLP", "Bu2025_MLP"):
         try:
@@ -43,14 +39,10 @@ def test_fiesta_kilonova_loads():
                 model=model_name, surrogate_dir=FIESTA_SURROGATES
             )
             break
-        # Anything coming out of the upstream fiesta loader counts as a layout
-        # / API drift — let it skip rather than block CI.
-        except Exception as e:
+        except OSError as e:
             last_err = e
     else:
-        pytest.skip(
-            f"fiesta surrogate didn't load from {FIESTA_SURROGATES}: {last_err}"
-        )
+        pytest.skip(f"fiesta surrogate not found at {FIESTA_SURROGATES}: {last_err}")
 
     assert kn_model.model_parameters, "fiesta model did not expose any parameters"
     assert kn_model.filters, "fiesta model did not advertise any filters"

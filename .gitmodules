@@ -1,0 +1,3 @@
+[submodule "nmma-data"]
+	path = nmma-data
+	url = https://github.com/nuclear-multimessenger-astronomy/nmma-data.git
