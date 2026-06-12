@@ -6,11 +6,6 @@ from argparse import Namespace
 
 from nmma.em import analysis, em_parsing, cluster_handling
 
-# These tests all use SVD models (Bu2019nsbh / Ka2017) fetched from the
-# now-deprecated GitLab path. Coverage moves to nmma/tests/fiesta_smoke.py
-# which exercises the fiesta-surrogates pipeline.
-pytestmark = pytest.mark.skip(reason="SVD-model tests retired; see fiesta_smoke")
-
 WORKING_DIR = os.path.dirname(__file__)
 DATA_DIR = os.path.join(WORKING_DIR, "data")
 os.environ["WORKING_DIR"] = WORKING_DIR
@@ -29,11 +24,9 @@ def args():
         em_parsing.multi_wavelength_analysis_parser, []
     )
     non_default_args = dict(
-        em_model="Bu2019nsbh",
-        interpolation_type="tensorflow",
-        svd_path=DATA_DIR,
+        em_model="Me2017",
         label="injection",
-        prior_file="priors/Bu2019lm.prior",
+        prior_file="priors/Me2017.prior",
         em_tmin=0.1,
         em_tmax=14.0,
         injection_em_tmax=12.0,
@@ -43,7 +36,7 @@ def args():
         Ebv_max=0.0,
         nlive=64,
         sampler="pymultinest",
-        injection_file=f"{DATA_DIR}/Bu2019lm_injection.json",
+        injection_file=f"{DATA_DIR}/Me2017_injection.json",
         injection_outfile="outdir/lc.csv",
         plot=True,
     )
@@ -55,7 +48,7 @@ def args():
 
 def test_with_Hubble(args):
     test_args = copy.deepcopy(args)
-    test_args.prior_file = "priors/Bu2019lm_Hubble.prior"
+    test_args.prior_file = "priors/Me2017_Hubble.prior"
     test_args.Hubble = True
     analysis.main(test_args)
 
@@ -66,44 +59,18 @@ def test_analysis_systematics_with_time(args):
 
 
 def test_analysis_systematics_with_time_and_filters(args):
-
     args.filters = ["ztfr", "sdssu", "2massks"]
     args.systematics_file = f"{DATA_DIR}/systematics_with_time_combined_filters.yaml"
     analysis.main(args)
 
 
 def test_analysis_systematics_without_time(args):
-
     args.filters = "ztfr"
     args.systematics_file = f"{DATA_DIR}/systematics_without_time.yaml"
     analysis.main(args)
 
 
-def test_analysis_tensorflow(args):
-    args.systematics_file = None
-    args.filters = "ztfr"
-    analysis.main(args)
-
-
-def test_analysis_sklearn_gp(args):
-    args.interpolation_type = "sklearn_gp"
-    analysis.main(args)
-
-
-def test_nn_analysis(args):
-
-    args.em_model = "Ka2017"
-    args.sampler = "neuralnet"
-    args.prior_file = "priors/Ka2017.prior"
-    args.em_tstep = 0.25
-    args.filters = ["ztfg", "ztfr", "ztfi"]
-    args.local_only = False
-    args.injection_file = f"{DATA_DIR}/Ka2017_injection.json"
-    analysis.main(args)
-
-
 def test_analysis_slurm(args):
-
     args_slurm = dict(
         Ncore=8,
         job_name="lightcurve-analysis",
@@ -120,7 +87,6 @@ def test_analysis_slurm(args):
         python_env_name="nmma_env",
         script_name="slurm.sub",
     )
-
     args.__dict__.update(args_slurm)
 
     cluster_handling.slurm_analysis(args)
