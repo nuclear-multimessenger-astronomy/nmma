@@ -1,4 +1,4 @@
-luminosity_distance = Uniform(minimum=0.0, maximum=200., name='luminosity_distance',latex_label='$D_L$')
+luminosity_distance = Uniform(minimum=1.0, maximum=200., name='luminosity_distance',latex_label='$D_L$')
 beta = Uniform(name='beta', minimum=1., maximum=5., latex_label='$\\beta$')
 log10_kappa_r = Uniform(name='log10_kappa_r', minimum=-1., maximum=2., latex_label='$\\log_{10}\\kappa_r$')
 timeshift = Uniform(minimum=-2.0, maximum=1.0, name='trigger_time',latex_label='$t_0$')
