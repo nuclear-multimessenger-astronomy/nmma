@@ -19,8 +19,10 @@ def _wire_sncosmo(sncosmo_dir: Path) -> None:
 
 
 def _wire_dustmaps(dustmaps_dir: Path) -> None:
-    from dustmaps.config import config
-
+    try:
+        from dustmaps.config import config
+    except ImportError:
+        return
     config["data_dir"] = str(dustmaps_dir)
 
 
