@@ -19,39 +19,6 @@ import astropy.units as u
 from ..core.constants import MeV_per_fm3_to_Msun_per_km3, geom_msun_km, particle_mass
 
 
-def fileno(file_or_fd):
-    fd = getattr(file_or_fd, 'fileno', lambda: file_or_fd)()
-    if not isinstance(fd, int):
-        raise ValueError("Expected a file (`.fileno()`) or a file descriptor")
-    return fd
-
-@contextlib.contextmanager
-def stdout_redirected(to=os.devnull, stdout=None):
-    """
-    https://stackoverflow.com/a/22434262/190597 (J.F. Sebastian)
-    """
-    if stdout is None:
-       stdout = sys.stdout
-
-    stdout_fd = fileno(stdout)
-    # copy stdout_fd before it is overwritten
-    #NOTE: `copied` is inheritable on Windows when duplicating a standard stream
-    with os.fdopen(os.dup(stdout_fd), 'wb') as copied: 
-        stdout.flush()  # flush library buffers that dup2 knows nothing about
-        try:
-            os.dup2(fileno(to), stdout_fd)  # $ exec >&to
-        except ValueError:  # filename
-            with open(to, 'wb') as to_file:
-                os.dup2(to_file.fileno(), stdout_fd)  # $ exec > to
-        try:
-            yield stdout # allow code to be run with the redirected stdout
-        finally:
-            # restore stdout to its previous value
-            #NOTE: dup2 makes stdout_fd inheritable unconditionally
-            stdout.flush()
-            os.dup2(copied.fileno(), stdout_fd)  # $ exec >&copied
-
-
 
 def baryonic_mass(gravitational_mass, EOS, eos_path_macro, eos_path_micro):
 
@@ -76,8 +43,7 @@ def baryonic_mass(gravitational_mass, EOS, eos_path_macro, eos_path_micro):
     x = np.arange(dr, r+dr, dr)
     y0 = [p0, m0]
 
-    with stdout_redirected():
-         p_solv, m_solv = scipy.integrate.odeint(TOVeq, y0=y0, t = x).T
+    p_solv, m_solv = scipy.integrate.odeint(TOVeq, y0=y0, t = x).T
     n_solv = np.interp(p_solv, P, N)
 
 
@@ -145,7 +111,6 @@ class PostmergerInferenceMixIn:
         log10_mdisk = self.posterior_samples.log10_mdisk.to_numpy()
 
         self.KDE = scipy.stats.gaussian_kde((chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn))
-
         super().__init__(**kwargs)
 
     def Prior(self, x):
@@ -171,7 +136,12 @@ class PostmergerInferenceMixIn:
         mdisk = 10**log10_mdisk
         mej_dyn = 10**log10_mej_dyn
 
-        m_rem_b = baryonic_mass(mass_1, EOS, self.eos_path_macro, self.eos_path_micro) + baryonic_mass(mass_2, EOS, self.eos_path_macro, self.eos_path_micro) - mdisk - mej_dyn #calculate the baryonic remnant mass
+        try:
+            b1 = baryonic_mass(mass_1, EOS, self.eos_path_macro, self.eos_path_micro) 
+            b2 = baryonic_mass(mass_2, EOS, self.eos_path_macro, self.eos_path_micro)
+            m_rem_b = b1 + b2 - mdisk - mej_dyn #calculate the baryonic remnant mass
+        except:
+            breakpoint()
 
         if self.use_M_max:
            m_threshold = baryonic_Kepler_mass(mTOV, R_14, ratio_R, delta) #if the Kepler limit is the threshold, use the quasiuniversal relation
@@ -223,7 +193,6 @@ def maximum_mass_resampling(args):
     class PostmergerInference(PostmergerInferenceMixIn, Solver):
         pass
     
-
     solution = PostmergerInference(prior, posterior_samples, Neos, args.eos_path_macro, args.eos_path_micro, args.use_M_Kepler, **pymulti_kwargs)
     
     

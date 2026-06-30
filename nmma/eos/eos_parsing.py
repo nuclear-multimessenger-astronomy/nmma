@@ -56,7 +56,7 @@ def eos_parsing(parser):
         help= "dict with additional mass-radius constraints to consider, using style: {'name':{'file_path':path_to_R_M_posterior,[, 'arxiv':'arxiv_id']},...}") 
     eos_input_parser.add(  "--mass-radius-name", nargs ="*",
         help= "list of identifiers for further mass-radius-posteriors to consider")
-    eos_input_parser.add("--mass-radius-posterior", "--mass-radius-file-path",nargs ="*",
+    eos_input_parser.add("--mass-radius-file-path", "--mass-radius-posterior", nargs ="*",
         help= "list of files with additional radius-mass posteriors to consider")
     eos_input_parser.add( "--mass-radius-arxiv", nargs ="*",
         help= "list of arxiv-ids for additional R-M posteriors to consider")    
