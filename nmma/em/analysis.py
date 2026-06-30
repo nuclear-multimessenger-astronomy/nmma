@@ -1,5 +1,4 @@
 import os
-import matplotlib
 import numpy as np
 import pandas as pd
 
@@ -10,7 +9,6 @@ from . import io, model, utils, systematics
 from .em_parsing import parsing_and_logging, multi_wavelength_analysis_parser, bolometric_parser
 from ..core.base import multi_analysis_loop
 from ..core.utils import read_injection_file, set_filename, read_trigger_time
-matplotlib.use("agg")
 
 def data_from_injection(args, filters, detection_limit):
     injection_df = read_injection_file(args)

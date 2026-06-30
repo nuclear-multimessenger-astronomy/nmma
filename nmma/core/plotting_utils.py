@@ -4,10 +4,14 @@ import numpy as np
 import matplotlib
 from matplotlib.colors import LinearSegmentedColormap
 import os
-# matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 import itertools
-matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
+if os.environ.get("CI") == 'true':
+    matplotlib.rcParams['text.usetex'] = False
+    matplotlib.rcParams['backend'] = 'pdf'
+else:
+    matplotlib.rcParams['text.usetex'] = True
+    matplotlib.rcParams['mathtext.fontset'] = "stix" 
 
 def fig_setup():
     fig_width_pt = 750.0  # Get this from LaTeX using \showthe\columnwidth
@@ -17,35 +21,14 @@ def fig_setup():
     fig_height = 0.9 * fig_width * golden_mean  # height in inches
     fig_size = [fig_width, fig_height]
     params = {
-        "backend": "pdf",
         "axes.labelsize": 18,
         "legend.fontsize": 18,
         "xtick.labelsize": 18,
         "ytick.labelsize": 18,
         "font.family": "serif",
         "figure.figsize": fig_size,
-        "mathtext.fontset": "stix",
     }
 
-    ## Alt choice
-    # params = {
-    #     # fonts
-    #     "mathtext.fontset": "stix",
-    #     "font.serif": "Computer Modern",
-    #     "font.family":["serif", "STIXGeneral"],
-    #     # figure and axes
-    #     "axes.grid": False,
-    #     "axes.titlesize": 10,
-    #     # tick markers
-    #     "xtick.direction": "in",
-    #     "ytick.direction": "in",
-    #     "xtick.labelsize": 13,
-    #     "ytick.labelsize": 13,
-    #     "xtick.major.size": 10.0,
-    #     "ytick.major.size": 10.0,
-    #     # legend
-    #     "legend.fontsize": 20,
-    # }
     matplotlib.rcParams.update(params)
 
     color_array = [
@@ -183,7 +166,7 @@ def arange_titles(ax, move = False):
         ax.texts[1].set_position((1., lower_y))
         ax.texts[1].set_ha('right')
         if move:
-            move_up(ax.texts[1])
+            move_up(ax.texts[0])
     elif len(ax.texts) == 3:
 
         ax.texts[1].set_position((0.5, lower_y))

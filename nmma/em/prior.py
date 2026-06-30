@@ -5,8 +5,6 @@ from scipy.interpolate import PchipInterpolator
 from scipy.stats import norm
 import healpy as hp
 import numpy as np
-import matplotlib
-matplotlib.use("agg")
 import matplotlib.pyplot as plt
 from bilby.core.prior import (
     Prior, DeltaFunction, Interped, ConditionalTruncatedGaussian,

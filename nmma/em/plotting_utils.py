@@ -1,22 +1,10 @@
 import matplotlib.pyplot as plt
 import matplotlib
-from matplotlib.ticker import MaxNLocator
-
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from itertools import cycle
 import numpy as np
 import os
 
-params = {
-    "backend": "pdf",
-    "figure.figsize": [18, 25],
-}
-matplotlib.rcParams.update(params)
-matplotlib.rcParams['text.usetex'] = (os.environ.get("CI") != 'true')
-matplotlib.rcParams['figure.labelsize'] = 20
-# matplotlib.rcParams['axes.titlesize'] = 'large'
-if os.environ.get("CI") == 'true':
-    matplotlib.use("agg")
 from nmma.core.plotting_utils import fig_setup
 nmma_colors = fig_setup()
 
@@ -41,7 +29,7 @@ def basic_em_analysis_plot(
         if not fig: 
             fig = init_em_analysis_plot(plot_filters, ncols)
 
-        add_xlim = check_limit(xlim) if xlim else get_time_limits_from_obs_data(transient)
+        add_xlim = check_limit(xlim) if xlim else get_time_limits_from_obs_data(transient, filter_names)
         old_xlim = fig.axes[0].get_xlim()
         xlim = (min(add_xlim[0], old_xlim[0]), 
                 max(add_xlim[1], old_xlim[1]))
@@ -125,7 +113,7 @@ def init_em_analysis_plot(plot_filters, ncols):
                                         size='40%',
                                         sharex=ax_sum,
                                         pad=0.1)
-        ax_delta.axhline(0, linestyle='--', color='k')
+        # ax_delta.axhline(0, linestyle='--', color='k')
         ax_delta.set_ylabel(r"$\Delta$ mag")
         ax_delta.set_ylim(0,1e-9)
     return fig
@@ -162,10 +150,6 @@ def plot_bestfit_with_errors(ax_sum, time, mag_plot, error_budget,
 
 
 def bolometric_lc_plot(transient, time, lc, save_path, color = "coral"):
-    matplotlib.rcParams.update(
-        {'font.size': 12, 'font.family': 'serif'
-        }
-    )
     fig, ax = plt.subplots(1, 1)
     ax = plot_observations(ax, transient, markersize=12)
 
@@ -229,9 +213,6 @@ def visualise_model_performance(training_data, training_model, light_curve_model
             figsize=(32, 14))  
 
 def chi2_hists_from_dict(chi2_dict, outpath):
-    matplotlib.rcParams.update(
-        {"font.size": 16, "font.family": "Serif"}
-    )
     for filt, chi2_array in chi2_dict.items():
         plt.figure()
         plt.xlabel(r"$\chi^2 / {\rm d.o.f.}$")
@@ -360,16 +341,22 @@ def lc_plot_with_histogram(filters, data_dict, sample_times, save_path, percenti
 def spec_subplot(
         fig, ax, X, Y, Z, data_label, vmin =-10, vmax =-2, fontsize=30, cbar_label="log10(Flux)"
         ):
+    old_pararams = matplotlib.rcParams.copy()
+    matplotlib.rcParams.update({
+        "axes.labelsize"    : fontsize,
+        "axes.titlesize"    : fontsize,
+        'xtick.labelsize'   : fontsize,
+        'ytick.labelsize'   : fontsize,
+        "figure.labelsize"  : fontsize+2,
+    })
     pcm = ax.pcolormesh(X, Y, Z, vmin=vmin, vmax=vmax)
-    ax.set_title(data_label, fontsize=fontsize)
-    ax.set_xlabel("Time [days]", fontsize=fontsize)
-    ax.set_ylabel("Wavelength [AA]", fontsize=fontsize)
-    ax.tick_params(axis="x", labelsize=fontsize)
-    ax.tick_params(axis="y", labelsize=fontsize)
+    ax.set_title(data_label)
+    ax.set_xlabel("Time [days]")
+    ax.set_ylabel("Wavelength [AA]")
     ax.grid(which="both", alpha=0.5)
     cbar = fig.colorbar(pcm, ax=ax)
-    cbar.set_label(cbar_label, fontsize=fontsize)
-    cbar.ax.tick_params(labelsize=fontsize)
+    cbar.set_label(cbar_label)
+    matplotlib.rcParams.update(old_pararams)
     return fig, ax
 
 def basic_spec_plot(
@@ -463,13 +450,13 @@ def analysis_plot_geometry(filters_to_plot, ncols=2):
 
 
 
-def get_time_limits_from_obs_data(transient):
+def get_time_limits_from_obs_data(transient, filter_names):
     """
     A function that goes through the lc data and finds the time range that encompasses all data points.
     """
 
-    xmin = np.min([t_arr.min() for t_arr in transient.light_curve_times.values()])
-    xmax = np.max([t_arr.max() for t_arr in transient.light_curve_times.values()])
+    xmin = np.min([transient.light_curve_times[filt].min() for filt in filter_names])
+    xmax = np.max([transient.light_curve_times[filt].max() for filt in filter_names])
 
     return (0.9*xmin, 1.1*xmax)
 
