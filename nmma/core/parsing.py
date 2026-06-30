@@ -122,6 +122,10 @@ def base_analysis_parsing(parser):
     parser.add_argument("--cpus", type=int, default=1,
         help="Number of cores to be used, only needed for dynesty (default: 1)")
     parser.add_argument("-n","--nlive", "--n-live", type=int, default=2048, help="Number of live points (default: 2048)")
+    parser.add_argument("--check-point-delta-t","--check-point-deltaT", default=1800, type=float,
+        help="Write a checkpoint resume file and diagnostic plots every deltaT [s]. Default: 0.5 hour.")
+    parser.add_argument("--checkpoint-plot", action='store_true',
+        help="Whether to generate analytical check-point plots")
     return parser
 
 def dynesty_parsing(parser):
@@ -173,6 +177,8 @@ def single_messenger_analysis_parsing(parser):
         help="To use reactive sampling in ultranest (default: False)")
     parser.add_argument("--bestfit", "--best-fit", action='store_true',
         help="Save the best fit parameters to JSON")
+    parser.add_argument("--result-format", default="json",
+        help="Format to save the result" )
     
     return parser
 
@@ -271,22 +277,22 @@ def slurm_analysis_parser(parser):
     return parser
 
 
-def process_sampler_kwargs(sampler_kwargs, kwargs):
+def process_sampler_kwargs(args):
     # Set defaults here to avoid inconsistent values
     default_kwargs = dict(dlogz=0.1, save_bounds=False,
         min_eff=10, sample="acceptance-walk", nlive=1000, bound="live",
         walks=100, facc=0.5, enlarge=1.5)
     
-    run_sampler_kwargs = {key: kwargs.get(key, default_kwargs[key]) 
-        for key in ['dlogz', 'save_bounds']}
+    run_sampler_kwargs = {key: getattr(args, key, default_kwargs[key]) 
+                          for key in ['dlogz', 'save_bounds']}
     
 
-    def_init_kwargs = {key: kwargs.get(key, default_kwargs[key]) 
+    def_init_kwargs = {key: getattr(args, key, default_kwargs[key]) 
         for key in ['min_eff','sample', 'nlive', 'bound', 'walks', 'facc', 'enlarge']}
     
-    sampler_init_kwargs = def_init_kwargs | sampler_kwargs
+    sampler_init_kwargs = def_init_kwargs | args.sampler_kwargs 
     sampler_init_kwargs['first_update'] = dict(min_eff=sampler_init_kwargs.pop('min_eff'), 
-                        min_ncall= 2 * sampler_init_kwargs['nlive'])
+                        min_ncall= 2 * args.nlive)
         
     return sampler_init_kwargs, run_sampler_kwargs
 

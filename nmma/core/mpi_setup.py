@@ -608,61 +608,32 @@ def pbilby_sampling(
     meta_data = {},
     **kwargs
 ):
-    
-    default_kwargs = dict(
-        sampler_kwargs={},
-        sampling_seed=42,
-        plot=True,
-        #
-        maxmcmc=5000,
-        naccept=60,
-        nact=2,
-        check_point_delta_t=1800,
-        n_check_point=2000,
-        max_its=1e10,
-        max_run_time=1e10,
-        checkpoint_plot=False,
-        #
-        rejection_sample_posterior=True,
-        result_format="hdf5",
-    )
-
-    # priority: kwargs > args > defaults
-    use_kwargs = {}
-    for key in default_kwargs.keys():
-        if key in kwargs:
-            use_kwargs[key] = kwargs[key]
-        elif hasattr(args, key):
-            use_kwargs[key] = getattr(args, key)
-        else:
-            use_kwargs[key] = default_kwargs[key]
-
-    use_kwargs |= kwargs # in case there are additional kwargs not in default_kwargs
+    # kwargs > args in priority, so that command line arguments can override the config      
+    args.__dict__.update(kwargs)
 
     # Initialise a worker. this needs a global scope to allow 
     # persistence of states beyond the pool's scope.
     # Otherwise emulators retrace on each evaluation.
     global worker
     if rank == 0:
-        sampler_init_kwargs, run_kwargs = process_sampler_kwargs(
-            kwargs.pop('sampler_kwargs', {}), use_kwargs)
+        sampler_init_kwargs, run_kwargs = process_sampler_kwargs(args)
 
         worker = Dynesty(
             args, prior, likelihood,
             injection_parameters,
-            maxmcmc=use_kwargs['maxmcmc'],
-            nact=use_kwargs['nact'],
-            naccept=use_kwargs['naccept'],
-            sampling_seed=use_kwargs['sampling_seed'],
+            maxmcmc=args.maxmcmc,
+            nact=args.nact,
+            naccept=args.naccept,
+            sampling_seed=args.sampling_seed,
             sampler_kwargs = run_kwargs,
             sampler_init_kwargs=sampler_init_kwargs,
-            plot=use_kwargs['plot'],
+            plot=args.plot,
             meta_data=meta_data,
         )
 
     else:
         worker = Worker(args, prior, likelihood,
-            injection_parameters,  plot = use_kwargs['plot'])
+            injection_parameters,  plot = args.plot)
 
     ## graceful handling of preemptive shutdowns
     def handle_sigterm(signum, frame):
@@ -688,15 +659,15 @@ def pbilby_sampling(
                 pooled_initial_point_from_prior)
 
             results = worker.run_sampler(
-                check_point_delta_t=use_kwargs['check_point_delta_t'],
-                n_check_point=use_kwargs['n_check_point'],
-                max_its=use_kwargs['max_its'],
-                max_run_time=use_kwargs['max_run_time'],
-                checkpoint_plot=use_kwargs['checkpoint_plot']
+                check_point_delta_t=args.check_point_delta_t,
+                n_check_point=args.n_check_point,
+                max_its=args.max_its,
+                max_run_time=args.max_run_time,
+                checkpoint_plot=args.checkpoint_plot
             )
             result = worker.format_result(
-            results, use_kwargs['result_format'],
-            use_kwargs['rejection_sample_posterior'])
+            results, args.result_format,
+            args.rejection_sample_posterior)
     
     return result
 
