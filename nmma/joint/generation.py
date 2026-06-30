@@ -33,7 +33,7 @@ from ..eos.eos_likelihood import (compose_eos_constraints,
         EoSConverter, JointEoSConstraint, setup_tabulated_eos_priors)
 from .joint_likelihood import MultiMessengerLikelihood
 
-import matplotlib    
+import matplotlib    ### FIXME: better to handle on a general level, jointly with fiesta
 matplotlib.rcParams['text.usetex'] = False
 
 from .. import __version__
@@ -49,12 +49,6 @@ def get_version_info():
     )
 
 def remove_expandable_args(parser, required_arg_groups):
-    # for cat in msg_list:
-    #     if messenger not in inputs.messengers:
-    #         #  identify argument_group corresponding to non-sampled msg.
-    #         for ag in parser._action_groups:
-    #             if f'with_{messenger}' in [act.dest for act in ag._group_actions]:
-    #                 parser._action_groups.remove(ag)
     for ag in parser._action_groups:
         if ag.title not in required_arg_groups:
             parser._action_groups.remove(ag)

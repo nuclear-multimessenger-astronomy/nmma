@@ -71,7 +71,7 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
         mags_to_plot = {k: best_mags[k] for k in plot_filters.keys()}
         mags_to_plot["time"] = observable_times
 
-        if isinstance(lc_model, model.CombinedLightCurveModelContainer):
+        if isinstance(lc_model, model.CombinedLightCurveModelContainer) and plot_kwargs.get("plot_submodels", True):
             sub_models = lc_model.lc_models
             model_colors = plt.cm.Spectral(np.linspace(0, 1, len(sub_models)))[::-1]
             obs_times , mag_all = lc_model.gen_detector_lc(

@@ -2,7 +2,6 @@ import corner
 import os
 import numpy as np
 import pandas as pd
-import matplotlib
 from matplotlib.ticker import MaxNLocator
 import seaborn
 from matplotlib import pyplot as plt
@@ -17,14 +16,12 @@ nmma_colors = corepu.fig_setup()
 
 def setup_plot_quantities(posterior_samples, limits, plot_keys, injection, post_dir = None, default_labels={}, **plot_kwargs):
     plot_quantities = {}
-    matplotlib.rcParams.update({'font.size': 16, 'font.family': 'serif'})
     #load samples
     posterior_samples = utils.get_posteriors(posterior_samples, post_dir)
     try:
         plot_quantities['best_fit'] = posterior_samples.iloc[posterior_samples['log_likelihood'].idxmax()]
     except KeyError:
         plot_quantities['best_fit'] = {k: None for k in posterior_samples.columns}
-
     if plot_keys is None:
         plot_keys = posterior_samples.columns.tolist() # show all we can
         for key in ['log_likelihood', 'log_prior']:
@@ -46,7 +43,7 @@ def setup_plot_quantities(posterior_samples, limits, plot_keys, injection, post_
             label = label_mapping.get(k, default_labels.get(k,k))
             plot_labels.append(label )
         except KeyError:
-            print(f"key {k} was not found in the posterior samples; Inserting dummy plot.")
+            print(f"{plot_kwargs.get('label', 'Warning')} : key {k} was not found in the posterior samples; Will try to insert dummy plot.")
             cur_min, cur_max = limits[i]
             if cur_min > cur_max: # meaning no data seen so far, so we have to take chances
                 cur_min, cur_max = 1e42, -1e42# just set crazy limits that we can still work on.
@@ -108,12 +105,13 @@ def plot_histograms_only(posterior_samples,limits = None, plot_keys = None,
             if plot_quantities['best_fit'][key] is not None:
                 ax.axvline(plot_quantities['best_fit'][key], color=color, linestyle='-.')
                 
-
+        xlim = plot_quantities['limits'][i]
         if isinstance(prior, dict):
             if key in prior and not isinstance(prior[key], bilby.core.prior.Constraint):
-                _range = np.linspace(*(ax.get_xlim()), 300)
-                ax.plot(_range, prior[key].prob(_range), color=color, alpha = 0.5, linewidth=1)
-
+                _range = np.linspace(*xlim, 300)
+                ax.plot(_range, prior[key].prob(_range), color=color, alpha = 0.5, linewidth=1, linestyle='--')
+        
+        
         ax.xaxis.set_major_locator(MaxNLocator(nbins=4, min_n_ticks=3, prune='both'))
         [l.set_rotation(45) for l in ax.get_xticklabels()]
         [l.set_rotation(45) for l in ax.get_xticklabels(minor=True)]

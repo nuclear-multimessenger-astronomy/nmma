@@ -70,17 +70,16 @@ class EquationofStateLikelihood(NMMALikelihood):
         radii, masses, lambdas = self.sub_model.eos_converter.macro_parameters.values()
         fig = getattr(args, 'fig', None)
         if fig is None:
-            x_lim = (min(np.min(radii)-0.3, 9), max(np.max(radii)+0.3, 15))
+            x_lim = (min(np.min(radii)-0.3, 9.3), max(np.max(radii)+0.3, 14.5))
             y_lim = (masses[0], masses[-1]+0.1)
             fig, ax = setup_multi_axes(1, figsize=(8, 8) )
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)
-            ax.set_xlabel(r'Radius [km]')
-            ax.set_ylabel(r'Mass [M$_\odot$]') 
+            ax.set_xlabel(r'Radius\,[km]')
+            ax.set_ylabel(r'Mass\,[M$_\odot$]') 
 
             for constraint in self.sub_model.constraints:
-                color = ax._get_lines.get_next_color()
-                ax = constraint.plot(ax=ax, color=color)
+                ax = constraint.plot(ax=ax)
         else:
             ax = fig.axes[0]
             xlow, xhigh = ax.get_xlim()
@@ -369,12 +368,20 @@ class MassConstraint(EoSConstraint):
                 tov_mass = local_parameters['masses'][-1]
         return self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)
     
-    def plot(self, ax, color = 'k', **kwargs):
+    def plot(self, ax, **kwargs):
         """Plot the mass constraint on the given figure."""
         x_lim = ax.get_xlim()
-        ax.hlines(self.mass, *x_lim, linestyle=self.linestyle, linewidth=2.5, zorder=3, color = color, **kwargs)
-        ax.text(x_lim[0]+0.05*(x_lim[1]-x_lim[0]), self.mass, self.name, color=color, fontsize=ax.xaxis.label.get_size(), va='center', zorder = 20, bbox=dict(facecolor='white', edgecolor='none', pad=0.5))
-        cmap = fading_cmap(color)
+        plot_kwargs = self.plot_kwargs | kwargs
+        if 'color' not in plot_kwargs:
+                plot_kwargs['color'] = ax._get_lines.get_next_color()
+        if 'linestyle' not in plot_kwargs:
+            plot_kwargs['linestyle'] = self.linestyle
+        if 'linewidth' not in plot_kwargs:
+            plot_kwargs['linewidth'] = 2.5
+
+        ax.hlines(self.mass, *x_lim, zorder=3, **plot_kwargs)
+        ax.text(x_lim[0]+0.05*(x_lim[1]-x_lim[0]), self.mass, self.name, color=plot_kwargs['color'], fontsize=ax.xaxis.label.get_size(), va='center', zorder = 20, bbox=dict(facecolor='white', edgecolor='none', pad=0.5))
+        # cmap = fading_cmap(plot_kwargs['color'])
         # levels = [0.95, 0.68]
         # for i, level in enumerate(levels):
         #     ax.fill_between(x_lim, self.mass - (i+1)*self.error, self.mass + (i+1)*self.error, color=cmap(0.8*level), zorder=2-i)
@@ -536,7 +543,7 @@ class MassRadiusConstraint(EoSConstraint):
         
         return log_l
     
-    def plot(self, ax, color = 'k', **kwargs):
+    def plot(self, ax,**kwargs):
         """Plot the mass-radius constraint on the given figure."""
           
         Xc = 0.5 * (self.rad_edges[:-1] + self.rad_edges[1:])
@@ -547,6 +554,10 @@ class MassRadiusConstraint(EoSConstraint):
         cumsum = np.cumsum(flat[order])
         levels = [0.9, 0.5]
         clevels=[flat[order][np.searchsorted(cumsum, p)] for p in levels]
+
+        plot_kwargs = self.plot_kwargs | kwargs
+        manual = plot_kwargs.get('manual', False)
+        color = plot_kwargs.get('color', ax._get_lines.get_next_color())
         cmap = fading_cmap(color)
         colors = cmap(levels[::-1])
         contour = ax.contour(
@@ -554,7 +565,6 @@ class MassRadiusConstraint(EoSConstraint):
             colors = colors, linewidths=2
         )
 
-        manual = self.plot_kwargs.get('manual', False)
         if isinstance(manual, bool) or manual is None:
             manual = False
         elif isinstance(manual, (list, tuple)):

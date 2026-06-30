@@ -369,13 +369,14 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
 
 def multi_analysis_loop(args, analysis_setup):
     USE_MPI = False
-    # check if it is running under mpi
+    rank = 0
     try:
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.Get_rank()
-        USE_MPI = True
-    except ImportError:
-        rank = 0
+        if MPI.COMM_WORLD.Get_size() > 1:
+            USE_MPI = True
+    except:
+        pass
         
     if rank != 0 and not getattr(args, 'verbose', False):
         devnull = os.open(os.devnull, os.O_WRONLY)
