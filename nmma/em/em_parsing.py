@@ -2,6 +2,7 @@ import argparse
 
 import numpy as np
 from .utils import DEFAULT_FILTERS
+from ..core.gitlab import DEFAULT_MODELS_HOME
 
 # unused imports kept for forward compatibility
 from ..core.parsing import (parsing_and_logging, single_messenger_analysis_parsing, 
@@ -85,10 +86,9 @@ def em_model_parsing(parser):
     em_model_parser.add_argument("--absolute", action='store_true',
         help="Use Absolute Magnitude?")
         
-    em_model_parser.add_argument( "--svd-path",  default="svdmodels",
+    em_model_parser.add_argument( "--svd-path",  default=str(DEFAULT_MODELS_HOME / "svdmodels"),
          help="Path to the SVD directory with {model}.joblib")
-    em_model_parser.add_argument(
-        "--svd-mag-ncoeff","--svd-ncoeff", type=int,  default=10, 
+    em_model_parser.add_argument("--svd-mag-ncoeff","--svd-ncoeff", type=int,  default=10, 
         help="Number of eigenvalues to be taken for mag evaluation (default: 10)")
     em_model_parser.add_argument("--svd-lbol-ncoeff", type=int, default=10,
         help="Number of eigenvalues to be taken for lbol evaluation (default: 10)")

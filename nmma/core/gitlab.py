@@ -16,6 +16,9 @@ from tqdm.auto import tqdm
 pbar = {}
 MODELS = {}
 REPO = "https://gitlab.com/Theodlz/nmma-models"
+# DEFAULT_MODELS_HOME = os.path.join("~", "nmma_models")
+code_dir = Path(__file__).resolve().parent.parent
+DEFAULT_MODELS_HOME = code_dir.parent / "nmma_models"
 
 # X-ray and Radio data
 SKIP_FILTERS = [
@@ -30,10 +33,9 @@ SKIP_FILTERS = [
 
 def get_models_home(models_home=None) -> str:
     if not models_home:
-        models_home = os.environ.get("NMMA_MODELS", os.path.join("~", "nmma_models"))
+        models_home = os.environ.get("NMMA_MODELS", DEFAULT_MODELS_HOME)
     models_home = os.path.expanduser(models_home)
-    if not os.path.exists(models_home):
-        os.makedirs(models_home)
+    os.makedirs(models_home, exist_ok=True)
     return models_home
 
 
