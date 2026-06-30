@@ -21,9 +21,6 @@ def _create_base_nmma_parser(sampler="dynesty", parents=[]):
         version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
     )
 
-    if sampler in ["all", "dynesty"]:
-        base_parser = multi_sampler_parsing(base_parser)
-        base_parser = dynesty_parsing(base_parser)
 
     base_parser = em_settings_parsing(base_parser)
     base_parser = base_analysis_parsing(base_parser)
@@ -33,6 +30,9 @@ def _create_base_nmma_parser(sampler="dynesty", parents=[]):
     base_parser = tabulated_eos_parsing(base_parser)
     base_parser = eos_parsing(base_parser)
     base_parser = add_misc_settings(base_parser)
+    if sampler in ["all", "dynesty"]:
+        base_parser = dynesty_parsing(base_parser)
+        base_parser = multi_dynesty_parsing(base_parser)
 
     return base_parser
 
@@ -45,29 +45,25 @@ def em_settings_parsing(parser):
     return parser
 
 
-def multi_sampler_parsing(parser):
-    sampler_group = parser.add_argument_group(title = "Setting for the Sampler")
+def multi_dynesty_parsing(parser):
+    sampler_group = parser.add_argument_group(title = "Setting for the Dynesty Sampler")
 
-    sampler_group.add_argument("--sampler", choices=["dynesty"], default="dynesty",
+    sampler_group.add_argument("--sampler", default="dynesty",
         help="The parallelised sampler to use, defaults to dynesty")
-    sampler_group.add_argument( "-n", "--nlive", default=1000, type=int, help="Number of live points" )
-    sampler_group.add_argument("--dlogz", default=0.1, type=float,
-        help="Stopping criteria: remaining evidence, (default=0.1)" )
     sampler_group.add_argument("--bound","--dynesty-bound", default="live", 
         help="Dynesty bounding method (default=live)" )
+    sampler_group.add_argument("--save-bounds", action='store_true',
+        help="Whether to store bounds in the resume file. Not doing this can make resume files large (~GB)")
     sampler_group.add_argument( "--sample", "--dynesty-sample", default="acceptance-walk",
         help="sampling method (default=acceptance-walk).")
+    sampler_group.add_argument("--n-check-point", default=2000, type=int,
+        help="Steps to take before attempting checkpoint")
+    
     return parser
 
 def add_misc_settings(parser):
     misc_group = parser.add_argument_group(title="Misc. Settings")
     misc_group.add_argument("-c", "--clean", action='store_true', help="Run clean: ignore any resume files")
-    misc_group.add_argument("--checkpoint-plot", action='store_true',
-        help="Whether to generate analytical check-point plots")
-    misc_group.add_argument("--save-bounds", action='store_true',
-        help="Whether to store bounds in the resume file. Not doing this can make resume files large (~GB)")
-    misc_group.add_argument("--check-point-delta-t","--check-point-deltaT", default=3600, type=float,
-        help="Write a checkpoint resume file and diagnostic plots every deltaT [s]. Default: 1 hour.")
     misc_group.add_argument("--plot", action='store_true',
         help="Whether to generate the various data plots at the end of the run")
     return parser

@@ -331,7 +331,9 @@ class EjectaFitting:
 
 class NSBHEjectaFitting(EjectaFitting):
     def chibh2risco(self, chi_bh):
-
+        """see, e.g., https://arxiv.org/pdf/2011.08948.pdf, eq. 2-4.
+        This expression gives the innermost stable circular orbit (ISCO) in units of the black hole mass as a function of the dimensionless spin parameter chi_bh. 
+        """
         Z1 = 1.0 + (1.0 - chi_bh ** 2) ** (1.0 / 3) * (
             (1 + chi_bh) ** (1.0 / 3) + (1 - chi_bh) ** (1.0 / 3)
         )
@@ -361,8 +363,8 @@ class NSBHEjectaFitting(EjectaFitting):
         equation (4) in https://arxiv.org/pdf/1807.00011
         '''
 
-        mass_ratio_invert = mass_1_source / mass_2_source
-        symm_mass_ratio = mass_ratio_invert / (1.0 + mass_ratio_invert)**2
+        mass_ratio = mass_2_source /mass_1_source
+        symm_mass_ratio = mass_ratio / (1.0 + mass_ratio)**2
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
@@ -390,27 +392,26 @@ class NSBHEjectaFitting(EjectaFitting):
         a1=7.11595154e-03,
         a2=1.43636803e-03,
         a4=-2.76202990e-02,
-        n1=8.63604211e-01,
-        n2=1.68399507,
+        n1=-8.63604211e-01,
+        n2=-1.68399507,
     ):
 
         """
         equation (9) in https://arxiv.org/abs/2002.07728
         """
 
-        mass_ratio_invert = mass_1_source / mass_2_source
+        mass_ratio= mass_2_source / mass_1_source
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
         baryon_mass_2 = self.baryon_mass_NS(mass_2_source, compactness_2)
 
         mdyn = (
-            a1
-            * np.power(mass_ratio_invert, n1)
+            a1 * mass_ratio**n1
             * (1.0 - 2.0 * compactness_2)
             / compactness_2
         )
-        mdyn += -a2 * np.power(mass_ratio_invert, n2) * risco + a4
+        mdyn += -a2 * mass_ratio**n2 * risco + a4
         mdyn *= baryon_mass_2
 
         mdyn = np.maximum(0.0, mdyn)
@@ -721,8 +722,8 @@ class BNSEjectaFitting(EjectaFitting):
             jet_func = gaussian_jet_energy_to_central_isotropic_energy_equivalent
             data = np.column_stack((10**log10_Ejet, thetaCore, alphaWing))
                 
-        return np.log10([jet_func(*row) for row in data])
-    
+        out = np.log10([jet_func(*row) for row in data])
+        return np.squeeze(out)    
         
 
     def bns_parameter_conversion(self, parameters):
@@ -793,6 +794,9 @@ class MultimessengerConversion:
 
         if 'em' in instruction_dict:
             conversions.append(instruction_dict['em'])
+        
+        if 'custom' in instruction_dict:
+            conversions.append(instruction_dict['custom'])
 
         return cls(*conversions)
     
@@ -826,54 +830,59 @@ class MultimessengerConversion:
         
 label_mapping = {
     ## Cosmology parameters ##
-    'Hubble_constant'       : r'$H_0{\rm [km\,s^{-1}\,Mpc^{-1}]}$',
+    'Hubble_constant'       : r'$H_0{\rm\,[km\,s^{-1}\,Mpc^{-1}]}$',
     'Omega_matter'          : r'$\Omega_{m}$',
     'redshift'              : r'$z$',
     ## System parameters ##
     'inclination_EM'        : r'$\theta_{obs}$',
     'theta_jn'              : r'$\theta_{JN}$',
     'cos_theta_jn'          : r'$\cos{\theta_{JN}}$',
-    'luminosity_distance'   : r'$d_L{\rm [Mpc]}$', 
+    'luminosity_distance'   : r'$d_L\,{\rm [Mpc]}$', 
     ## GW parameters ##
-    'chirp_mass'            :r'$\mathcal{M}_c{\rm [M_{\odot}]}$',
+    'chirp_mass'            :r'$\mathcal{M}_c\,{\rm [M_{\odot}]}$',
     'mass_ratio'            : r'$q$', 
     'chi_eff'               : r'$\chi_{\rm{eff}}$', 
-    'mass_1_source'         : r'$m_{1,s}{\rm [M_{\odot}]}$', 
-    'mass_2_source'         : r'$m_{2,s}{\rm [M_{\odot}]}$', 
+    'mass_1_source'         : r'$m_{1,s}\,{\rm [M_{\odot}]}$', 
+    'mass_2_source'         : r'$m_{2,s}\,{\rm [M_{\odot}]}$', 
     ## KN parameters ##
-    'log10_mej'             : r'$\log_{10}(M_{\rm{ej}}{\rm [M_{\odot}]})$',
-    'log10_mej_dyn'         : r'$\log_{10}(M_{\rm{ej,dyn}}{\rm [M_{\odot}]})$',
-    'log10_mej_wind'        : r'$\log_{10}(M_{\rm{ej,wind}}{\rm [M_{\odot}]})$',
-    'log10_E0'              : r'$\log_{10}(E_0{\rm [erg]})$',
+    'log10_mej'             : r'$\log_{10}(M_{\rm{ej}}\,{\rm [M_{\odot}]})$',
+    'log10_mej_dyn'         : r'$\log_{10}(M_{\rm{dyn}}\,{\rm [M_{\odot}]})$',
+    'log10_mej_wind'        : r'$\log_{10}(M_{\rm{wind}}\,{\rm [M_{\odot}]})$',
     'ratio_zeta'            : r'$\zeta$',
     'alpha'                 : r'$\alpha$',
-    'KNtheta'               : r'$\theta_{KN} [^\circ]$',
-    'KNphi'                 : r'$\phi_{KN} [^\circ]$',
+    'KNtheta'               : r'$\theta_{\rm obs}\,[^\circ]$',
+    'KNphi'                 : r'$\phi_{KN}\,[^\circ]$',
+    # Bu parameters ##
+    'vej_dyn'               : r'$v_{\rm{dyn}}\,{\rm [c]}$',
+    'vej_wind'              : r'$v_{\rm{wind}}\,{\rm [c]}$',
+    'v_ej_dyn'              : r'$v_{\rm{dyn}}\,{\rm [c]}$',
+    'v_ej_wind'             : r'$v_{\rm{wind}}\,{\rm [c]}$',
+    'Ye_dyn'                : r'$Y_{e,{\rm{dyn}}}$',
     'kappa_Ye'              : r'$\kappa_{\rm{Y_e}}$',
     'kappa_v'               : r'$\kappa_{v}$', 
     ## GRB parameters ##
-    'log10_E0'              : r'$\log_{10}(E_0{\rm [erg]})$',
+    'log10_E0'              : r'$\log_{10}(E_{\rm iso,0}\,{\rm [erg]})$',
     'ratio_epsilon'         : r'$\epsilon$',
     'thetaCore'             : r'$\theta_{c}$',
     'thetaWing'             : r'$\theta_{w}$',
     'alphaWing'             : r'$\alpha_{w}$',
-    'log10_n0'              : r'$\log_{10}(n_{0}{\rm [cm^{-3}]})$',
+    'log10_n0'              : r'$\log_{10}(n_{0}\,{\rm [cm^{-3}]})$',
     'p'                     : r'$p$',
     'log10_epsilon_e'       : r'$\log_{10}(\epsilon_{e})$',
     'log10_epsilon_B'       : r'$\log_{10}(\epsilon_{B})$',
     ## Ejecta parameters ##
-    'mni'                   : r'$M_{\rm{Ni}}{\rm [M_{\odot}]}$',
-    'mtot'                  : r'$M_{\rm{tot}}{\rm [M_{\odot}]}$',
-    'mrp'                   : r'$M_{\rm{rp}}{\rm [M_{\odot}]}$',
+    'mni'                   : r'$M_{\rm{Ni}}\,{\rm [M_{\odot}]}$',
+    'mtot'                  : r'$M_{\rm{tot}}\,{\rm [M_{\odot}]}$',
+    'mrp'                   : r'$M_{\rm{rp}}\,{\rm [M_{\odot}]}$',
     'mni_c'                 : r'$M_{\rm{Ni}}/M_{\rm{tot}}$',
-    'mrp_c'                 : r'$M_{\rm{rp,c}}{\rm [M_{\odot}]}$',
+    'mrp_c'                 : r'$M_{\rm{rp,c}}\,{\rm [M_{\odot}]}$',
     ### EOS parameters ###
-    'L_sym'                 : r'$L_{\rm sym}{\rm [MeV]}$',
-    'K_sym'                 : r'$K_{\rm sym}{\rm [MeV]}$',
-    'K_sat'                 : r'$K_{\rm sat}{\rm [MeV]}$',
-    '3n_sat'                : r'$c^2_{3n_{\rm sat}}{\rm [c^2]}$',
-    '5n_sat'                : r'$c^2_{5n_{\rm sat}}{\rm [c^2]}$',
-    'TOV_mass'              : r'$M_{\rm{TOV}}{\rm [M_{\odot}]}$',
-    'R_14'                  : r'$R_{1.4}{\rm[km]}$',
+    'L_sym'                 : r'$L_{\rm sym}\,{\rm [MeV]}$',
+    'K_sym'                 : r'$K_{\rm sym}\,{\rm [MeV]}$',
+    'K_sat'                 : r'$K_{\rm sat}\,{\rm [MeV]}$',
+    '3n_sat'                : r'$c^2_{3n_{\rm sat}}\,{\rm [c^2]}$',
+    '5n_sat'                : r'$c^2_{5n_{\rm sat}}\,{\rm [c^2]}$',
+    'TOV_mass'              : r'$M_{\rm{TOV}}\,{\rm [M_{\odot}]}$',
+    'R_14'                  : r'$R_{1.4}\,{\rm[km]}$',
     'lambda_tilde'          : r'$\tilde{\Lambda}$', 
 }

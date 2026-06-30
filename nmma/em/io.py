@@ -39,6 +39,8 @@ def load_em_observations(filename, args=None, format='observations'):
     if isinstance(filename, argparse.Namespace):
         args = filename
         filename = args.light_curve_data
+    if isinstance(filename, dict):
+        return filename     # assume it is already in the correct format
     
     if filename is None:
         raise ValueError("No filename provided for lightcurve data.")
@@ -74,35 +76,10 @@ def read_lc_from_json(filename):
 
 def read_lc_from_csv(filename, args, format):
     if "obs" in format:
-        with open(filename, "r") as f:
-            lines = [line.rstrip("\n") for line in f]
-            lines = filter(None, lines) #get non-empty lines
-
-            data = {}
-            for line in lines:
-                if line.startswith("#") or line.startswith("time") or line.startswith("mjd"):
-                    continue
-                lineSplit = line.split(None)
-                lineSplit = list(filter(None, lineSplit))
-                try:
-                    mjd = Time(lineSplit[0]).mjd
-                except ValueError:
-                    format = getattr(args, "time_format", None)
-                    if format is None:
-                        format = 'mjd'
-                    mjd = Time(lineSplit[0], format=format).mjd
-                filt = lineSplit[1]
-                mag = float(lineSplit[2])
-                dmag = float(lineSplit[3])
-
-                try:
-                    data[filt]['time'].append(mjd)
-                    data[filt]['mag'].append(mag)
-                    data[filt]['mag_error'].append(dmag)
-                except KeyError:
-                    data[filt] = {'time': [mjd], 'mag': [mag], 'mag_error': [dmag]}
-        return data
-
+        try:
+            return strict_read_csv(filename, args)
+        except Exception as e:
+            return generous_read_csv(filename)
 
     elif 'model' in format:
         #FIXME 
@@ -120,6 +97,51 @@ def read_lc_from_csv(filename, args, format):
         return data
     elif format == "standard":
         raise ValueError("Standard format is not supported for reading from csv files. Please use json files instead.")
+    
+def generous_read_csv(filename):
+    data = pd.read_csv(filename)
+    out_data = {}
+    for filter in data['filter'].unique():
+        sub_data = data[data['filter'] == filter]
+        out_data[filter] = {
+            'time': sub_data['mjd'].to_numpy(),
+            'mag': sub_data['mag_corr'].to_numpy(),
+            'mag_error': sub_data['magerr'].to_numpy()
+        }
+        non_dets = np.isnan(out_data[filter]['mag'])
+        out_data[filter]['mag'][non_dets] = sub_data['limiting_mag'].to_numpy()[non_dets]
+        out_data[filter]['mag_error'][non_dets] = np.inf
+    return out_data
+
+def strict_read_csv(filename, args):
+    with open(filename, "r") as f:
+        lines = [line.rstrip("\n") for line in f]
+        lines = filter(None, lines) #get non-empty lines
+
+        data = {}
+        for line in lines:
+            if line.startswith("#") or line.startswith("time") or line.startswith("mjd"):
+                continue
+            lineSplit = line.split(None)
+            lineSplit = list(filter(None, lineSplit))
+            try:
+                mjd = Time(lineSplit[0]).mjd
+            except ValueError:
+                format = getattr(args, "time_format", None)
+                if format is None:
+                    format = 'mjd'
+                mjd = Time(lineSplit[0], format=format).mjd
+            filt = lineSplit[1]
+            mag = float(lineSplit[2])
+            dmag = float(lineSplit[3])
+
+            try:
+                data[filt]['time'].append(mjd)
+                data[filt]['mag'].append(mag)
+                data[filt]['mag_error'].append(dmag)
+            except KeyError:
+                data[filt] = {'time': [mjd], 'mag': [mag], 'mag_error': [dmag]}
+    return data
 
 def write_em_observations(filename, data, format='observations'):
     # write json file in standard format or csv file, either in observations or model format

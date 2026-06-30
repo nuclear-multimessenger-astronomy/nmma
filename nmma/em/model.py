@@ -384,13 +384,8 @@ class LightCurveModelContainer:
                 apparent_magnitude = mags + self.distmod + redshift_correction
                 # apparent_magnitude = utils.autocomplete_data(
                 #      observable_times,  observable_times[use_mask], apparent_magnitude[use_mask])
-<<<<<<< HEAD
-            else:  # no meaningful inter-/extrapolation possible
-                apparent_magnitude = np.full_like(self.model_times, np.inf)
-=======
             else: #no meaningful inter-/extrapolation possible
                 apparent_magnitude =  np.full_like(observable_times, np.inf)
->>>>>>> 07b237b (ENH: improved sncosmo connection)
             lc_data[filt] = apparent_magnitude
 
         return (observable_times, lc_data)
@@ -499,12 +494,7 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
         A light curve model object to evaluate the light curve
         from a set of parameters
     """
-<<<<<<< HEAD
-
-    def __init__(self, model="Arnett", sample_times=None):
-=======
     def __init__(self, model="Arnett", sample_times=None, **em_model_kwargs):
->>>>>>> 07b237b (ENH: improved sncosmo connection)
         super().__init__(model, sample_times=sample_times)
         if model == "Arnett":
             self.lc_func = lc_gen.arnett_lc
@@ -750,20 +740,13 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-<<<<<<< HEAD
-
-    def __init__(self, model="Bu2025_MLP", filters=None, surrogate_dir=None, **kwargs):
-=======
     def __init__(self, model="Bu2026_MLP", filters=None, surrogate_dir=None, **em_model_kwargs):
->>>>>>> 07b237b (ENH: improved sncosmo connection)
         if model.endswith("_lc"):
             from fiesta.inference.lightcurve_model import (
                 BullaLightcurveModel as BullaSurrogate,
             )
         else:
             from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
-<<<<<<< HEAD
-<<<<<<< HEAD
         # fiesta requires a non-empty in-range filter list at construction;
         # there is no "all trained filters" default. Pick a safe optical/NIR
         # set that fits every published Bu* surrogate.
@@ -795,31 +778,8 @@ class FiestaKilonovaModel(FiestaModel):
             fiesta_model = BullaSurrogate(**fiesta_kwargs)
 
         super().__init__(
-            fiesta_model, filters, sample_times=kwargs.get("sample_times", None)
+            fiesta_model, filters, sample_times=em_model_kwargs.get("sample_times", None)
         )
-
-=======
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir,**em_model_kwargs)
-=======
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
->>>>>>> b456dc0 (various bug fixes)
-        fiesta_model = BullaSurrogate(**fiesta_kwargs)
-
-        super().__init__(fiesta_model, filters, sample_times=em_model_kwargs.get('sample_times', None))
->>>>>>> 07b237b (ENH: improved sncosmo connection)
-
-    def parameter_conversion(self, parameters):
-        if "kappa_Ye" in parameters:
-            if "Ye_wind" in parameters:
-                parameters["Ye_dyn"] = parameters["kappa_Ye"] * parameters["Ye_wind"]
-            else:
-                parameters["Ye_wind"] = parameters["Ye_dyn"] / parameters["kappa_Ye"]
-        if "kappa_v" in parameters:
-            if "v_ej_wind" in parameters:
-                parameters["v_ej_dyn"] = parameters["kappa_v"] * parameters["v_ej_wind"]
-            else:
-                parameters["v_ej_wind"] = parameters["v_ej_dyn"] / parameters["kappa_v"]
-        return super().parameter_conversion(parameters)
 
 class GRBMixin:
     def __init__(self, *args, resolution=12, **kwargs):
@@ -886,7 +846,6 @@ class FiestaGRBModel(GRBMixin, FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-<<<<<<< HEAD
 
     def __init__(
         self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **kwargs
@@ -908,14 +867,6 @@ class FiestaGRBModel(GRBMixin, FiestaModel):
             fiesta_model, filters, sample_times=kwargs.get("sample_times", None)
         )
 
-=======
-    def __init__(self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **em_model_kwargs):
-        from fiesta.inference.lightcurve_model import AfterglowFlux
-        fiesta_kwargs= dict( name=model, filters=filters, directory=surrogate_dir)
-        fiesta_model = AfterglowFlux(**fiesta_kwargs)
-        
-        super().__init__(fiesta_model, filters, sample_times=em_model_kwargs.get('sample_times', None))
->>>>>>> 07b237b (ENH: improved sncosmo connection)
 
 class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
     """A light curve model object for GRB light curves using afterglowpy
@@ -959,16 +910,7 @@ class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
             model, filters, model_parameters, sample_times, resolution=resolution
         )
         self.jet_type = jet_type
-<<<<<<< HEAD
-        self.default_parameters = {
-            "xi_N": 1.0,
-            "d_L": 3.086e19,
-            "jetType": jet_type,
-            "specType": 0,
-        }  # d_L=10pc in cm
-=======
         self.default_parameters = {"xi_N": 1.0, "d_L": 3.086e19, "jetType": jet_type, "specType": 0, **em_model_kwargs}  # d_L=10pc in cm
->>>>>>> 07b237b (ENH: improved sncosmo connection)
         self.def_keys = self.default_parameters.keys()
         # keys we typically sample in log space, but need to convert to linear space
         self.log_sampling_keys = ["E0", "n0", "epsilon_e", "epsilon_B"]
@@ -1078,10 +1020,7 @@ class HostGalaxyLightCurveModel(LightCurveModelContainer):
         # host_mag is the magnitude of the host galaxy in the filters
         host_mag=23.9,  # value for case of arxiv:2303.12849
         model_parameters=None,
-<<<<<<< HEAD
-=======
         **em_model_kwargs
->>>>>>> 07b237b (ENH: improved sncosmo connection)
     ):
         super().__init__(model, filters, model_parameters, sample_times=sample_times)
         if isinstance(host_mag, (float, int)):
@@ -1124,17 +1063,12 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         filters=None,
         sample_times=None,
         model_parameters=None,
-<<<<<<< HEAD
-    ):
-        self.sn_model = sncosmo.Model(source=model)
-=======
         **em_model_kwargs
     ):  
         if isinstance(model, str):
             self.sn_model = sncosmo.Model(source=model, **em_model_kwargs)
         else:
             self.sn_model = model
->>>>>>> 07b237b (ENH: improved sncosmo connection)
         if model_parameters is not None:
             print(
                 "Warning: model_parameters are ignored for SupernovaLightCurveModel, using sncosmo defaults."
@@ -1142,11 +1076,6 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         model_parameters = self.sn_model.param_names
 
         if sample_times is None:
-<<<<<<< HEAD
-            sample_times = np.linspace(
-                self.sn_model.mintime(), self.sn_model.maxtime(), 200
-            )
-=======
             sample_times = np.linspace(self.sn_model.mintime(), self.sn_model.maxtime(), 200)
 
             if (sample_times < 0).any():
@@ -1154,7 +1083,6 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
                 sample_times += sample_times[0]
                 print(f"Warning: Some supernova models are relative to the peak, some relative to the explosion time, "
                     "but nmma always expects times relative to the explosion time. Adjust your t0 prior accordingly." )
->>>>>>> 07b237b (ENH: improved sncosmo connection)
         super().__init__(model, filters, model_parameters, sample_times)
 
     def em_parameter_setup(self, parameters):
@@ -1162,16 +1090,9 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         self.sn_model.set(**lc_pars)
 
     def combine_lc_params(self, parameters):
-<<<<<<< HEAD
         # FIXME: This should probably be removed, use sncosmo parameters instead
         self.stretch = parameters.get("supernova_mag_stretch", 1.0)
         parameters["t0"] = parameters.get("t0", 0.0)
-=======
-        
-        self.stretch = parameters.get('supernova_mag_stretch', 1.)
-
-        parameters["t0"] = parameters.get("t0", 0.)
->>>>>>> 07b237b (ENH: improved sncosmo connection)
         parameters["z"] = self.redshift
         return {
             p: parameters.get(p, self.sn_model.get(p)) for p in self.model_parameters
@@ -1190,15 +1111,6 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
             
         # convert the parameters to the fiesta model parameters
         self.em_parameter_setup(parameters)
-<<<<<<< HEAD
-
-        mag = lc_gen.sn_lc(
-            sample_times / self.stretch, self.sn_model, self.default_filts, self.lambdas
-        )
-
-        return {filt: filt_mag for filt, filt_mag in mag.items()}
-
-=======
         mag = lc_gen.sn_lc(sample_times / self.stretch/(1 + self.redshift), self.sn_model, 
                            self.default_filts, self.lambdas)
 
@@ -1209,7 +1121,6 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         # we are in observer frame, but still need to add the timeshift
         return (sample_times + self.timeshift, obs_mags)
             
->>>>>>> 07b237b (ENH: improved sncosmo connection)
 
 class ShockCoolingLightCurveModel(LightCurveModelContainer):
     def __init__(
@@ -1219,14 +1130,6 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
 
             An object to evaluted the shock cooling light curve across filters, particularly suited for descriptions of lightcurves at early times (hours to few days)
 
-<<<<<<< HEAD
-            Parameters
-            ----------
-        model: str, optional
-            Name of the model. Default is "Piro2021".
-        filters: list of str, optional
-            List of filters to create model for. Defaults to all available filters.
-=======
         Parameters
         ----------
     model: str, optional
@@ -1237,7 +1140,6 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
         List of alternative model parameters. If not specified, default will be used.
     em_model_kwargs: optional
         Additional keyword arguments, not used, but provided for consistency.
->>>>>>> 07b237b (ENH: improved sncosmo connection)
 
             Returns
             -------
@@ -1292,14 +1194,9 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-<<<<<<< HEAD
-
-    def __init__(self, model="Me2017", filters=None, sample_times=None):
-=======
     def __init__(
         self, model="Me2017", filters=None, sample_times=None, **em_model_kwargs
     ):
->>>>>>> 07b237b (ENH: improved sncosmo connection)
         super().__init__(model, filters, sample_times=sample_times)
         lc_dict = {
             "HoHa2020": lc_gen.HoNa_lc,
@@ -1595,18 +1492,11 @@ def single_model_from_args(
     )
 
     # update explicit args
-<<<<<<< HEAD
     model_args = default_model_args | dict(
         filters=filters,
         sample_times=utils.setup_sample_times(args),
     )
     if model_name is not None:
-=======
-    model_args = default_model_args | dict(filters=filters,
-        sample_times=utils.setup_sample_times(args)
-    )
-    if model_name: 
->>>>>>> 07b237b (ENH: improved sncosmo connection)
         model_args["model"] = model_name.strip()
     if args.em_model_kwargs:
         model_args|= args.em_model_kwargs

@@ -1,5 +1,4 @@
 import os
-import matplotlib
 import numpy as np
 import pandas as pd
 
@@ -14,8 +13,6 @@ from .em_parsing import (
 )
 from ..core.base import multi_analysis_loop
 from ..core.utils import read_injection_file, set_filename, read_trigger_time
-
-matplotlib.use("agg")
 
 
 def data_from_injection(args, filters, detection_limit):
@@ -110,23 +107,20 @@ def bolometric_setup(args):
 
     return priors, likelihood, injection_parameters
 
-
 def analysis_setup(args):
     
     filters = utils.set_filters(args)
-    try:
+    if getattr(args, 'light_curve_data', None):
         # load observational data
-        data = io.load_em_observations(args, format="observations")
-        trigger_time = read_trigger_time(None, args)
-        injection_parameters = None
-    except ValueError:
+        data = io.load_em_observations(args, format='observations')
+        trigger_time = read_trigger_time(None,args)
+        injection_parameters = getattr(args, 'injection_parameters', None)
+    else:
         detection_limit = utils.create_detection_limit(args, filters)
         # try to work with injection data instead
         data, injection_parameters = data_from_injection(args, filters, detection_limit)
-        trigger_time = injection_parameters.get("trigger_time", 0)
-    except FileNotFoundError:
-        # If the injection file is not found, raise an error
-        raise FileNotFoundError("Injection file not found.")
+        trigger_time = injection_parameters.get('trigger_time',0)
+        
     data = utils.cut_data_to_time_range(data, args, trigger_time)
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)

@@ -18,6 +18,7 @@ if rank != 0:
     
 from bilby.core.prior import PriorDict
 from ..core.mpi_setup import pbilby_sampling 
+from ..core.base import bilby_sampling
 from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args
 from .joint_likelihood import MultiMessengerLikelihood
 from ..core.utils import logger
@@ -69,12 +70,16 @@ def analysis_runner(
     if ifo_list is not None:
         meta_data["ifo_list"] = [ifo.__repr__() for ifo in ifo_list]
 
-    
-    pbilby_sampling(
-        likelihood, priors, args, 
-    data_dump.get("injection_parameters", None), rank,
-    plot=plot, meta_data=meta_data, 
-    **kwargs)
+    if args.sampler == "dynesty":
+        logger.info("Using dynesty sampler")
+        return pbilby_sampling(
+            likelihood, priors, args, 
+            data_dump.get("injection_parameters", None), rank,
+            plot=plot, meta_data=meta_data, **kwargs)
+    else:
+        return bilby_sampling(
+            likelihood, priors, args, 
+            data_dump.get("injection_parameters", None), rank)
 
 def nmma_analysis():
     """

@@ -5,6 +5,7 @@ from ast import literal_eval
 import numpy as np
 import pandas as pd
 from copy import deepcopy
+from itertools import product
 
 from bilby import run_sampler
 from bilby.core.likelihood import Likelihood
@@ -311,7 +312,7 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
             sampler_kwargs["niter"] = 1
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
-
+    
     result = run_sampler(
         likelihood,
         priors,
@@ -331,6 +332,7 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         return
 
     try:
+        result.posterior = likelihood.posterior_conversion(result.posterior)
         result.save_to_file()
         result.save_posterior_samples()
     except FileMovedError:
@@ -368,18 +370,19 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
 
 def multi_analysis_loop(args, analysis_setup):
     USE_MPI = False
-    # check if it is running under mpi
+    rank = 0
     try:
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.Get_rank()
-        USE_MPI = True
-    except ImportError:
-        rank = 0
+        if MPI.COMM_WORLD.Get_size() > 1:
+            USE_MPI = True
+    except:
+        pass
         
-    # if rank != 0:
-    #     devnull = os.open(os.devnull, os.O_WRONLY)
-    #     os.dup2(devnull, 1)
-    #     os.dup2(devnull, 2)
+    if rank != 0 and not getattr(args, 'verbose', False):
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, 1)
+        os.dup2(devnull, 2)
         
     if getattr(args, 'multi', None):
         sub_runs = []
@@ -399,6 +402,27 @@ def multi_analysis_loop(args, analysis_setup):
                         raise KeyError(f"{key} not a known argument... please remove")
                     setattr(run_args, key, value)
                 sub_runs.append(run_args)
+    elif getattr(args, 'matrix', None):
+        sub_runs = []
+        keys = args.matrix.keys()
+        vals = args.matrix.values()
+        for arg_variation in product(*vals):
+            run_args = deepcopy(args)
+            run_name = args.label
+            for i, var in enumerate(arg_variation):
+                rep = f'_{var}'
+                if len(rep)>20:
+                    key = keys[i]
+                    var_idx = vals[i].index(var)
+                    rep = f"_{key}_{var_idx}"
+                run_name += rep
+            setattr(run_args, 'label', run_name)
+            for key, val in zip(keys, arg_variation):
+                if key not in args:
+                    raise KeyError(f"{key} not a known argument... please remove")
+                setattr(run_args, key, val)
+            sub_runs.append(run_args)
+            
     else:
         sub_runs = [args]
     for run_args in sub_runs:
