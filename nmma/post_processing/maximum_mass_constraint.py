@@ -1,7 +1,5 @@
 
 import os
-import sys
-import contextlib
 
 from .parser import maximum_mass_parser
 from ..core.parsing import nmma_base_parsing
@@ -53,7 +51,7 @@ def baryonic_mass(gravitational_mass, EOS, eos_path_macro, eos_path_micro):
           cut = min(cut, np.where(np.isnan(m_solv))[0][0])
        n_solv = n_solv[:cut]; m_solv = m_solv[:cut]; x= x[:cut]
 
-    n_solv = n_solv *(1.*u.fm**(-3)).to(u.km**(-3)) #convert from fm**(-3) to km**(-3)
+    n_solv = n_solv *(1.*u.fm**(-3)).to(u.km**(-3)).value #convert from fm**(-3) to km**(-3)
     
     m_baryonic = particle_mass*4*np.pi*scipy.integrate.simpson(y=(n_solv)*x**2/np.sqrt(1-2*geom_msun_km*m_solv/x), x=x) #get baryonic mass in Msun
     
