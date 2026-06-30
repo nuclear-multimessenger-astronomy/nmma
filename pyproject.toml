@@ -44,7 +44,7 @@ dependencies = [
     "pymultinest",
     "sncosmo",
     "dust_extinction",
-    "arviz",
+    "arviz>=1.2",
     "tornado",
     "notebook",
     "toml",

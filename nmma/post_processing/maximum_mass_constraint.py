@@ -136,18 +136,9 @@ class PostmergerInferenceMixIn:
         mdisk = 10**log10_mdisk
         mej_dyn = 10**log10_mej_dyn
 
-<<<<<<< HEAD
-        try:
-            b1 = baryonic_mass(mass_1, EOS, self.eos_path_macro, self.eos_path_micro) 
-            b2 = baryonic_mass(mass_2, EOS, self.eos_path_macro, self.eos_path_micro)
-            m_rem_b = b1 + b2 - mdisk - mej_dyn #calculate the baryonic remnant mass
-        except:
-            breakpoint()
-=======
         b1 = baryonic_mass(mass_1, EOS, self.eos_path_macro, self.eos_path_micro) 
         b2 = baryonic_mass(mass_2, EOS, self.eos_path_macro, self.eos_path_micro)
         m_rem_b = b1 + b2 - mdisk - mej_dyn #calculate the baryonic remnant mass
->>>>>>> dev
 
         if self.use_M_max:
            m_threshold = baryonic_Kepler_mass(mTOV, R_14, ratio_R, delta) #if the Kepler limit is the threshold, use the quasiuniversal relation
