@@ -1,9 +1,8 @@
-FROM condaforge/mambaforge:4.9.2-5 as conda
+FROM condaforge/mambaforge:4.9.2-5 AS conda
 
 RUN apt update && apt install gcc -y && apt clean
 
 COPY api/environment.yml .
-COPY requirements.txt .
 
 RUN mamba env create -f environment.yml
 RUN conda clean -afy

@@ -11,4 +11,26 @@ dependencies:
 - mpi4py
 
 - pip:
-  - -r requirements.txt
+  - future
+  - bilby>=2.7.1
+  - bilby_pipe>=1.7.0
+  - fiestaEM @ git+https://github.com/nuclear-multimessenger-astronomy/fiestaEM.git
+  - huggingface_hub
+  - schwimmbad
+  - colorcet
+  - numpy>=2.0
+  - matplotlib>=3.8
+  - scipy>=1.15
+  - pandas>=2.0
+  - astropy>=6.0
+  - pymultinest
+  - sncosmo
+  - dust_extinction
+  - arviz>=1.2
+  - tornado
+  - notebook
+  - toml
+  - ligo.skymap
+  - healpy
+  - scikit-learn
+  - tensorflow-cpu>=2.19
