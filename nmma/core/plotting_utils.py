@@ -141,21 +141,20 @@ def format_title_offset(ax, title):
 
 def get_offset(offset_string):
     offset = offset_string.replace('−', '-')
+
     #single addition
     if offset.startswith('+') or offset.startswith('-'):
         return (1., float(offset))
-    
-    parts = offset.split('e')
-    # single multiplication
-    if len(parts) == 2:
-        return (float(offset), 0.)
-    #addition and multiplication
-    for i, char in enumerate(parts[1]):
+    first_part, second_part = offset.split('e', 1)
+    if not ('+' in second_part[1:] or '-' in second_part[1:]):
+        return (float(offset), 0.0)
+
+    for i, char in enumerate(second_part):
         if char in ['+', '-'] and i != 0:
             break
-    mult = 'e'.join([parts[0], parts[1][:i]])
-    add = 'e'.join([parts[1][i:], parts[2]])
-    return (float(mult), float(add))
+    multiplier = 'e'.join([first_part, second_part[:i]])
+    addend = second_part[i:]
+    return (float(multiplier), float(addend))
 
 def arange_titles(ax, move = False):
     lower_y = 1.07
@@ -188,7 +187,7 @@ def arange_titles(ax, move = False):
     else:
         print("Warning: Titles could not be nicely aligned.")
         title_texts = [t.get_text() for t in ax.texts]
-        print(f"All intended title information was {ax.get_ylabel()}: {title_texts}")
+        print(f"The intended title was {ax.get_ylabel()}: {title_texts}")
         for t in ax.texts:
             t.set_visible(False)
     return ax
