@@ -31,7 +31,6 @@ dependencies = [
     "future",
     "bilby>=2.7.1",
     "bilby_pipe>=1.7.0",
-    "fiestaEM",
     "huggingface_hub",
     "schwimmbad",
     "colorcet",
@@ -95,6 +94,7 @@ production = [
     "pyarrow",
     "parquet",
     "dynesty>=3.0.0",
+    "fiestaEM",
 ]
 sampler = [
     "ultranest",
@@ -176,7 +176,7 @@ asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
 
 [tool.bumpver]
-current_version = "1.0.0"
+current_version = "1.0.1"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
 commit_message = "bump version {old_version} -> {new_version}"
 commit = true
