@@ -24,7 +24,6 @@ classifiers = [
     'Topic :: Scientific/Engineering :: Physics',
     'Operating System :: POSIX',
     'Operating System :: Unix',
-    'Operating System :: MacOS',
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 ]
 dynamic = ["version"]
@@ -32,7 +31,7 @@ dependencies = [
     "future",
     "bilby>=2.7.1",
     "bilby_pipe>=1.7.0",
-    "fiestaEM @ git+https://github.com/nuclear-multimessenger-astronomy/fiestaEM.git",
+    "fiestaEM",
     "huggingface_hub",
     "schwimmbad",
     "colorcet",
@@ -51,8 +50,6 @@ dependencies = [
     "ligo.skymap",
     "healpy",
     "scikit-learn",
-    'tensorflow>=2.19; platform_system == "Darwin"',
-    'tensorflow>=2.19; platform_system == "Windows"',
     'tensorflow-cpu>=2.19; platform_system == "Linux"',
 ]
 
