@@ -21,7 +21,7 @@ def setup_em_kwargs(priors, data_dump, args,  logger=None):
     light_curve_model = model.create_light_curve_model_from_args(lc_model, args, filters)
     trigger_time = read_trigger_time(None, args)
     light_curve_data = utils.setup_filtered_lc_data(light_curve_data, trigger_time)
-    light_curve_data = utils.check_model_time_consistency(light_curve_data, light_curve_model, priors)
+    light_curve_data = utils.check_model_time_consistency(light_curve_data, light_curve_model, priors, args.injection)
     sys_handler = systematics.FilterSystematicsHandler(filters, 
         data_dump['systematics_dict'], error_budget=args.em_error_budget,
         light_curve_times=light_curve_data[0])
@@ -119,7 +119,7 @@ class EMTransientLikelihood(NMMALikelihood):
             The figure object containing the plot
 
         """
-        self.sub_model.final_diagnostics(bestfit_params, args, result)
+        return self.sub_model.final_diagnostics(bestfit_params, args, result)
 
     def posterior_conversion(self, posterior_samples):
         if 'log10_mej_dyn' in posterior_samples and 'log10_mej_wind' in posterior_samples:
@@ -240,7 +240,8 @@ class BasicEMTransient:
         else:
             minus_chisquare = 0.0
 
-        # evaluate the data with infinite error
+        # evaluate the data with infinite error, i.e. upper limits,
+        # as Gaussian survival function
         gausslogsf=np.zeros(2) ##hack if len(infIdx)==0
         if infIdx.sum() > 0:
             gausslogsf = norm.logsf(
@@ -259,7 +260,7 @@ class BasicEMTransient:
         if result is None:
             save_path = f'{args.outdir}/{args.label}_bol_lightcurve.png'
         save_path = f'{result.outdir}/{result.label}_bol_lightcurve.png'
-        bolometric_lc_plot(self, obs_times, obs_lc, save_path = save_path)
+        return bolometric_lc_plot(self, obs_times, obs_lc, save_path = save_path)
 
 
 class MultiFilterTransient(BasicEMTransient):
@@ -351,4 +352,4 @@ class MultiFilterTransient(BasicEMTransient):
         return minus_chisquare_total + gaussprob_total
    
     def final_diagnostics(self, bestfit_params, args, result=None):
-        lch_bestfit(self, bestfit_params, args, result)
+        return lch_bestfit(self, bestfit_params, args, result)

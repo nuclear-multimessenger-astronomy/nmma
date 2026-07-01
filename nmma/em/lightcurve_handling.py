@@ -63,15 +63,15 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
         print(f"Saved bestfit parameters and magnitudes to {bestfit_file}")
 
     if args.plot:
-        filters_to_plot = [
-            filt for filt in transient.observed_filters
-            if not np.isnan(transient.light_curves[filt]).all()
-        ]
-        plot_error = {filt: model_error[filt] for filt in filters_to_plot}
-        mags_to_plot = {filt: best_mags[filt] for filt in filters_to_plot}
+        plot_kwargs = getattr(args, "plot_kwargs", {})
+        if (plot_filters := plot_kwargs.pop("filters", None)) is None:
+            plot_filters = {filt: filt for filt in transient.observed_filters if not np.isnan(transient.light_curves[filt]).all()}
+
+        plot_error = {k: model_error[k] for k in plot_filters.keys()}
+        mags_to_plot = {k: best_mags[k] for k in plot_filters.keys()}
         mags_to_plot["time"] = observable_times
 
-        if isinstance(lc_model, model.CombinedLightCurveModelContainer):
+        if isinstance(lc_model, model.CombinedLightCurveModelContainer) and plot_kwargs.get("plot_submodels", True):
             sub_models = lc_model.lc_models
             model_colors = plt.cm.Spectral(np.linspace(0, 1, len(sub_models)))[::-1]
             obs_times , mag_all = lc_model.gen_detector_lc(
@@ -85,7 +85,7 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
                 }
                 plot_errors = []
                 plot_mags = []
-                for filt in filters_to_plot:
+                for filt in plot_filters.keys():
                     try:
                         plot_mags.append(utils.get_filtered_mag(mag_all[i], filt))
                     except KeyError:
@@ -98,11 +98,15 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
                 sub_model_plot_props[sub_model.model]['plot_errors'] = plot_errors
         else: sub_model_plot_props = None
 
-        
-        basic_em_analysis_plot(
-            transient, mags_to_plot, plot_error, chi2_dict, mismatches,
-            sub_model_plot_props, xlim = args.xlim, ylim = args.ylim, 
-            save_path = os.path.join(args.outdir, f"{args.label}_lightcurves.png")
+        save_path = plot_kwargs.pop("save_path", 
+            os.path.join(args.outdir, 
+                    f"{args.label}_bestfit_lightcurves.png"))
+        return basic_em_analysis_plot(
+            transient, plot_filters, mags_to_plot, plot_error, 
+            chi2_dict, mismatches, sub_model_plot_props, 
+            xlim = args.xlim, ylim = args.ylim, 
+            save_path = save_path, 
+            fig = getattr(args, "fig", None),  **plot_kwargs 
         )
 
        

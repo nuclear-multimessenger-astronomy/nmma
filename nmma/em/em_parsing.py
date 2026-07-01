@@ -2,6 +2,7 @@ import argparse
 
 import numpy as np
 from .utils import DEFAULT_FILTERS
+from ..core.gitlab import DEFAULT_MODELS_HOME
 
 # unused imports kept for forward compatibility
 from ..core.parsing import (parsing_and_logging, single_messenger_analysis_parsing, 
@@ -38,7 +39,6 @@ def basic_em_only_parsing(parser):
     parser.add_argument("--verbose", action='store_true', help="print out log likelihoods" )
     return parser
 
-
 def basic_em_only_analysis_parsing(parser):
     parser = single_messenger_analysis_parsing(parser)
 
@@ -47,8 +47,6 @@ def basic_em_only_analysis_parsing(parser):
     parser.add_argument("--light-curve-data", "--data", help="Path to data in [time filter magnitude error] format, time format will be inferred, but can be explicitly adjusted with --time-format. If not given, will try to generate data from the injection file.")
     parser.add_argument("--time-format", 
         help="Time format of the light curve data, e.g. isot, mjd, see https://docs.astropy.org/en/stable/time/#time-format")
-    parser.add_argument("--bestfit", "--best-fit", action='store_true',
-        help="Save the best fit parameters and magnitudes to JSON")
 
     return parser
 
@@ -73,6 +71,8 @@ def em_model_parsing(parser):
         help="Name of the model-type to be used, can be a comma-seperated list for joint lightcurve models" )
     em_model_parser.add_argument("--em-model", "--kilonova-model","--model", type=yaml_parse, nargs="*",
         help="Name of the transient model to be used")
+    em_model_parser.add_argument("--em-model-kwargs", "--model-parameters", type=yaml_parse,
+        help="Additional keyword arguments for the transient model, given like a python-dict ")
     em_model_parser.add_argument("--interpolation-type", "--gptype", 
         default="keras", help="Interpolation library to be used for EM "\
             "transient model. Default: keras, further options: tensorflow, sklearn_gp, api_gp" )
@@ -86,10 +86,9 @@ def em_model_parsing(parser):
     em_model_parser.add_argument("--absolute", action='store_true',
         help="Use Absolute Magnitude?")
         
-    em_model_parser.add_argument( "--svd-path",  default="svdmodels",
+    em_model_parser.add_argument( "--svd-path",  default=str(DEFAULT_MODELS_HOME / "svdmodels"),
          help="Path to the SVD directory with {model}.joblib")
-    em_model_parser.add_argument(
-        "--svd-mag-ncoeff","--svd-ncoeff", type=int,  default=10, 
+    em_model_parser.add_argument("--svd-mag-ncoeff","--svd-ncoeff", type=int,  default=10, 
         help="Number of eigenvalues to be taken for mag evaluation (default: 10)")
     em_model_parser.add_argument("--svd-lbol-ncoeff", type=int, default=10,
         help="Number of eigenvalues to be taken for lbol evaluation (default: 10)")
@@ -233,7 +232,8 @@ def modified_em_prior_parsing(parser):
     mod_em_prior_parser.add_argument("--em-error-budget", "--kilonova-error", 
         help="Additional statistical error (mag) to be introduced in each filter," \
         " can be passed as list or dict. Will only be used if em_syserr is not given in prior")
-    mod_em_prior_parser.add_argument("--systematics-file", help="Path to systematics configuration file")
+    mod_em_prior_parser.add_argument("--systematics-file", type=yaml_parse, 
+        help="Path to systematics configuration file")
     return parser
 
 def em_analysis_parsing(parser):

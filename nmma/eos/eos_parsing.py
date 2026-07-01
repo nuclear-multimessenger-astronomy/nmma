@@ -1,4 +1,4 @@
-from ..core.parsing import noneint, single_messenger_analysis_parsing
+from ..core.parsing import noneint, single_messenger_analysis_parsing, yaml_parse
 
 def tabulated_eos_parsing(parser):
     tab_eos_input_parser = parser.add_argument_group(
@@ -28,7 +28,7 @@ def eos_parsing(parser):
         help="path to .json-file from which eos-constraints are read and/or to which they should be stored. Can be appended with additional constraints." )
 
     ### setup LowerMTOVConstraint
-    eos_input_parser.add( "--lower-mtov",
+    eos_input_parser.add( "--lower-mtov", type=yaml_parse,
         help= "dict with additional lower mtov limits to consider, using style: {'name':{'mass':mass_val,'error':gaussian_error_val [, 'arxiv':'arxiv_id']},...}" )
     eos_input_parser.add( "--lower-mtov-name", nargs ="*",
         help= "list of identifiers for further lower-mtov-values to consider" )
@@ -38,9 +38,11 @@ def eos_parsing(parser):
         help= "list of additional mtov limit errors to consider")
     eos_input_parser.add( "--lower-mtov-arxiv", nargs ="*",
         help= "list of arxiv-ids for additional lower mtov limits to consider")
+    eos_input_parser.add( "--lower-plot-kwargs", type=yaml_parse,
+        help= "dict with additional plot kwargs for mass-radius posteriors")
     
     ### setup UpperMTOVConstraint
-    eos_input_parser.add( "--upper-mtov",
+    eos_input_parser.add( "--upper-mtov", type=yaml_parse,
         help= "dict with additional upper mtov limits to consider, using style: {'name':{'mass':mass_val,'error':gaussian_error_val [, 'arxiv':'arxiv_id']},...}" )
     eos_input_parser.add( "--upper-mtov-name", nargs ="*",
         help= "list of identifiers for further upper-mtov-values to consider")
@@ -50,16 +52,20 @@ def eos_parsing(parser):
         help= "list of additional mtov limit errors to consider")
     eos_input_parser.add( "--upper-mtov-arxiv", nargs ="*",
         help= "list of arxiv-ids for additional upper mtov limits to consider")
+    eos_input_parser.add( "--upper-plot-kwargs", type=yaml_parse,
+        help= "dict with additional plot kwargs for mass-radius posteriors")
 
     ### setup MassRadiusConstraint
-    eos_input_parser.add( "--mass-radius", 
+    eos_input_parser.add( "--mass-radius",  type=yaml_parse,
         help= "dict with additional mass-radius constraints to consider, using style: {'name':{'file_path':path_to_R_M_posterior,[, 'arxiv':'arxiv_id']},...}") 
     eos_input_parser.add(  "--mass-radius-name", nargs ="*",
         help= "list of identifiers for further mass-radius-posteriors to consider")
-    eos_input_parser.add("--mass-radius-posterior", "--mass-radius-file-path",nargs ="*",
+    eos_input_parser.add("--mass-radius-file-path", "--mass-radius-posterior", nargs ="*",
         help= "list of files with additional radius-mass posteriors to consider")
     eos_input_parser.add( "--mass-radius-arxiv", nargs ="*",
-        help= "list of arxiv-ids for additional R-M posteriors to consider")    
+        help= "list of arxiv-ids for additional R-M posteriors to consider")  
+    eos_input_parser.add( "--mass-radius-plot-kwargs", type=yaml_parse,
+        help= "dict with additional plot kwargs for mass-radius posteriors")
     return parser
 
 def eos_analysis_parsing(parser):

@@ -13,9 +13,10 @@ from ..em import training, model_parameters, io
 pytestmark = pytest.mark.skip(reason="SVD training retired; use fiesta-surrogates")
 
 
+MODELPATH = "svdtrainingmodel"
 @pytest.fixture(autouse=True)
 def cleanup_outdir():
-    ModelPath = "svdtrainingmodel"
+    ModelPath = MODELPATH
     yield
     if os.path.exists(ModelPath):
         shutil.rmtree(ModelPath, ignore_errors=True)
@@ -40,7 +41,7 @@ def test_training():
     workingDir = os.path.dirname(__file__)
 
     dataDir = os.path.join(workingDir, "data/bulla")
-    ModelPath = "svdtrainingmodel"
+    ModelPath = MODELPATH
     filenames = glob.glob(f"{dataDir}/*.dat")
     data = io.read_photometry_files(filenames, filters=filts)
     # Loads the model data
@@ -63,6 +64,7 @@ def test_training():
         dataDir,
         interpolation_type=interpolation_type,
         filters=filts,
+        outdir = ModelPath
     )
 
     interpolation_type = "keras"
@@ -82,4 +84,5 @@ def test_training():
         dataDir,
         interpolation_type=interpolation_type,
         filters=filts,
+        outdir=ModelPath
     )

@@ -77,7 +77,7 @@ def setup_sample_times(args):
         return np.arange(tmin, tmax + args.em_tstep, args.em_tstep)
     
     # otherwise, create the array based on selected scale
-    if 'lin' in args.em_timescale:
+    if 'lin' in args.em_timescale or tmin<=0.:
         return np.linspace(tmin, tmax, args.em_nsteps)
     elif any(scale in args.em_timescale for scale in ['log', 'geo']):
         return np.geomspace(tmin, tmax, args.em_nsteps)
@@ -103,6 +103,7 @@ def set_filters(args):
             em_detectors = args.em_detectors.split(",")
         else: 
             em_detectors = getattr(args, "em_detectors", []).copy()
+        em_detectors = [det.strip().lower() for det in em_detectors]
         filters = []
         if 'ztf' in em_detectors:
             em_detectors.remove('ztf')
@@ -110,7 +111,7 @@ def set_filters(args):
         if 'lsst' in em_detectors:
             em_detectors.remove('lsst')
             filters.extend( ["lsstg", "lsstr", "lssti", "lsstz", "lssty"] )
-        elif hasattr(args, "rubin_ToO_type"):
+        elif getattr(args, "rubin_ToO_type"):
             if args.rubin_ToO_type == 'platinum':
                 filters.extend( ["ps1::g","ps1::r","ps1::i","ps1::z","ps1::y"] )
             elif args.rubin_ToO_type == 'gold':
@@ -129,7 +130,6 @@ def set_filters(args):
         if em_detectors:
             raise NotImplementedError(f"{em_detectors} not implemented yet.")
         ## to be extended
-        
     return filters
 
 
@@ -198,7 +198,6 @@ def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
 
 
 def cut_data_to_time_range(data, args, trigger_time, tmin = 0, tmax = np.inf):
-    
     tmin = getattr(args, "data_tmin", tmin)
     tmax = getattr(args, "data_tmax", tmax)
 
@@ -251,9 +250,11 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 def check_model_time_consistency(light_curve_data, light_curve_model, priors, injection = None):
 
     (lc_times, lc_mags, lc_uncertainties, trigger_time) = light_curve_data
-    
-    data_tmin = np.min([lc_times[key].min() for key in lc_times.keys()])
-    data_tmax = np.max([lc_times[key].max() for key in lc_times.keys()])
+    data_tmin, data_tmax = np.inf, -np.inf
+    for key in lc_times.keys():
+        detections = np.isfinite(lc_mags[key]) & np.isfinite(lc_uncertainties[key])
+        data_tmin = np.minimum(data_tmin, lc_times[key][detections].min())
+        data_tmax = np.maximum(data_tmax, lc_times[key][detections].max())
     
     # get minimal / maximal redshift from prior
     if "redshift" in priors:

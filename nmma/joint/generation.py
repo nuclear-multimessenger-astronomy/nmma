@@ -18,6 +18,11 @@ import numpy as np
 
 
 from  .multi_parsing import  parse_generation_args
+from ..core.constants import set_cosmology
+from ..core.conversion import KilonovaEjectaFitting
+from ..core.base import adjust_priors_for_nmma, adjust_hubble_prior
+from ..core.utils import read_trigger_time
+from ..gw.gw_inputs import NMMAGravitationalWaveInput
 from ..em.prior import extinction_prior
 from ..em.io import load_em_observations
 from ..em.model import create_injection_model
@@ -26,12 +31,9 @@ from ..em.systematics import FilterSystematicsHandler
 from ..em import utils as em_utils
 from ..eos.eos_likelihood import (compose_eos_constraints, 
         EoSConverter, JointEoSConstraint, setup_tabulated_eos_priors)
-from ..core.constants import set_cosmology
-from ..core.base import adjust_priors_for_nmma, adjust_hubble_prior
-from ..core.utils import read_trigger_time
 from .joint_likelihood import MultiMessengerLikelihood
 
-import matplotlib    
+import matplotlib    ### FIXME: better to handle on a general level, jointly with fiesta
 matplotlib.rcParams['text.usetex'] = False
 
 from .. import __version__
@@ -47,12 +49,6 @@ def get_version_info():
     )
 
 def remove_expandable_args(parser, required_arg_groups):
-    # for cat in msg_list:
-    #     if messenger not in inputs.messengers:
-    #         #  identify argument_group corresponding to non-sampled msg.
-    #         for ag in parser._action_groups:
-    #             if f'with_{messenger}' in [act.dest for act in ag._group_actions]:
-    #                 parser._action_groups.remove(ag)
     for ag in parser._action_groups:
         if ag.title not in required_arg_groups:
             parser._action_groups.remove(ag)
@@ -181,19 +177,21 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         self.plot_injection = args.plot_injection
 
 
-        self.sampler = "dynesty"
+        self.sampler = args.sampler
         self.sampling_seed = args.sampling_seed
         self.data_dump_file = f"{self.data_directory}/{self.label}_data_dump.pickle"
 
         self.data_set = False
-        self.injection = args.injection
         self.injection_numbers = args.injection_numbers
         self.injection_file = args.injection_file
         self.injection_dict = args.injection_dict
-        if self.injection:
+        if self.injection_file or self.injection_dict:
+            self.injection = True
+            args.injection = True
             self.injection_parameters = self.injection_df.iloc[self.idx].to_dict()
         else: 
-            self.injection_parameters=None
+            args.injection = False
+            self.injection_parameters = None
 
         self.trigger_time = read_trigger_time(self.injection_parameters, args, 'gps')
         args.trigger_time = self.trigger_time
@@ -204,33 +202,35 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 **get_version_info(),
                 command_line_args=args.__dict__,
                 unknown_command_line_args=self.unknown_args,
-                injection_parameters= self.injection_parameters,
+                injection_parameters=self.injection_parameters,
         )
         self.adjust_priors_and_data(args, logger)
-
+        
         #test-build likelihood 
-        lhood = MultiMessengerLikelihood.setup_from_args(
+        self.lhood = MultiMessengerLikelihood.setup_from_args(
             self.data_dump, self._priors, self.args, logger)
-        lhood.log_likelihood(self._priors.sample())
+        self.lhood.log_likelihood(self._priors.sample())
         
         self.save_data_dump()
 
     def adjust_priors_and_data(self, args, logger):
         messengers, analysis_modifiers = [], []
         data_dump = dict(injection_parameters = self.injection_parameters)
+        if self.injection_parameters:
+            converted_injection = self.injection_parameters.copy()
+            
         # GW SETUP
         if args.detectors:
             messengers.append("gw")
             # get a BBHPriorDict only if GW parameters are present
             priors = super()._get_priors()
-            self.gw_inputs= bilby_pipe.data_generation.DataGenerationInput(args, self.unknown_args)
-            #### FIXME resetting likelihood type is an unpleasant bilby_pipe remnant
-            self.gw_inputs.interferometers.plot_data(outdir=self.data_directory, label=self.label)
-            args.gw_likelihood_type = self.gw_inputs.likelihood_type
-            if args.gw_likelihood_type == "ROQGravitationalWaveTransient":
-                self.gw_inputs.save_roq_weights()
-            data_dump |= dict(waveform_generator=self.gw_inputs.waveform_generator,
-                ifo_list=self.gw_inputs.interferometers)
+            if self.injection_parameters:
+                converted_injection = bilby.gw.conversion.convert_to_lal_binary_neutron_star_parameters(
+                    converted_injection)[0]
+            else:
+                self.gw_inputs= NMMAGravitationalWaveInput(args, self.unknown_args)
+                data_dump |= dict(waveform_generator=self.gw_inputs.waveform_generator,
+                    ifo_list=self.gw_inputs.interferometers)
         else:
             priors = self._get_priors()
 
@@ -239,15 +239,58 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         if args.Hubble or any(['hubble' in key.lower() for key in priors.keys()]):
             analysis_modifiers.append("Hubble")
 
+        # EOS Setup
+        if args.emulator_metadata:
+            messengers.append("eos")
+            logger.info("Setting up EOS constraints")
+            data_dump |= dict(eos_constraint_dict= compose_eos_constraints(args))
+            eos_converter = EoSConverter(args, 'emulated')
+
+        elif args.eos_data:
+            analysis_modifiers.append('tabulated_eos')
+            eos_constraint_dict = compose_eos_constraints(args)
+            if eos_constraint_dict:
+                eos_converter = EoSConverter(args, 'tabulated')
+                constraint = JointEoSConstraint(eos_constraint_dict, eos_converter=eos_converter)
+                args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weighted_eos(
+                    args.Neos, args.outdir, args.eos_weight)
+            priors = setup_tabulated_eos_priors(args, priors, logger)
+        
+        if self.injection_parameters:
+            try: 
+                converted_injection = eos_converter(converted_injection)
+                converted_injection = KilonovaEjectaFitting()(converted_injection)
+            except Exception as e:
+                logger.warning("eos and ejecta fitting failed for injection parameters. Continuing without conversion.")
+                logger.warning(f"Error was {e}")
+                pass
+            finally:
+                # correct injection only once lambdas are properly set
+                # some routines return np.float32 which raises errors 
+                # downstream in results processing, so we convert to float
+                # here. Should be handled more elegantly
+                args.injection_dict = {k: float(v) for k, v in converted_injection.items()}
+                if 'gw' in messengers:
+                    self.gw_inputs= NMMAGravitationalWaveInput(args, self.unknown_args)
+                    data_dump |= dict(waveform_generator=self.gw_inputs.waveform_generator,
+                    ifo_list=self.gw_inputs.interferometers)
 
         # EM SETUP
         if args.em_model or args.em_transient_class:
             messengers.append('em')
             if self.injection_parameters:
                 injection_model = create_injection_model(args)
+                converted_injection = injection_model.parameter_conversion(
+                    converted_injection)
+                for param in injection_model.model_parameters:
+                    if param not in self.injection_parameters:
+                        try:
+                            self.injection_parameters[param] = converted_injection[param]
+                        except KeyError:
+                            raise KeyError(f"Required parameter {param} could not be derived from conversion.")
                 light_curve_data = create_light_curve_data(
-                    self.injection_parameters, args, injection_model
-                )
+                        self.injection_parameters, args, injection_model
+                    )
             else:
                 light_curve_data = load_em_observations(args)
 
@@ -262,23 +305,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             priors = extinction_prior(priors, args)
             data_dump |= dict(light_curve_data=light_curve_data, filters = filters,
                     systematics_dict = sys_handler.systematics_dict)
-            
-
-        # EOS Setup
-        if args.emulator_metadata:
-            messengers.append("eos")
-            logger.info("Setting up EOS constraints")
-            data_dump |= dict(eos_constraint_dict= compose_eos_constraints(args))
-
-        elif args.eos_data:
-            analysis_modifiers.append('tabulated_eos')
-            eos_constraint_dict = compose_eos_constraints(args)
-            if eos_constraint_dict:
-                eos_converter = EoSConverter(args, 'tabulated')
-                constraint = JointEoSConstraint(eos_constraint_dict, eos_converter=eos_converter)
-                args.eos_weight, args.eos_data, args.Neos = constraint.tabulate_weighted_eos(
-                    args.Neos, args.outdir, args.eos_weight)
-            priors = setup_tabulated_eos_priors(args, priors, logger)
 
         self.args = args
         self.messengers = messengers

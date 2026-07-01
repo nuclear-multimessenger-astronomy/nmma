@@ -8,7 +8,6 @@ from bilby.core.utils import decode_bilby_json
 from bilby.core.result import read_in_result
 from astropy import time
 
-from matplotlib.colors import LinearSegmentedColormap
 from pathlib import Path
 import yaml
 
@@ -69,6 +68,11 @@ def read_trigger_time(parameters=None, args=None, out_format = 'mjd'):
                     format = 'gps'
                 trigger_time= time.Time(args.trigger_time, format=format)
                 trigger_time  # this fails if not a valid time
+    elif args is not None:
+        args.trigger_time = trigger_time.mjd if out_format == 'mjd' else trigger_time.gps
+    if trigger_time is None:
+        logger.warning("Neither trigger_time, geocent_time nor geocent_time_x provided. This is a required argument. If you don't know the exact trigger time, use a free timeshift prior.")
+        return None
     
     if out_format == 'mjd':
         return trigger_time.mjd
@@ -76,8 +80,6 @@ def read_trigger_time(parameters=None, args=None, out_format = 'mjd'):
     elif out_format == 'gps':
         return trigger_time.gps
 
-    print("Neither trigger_time, geocent_time nor geocent_time_x provided. This is a required argument. If you don't know the exact trigger time, use a free timeshift prior.")
-    return None
 
 def read_injection_file(file):
     #work for both file-str and Namespace
@@ -99,6 +101,8 @@ def get_posteriors(posterior_samples, outdir = None):
     """
     if isinstance(posterior_samples, pd.DataFrame):
         return posterior_samples
+    elif isinstance(posterior_samples, dict):
+        return pd.DataFrame(posterior_samples)
     
     if isinstance(posterior_samples, Namespace):
         if outdir is None:
@@ -151,19 +155,20 @@ def set_filename(basename, args, identifier=''):
         return  f"{base}{identifier}{ext}"
 
 
-def read_bestfit_from_posterior(args, mode = 'max_likelihood'):
+def read_bestfit_from_posterior(args, mode = 'max_likelihood', return_posterior=False):
     posterior_samples = get_posteriors(args)
     if mode == 'max_likelihood':
         bestfit = posterior_samples.loc[posterior_samples.log_likelihood.idxmax()]
     elif mode == 'max_posterior':
-        bestfit = posterior_samples.loc[(posterior_samples.log_likelihood*posterior_samples.log_prior).idxmax()]
+        bestfit = posterior_samples.loc[(posterior_samples.log_likelihood + posterior_samples.log_prior).idxmax()]
     else:
         raise ValueError(f"Mode {mode} not recognized. Use 'max_likelihood' or 'max_posterior'.")
     bestfit_params = bestfit.to_dict()
     bestfit_idx = bestfit.name
     print(f"Best fit parameters: {str(bestfit_params)}\nBest fit index: {bestfit_idx}")
     bestfit_params["best_fit_index"] = int(bestfit_idx)
-    return bestfit_params
+    
+    return (bestfit_params, posterior_samples) if return_posterior else bestfit_params
 
 def read_bestfit_from_json(bestfit_file_json, cols, verbose=False):
     df = pd.read_json(bestfit_file_json, typ="series")
@@ -185,11 +190,17 @@ def sig_lims(values, quantiles=None, sig_unc=2):
     q_low, q_mean, q_high = np.quantile(values, quantiles)
     low_err     = q_mean - q_low
     high_err    = q_high - q_mean
-    ord_error   = sig_unc -1 - int(np.log10(min(low_err, high_err)))
+    error_of_interest = min(low_err, high_err)
+    log_err = np.log10(error_of_interest) 
+    int_log = int(log_err) - 1 if log_err < 0 else int(log_err)
+    ord_error   = sig_unc -1 - int_log
+    if error_of_interest / 10.**int_log > 3:
+        ord_error -= 1
     if ord_error>=0:
         fmt = f".{ord_error}f"
         return f"${{{q_mean:{fmt}}}}_{{-{low_err:{fmt}}}}^{{+{high_err:{fmt}}}}$"
     else:
+        q_mean, low_err, high_err =np.around([q_mean, low_err, high_err], ord_error)
         return f"${{{int(q_mean)}}}_{{-{int(low_err)}}}^{{+{int(high_err)}}}$"
 
 
@@ -222,12 +233,15 @@ def input_obj_to_str(input_obj, ref_name= None):
     else:
         raise TypeError("Input object could not be identified.")
     
-def fading_cmap(color):
-    cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white",color], gamma = 2)
-
-    cdict = cmap._segmentdata.copy()
-    vals = cdict['alpha'][:, 0]
-    alpha = np.linspace(0, 1, len(vals))
-    cdict['alpha'] = np.column_stack([vals, alpha, alpha])
-
-    return LinearSegmentedColormap(cmap.name, cdict, cmap.N, cmap._gamma)
+def nan_level(data, level, weights=None):
+    nans, clean_data = np.isnan(data), data[~np.isnan(data)]
+    if weights is not None:
+        weights = np.array(weights)[~nans]
+        weights = weights / np.sum(weights)
+    nan_share = np.sum((nans)) / len(data)
+    if nan_share > level:
+        return [np.nan, np.nan]
+    rest_level = level - nan_share
+    low = np.quantile(clean_data,   (1-rest_level)/2, weights=weights, method='inverted_cdf')
+    up  = np.quantile(clean_data, 1-(1-rest_level)/2, weights=weights, method='inverted_cdf')
+    return [low, up]

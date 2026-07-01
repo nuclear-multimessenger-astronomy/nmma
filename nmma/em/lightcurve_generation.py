@@ -11,6 +11,7 @@ from scipy.special import erfc
 from scipy.interpolate import CubicSpline
 
 from . import utils 
+from ..core.utils import read_trigger_time
 try:
     import afterglowpy
 
@@ -36,12 +37,15 @@ abs_mag_dist_factor = D**2
 
 
 #################################################################
+def dummy_add(nu):
+    return 0.0
+
 def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared = abs_mag_dist_factor):
     exponent = np.clip(h * nu * inv_temp / kb, None, 700)  # to avoid overflow in exp
     bb_factor = 2.* h/ c_cgs**2
     return bb_factor * nu**3 /np.expm1(exponent) * R_photo * R_photo / dist_squared
 
-def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add = lambda x: 0.):
+def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add = dummy_add):
     mag = {}
     # nu_host = nu_obs * (1 + redshift)
     for idx, filt in enumerate(filters):
@@ -57,10 +61,11 @@ def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add = lambda x: 
 #################################################################
 ######################### LC MODELS #############################
 #################################################################
-
 ## Arnett model convenience functions
 def arnett_lc_get_int_A_non_vec(x, y):
-    r = quad(lambda z: 2 * z * np.exp(-2 * z * y + z**2), 0, x)
+    def arnett_func(z):
+        return 2 * z * np.exp(-2 * z * y + z**2)
+    r = quad(arnett_func, 0, x)
     return r[0]
 
 
@@ -68,7 +73,9 @@ arnett_lc_get_int_A = np.vectorize(arnett_lc_get_int_A_non_vec, excluded=["y"])
 
 
 def arnett_lc_get_int_B_non_vec(x, y, s):
-    r = quad(lambda z: 2 * z * np.exp(-2 * z * y + 2 * z * s + z**2), 0, x)
+    def arnett_func(z):
+        return 2 * z * np.exp(-2 * z * y + 2 * z * s + z**2)
+    r = quad(arnett_func, 0, x)
     return r[0]
 
 
@@ -235,13 +242,14 @@ def flux_density_on_E0_array(default_time, obs_frequencies, param_dict):
     time_scale = np.log10(default_time / t_end)
     log10_E0[mask] = log10_Eend + energy_exponential * time_scale[mask]
     E0 = 10 ** log10_E0
-    vec_func = np.vectorize(
-        lambda i: fluxDensity(
+    def helper(i):
+        return fluxDensity(
             default_time[i], 
             obs_frequencies, 
             E0=E0[i], 
             **param_dict
-        ), 
+        )
+    vec_func = np.vectorize(helper, 
         otypes=[np.ndarray]
     )
     mJys = vec_func(np.arange(len(default_time)))
@@ -288,20 +296,18 @@ def host_lc(sample_times, parameters, filters, host_mag):
 ## supernova model
 def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
     mag = {}
-
-    for filt, lambda_A in zip(filters, lambdas):
-        # convert back to AA
-        lambda_AA = 1e10 * lambda_A
-        if lambda_AA < sn_model.minwave() or lambda_AA > sn_model.maxwave():
-            mag[filt] = np.full_like(sample_times_stretched,np.inf) 
-        else:
-            try:
-                flux = sn_model.flux(sample_times_stretched, [lambda_AA])[:, 0]
-                # see https://en.wikipedia.org/wiki/AB_magnitude
-                flux_jy = 3.34e4 * np.power(lambda_AA, 2.0) * flux
-                mag[filt] = utils.flux_to_ABmag(flux_jy, unit='Jy')
-            except Exception:
-                return {}
+    for filt, lambda_ in zip(filters, lambdas):
+        try:
+            mag[filt] = sn_model.bandmag(filt, 'ab', sample_times_stretched)
+        except ValueError:
+            lambda_AA = 1e10 * lambda_
+            if lambda_AA < sn_model.minwave() or lambda_AA > sn_model.maxwave():
+                mag[filt] = np.full_like(sample_times_stretched, np.inf)
+                continue
+            #NOTE: workaround  for potential bug in sncosmo: buffer error if lambdaa as float 
+            flux_AA = sn_model.flux(sample_times_stretched, [lambda_AA]).flatten()
+            # see https://en.wikipedia.org/wiki/AB_magnitude
+            mag[filt] = utils.flux_to_ABmag(flux_AA*3.34e4 * lambda_AA**2, unit='Jy')
     return mag
 
 ## shock-cooling lightcurve
@@ -818,7 +824,9 @@ def create_light_curve_data(
     
     injection_parameters = light_curve_model.parameter_conversion(injection_parameters)
     filters = utils.set_filters(args)
-    trigger_time = injection_parameters.get("trigger_time", 0.)
+    trigger_time = read_trigger_time(injection_parameters, args)
+    if trigger_time is None:
+        trigger_time = 0.
     if rng is None:
         rng = np.random.default_rng(args.generation_seed)
     if getattr(args, 'absolute', False):

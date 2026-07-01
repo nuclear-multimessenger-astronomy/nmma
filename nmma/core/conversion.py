@@ -4,7 +4,7 @@ from scipy.special import erf
 from scipy.integrate import simpson
 from astropy import units
 from astropy import cosmology as cosmo
-from .constants import geom_msun_km, msun_to_ergs, get_cosmology, set_cosmology
+from .constants import geom_msun_km, msun_to_ergs, msun_s, get_cosmology, set_cosmology
 
 from bilby.gw.conversion import (
     component_masses_to_chirp_mass,
@@ -191,32 +191,50 @@ def convert_mtot_mni(params):
     params["mrp_c"] = (params["xmix"]*(params["mtot"]-params["mni"])-params["mrp"])
     return params
 
+############################## pulsar timing conversions ####################################
+def binary_mass_function(m_obs, m_comp, sin_i):
+    return (m_comp * sin_i)**3 / (m_obs + m_comp)**2
+
+def shapiro_delay(m_comp, sin_i):
+    "see https://arxiv.org/pdf/1007.0933.pdf"
+    shapiro_range = msun_s*1.e6 * m_comp # in microseconds
+    orthometric_ratio = sin_i/(1+np.sqrt(1-sin_i**2))
+    return shapiro_range * orthometric_ratio**3
+
+def einstein_delay_orbital_factor(orbital_period, eccentricity):
+    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12 "
+    return msun_s**(2/3) * eccentricity * (orbital_period /2/np.pi)**(1/3)
+def simplified_einstein_delay(m_psr, m_comp, einstein_factor):
+    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12 "
+    return einstein_factor *m_comp * (m_psr + 2*m_comp) / (m_psr + m_comp)**(4/3)
+
+def einstein_delay(m_psr, m_comp, orbital_period, eccentricity):
+    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12 "
+    einstein_delay_factor = einstein_delay_orbital_factor(orbital_period, eccentricity)
+    return simplified_einstein_delay(m_psr, m_comp, einstein_delay_factor)
+
+def mass_parameters_to_sini(total_mass, mass_function, m_comp):
+    "Invert the binary mass function to get sin(i) for a given total mass and mass function"
+    return np.cbrt(mass_function * total_mass**2)/m_comp
+
 ############################## EOS-related conversions ####################################
 
-def EOS2Parameters(radii, masses, lambdas, m1_source, m2_source):
-    ### FIXME: Under what circumstance would these not simply be mass_val[-1], radius_val[-1]?
+def EOS_to_ns_parameters(radii, masses, lambdas):
     TOV_mass = masses.max(axis=-1)
     TOV_radius = radii[np.argmax(masses)]
+    R_14, R_16 = np.interp(x=[1.4, 1.6], xp=masses, fp=radii, left=0, right=0)
 
+    return TOV_mass, TOV_radius, R_14, R_16
+
+def EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source):
     (log_lambda_1, log_lambda_2) = np.interp(x=[m1_source, m2_source],
             xp= masses, fp=np.log(lambdas), left=-np.inf, right=-np.inf)
     lambda_1 = np.exp(log_lambda_1)
     lambda_2 = np.exp(log_lambda_2)
-    try:
-        (radius_1, radius_2, R_14, R_16) = np.interp(
-                x=[m1_source, m2_source, 1.4, 1.6],
-                xp=masses, fp= radii, left =0, right=0)
+    (radius_1, radius_2) = np.interp( x=[m1_source, m2_source],
+            xp=masses, fp= radii, left =0, right=0)
 
-        return TOV_mass, TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
-    ## radius interpolation will raise an error if dealing with multiple sources at once
-    # In that case we return all values as corresponding arrays
-    except ValueError:
-        ref = np.ones_like(lambda_1)
-        (radius_1, radius_2, R_14, R_16) = np.interp(
-                x=[m1_source, m2_source, 1.4*ref, 1.6*ref],
-                xp=masses, fp= radii, left =0, right=0)
-
-        return ref*TOV_mass, ref*TOV_radius, lambda_1, lambda_2, radius_1, radius_2, R_14, R_16
+    return lambda_1, lambda_2, radius_1, radius_2
 
 def radii_from_qur(parameters):
     mass_1_source = parameters["mass_1_source"]
@@ -313,7 +331,9 @@ class EjectaFitting:
 
 class NSBHEjectaFitting(EjectaFitting):
     def chibh2risco(self, chi_bh):
-
+        """see, e.g., https://arxiv.org/pdf/2011.08948.pdf, eq. 2-4.
+        This expression gives the innermost stable circular orbit (ISCO) in units of the black hole mass as a function of the dimensionless spin parameter chi_bh. 
+        """
         Z1 = 1.0 + (1.0 - chi_bh ** 2) ** (1.0 / 3) * (
             (1 + chi_bh) ** (1.0 / 3) + (1 - chi_bh) ** (1.0 / 3)
         )
@@ -343,8 +363,8 @@ class NSBHEjectaFitting(EjectaFitting):
         equation (4) in https://arxiv.org/pdf/1807.00011
         '''
 
-        mass_ratio_invert = mass_1_source / mass_2_source
-        symm_mass_ratio = mass_ratio_invert / (1.0 + mass_ratio_invert)**2
+        mass_ratio = mass_2_source /mass_1_source
+        symm_mass_ratio = mass_ratio / (1.0 + mass_ratio)**2
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
@@ -372,27 +392,26 @@ class NSBHEjectaFitting(EjectaFitting):
         a1=7.11595154e-03,
         a2=1.43636803e-03,
         a4=-2.76202990e-02,
-        n1=8.63604211e-01,
-        n2=1.68399507,
+        n1=-8.63604211e-01,
+        n2=-1.68399507,
     ):
 
         """
         equation (9) in https://arxiv.org/abs/2002.07728
         """
 
-        mass_ratio_invert = mass_1_source / mass_2_source
+        mass_ratio= mass_2_source / mass_1_source
 
         #  use the BH spin to find the normalized risco
         risco = self.chibh2risco(chi_bh)
         baryon_mass_2 = self.baryon_mass_NS(mass_2_source, compactness_2)
 
         mdyn = (
-            a1
-            * np.power(mass_ratio_invert, n1)
+            a1 * mass_ratio**n1
             * (1.0 - 2.0 * compactness_2)
             / compactness_2
         )
-        mdyn += -a2 * np.power(mass_ratio_invert, n2) * risco + a4
+        mdyn += -a2 * mass_ratio**n2 * risco + a4
         mdyn *= baryon_mass_2
 
         mdyn = np.maximum(0.0, mdyn)
@@ -638,7 +657,7 @@ class BNSEjectaFitting(EjectaFitting):
 
         return chi_BH
 
-    def bns_parameter_conversion(self, converted_parameters):
+    def bns_ejecta_conversion(self, converted_parameters):
 
         # prevent the output message flooded by these warning messages
         old = np.seterr()
@@ -674,26 +693,48 @@ class BNSEjectaFitting(EjectaFitting):
         # total eject mass
         total_ejeta_mass = 10**log10_mej_dyn + 10**log10_mej_wind
 
-        # GRB afterglow energy
-        log10_Ejet = converted_parameters.get("log10_E0", (
-              np.log10(converted_parameters.get("ratio_epsilon", 2e-4))
-            + np.log10(1.0 - converted_parameters["ratio_zeta"])
-            + log10_mdisk_fit + np.log10(msun_to_ergs) )
-        )
-
-        thetaCore = converted_parameters.get("thetaCore", 0.105)
-
-        if "b" in converted_parameters: # power law jet
-            alphaWing = converted_parameters.get("alphaWing", converted_parameters["thetaWing"] / converted_parameters["thetaCore"])
-            log10_E0 = np.log10(powerlaw_jet_energy_to_central_isotropic_energy_equivalent(10**log10_Ejet, thetaCore, alphaWing, converted_parameters["b"]))
-        elif "b" not in converted_parameters and ("thetaWing" in converted_parameters or "alphaWing" in converted_parameters): # gaussian jet
-            alphaWing = converted_parameters.get("alphaWing", converted_parameters["thetaWing"] / converted_parameters["thetaCore"])
-            log10_E0 = np.log10(gaussian_jet_energy_to_central_isotropic_energy_equivalent(10**log10_Ejet, thetaCore, alphaWing))
-        else:
-            log10_E0 = log10_Ejet - np.log10(np.sin(thetaCore/2)**2)
-        
         np.seterr(**old)
-        converted_ejecta = np.stack((log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_E0 ))
+        return log10_mej_dyn, log10_mej_wind, np.log10(total_ejeta_mass), log10_mdisk_fit
+    
+    def grb_energy_conversion(self, converted_parameters, log10_mdisk_fit):
+
+        # GRB afterglow energy
+        log10_Ejet = np.log10(converted_parameters.get("ratio_epsilon", 2e-4))
+        log10_Ejet += np.log10(1.0 - converted_parameters["ratio_zeta"])
+        log10_Ejet += log10_mdisk_fit + np.log10(msun_to_ergs)
+
+        thetaCore = converted_parameters.get("thetaCore", 0.105) ## default about 6 degree, see arxiv:2210.05695
+        
+        if not any(key in converted_parameters for key in ["thetaWing", "alphaWing", "b"]):
+            return log10_Ejet - np.log10(np.sin(thetaCore/2)**2)
+
+        if "alphaWing" in converted_parameters:
+            alphaWing = converted_parameters['alphaWing'] 
+        else:
+            alphaWing = converted_parameters["thetaWing"] / converted_parameters["thetaCore"]
+
+        
+        if "b" in converted_parameters: # power law jet
+            jet_func = powerlaw_jet_energy_to_central_isotropic_energy_equivalent
+            data = np.column_stack((10**log10_Ejet, thetaCore, alphaWing, converted_parameters["b"]))
+            
+        else:
+            jet_func = gaussian_jet_energy_to_central_isotropic_energy_equivalent
+            data = np.column_stack((10**log10_Ejet, thetaCore, alphaWing))
+                
+        out = np.log10([jet_func(*row) for row in data])
+        return np.squeeze(out)    
+        
+
+    def bns_parameter_conversion(self, parameters):
+        log10_mej_dyn, log10_mej_wind, log10_mej_total, log10_mdisk_fit = self.bns_ejecta_conversion(parameters)
+
+        if "log10_E0" in parameters:
+            log10_E0 = parameters["log10_E0"]
+        else:
+            log10_E0 = self.grb_energy_conversion(parameters, log10_mdisk_fit)
+        
+        converted_ejecta = (log10_mej_dyn, log10_mej_wind, log10_mej_total, log10_E0)
 
         return  np.where(np.isfinite(converted_ejecta), converted_ejecta, -np.inf)
 
@@ -753,6 +794,9 @@ class MultimessengerConversion:
 
         if 'em' in instruction_dict:
             conversions.append(instruction_dict['em'])
+        
+        if 'custom' in instruction_dict:
+            conversions.append(instruction_dict['custom'])
 
         return cls(*conversions)
     
@@ -786,52 +830,59 @@ class MultimessengerConversion:
         
 label_mapping = {
     ## Cosmology parameters ##
-    'Hubble_constant'       : r'$H_0{\rm [km\,s^{-1}\,Mpc^{-1}]}$',
+    'Hubble_constant'       : r'$H_0{\rm\,[km\,s^{-1}\,Mpc^{-1}]}$',
     'Omega_matter'          : r'$\Omega_{m}$',
     'redshift'              : r'$z$',
     ## System parameters ##
     'inclination_EM'        : r'$\theta_{obs}$',
     'theta_jn'              : r'$\theta_{JN}$',
     'cos_theta_jn'          : r'$\cos{\theta_{JN}}$',
-    'luminosity_distance'   : r'$d_L{\rm [Mpc]}$', 
+    'luminosity_distance'   : r'$d_L\,{\rm [Mpc]}$', 
     ## GW parameters ##
-    'chirp_mass'            :r'$\mathcal{M}_c{\rm [M_{\odot}]}$',
+    'chirp_mass'            :r'$\mathcal{M}_c\,{\rm [M_{\odot}]}$',
     'mass_ratio'            : r'$q$', 
     'chi_eff'               : r'$\chi_{\rm{eff}}$', 
-    'mass_1_source'         : r'$m_{1,s}{\rm [M_{\odot}]}$', 
-    'mass_2_source'         : r'$m_{2,s}{\rm [M_{\odot}]}$', 
+    'mass_1_source'         : r'$m_{1,s}\,{\rm [M_{\odot}]}$', 
+    'mass_2_source'         : r'$m_{2,s}\,{\rm [M_{\odot}]}$', 
     ## KN parameters ##
-    'log10_mej'             : r'$\log_{10}(M_{\rm{ej}}{\rm [M_{\odot}]})$',
-    'log10_mej_dyn'         : r'$\log_{10}(M_{\rm{ej,dyn}}{\rm [M_{\odot}]})$',
-    'log10_mej_wind'        : r'$\log_{10}(M_{\rm{ej,wind}}{\rm [M_{\odot}]})$',
-    'log10_E0'              : r'$\log_{10}(E_0{\rm [erg]})$',
+    'log10_mej'             : r'$\log_{10}(M_{\rm{ej}}\,{\rm [M_{\odot}]})$',
+    'log10_mej_dyn'         : r'$\log_{10}(M_{\rm{dyn}}\,{\rm [M_{\odot}]})$',
+    'log10_mej_wind'        : r'$\log_{10}(M_{\rm{wind}}\,{\rm [M_{\odot}]})$',
     'ratio_zeta'            : r'$\zeta$',
     'alpha'                 : r'$\alpha$',
-    'KNtheta'               : r'$\theta_{KN}$',
-    'KNphi'                 : r'$\phi_{KN}$',
+    'KNtheta'               : r'$\theta_{\rm obs}\,[^\circ]$',
+    'KNphi'                 : r'$\phi_{KN}\,[^\circ]$',
+    # Bu parameters ##
+    'vej_dyn'               : r'$v_{\rm{dyn}}\,{\rm [c]}$',
+    'vej_wind'              : r'$v_{\rm{wind}}\,{\rm [c]}$',
+    'v_ej_dyn'              : r'$v_{\rm{dyn}}\,{\rm [c]}$',
+    'v_ej_wind'             : r'$v_{\rm{wind}}\,{\rm [c]}$',
+    'Ye_dyn'                : r'$Y_{e,{\rm{dyn}}}$',
+    'kappa_Ye'              : r'$\kappa_{\rm{Y_e}}$',
+    'kappa_v'               : r'$\kappa_{v}$', 
     ## GRB parameters ##
-    'log10_E0'              : r'$\log_{10}(E_0{\rm [erg]})$',
+    'log10_E0'              : r'$\log_{10}(E_{\rm iso,0}\,{\rm [erg]})$',
     'ratio_epsilon'         : r'$\epsilon$',
     'thetaCore'             : r'$\theta_{c}$',
     'thetaWing'             : r'$\theta_{w}$',
     'alphaWing'             : r'$\alpha_{w}$',
-    'log10_n0'              : r'$\log_{10}(n_{0}{\rm [cm^{-3}]})$',
+    'log10_n0'              : r'$\log_{10}(n_{0}\,{\rm [cm^{-3}]})$',
     'p'                     : r'$p$',
     'log10_epsilon_e'       : r'$\log_{10}(\epsilon_{e})$',
     'log10_epsilon_B'       : r'$\log_{10}(\epsilon_{B})$',
     ## Ejecta parameters ##
-    'mni'                   : r'$M_{\rm{Ni}}{\rm [M_{\odot}]}$',
-    'mtot'                  : r'$M_{\rm{tot}}{\rm [M_{\odot}]}$',
-    'mrp'                   : r'$M_{\rm{rp}}{\rm [M_{\odot}]}$',
+    'mni'                   : r'$M_{\rm{Ni}}\,{\rm [M_{\odot}]}$',
+    'mtot'                  : r'$M_{\rm{tot}}\,{\rm [M_{\odot}]}$',
+    'mrp'                   : r'$M_{\rm{rp}}\,{\rm [M_{\odot}]}$',
     'mni_c'                 : r'$M_{\rm{Ni}}/M_{\rm{tot}}$',
-    'mrp_c'                 : r'$M_{\rm{rp,c}}{\rm [M_{\odot}]}$',
+    'mrp_c'                 : r'$M_{\rm{rp,c}}\,{\rm [M_{\odot}]}$',
     ### EOS parameters ###
-    'L_sym'                 : r'$L_{\rm{sym}}{\rm [MeV]}$',
-    'K_sym'                 : r'$K_{\rm{sym}}{\rm [MeV]}$',
-    'K_sat'                 : r'$K_{\rm{sat}}{\rm [MeV]}$',
-    '3n_sat'                : r'$c_{3n_{\rm{sat}}{\rm [c]}$',
-    '5n_sat'                : r'$c_{5n_{\rm{sat}}{\rm [c]}$',
-    'TOV_mass'              : r'$M_{\rm{TOV}}{\rm [M_{\odot}]}$',
-    'R_14'                  : r'$R_{1.4}{\rm[km]}$',
+    'L_sym'                 : r'$L_{\rm sym}\,{\rm [MeV]}$',
+    'K_sym'                 : r'$K_{\rm sym}\,{\rm [MeV]}$',
+    'K_sat'                 : r'$K_{\rm sat}\,{\rm [MeV]}$',
+    '3n_sat'                : r'$c^2_{3n_{\rm sat}}\,{\rm [c^2]}$',
+    '5n_sat'                : r'$c^2_{5n_{\rm sat}}\,{\rm [c^2]}$',
+    'TOV_mass'              : r'$M_{\rm{TOV}}\,{\rm [M_{\odot}]}$',
+    'R_14'                  : r'$R_{1.4}\,{\rm[km]}$',
     'lambda_tilde'          : r'$\tilde{\Lambda}$', 
 }

@@ -620,7 +620,7 @@ def create_benchmark(
     tmax=None,
     filters=None,
     ncpus=1,
-    outdir="benchmark_output",
+    outdir=".",
     ignore_bolometric=True,
     local_only=False,
     plot= True
@@ -651,7 +651,7 @@ def create_benchmark(
     ncpus : int, optional
         Number of CPUs to use for the benchmark. Default is 1.
     outdir : str, optional
-        Output directory for the benchmark results. Default is "benchmark_output".
+        Output directory for the benchmark results. Default is current directory.
     ignore_bolometric : bool, optional
         Whether to ignore bolometric light curves in the data. Default is True.
     local_only : bool, optional
