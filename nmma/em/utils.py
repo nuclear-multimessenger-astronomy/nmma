@@ -6,31 +6,35 @@ from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
 
 try:
     from m4opt.missions import uvex
+
     M4OPT_INSTALLED = True
-except:
+except Exception as e:
     M4OPT_INSTALLED = False
-    print("Install m4opt if you want to use uvex filters")
+    print(f"Warning: m4opt not installed. {e}")
+    print("\nInstall m4opt if you want to use uvex filters")
 import healpy as hp
 from astropy.io import fits
 
 import dust_extinction.shapes as dustShp
+from dust_extinction.parameter_averages import G23
 
 import matplotlib
 import matplotlib.pyplot as plt
 
-
 import warnings
 from numpy.exceptions import VisibleDeprecationWarning
 
-warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
-
-
 import astropy.units
-from ..core.conversion import (distance_modulus_nmma, 
-        luminosity_distance_to_redshift, cosmology_to_distance)
-### some frequently used constants:
+from ..core.conversion import (
+    distance_modulus_nmma,
+    luminosity_distance_to_redshift,
+    cosmology_to_distance,
+)
+
+# some frequently used constants:
 from ..core.constants import c_cgs, c_SI, eV_per_h_SI
 
+warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
 
 # Define default filters variable for import in other parts of the code
@@ -64,29 +68,31 @@ DEFAULT_FILTERS = [
     "ultrasat",
 ]
 
+
 def setup_sample_times(args):
     "create an array of sample times used for generating EM model lightcurves from args"
     tmin = args.em_tmin
     tmax = args.em_tmax
 
     if tmin is None and tmax is None:
-        return None         # Default, we normally let the model decide the time range
-    
+        return None  # Default, we normally let the model decide the time range
+
     # first check the legacy case of a transient with a fixed time step
     if args.em_tstep:
         return np.arange(tmin, tmax + args.em_tstep, args.em_tstep)
-    
+
     # otherwise, create the array based on selected scale
-    if 'lin' in args.em_timescale or tmin<=0.:
+    if "lin" in args.em_timescale or tmin <= 0.0:
         return np.linspace(tmin, tmax, args.em_nsteps)
-    elif any(scale in args.em_timescale for scale in ['log', 'geo']):
+    elif any(scale in args.em_timescale for scale in ["log", "geo"]):
         return np.geomspace(tmin, tmax, args.em_nsteps)
     else:
         raise ValueError(
             f"Unknown time scale {args.em_timescale}. "
             "Please use 'lin(ear)' or 'log(arithmic)' / 'geo(metric)'."
         )
-    
+
+
 def set_filters(args):
     filters = None  # default value
     if args.filters:
@@ -94,75 +100,101 @@ def set_filters(args):
         if isinstance(filters, str):
             filters = filters.split(",")
         # do some cleaning for dirty command-line input
-        filters = [ f.replace(" ", "").split(",") for f in filters]
-        filters = [f for sublist in filters for f in sublist if f] # flatten the list
+        filters = [f.replace(" ", "").split(",") for f in filters]
+        filters = [f for sublist in filters for f in sublist if f]  # flatten the list
         if len(filters) == 0:
             raise ValueError("Need at least one valid filter.")
     elif getattr(args, "em_detectors", None) or getattr(args, "rubin_ToO_type", False):
         if isinstance(args.em_detectors, str):
             em_detectors = args.em_detectors.split(",")
-        else: 
+        else:
             em_detectors = getattr(args, "em_detectors", []).copy()
         em_detectors = [det.strip().lower() for det in em_detectors]
         filters = []
-        if 'ztf' in em_detectors:
-            em_detectors.remove('ztf')
-            filters.extend( ["ztfg", "ztfr", "ztfi"] )
-        if 'lsst' in em_detectors:
-            em_detectors.remove('lsst')
-            filters.extend( ["lsstg", "lsstr", "lssti", "lsstz", "lssty"] )
+        if "ztf" in em_detectors:
+            em_detectors.remove("ztf")
+            filters.extend(["ztfg", "ztfr", "ztfi"])
+        if "lsst" in em_detectors:
+            em_detectors.remove("lsst")
+            filters.extend(["lsstg", "lsstr", "lssti", "lsstz", "lssty"])
         elif getattr(args, "rubin_ToO_type"):
-            if args.rubin_ToO_type == 'platinum':
-                filters.extend( ["ps1::g","ps1::r","ps1::i","ps1::z","ps1::y"] )
-            elif args.rubin_ToO_type == 'gold':
-                filters.extend(["ps1::g","ps1::r","ps1::i"])
-            elif args.rubin_ToO_type == 'gold_z':
-                filters.extend(["ps1::g","ps1::r","ps1::z"])
-            elif args.rubin_ToO_type == 'silver':
-                filters.extend(["ps1::g","ps1::i"])
-            elif args.rubin_ToO_type == 'silver_z':
-                filters.extend(["ps1::g","ps1::z"])
-            if 'rubin' in em_detectors:
-                em_detectors.remove('rubin')
-        elif 'rubin' in em_detectors:
-            em_detectors.remove('rubin')
-            filters.extend( ["ps1::g","ps1::r","ps1::i","ps1::z","ps1::y"] )
+            if args.rubin_ToO_type == "platinum":
+                filters.extend(["ps1::g", "ps1::r", "ps1::i", "ps1::z", "ps1::y"])
+            elif args.rubin_ToO_type == "gold":
+                filters.extend(["ps1::g", "ps1::r", "ps1::i"])
+            elif args.rubin_ToO_type == "gold_z":
+                filters.extend(["ps1::g", "ps1::r", "ps1::z"])
+            elif args.rubin_ToO_type == "silver":
+                filters.extend(["ps1::g", "ps1::i"])
+            elif args.rubin_ToO_type == "silver_z":
+                filters.extend(["ps1::g", "ps1::z"])
+            if "rubin" in em_detectors:
+                em_detectors.remove("rubin")
+        elif "rubin" in em_detectors:
+            em_detectors.remove("rubin")
+            filters.extend(["ps1::g", "ps1::r", "ps1::i", "ps1::z", "ps1::y"])
         if em_detectors:
             raise NotImplementedError(f"{em_detectors} not implemented yet.")
-        ## to be extended
+        # to be extended
     return filters
 
 
-def create_detection_limit(args, filters, default_limit = np.inf):
-    if getattr(args, 'detection_limit', None):
+def create_detection_limit(args, filters, default_limit=np.inf):
+    if getattr(args, "detection_limit", None):
         return set_filter_associated_dict(args.detection_limit, filters, default_limit)
-    elif getattr(args, 'detection_limit_fits_file', None):
+    elif getattr(args, "detection_limit_fits_file", None):
         detection_limit = detection_limit_from_m4opt_fits_file(args)
         return set_filter_associated_dict(detection_limit, filters, default_limit)
-    
+
     detection_limit = {filt: default_limit for filt in filters}
     if getattr(args, "em_detectors", None):
         if isinstance(args.em_detectors, str):
             em_detectors = args.em_detectors.split(",")
-        else: 
+        else:
             em_detectors = getattr(args, "em_detectors", []).copy()
-        if 'lsst' in em_detectors: 
-            em_detectors.remove('lsst')
+        if "lsst" in em_detectors:
+            em_detectors.remove("lsst")
             # https://arxiv.org/abs/2108.01683, https://rubinobservatory.org/for-scientists/rubin-101/key-numbers
-            detection_limit.update({'lsstu':23.9, 'lsstg':25.0, 'lsstr':24.7,'lssti':24.0,'lsstz':23.3,'lssty':22.1})
-        if 'ztf' in em_detectors:
-            em_detectors.remove('ztf')
-            detection_limit.update({'ztfg':21.7, 'ztfr':21.4, 'ztfi':20.9})
-        if 'rubin' in em_detectors:
-            em_detectors.remove('rubin')
-            detection_limit.update({'ps1::g':25.8,'ps1::r':25.5,'ps1::i':24.8,'ps1::z':24.1,'ps1::y':22.9} )
+            detection_limit.update(
+                {
+                    "lsstu": 23.9,
+                    "lsstg": 25.0,
+                    "lsstr": 24.7,
+                    "lssti": 24.0,
+                    "lsstz": 23.3,
+                    "lssty": 22.1,
+                }
+            )
+        if "ztf" in em_detectors:
+            em_detectors.remove("ztf")
+            detection_limit.update({"ztfg": 21.7, "ztfr": 21.4, "ztfi": 20.9})
+        if "rubin" in em_detectors:
+            em_detectors.remove("rubin")
+            detection_limit.update(
+                {
+                    "ps1::g": 25.8,
+                    "ps1::r": 25.5,
+                    "ps1::i": 24.8,
+                    "ps1::z": 24.1,
+                    "ps1::y": 22.9,
+                }
+            )
         if em_detectors:
             raise NotImplementedError(f"{em_detectors} not implemented yet.")
-        
-    if getattr(args,'rubin_ToO_type', None):
-        detection_limit.update({'ps1::g':25.8,'ps1::r':25.5,'ps1::i':24.8,'ps1::z':24.1,'ps1::y':22.9} )
-            
+
+    if getattr(args, "rubin_ToO_type", None):
+        detection_limit.update(
+            {
+                "ps1::g": 25.8,
+                "ps1::r": 25.5,
+                "ps1::i": 24.8,
+                "ps1::z": 24.1,
+                "ps1::y": 22.9,
+            }
+        )
+
     return detection_limit
+
 
 def detection_limit_from_m4opt_fits_file(args):
     # Open the FITS file
@@ -170,24 +202,25 @@ def detection_limit_from_m4opt_fits_file(args):
     # Get the BinTableHDU containing the HEALPix data
     bintable = hdul[1]  # Assuming it's the first extension
     # Extract the LIMMAG data and flatten it
-    limmag_data = bintable.data['LIMMAG']
+    limmag_data = bintable.data["LIMMAG"]
     limmag_map = limmag_data.flatten()
 
-    nside = bintable.header['NSIDE']  # Should be 128 based on your header
+    nside = bintable.header["NSIDE"]  # Should be 128 based on your header
     pixel_idx = get_skymap_idx(args.ra, args.dec, nside)
     return limmag_map[pixel_idx]
 
-def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
+
+def set_filter_associated_dict(quantity, filters, default_limit=np.inf):
     if isinstance(quantity, (int, float)):
         # If a single value is provided, apply it to all filters
         return {x: float(quantity) for x in filters}
-    
+
     elif isinstance(quantity, (list, tuple)):
-        assert len(quantity) == len(filters), (
-            f" {quantity} must match the number of filters: {filters}."
-        )
-        return {x: float(y) for x, y in zip(filters, quantity) }
-    
+        assert len(quantity) == len(
+            filters
+        ), f" {quantity} must match the number of filters: {filters}."
+        return {x: float(y) for x, y in zip(filters, quantity)}
+
     elif isinstance(quantity, dict):
         # If a dict is provided, ensure it has the correct filters
         return {filt: float(quantity.get(filt, default_limit)) for filt in filters}
@@ -197,20 +230,24 @@ def set_filter_associated_dict(quantity, filters, default_limit = np.inf):
         )
 
 
-def cut_data_to_time_range(data, args, trigger_time, tmin = 0, tmax = np.inf):
+def cut_data_to_time_range(data, args, trigger_time, tmin=0, tmax=np.inf):
     tmin = getattr(args, "data_tmin", tmin)
     tmax = getattr(args, "data_tmax", tmax)
 
     filts = list(data.keys()).copy()
-       
+
     for filt in filts:
         detector_time = data[filt]["time"] - trigger_time
         mask = (tmin <= detector_time) & (detector_time <= tmax)
-        
+
         if not np.any(mask):
             del data[filt]
         else:
-            data[filt] = {'time': data[filt]["time"][mask], 'mag': data[filt]["mag"][mask], 'mag_error': data[filt]["mag_error"][mask]}
+            data[filt] = {
+                "time": data[filt]["time"][mask],
+                "mag": data[filt]["mag"][mask],
+                "mag_error": data[filt]["mag_error"][mask],
+            }
 
     return data
 
@@ -233,21 +270,25 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 
     min_time = np.inf
     for filt, sub_dict in light_curve_data.items():
-        lc_mags[filt] = np.array(sub_dict['mag'])
-        lc_uncertainties[filt] = np.array(sub_dict['mag_error'])
-        lc_times[filt] = np.array(sub_dict['time'])
-        min_time = np.minimum(min_time, np.min(sub_dict['time']))
-    
-    if min_time<0:
+        lc_mags[filt] = np.array(sub_dict["mag"])
+        lc_uncertainties[filt] = np.array(sub_dict["mag_error"])
+        lc_times[filt] = np.array(sub_dict["time"])
+        min_time = np.minimum(min_time, np.min(sub_dict["time"]))
+
+    if min_time < 0:
         raise ValueError(
             f"trigger_time is {-min_time} days later than earliest data time. "
-            "Please provide a valid trigger time." )
-    
+            "Please provide a valid trigger time."
+        )
+
     lc_times = {filt: lc_times[filt] - trigger_time for filt in lc_times}
 
     return (lc_times, lc_mags, lc_uncertainties, trigger_time)
 
-def check_model_time_consistency(light_curve_data, light_curve_model, priors, injection = None):
+
+def check_model_time_consistency(
+    light_curve_data, light_curve_model, priors, injection=None
+):
 
     (lc_times, lc_mags, lc_uncertainties, trigger_time) = light_curve_data
     data_tmin, data_tmax = np.inf, -np.inf
@@ -255,10 +296,10 @@ def check_model_time_consistency(light_curve_data, light_curve_model, priors, in
         detections = np.isfinite(lc_mags[key]) & np.isfinite(lc_uncertainties[key])
         data_tmin = np.minimum(data_tmin, lc_times[key][detections].min())
         data_tmax = np.maximum(data_tmax, lc_times[key][detections].max())
-    
+
     # get minimal / maximal redshift from prior
     if "redshift" in priors:
-        zmin, zmax = priors['redshift'].minimum, priors['redshift'].maximum    
+        zmin, zmax = priors["redshift"].minimum, priors["redshift"].maximum
     elif "luminosity_distance" in priors:
         if "Hubble_constant" in priors:
             min_pars = {par: priors[par].minimum for par in priors}
@@ -268,49 +309,61 @@ def check_model_time_consistency(light_curve_data, light_curve_model, priors, in
             max_pars = cosmology_to_distance(max_pars)
             zmax = max_pars["redshift"]
         else:
-            zmin = luminosity_distance_to_redshift(priors["luminosity_distance"].minimum)
-            zmax = luminosity_distance_to_redshift(priors["luminosity_distance"].maximum)
+            zmin = luminosity_distance_to_redshift(
+                priors["luminosity_distance"].minimum
+            )
+            zmax = luminosity_distance_to_redshift(
+                priors["luminosity_distance"].maximum
+            )
 
-
-    
     # get minimal / maximal timeshift from prior
     try:
-        t0_min, t0_max = priors['timeshift'].minimum, priors["timeshift"].maximum
+        t0_min, t0_max = priors["timeshift"].minimum, priors["timeshift"].maximum
     except KeyError:
         t0_min, t0_max = 0.0, 0.0
     # Get model time range in detector frame
     t_source_min, t_source_max = light_curve_model.model_times[[0, -1]]
-    
-    t_obs_start_max = (1+zmax) * t_source_min + t0_max
-    t_obs_end_min = (1+zmin) * t_source_max + t0_min
-    
+
+    t_obs_start_max = (1 + zmax) * t_source_min + t0_max
+    t_obs_end_min = (1 + zmin) * t_source_max + t0_min
+
     if injection is not None:
         for key, time in lc_times.items():
-            print(f"Cutting light curve data for filter {key} to model time range {t_obs_start_max} - {t_obs_end_min}.")
+            print(
+                f"Cutting light curve data for filter {key} to model time range {t_obs_start_max} - {t_obs_end_min}."
+            )
             use_mask = (time >= t_obs_start_max) & (time <= t_obs_end_min)
             lc_times[key] = time[use_mask]
             lc_mags[key] = lc_mags[key][use_mask]
             lc_uncertainties[key] = lc_uncertainties[key][use_mask]
-    # check model compatability 
+    # check model compatability
     elif data_tmin < t_obs_start_max:
-        raise ValueError(f"First data point is at {data_tmin} days, but with your timeshift and redshift settings, the model time in detector frame can start as late as {t_obs_start_max}.") 
+        raise ValueError(
+            f"First data point is at {data_tmin} days, but with your timeshift and redshift settings, the model time in detector frame can start as late as {t_obs_start_max}."
+        )
     elif t_obs_end_min < data_tmax:
-        raise ValueError(f"Last data point is at {data_tmax} days, but with your timeshift and redshift settings, the model time in detector frame can end as early as {t_obs_end_min}.")
+        raise ValueError(
+            f"Last data point is at {data_tmax} days, but with your timeshift and redshift settings, the model time in detector frame can end as early as {t_obs_end_min}."
+        )
 
     return (lc_times, lc_mags, lc_uncertainties, trigger_time)
 
 
 def setup_bolometric_lc_data(light_curve_data, trigger_time):
-    data_time = light_curve_data['phase'].to_numpy()
+    data_time = light_curve_data["phase"].to_numpy()
     sort_ids = np.argsort(data_time)
-    return (data_time[sort_ids] - trigger_time,
-            light_curve_data['Lbb'].to_numpy()[sort_ids],
-            light_curve_data['Lbb_unc'].to_numpy()[sort_ids],
-            trigger_time)
+    return (
+        data_time[sort_ids] - trigger_time,
+        light_curve_data["Lbb"].to_numpy()[sort_ids],
+        light_curve_data["Lbb_unc"].to_numpy()[sort_ids],
+        trigger_time,
+    )
 
 
 def transform_to_app_mag_dict(mag_dict, params):
-    d_lum = params.get("luminosity_distance", 1e-5) ## assume 10 pc =1e-5 Mpc for abs_mag
+    d_lum = params.get(
+        "luminosity_distance", 1e-5
+    )  # assume 10 pc =1e-5 Mpc for abs_mag
     distance_modulus = distance_modulus_nmma(d_lum)
     for k in mag_dict.keys():
         mag_dict[k] += distance_modulus
@@ -375,6 +428,37 @@ def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
     return ext
 
 
+def extinctionFactorG23MW(nu, Ebv, Rv=3.1):
+    """Galactic-foreground extinction factor.
+
+    Gordon et al. (2023) Milky-Way average curve (912 A - 32 um),
+    evaluated in the OBSERVER frame (the Galactic dust screen is at z=0),
+    following the approach of M4OPT (m4opt.synphot.extinction).
+    Same convention as extinctionFactorP92SMC: returns the multiplicative
+    flux factor e^{-0.4 A_lambda} per input frequency.
+
+    Parameters
+    ----------
+    nu : array_like
+        Observer-frame frequencies in Hz (one per filter, = model.nu_0s).
+    Ebv : float
+        Colour excess E(B-V) proposed by the sampler (bounded by the
+        dust-map line-of-sight value via the prior).
+    Rv : float, optional
+        Total-to-selective extinction; 3.1 is the G23 MW average and must
+        stay consistent with the curve (curve and Rv form one package).
+    """
+
+    law = G23(Rv=Rv)
+    x = (np.atleast_1d(nu) * astropy.units.Hz).to(
+        1 / astropy.units.micron, equivalencies=astropy.units.spectral()
+    )
+    ext = np.ones(x.shape)
+    good = (x.value >= law.x_range[0]) & (x.value <= law.x_range[1])
+    ext[good] = law.extinguish(x[good], Ebv=Ebv)
+    return ext
+
+
 def get_all_bandpass_metadata():
     """
     Retrieves and combines the metadata for all registered bandpasses and interpolators.
@@ -389,6 +473,7 @@ def get_all_bandpass_metadata():
     combined_metadata = bandpass_metadata + interpolator_metadata
 
     return combined_metadata
+
 
 def get_filter_name_mapping(observed_filters):
     """
@@ -423,26 +508,28 @@ def get_filter_name_mapping(observed_filters):
         "swope2::H",
     ]
     unprocessed_filts.extend([val["name"] for val in get_all_bandpass_metadata()])
-    filter_maps = {name:name for name in unprocessed_filts}
+    filter_maps = {name: name for name in unprocessed_filts}
 
-    # FIXME: Left here as a reminder, to be removed 
+    # FIXME: Left here as a reminder, to be removed
     # sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
     # filter_maps.update({name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts})
     # filter_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
 
-    #hardcoded filter names
-    filter_maps.update({
-        'B': 'g',
-        'R': 'z',
-        'F160W':'H',
-        'U': 'u',
-        'UVW2': 'u',
-        'UVW1': 'u',
-        'UVM2': 'u' 
-        })
+    # hardcoded filter names
+    filter_maps.update(
+        {
+            "B": "g",
+            "R": "z",
+            "F160W": "H",
+            "U": "u",
+            "UVW2": "u",
+            "UVW1": "u",
+            "UVM2": "u",
+        }
+    )
 
     direct_map = {}
-    averaging_map= {}
+    averaging_map = {}
 
     if isinstance(observed_filters, str):
         # If a single filter is provided as a string, convert it to a list
@@ -455,16 +542,17 @@ def get_filter_name_mapping(observed_filters):
             direct_map[obs_filt] = obs_filt
         else:
             averaging_map[obs_filt] = map_observable_to_modelled_filters(obs_filt)
-        
 
     return direct_map, averaging_map
+
 
 def map_observable_to_modelled_filters(obs_filter):
     # NOTE: this is a hardcoded mapping of observable filters to modelled filters,
     # needs to correspond to the filters in average_mags
-    map_dict = {'w':["g", "r", "i"],
-                'o': ["r", "i"],
-                }
+    map_dict = {
+        "w": ["g", "r", "i"],
+        "o": ["r", "i"],
+    }
     for filt in ["c", "V", "F606W"]:
         map_dict[filt] = ["g", "r"]
     for filt in ["I", "F814W"]:
@@ -474,35 +562,35 @@ def map_observable_to_modelled_filters(obs_filter):
     else:
         raise ValueError(f"Unknown filter: {obs_filter}. Cannot be processed")
 
+
 def average_mags(mag, filt):
     # These average between filters is equivalent to
     # the geometric mean of the flux. These averages
     # are kind of justifiable because the spectral
     # commonly goes as F_\nu \propto \nu^\alpha,
     # where \nu is the frequency.
-    
 
-    ## NOTE: If editing, also update the corresponding part 
+    # NOTE: If editing, also update the corresponding part
     # in map_observable_to_modelled_filters
     if filt == "w":
         return (mag["g"] + mag["r"] + mag["i"]) / 3.0
     elif filt in ["c", "V", "F606W"]:
-        return(mag["g"] + mag["r"]) / 2.0
+        return (mag["g"] + mag["r"]) / 2.0
     elif filt == "o":
         return (mag["r"] + mag["i"]) / 2.0
     elif filt in ["I", "F814W"]:
-        return(mag["z"] + mag["y"]) / 2.0
+        return (mag["z"] + mag["y"]) / 2.0
     else:
         raise ValueError(f"Unknown filter: {filt}")
-    
-    
-    
+
+
 def get_filtered_mag(mag, filt):
     direct_map, averaging_filters = get_filter_name_mapping(filt)
     if filt in averaging_filters:
         return average_mags(mag, filt)
     else:
         return mag[direct_map[filt]]
+
 
 def interpolate_nans(data_dict: dict) -> dict:
     """
@@ -526,57 +614,66 @@ def interpolate_nans(data_dict: dict) -> dict:
                 continue
 
             interpolated_data = autocomplete_data(time_array, time_array, val)
-            ##interpolated_data contains only nans, if there were not at least 2 usable data points
+            # interpolated_data contains only nans, if there were not at least 2 usable data points
             if np.isnan(interpolated_data[0]):
                 continue
-            
+
             data_dict[name][key] = interpolated_data
-                
 
     return data_dict
 
-def autocomplete_data(interp_points, ref_points, ref_data, extrapolate='linear', ref_value=np.inf):
+
+def autocomplete_data(
+    interp_points, ref_points, ref_data, extrapolate="linear", ref_value=np.inf
+):
     """
     Interpolates and extrapolates reference data to a 1-D array of arguments. This can be wide off!
-    This basically extends np.interp to ignore nans and provide simple extrapolations. 
+    This basically extends np.interp to ignore nans and provide simple extrapolations.
     """
-    
+
     data_mask = np.isfinite(ref_data)
     if np.sum(data_mask) < 2:
         return np.full_like(interp_points, ref_value)
-    
-    fin_ref= np.asarray(ref_points)[data_mask]
-    fin_data=np.asarray(ref_data)[data_mask]
-    interp_points=np.atleast_1d(interp_points)
 
-    if isinstance(extrapolate, (float , int)):
-        interp_data = np.interp(interp_points, fin_ref, fin_data,
-                                 left=extrapolate, right=extrapolate)
-      
+    fin_ref = np.asarray(ref_points)[data_mask]
+    fin_data = np.asarray(ref_data)[data_mask]
+    interp_points = np.atleast_1d(interp_points)
+
+    if isinstance(extrapolate, (float, int)):
+        interp_data = np.interp(
+            interp_points, fin_ref, fin_data, left=extrapolate, right=extrapolate
+        )
+
     elif isinstance(extrapolate, str):
-        if extrapolate=='spline':
+        if extrapolate == "spline":
             spline = UnivariateSpline(fin_ref, fin_data, s=ref_value)
             interp_data = spline(interp_points)
 
-        elif extrapolate=='linear':
+        elif extrapolate == "linear":
             interp_data = np.interp(interp_points, fin_ref, fin_data)
-            x0, x1, xm, xn = fin_ref[ [0,1,-2,-1]]
-            y0, y1, ym, yn = fin_data[[0,1,-2,-1]]
-            lower_extrap_args= np.argwhere(interp_points<x0)
-            interp_data[lower_extrap_args] = y0 + (y1-y0)/(x1-x0)*(interp_points[lower_extrap_args]-x0)
-            upper_extrap_args = np.argwhere(interp_points>xn)
-            interp_data[upper_extrap_args] = yn + (yn-ym)/(xn-xm)*(interp_points[upper_extrap_args]-xn)
-        
-        elif extrapolate=='constant':
-            interp_data = np.interp(interp_points, fin_ref, fin_data,
-                                 left=fin_data[0], right=fin_data[-1])   
+            x0, x1, xm, xn = fin_ref[[0, 1, -2, -1]]
+            y0, y1, ym, yn = fin_data[[0, 1, -2, -1]]
+            lower_extrap_args = np.argwhere(interp_points < x0)
+            interp_data[lower_extrap_args] = y0 + (y1 - y0) / (x1 - x0) * (
+                interp_points[lower_extrap_args] - x0
+            )
+            upper_extrap_args = np.argwhere(interp_points > xn)
+            interp_data[upper_extrap_args] = yn + (yn - ym) / (xn - xm) * (
+                interp_points[upper_extrap_args] - xn
+            )
+
+        elif extrapolate == "constant":
+            interp_data = np.interp(
+                interp_points, fin_ref, fin_data, left=fin_data[0], right=fin_data[-1]
+            )
         else:
             raise ValueError(f"Unknown extrapolation method: {extrapolate}.")
-        ## TODO Allow more sophisticated treatment of extrapolation
-    
+        # TODO Allow more sophisticated treatment of extrapolation
+
     else:
-        interp_data = np.interp(interp_points, fin_ref, fin_data,
-                                 left=extrapolate[0], right=extrapolate[-1])   
+        interp_data = np.interp(
+            interp_points, fin_ref, fin_data, left=extrapolate[0], right=extrapolate[-1]
+        )
     return interp_data
 
 
@@ -619,7 +716,7 @@ def get_default_filts_lambdas(filters=None):
     )
     lambdas_bessel = 1e-10 * np.array([3605.07, 4413.08, 5512.12, 6585.91, 8059.88])
     lambdas_radio = c_SI / np.array([1.25e9, 3e9, 5.5e9, 6e9])
-    lambdas_Xray  = c_SI /(np.array([1e3, 5e3]) * eV_per_h_SI)
+    lambdas_Xray = c_SI / (np.array([1e3, 5e3]) * eV_per_h_SI)
 
     lambdas = np.concatenate(
         [lambdas_sloan, lambdas_bessel, lambdas_radio, lambdas_Xray]
@@ -629,7 +726,7 @@ def get_default_filts_lambdas(filters=None):
     for val in get_all_bandpass_metadata():
         try:
             bandpass = sncosmo.get_bandpass(val["name"])
-        except:
+        except Exception:
             bandpass = sncosmo.get_bandpass(val["name"], 3)
             bandpass.name = bandpass.name.split()[0]
 
@@ -639,13 +736,13 @@ def get_default_filts_lambdas(filters=None):
     lambdas = np.concatenate([lambdas, [1e-10 * band.wave_eff for band in bandpasses]])
 
     if M4OPT_INSTALLED:
-        fuv_bandpass = uvex.detector.bandpasses['FUV']
-        nuv_bandpass = uvex.detector.bandpasses['NUV']
+        fuv_bandpass = uvex.detector.bandpasses["FUV"]
+        nuv_bandpass = uvex.detector.bandpasses["NUV"]
 
         fuv_lambda = 1e-10 * fuv_bandpass.avgwave().value
         nuv_lambda = 1e-10 * nuv_bandpass.avgwave().value
 
-        filts = filts + ['FUV', 'NUV']
+        filts = filts + ["FUV", "NUV"]
         lambdas = np.concatenate([lambdas, [fuv_lambda, nuv_lambda]])
 
     if filters is not None:
@@ -681,6 +778,7 @@ def get_default_filts_lambdas(filters=None):
 
     return filts, lambdas
 
+
 def extract_unit(filter_string, indicator, target_unit):
     # calculate the lambdas based on the filter name
     # split the filter name
@@ -692,25 +790,26 @@ def extract_unit(filter_string, indicator, target_unit):
     return quantity.to(target_unit).value
 
 
-def flux_to_ABmag(flux, unit='cgs', residual_mag = None):
-    """ see https://en.wikipedia.org/wiki/AB_magnitude """
-    if unit=='cgs':
-        residual_magnitude =  - 48.6
-    elif unit == 'Jy':
+def flux_to_ABmag(flux, unit="cgs", residual_mag=None):
+    """see https://en.wikipedia.org/wiki/AB_magnitude"""
+    if unit == "cgs":
+        residual_magnitude = -48.6
+    elif unit == "Jy":
         residual_magnitude = 8.9
-    elif unit == 'mJy':
+    elif unit == "mJy":
         residual_magnitude = 16.4
-    ## explicit value takes preference over default units
+    # explicit value takes preference over default units
     if residual_mag:
         residual_magnitude = residual_mag
 
-    suff_flux = np.argwhere(flux> 0)
-    if len(suff_flux)< 2:
+    suff_flux = np.argwhere(flux > 0)
+    if len(suff_flux) < 2:
         return np.full_like(flux, np.nan)
     mAB = np.full_like(flux, np.inf)
 
     mAB[suff_flux] = -2.5 * np.log10(flux[suff_flux]) + residual_magnitude
     return mAB
+
 
 def get_skymap_idx(ra, dec, nside):
     """
@@ -733,7 +832,7 @@ def get_skymap_idx(ra, dec, nside):
         The HEALPix pixel index corresponding to the input coordinates.
     """
     theta = np.radians(90.0 - dec)  # Convert Dec to co-latitude
-    phi = np.radians(ra)            # RA is already longitude-like
+    phi = np.radians(ra)  # RA is already longitude-like
 
     return hp.ang2pix(nside, theta, phi, nest=True)
 
@@ -797,13 +896,10 @@ class Spectrum:
         """
 
         # Values must be in cgs for interpolation
-        return np.interp(vals,
-            self.wavelength_arr,
-            self.flux_density_arr,
-            left=0,
-            right=0
+        return np.interp(
+            vals, self.wavelength_arr, self.flux_density_arr, left=0, right=0
         )
-    
+
     def plot(self, ax=None, **kwargs):
         """
         Plot spectrum in format similar to Even et al. (2019)
