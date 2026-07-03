@@ -6,12 +6,17 @@ from ..core.gitlab import DEFAULT_MODELS_HOME
 
 # unused imports kept for forward compatibility
 from ..core.parsing import (
+    parsing_and_logging,
     single_messenger_analysis_parsing,
     base_injection_parsing,
     yaml_parse,
     nonefloat,
+    noneint,
     nonestr,
 )
+
+parsing_and_logging = parsing_and_logging
+noneint = noneint
 
 
 def em_time_parsing(parser):
