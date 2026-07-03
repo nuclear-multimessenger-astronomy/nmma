@@ -1606,7 +1606,12 @@ def single_model_from_args(
         model_args["model"] = model_name.strip()
     if args.em_model_kwargs:
         model_args |= args.em_model_kwargs
-    return model_class(**model_args)
+
+    instance = model_class(**model_args)
+    law = getattr(args, "em_extinction_law", None)
+    if law:
+        instance.extinction_law = law
+    return instance
 
 
 def create_light_curve_model_from_args(em_transient, args, filters=None):
