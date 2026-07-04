@@ -195,6 +195,11 @@ class LightCurveModelContainer:
         from a set of parameters
     """
 
+    #: Extinction law for get_extinction_mags:
+    #: - "P92_SMC_host" (default): host-frame SMC (Pei 1992, Rv=2.93)
+    #: - "G23_MW": Galactic foreground MW (Gordon 2023, Rv=3.1)
+    extinction_law = "P92_SMC_host"
+
     def __init__(
         self,
         model,
@@ -323,7 +328,15 @@ class LightCurveModelContainer:
         ext_mag = np.zeros_like(self.nu_0s)
 
         if Ebv != 0.0:
-            ext = utils.extinctionFactorP92SMC(self.nu_0s, Ebv, redshift)
+            if self.extinction_law == "G23_MW":
+                ext = utils.extinctionFactorG23MW(self.nu_0s, Ebv)
+            elif self.extinction_law == "P92_SMC_host":
+                ext = utils.extinctionFactorP92SMC(self.nu_0s, Ebv, redshift)
+            else:
+                raise ValueError(
+                    f"Unknown extinction_law {self.extinction_law!r}"
+                    "use 'P92_SMC_host' or 'G23_MW'."
+                )
             ext_mag = -2.5 * np.log10(ext)
 
         return ext_mag
@@ -1593,7 +1606,12 @@ def single_model_from_args(
         model_args["model"] = model_name.strip()
     if args.em_model_kwargs:
         model_args |= args.em_model_kwargs
-    return model_class(**model_args)
+
+    instance = model_class(**model_args)
+    law = getattr(args, "em_extinction_law", None)
+    if law:
+        instance.extinction_law = law
+    return instance
 
 
 def create_light_curve_model_from_args(em_transient, args, filters=None):
