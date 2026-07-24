@@ -6,14 +6,26 @@ from bilby_pipe.utils import convert_string_to_dict
 from bilby_pipe.create_injections import InjectionCreator
 
 
-from ..core.parsing import (parsing_and_logging, slurm_setup_parser, nmma_base_parsing, process_multi_condition_string)
+from ..core.parsing import (
+    parsing_and_logging,
+    slurm_setup_parser,
+    nmma_base_parsing,
+    process_multi_condition_string,
+)
 from ..core.constants import set_cosmology, get_cosmology
 from ..core.utils import set_filename, rejection_sample, read_injection_file
-from ..core.conversion import MultimessengerConversion, KilonovaEjectaFitting, bbh_source_frame
+from ..core.conversion import (
+    MultimessengerConversion,
+    KilonovaEjectaFitting,
+    BNSEjectaFitting,
+    NSBHEjectaFitting,
+    bbh_source_frame,
+)
 from ..em import utils, lightcurve_handling as lch
 from ..em.model import create_injection_model
 from ..eos.eos_processing import EoSConverter
 from .joint_parsing import injection_parsing
+
 
 class NMMAInjectionCreator(InjectionCreator):
     """A class to create NMMA injections, extending the bilby_pipe InjectionCreator."""
@@ -25,13 +37,13 @@ class NMMAInjectionCreator(InjectionCreator):
             # convert string to dict
             args.prior_dict = convert_string_to_dict(args.prior_dict)
 
-        set_cosmology(getattr(args, 'cosmology', None))
+        set_cosmology(getattr(args, "cosmology", None))
         super().__init__(
             prior_file=args.prior_file,
             prior_dict=args.prior_dict,
             n_injection=args.n_injection,
             default_prior="CBCPriorDict",
-            trigger_time=getattr(args, "trigger_time", 0.),
+            trigger_time=getattr(args, "trigger_time", 0.0),
             deltaT=args.deltaT,
             gpstimes=args.gps_file,
             duration=args.duration,
@@ -43,14 +55,21 @@ class NMMAInjectionCreator(InjectionCreator):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        #bilby-pipe injection_creator can only handle dat or json
-        self.extension = 'dat' if args.extension == 'csv' else args.extension
-        self.filename= set_filename(args.injection_file, args)
+        # bilby-pipe injection_creator can only handle dat or json
+        self.extension = "dat" if args.extension == "csv" else args.extension
+        self.filename = set_filename(args.injection_file, args)
+
+        # FIXME Weizmann: restores nmma 0.2.3's --binary-type/--eject
+        # behaviour -- see joint_parsing.py's --binary-type help for why
+        # this is needed alongside (not instead of) --tests/--post-processing.
+        self.binary_type_filter = getattr(args, "binary_type", None)
+        if self.binary_type_filter is not None and not getattr(args, "eos_file", None):
+            raise ValueError("--binary-type requires --eos-file")
 
         if args.simple_setup:
             self.include_checks = False
         else:
-             ## initialise testing methods we want to apply to the injections
+            # initialise testing methods we want to apply to the injections
             self.setup_test_routines(args)
             self.columns_to_remove = None
             self.max_redraws = args.max_redraws
@@ -59,13 +78,15 @@ class NMMAInjectionCreator(InjectionCreator):
             self.setup_post_processing(args)
 
             # we need to be able to do a parameter conversion
-            self.param_conversion = MultimessengerConversion.from_dict(self.conv_instructions)
+            self.param_conversion = MultimessengerConversion.from_dict(
+                self.conv_instructions
+            )
 
             self.original_parameters = args.original_parameters
             self.include_checks = True
 
         # legacy
-        self.gw_injection_file = getattr(args, 'gw_injection_file', self.filename)
+        self.gw_injection_file = getattr(args, "gw_injection_file", self.filename)
         self.reference_frequency = getattr(args, "reference_frequency", 20.0)
 
     def setup_test_routines(self, args):
@@ -74,62 +95,83 @@ class NMMAInjectionCreator(InjectionCreator):
         tests = process_multi_condition_string(args.tests)
 
         for test, val in tests.items():
-            if 'snr' in test:
+            if "snr" in test:
                 self.initialise_ifos(args)
-                self.conv_instructions['gw'] = bbh_source_frame
+                self.conv_instructions["gw"] = bbh_source_frame
                 self.snr_op, self.snr_threshold = val
                 test_methods.append(self.test_snr)
-            elif 'population' in test:
+            elif "population" in test:
                 test_methods.append(self.test_population)
-            elif 'ejecta' in test:
+            elif "ejecta" in test:
                 test_methods.append(self.test_ejecta)
-                self.conv_instructions['ejecta'] = True
-            elif 'peak_magnitude' in test:
+                self.conv_instructions["ejecta"] = True
+            elif "peak_magnitude" in test:
                 self.mag_op, self.ref_mag = val
                 self.initialise_lc_model(args)
-                self.conv_instructions['em'] = self.lc_model.parameter_conversion
+                self.conv_instructions["em"] = self.lc_model.parameter_conversion
                 test_methods.append(self.test_detectability)
 
-        self.conv_instructions['eos'] = EoSConverter(args) 
+        self.conv_instructions["eos"] = EoSConverter(args)
+        # FIXME Weizmann: eos conversion needs mass_1_source/mass_2_source, which are only
+        # computed by the 'gw' step (bbh_source_frame). That step is normally
+        # only added above for an 'snr' test, so make sure it is present
+        # whenever eos conversion is used, regardless of --tests.
+        self.conv_instructions.setdefault("gw", bbh_source_frame)
         if "Hubble_constant" in self.priors:
-            self.conv_instructions['cosmo'] = self.cosmology
+            self.conv_instructions["cosmo"] = self.cosmology
         self.test_routines = test_methods
-                   
+
     def setup_post_processing(self, args):
         postprocess_methods = []
-        if 'snr' in args.post_processing and not hasattr(self, 'snr_threshold'):
+        if "snr" in args.post_processing and not hasattr(self, "snr_threshold"):
             self.initialise_ifos(args)
-            self.conv_instructions['gw'] = bbh_source_frame
+            self.conv_instructions["gw"] = bbh_source_frame
             postprocess_methods.append(self.add_snrs)
-        if 'ejecta' in args.post_processing:
+        if "ejecta" in args.post_processing:
             postprocess_methods.append(self.compute_ejecta)
-        if 'lightcurve' in args.post_processing:
+        if "lightcurve" in args.post_processing:
             self.initialise_lc_model(args)
             postprocess_methods.append(self.prepare_lightcurves)
 
         if not postprocess_methods:
+
             def dummy_postprocess(df):
                 return df
-            postprocess_methods.append(dummy_postprocess) # No-op if no postprocessing is needed
+
+            postprocess_methods.append(
+                dummy_postprocess
+            )  # No-op if no postprocessing is needed
         self.postprocessing = postprocess_methods
-    
+
     def generate_injection_file(self):
-        """Generate the injection file based on the provided parameters."""   
+        """Generate the injection file based on the provided parameters."""
+        # FIXME Weizmann: NMMAInjectionCreator overrides
+        # InjectionCreator.generate_injection_file(self, filepath, extension)
+        # with a different signature, which silently dropped the parent's
+        # bilby.core.utils.random.seed(self.generation_seed) call. Without
+        # it, self.priors.sample(n) (called from generate_prelim_dataframe)
+        # draws from bilby's unseeded internal RNG, so --generation-seed had
+        # no effect on the actual prior draws: identical commands (same
+        # seed, same prior, same --gw-injection-file) produced a different
+        # --binary-type filter count on every run.
+        bilby.core.utils.random.seed(self.generation_seed)
         dataframe = self.generate_prelim_dataframe()
         if self.include_checks:
             dataframe = self.testing_and_postprocessing(dataframe)
 
         # Finally dump the whole thing back into a json injection file
-        self.write_injection_dataframe(dataframe, self.filename, self.extension )    
+        self.write_injection_dataframe(dataframe, self.filename, self.extension)
 
     def generate_prelim_dataframe(self):
-        #step 1: Check: we may want to extend a preliminary injection file
+        # step 1: Check: we may want to extend a preliminary injection file
         # if not, this will be an empty dataframe
-        dataframe_from_file = self.handle_incomplete_injection_file(self.gw_injection_file)
+        dataframe_from_file = self.handle_incomplete_injection_file(
+            self.gw_injection_file
+        )
         if len(dataframe_from_file) > 0:
             self.n_injection = len(dataframe_from_file)
 
-        # If we want to only complement a given injection, there might be an 
+        # If we want to only complement a given injection, there might be an
         # overlap in parameters. In that case, we drop the newly sampled ones
         prior_columns = set(self.priors.keys())
         inj_columns = set(dataframe_from_file.columns.tolist())
@@ -141,24 +183,31 @@ class NMMAInjectionCreator(InjectionCreator):
         self.use_prior_columns = dataframe_from_prior.columns.tolist()
         # if 'index' in use_prior_columns:
         #     use_prior_columns.remove('index')
-        
-        
+
         # combine the dataframes
-        dataframe = pd.DataFrame.merge(dataframe_from_file, dataframe_from_prior,
-            how="outer", ## outer to keep all prior parameters
-            left_index=True, right_index=True )
-        
+        dataframe = pd.DataFrame.merge(
+            dataframe_from_file,
+            dataframe_from_prior,
+            how="outer",  # outer to keep all prior parameters
+            left_index=True,
+            right_index=True,
+        )
+
         # Move dataframe index column to simulation_id if column does not exist
         if "simulation_id" not in dataframe.columns:
-            dataframe = dataframe.reset_index().rename({"index": "simulation_id"}, axis=1)
-        dataframe.astype({'simulation_id': 'int32'})
+            dataframe = dataframe.reset_index().rename(
+                {"index": "simulation_id"}, axis=1
+            )
+        dataframe.astype({"simulation_id": "int32"})
         return dataframe
 
     def adjusted_prior_draw(self):
         dataframe_from_prior = self.get_injection_dataframe()
-        try: ## FIXME: This could be handled more gracefully...
-            swap_mask = dataframe_from_prior["mass_1"] < dataframe_from_prior["mass_2"]    
-            dataframe_from_prior.loc[swap_mask, ['mass_1', 'mass_2']] = dataframe_from_prior.loc[swap_mask, ['mass_2','mass_1']].values
+        try:  # FIXME: This could be handled more gracefully...
+            swap_mask = dataframe_from_prior["mass_1"] < dataframe_from_prior["mass_2"]
+            dataframe_from_prior.loc[
+                swap_mask, ["mass_1", "mass_2"]
+            ] = dataframe_from_prior.loc[swap_mask, ["mass_2", "mass_1"]].values
         except KeyError:
             pass
         if self.columns_to_remove is not None:
@@ -169,14 +218,22 @@ class NMMAInjectionCreator(InjectionCreator):
         # step 3: redraw if necessary until all injections passed the tests
         test_df = self.test_wrap(dataframe)
 
-        if test_df['tests_passed'].all():
+        if test_df["tests_passed"].all():
             dataframe = test_df
             print("All injections passed all tests immediately.")
         else:
-            dataframe['tests_passed'] = test_df['tests_passed']
+            # FIXME Weizmann: this used to copy only the 'tests_passed'
+            # column onto the original (unconverted) dataframe, discarding
+            # every column test_wrap()/core_conversion() added (e.g.
+            # mass_1_source, lambda_1/2, radius_1/2 from eos conversion) for
+            # rows that passed on the first draw. With --original-parameters
+            # those columns are never recomputed afterwards, so they were
+            # silently missing from the final injection file whenever at
+            # least one row needed a redraw.
+            dataframe = test_df
             dataframe = self.refill_failed_tests(dataframe)
-        dataframe.drop(columns=['tests_passed'], inplace=True)
-  
+        dataframe.drop(columns=["tests_passed"], inplace=True)
+
         # step 4: Wrap things up
         # do final conversion to all necessary parameters if desired
         if not self.original_parameters:
@@ -184,48 +241,117 @@ class NMMAInjectionCreator(InjectionCreator):
         # or add expensive information not required for tests
         for postprocess in self.postprocessing:
             postprocess(dataframe)
+
+        # FIXME Weizmann: --binary-type/--eject restoration (nmma 0.2.3
+        # behaviour); see joint_parsing.py's --binary-type help. This is a
+        # one-shot filter (drop and done), never a redraw, so it works even
+        # when masses come from an external --gw-injection-file.
+        if self.binary_type_filter is not None:
+            dataframe = self.filter_by_binary_type(dataframe)
+
         return dataframe
-    
+
+    def filter_by_binary_type(self, dataframe):
+        """Apply a single ejecta formula (BNS or NSBH) to every injection,
+        uniformly, and drop those whose resulting ejecta mass isn't finite
+        -- i.e. the assumed binary type isn't physically consistent with
+        the chosen EOS for that injection's masses. Mirrors nmma 0.2.3's
+        --eject + --binary-type BNS/NSBH:
+            index_taken = np.where(isfinite(log10_mej_dyn) * isfinite(log10_mej_wind))[0]
+            dataframe = dataframe.take(index_taken)
+        applied once, not through the --tests redraw mechanism (which
+        cannot work here: a mass read from --gw-injection-file is fixed and
+        can never be redrawn away from failing a test).
+        """
+        if self.binary_type_filter == "BNS":
+            fitter = BNSEjectaFitting()
+        elif self.binary_type_filter == "NSBH":
+            fitter = NSBHEjectaFitting()
+        else:
+            raise ValueError(f"Unknown binary type: {self.binary_type_filter}")
+
+        # FIXME Weizmann: don't call fitter(dataframe) (EjectaFitting.__call__)
+        # here -- it does parameters[key] = parameters.get(key, val), i.e.
+        # prefers an already-sampled log10_mej_dyn/log10_mej_wind (e.g. from
+        # a prior that samples them directly) over the EOS-derived value.
+        # nmma 0.2.3's --eject had no such preference: it always overwrote
+        # log10_mej_dyn/log10_mej_wind with the freshly computed value,
+        # unconditionally. --binary-type is an explicit request to recompute
+        # ejecta from this EOS + assumed type, so it must overwrite the same
+        # way, not silently no-op against a prior that happens to sample
+        # those two keys directly.
+        conv_parameters = fitter.ejecta_parameter_conversion(dataframe)
+        for key, val in zip(fitter.mass_fitting_keys, conv_parameters):
+            dataframe[key] = val
+
+        mask = np.isfinite(dataframe["log10_mej_dyn"]) & np.isfinite(
+            dataframe["log10_mej_wind"]
+        )
+        kept, total = int(mask.sum()), len(dataframe)
+        print(
+            f"--binary-type {self.binary_type_filter}: kept {kept}/{total} "
+            "injections (dropped those with non-finite ejecta mass)"
+        )
+        return dataframe[mask].reset_index(drop=True)
+
     def test_wrap(self, dataframe):
         test_df = dataframe.copy()
         test_df = self.param_conversion.core_conversion(test_df)
-        test_df['tests_passed'] =self.priors.evaluate_constraints(test_df)
+        # FIXME Weizmann: bilby's PriorDict.evaluate_constraints does `next(iter(sample.values()))`
+        # to get a template array; on a DataFrame, `.values` is an ndarray
+        # property, so `.values()` raises TypeError, which is silently caught
+        # and falls back to `np.ones_like(sample)` over the whole 2D table.
+        # Passing a dict of columns instead keeps that fallback from firing.
+        test_df["tests_passed"] = self.priors.evaluate_constraints(dict(test_df))
         for test_routine in self.test_routines:
             # run the test routine on the test_df
             # this will modify the dataframe in place
             test_routine(test_df)
-        
+
         return test_df
-    
+
     def refill_failed_tests(self, dataframe):
         """Routine to redo tests until all conditions are fulfilled or max_redraws is reached."""
         redraw_from_prior = self.adjusted_prior_draw()
         redraws = 1
         failed_tests = 0
-        while redraws <= self.max_redraws: 
-            fail_mask = ~ dataframe['tests_passed'].astype(bool)
+        while redraws <= self.max_redraws:
+            fail_mask = ~dataframe["tests_passed"].astype(bool)
             n_fail = fail_mask.sum()
             failed_tests += n_fail
-            if n_fail == 0:                 # if all tests passed, break
-                print(f"All injections passed all tests after {redraws-1} redraws,"
-                      f" with {failed_tests} total failed samples.")
+            if n_fail == 0:  # if all tests passed, break
+                print(
+                    f"All injections passed all tests after {redraws - 1} redraws,"
+                    f" with {failed_tests} total failed samples."
+                )
                 return dataframe
-            
+
             if len(redraw_from_prior) < n_fail:
                 redraws += 1
                 extra_draw = self.adjusted_prior_draw()
-                redraw_from_prior = pd.concat([redraw_from_prior, extra_draw], ignore_index=True)
+                redraw_from_prior = pd.concat(
+                    [redraw_from_prior, extra_draw], ignore_index=True
+                )
 
             replace_vals = redraw_from_prior.iloc[:n_fail][self.use_prior_columns]
             redraw_from_prior = redraw_from_prior.iloc[n_fail:]
 
-            dataframe.loc[fail_mask, self.use_prior_columns]=replace_vals.to_numpy()
+            dataframe.loc[fail_mask, self.use_prior_columns] = replace_vals.to_numpy()
             retest_df = dataframe[fail_mask].reset_index(drop=True)
-            retest_df['tests_passed'] = self.test_wrap(retest_df)
-            dataframe.loc[fail_mask, 'tests_passed'] = retest_df['tests_passed'].to_numpy()
+            # FIXME Weizmann: test_wrap() returns the whole dataframe (with a
+            # 'tests_passed' column added), not just that column on its own;
+            # assigning it straight into retest_df["tests_passed"] raised
+            # ValueError: Columns must be same length as key.
+            retest_df = self.test_wrap(retest_df)
+            # FIXME Weizmann: only copying back 'tests_passed' left every
+            # other column (mass_1_source, lambda_1/2, radius_1/2, ...) at
+            # its stale pre-redraw value for rows that got redrawn here.
+            dataframe.loc[fail_mask, retest_df.columns] = retest_df.to_numpy()
 
-        raise ValueError(f"Redrew {redraws} times, but still {n_fail} failed samples. "
-            "Consider increasing the max_redraws or check your prior." )
+        raise ValueError(
+            f"Redrew {redraws} times, but still {n_fail} failed samples. "
+            "Consider increasing the max_redraws or check your prior."
+        )
 
     def handle_incomplete_injection_file(self, gw_injection_file=None):
         # check injection file format
@@ -255,126 +381,180 @@ class NMMAInjectionCreator(InjectionCreator):
 
     def test_population(self, df):
         # FIXME: Allow tests on other distributions
-        
+
         # rejection sampling for uniform mass ratio
-        pop_prob= BNS_distribution(df["mass_1"], df["mass_2"])
-        df["tests_passed"] *= rejection_sample(pop_prob, np.ones_like(pop_prob), self.rng)[1]
+        pop_prob = BNS_distribution(df["mass_1"], df["mass_2"])
+        df["tests_passed"] *= rejection_sample(
+            pop_prob, np.ones_like(pop_prob), self.rng
+        )[1]
         # min mass constraint
-        df["tests_passed"]*=(df["mass_2_source"] >=1.)
+        df["tests_passed"] *= df["mass_2_source"] >= 1.0
 
     def test_ejecta(self, df):
-        df["tests_passed"]*=np.isfinite(df["log10_mej_dyn"]) 
-        df["tests_passed"]*=np.isfinite(df["log10_mej_wind"])
-    
+        df["tests_passed"] *= np.isfinite(df["log10_mej_dyn"])
+        df["tests_passed"] *= np.isfinite(df["log10_mej_wind"])
+
     def test_snr(self, df):
         """Test the SNR of the injections."""
         df = self.add_snrs(df)
-        df["tests_passed"]*= self.snr_op(df["snr"], self.snr_threshold)
-    
+        df["tests_passed"] *= self.snr_op(df["snr"], self.snr_threshold)
+
     def test_detectability(self, df):
         """Test whether the injections are detectable in the light curve model."""
         # FIXME: Extend to respect known systems / filters
         def row_check(data_row):
             _, mags = self.lc_model.gen_detector_lc(data_row)
-            return any([(self.mag_op(mag, self.ref_mag)).any() for mag in mags.values()])
+            return any(
+                [(self.mag_op(mag, self.ref_mag)).any() for mag in mags.values()]
+            )
+
         df["tests_passed"] *= df.apply(lambda row: row_check(row), axis=1)
 
-    #################### Messenger-specific methods ########################
+    # ------------- Messenger-specific methods-----------------------------#
     def initialise_ifos(self, args):
-        if isinstance(args.gw_detectors, str):  
+        if isinstance(args.gw_detectors, str):
             detectors = args.gw_detectors.split(",")
         else:
             detectors = args.gw_detectors
-        dets = [bilby.gw.detector.get_empty_interferometer(det) for det in detectors 
-                     if det != 'ET']
-        if 'ET' in detectors:
-            dets.append(bilby.gw.detector.networks.get_empty_interferometer('ET'))
+        dets = [
+            bilby.gw.detector.get_empty_interferometer(det)
+            for det in detectors
+            if det != "ET"
+        ]
+        if "ET" in detectors:
+            dets.append(bilby.gw.detector.networks.get_empty_interferometer("ET"))
 
         self.ifos = bilby.gw.detector.InterferometerList(dets)
         self.f_min = max(ifo.minimum_frequency for ifo in self.ifos)
         f_max = min(ifo.maximum_frequency for ifo in self.ifos)
 
-        self.sampling_frequency = f_max * 2  
+        self.sampling_frequency = f_max * 2
 
-        default_waveform_arguments = {'reference_frequency': 20.0, 'waveform_approximant': 'IMRPhenomXAS_NRTidalv3', 'minimum_frequency': self.f_min, 'maximum_frequency': f_max}
+        default_waveform_arguments = {
+            "reference_frequency": 20.0,
+            "waveform_approximant": "IMRPhenomXAS_NRTidalv3",
+            "minimum_frequency": self.f_min,
+            "maximum_frequency": f_max,
+        }
         if args.waveform_arguments:
             waveform_arguments = convert_string_to_dict(args.waveform_arguments)
             waveform_arguments = default_waveform_arguments | waveform_arguments
 
-        self.duration = 2048.
+        self.duration = 2048.0
 
         self.waveform_gen = bilby.gw.WaveformGenerator(
-            sampling_frequency=self.sampling_frequency, duration=self.duration,
-            start_time=2-self.duration, time_domain_source_model= None,
+            sampling_frequency=self.sampling_frequency,
+            duration=self.duration,
+            start_time=2 - self.duration,
+            time_domain_source_model=None,
             frequency_domain_source_model=bilby.gw.source.lal_binary_neutron_star,
             parameter_conversion=bilby.gw.conversion.convert_to_lal_binary_neutron_star_parameters,
-            waveform_arguments=waveform_arguments)
+            waveform_arguments=waveform_arguments,
+        )
 
     def add_snrs(self, dataframe):
         """Compute SNR and duration for each row in parallel using threads."""
         # FIXME: preferable to parallelise, but ifo meta_data is not thread-safe
-        
+
         # records = dataframe.to_dict("records")
         # n_workers = min(len(records), os.cpu_count() or 1)
         # with ThreadPool(n_workers) as pool:
         #     results = pool.map(self.compute_snr, records)
 
-        
         # snrs, durations = zip(*results)
         # dataframe[["snr", "duration"]] = np.column_stack((snrs, durations))
 
         dataframe[["snr", "duration"]] = dataframe.apply(
-            lambda row: self.compute_snr(row), axis=1, result_type='expand')
+            lambda row: self.compute_snr(row), axis=1, result_type="expand"
+        )
         return dataframe
-    
+
     def compute_snr(self, data):
-        injection_parameters = {'fiducial': 1. }
-        injection_keys = ('mass_1', 'mass_2','chi_1', 'chi_2', 'luminosity_distance', 'dec', 'ra', 'theta_jn', 'phase', 'theta_jn', 'psi', 'geocent_time', 'lambda_1', 'lambda_2')
-        for k in injection_keys:  
+        injection_parameters = {"fiducial": 1.0}
+        injection_keys = (
+            "mass_1",
+            "mass_2",
+            "chi_1",
+            "chi_2",
+            "luminosity_distance",
+            "dec",
+            "ra",
+            "theta_jn",
+            "phase",
+            "theta_jn",
+            "psi",
+            "geocent_time",
+            "lambda_1",
+            "lambda_2",
+        )
+        for k in injection_keys:
             injection_parameters[k] = data[k]
 
-        self.ifos.set_strain_data_from_zero_noise(self.sampling_frequency, duration=self.duration, start_time=2-self.duration) 
-        self.ifos.inject_signal(injection_parameters, waveform_generator=self.waveform_gen)
-        
+        self.ifos.set_strain_data_from_zero_noise(
+            self.sampling_frequency,
+            duration=self.duration,
+            start_time=2 - self.duration,
+        )
+        self.ifos.inject_signal(
+            injection_parameters, waveform_generator=self.waveform_gen
+        )
 
-        mass_1,mass_2 = injection_parameters['mass_1'], injection_parameters['mass_2']
-        chi_1,chi_2 = injection_parameters['chi_1'], injection_parameters['chi_2']
-        chi_eff = (mass_1 * chi_1 + mass_2 * chi_2)/(mass_1+mass_2) 
-        true_duration = np.rint(bilby.gw.utils.calculate_time_to_merger(self.f_min, mass_1, mass_2, chi=chi_eff))+1
-        return np.sqrt(np.sum([ifo.meta_data['optimal_SNR']**2 for ifo in self.ifos]) ), true_duration
-    
-    
+        mass_1, mass_2 = injection_parameters["mass_1"], injection_parameters["mass_2"]
+        chi_1, chi_2 = injection_parameters["chi_1"], injection_parameters["chi_2"]
+        chi_eff = (mass_1 * chi_1 + mass_2 * chi_2) / (mass_1 + mass_2)
+        true_duration = (
+            np.rint(
+                bilby.gw.utils.calculate_time_to_merger(
+                    self.f_min, mass_1, mass_2, chi=chi_eff
+                )
+            )
+            + 1
+        )
+        return (
+            np.sqrt(np.sum([ifo.meta_data["optimal_SNR"] ** 2 for ifo in self.ifos])),
+            true_duration,
+        )
+
     def initialise_lc_model(self, args):
         self.lc_model = create_injection_model(args)
         self.args.label = args.lc_label if args.lc_label else self.filename
         self.detection_limit = utils.create_detection_limit(args, self.lc_model.filters)
 
     def prepare_lightcurves(self, dataframe):
-        lch.create_multiple_injections(dataframe, self.args, self.lc_model, format= 'standard')
+        lch.create_multiple_injections(
+            dataframe, self.args, self.lc_model, format="standard"
+        )
 
     def compute_ejecta(self, dataframe):
         """Compute the ejecta parameters for the injections."""
-        # very short wrapper to avoid issues in the initialisation sequence
-        return KilonovaEjectaFitting(dataframe)
-            
+        # FIXME Weizmann: KilonovaEjectaFitting has no __init__ taking a
+        # dataframe argument (only __call__); this raised
+        # TypeError: KilonovaEjectaFitting() takes no arguments.
+        # Instantiate first, then call on the dataframe.
+        return KilonovaEjectaFitting()(dataframe)
 
-    ############################ Legacy functions ##########################
-    def file_to_dataframe(self,injection_file, reference_frequency, trigger_time=0.0
-    ):
+    # ------------- Legacy functions ----------------#
+    def file_to_dataframe(self, injection_file, reference_frequency, trigger_time=0.0):
         """legacy function to convert a bilby- injection file to a dataframe.
         Consider doing a complete nmma-injection instead"""
-        #legacy imports
-        from  lalsimulation import SimInspiralTransformPrecessingWvf2PE as lalsim_conversion
+        # legacy imports
+        from lalsimulation import (
+            SimInspiralTransformPrecessingWvf2PE as lalsim_conversion,
+        )
         from gwpy.table import Table
         from astropy.table import Table as AstroTable
 
         try:
             import ligo.lw  # noqa F401
         except ImportError:
-            raise ImportError("You do not have ligo.lw installed: $ pip install python-ligo-lw")
+            raise ImportError(
+                "You do not have ligo.lw installed: $ pip install python-ligo-lw"
+            )
 
-        if injection_file.endswith((".xml", '.xml.gz')):
-            table = Table.read(injection_file, format="ligolw", tablename="sim_inspiral")
+        if injection_file.endswith((".xml", ".xml.gz")):
+            table = Table.read(
+                injection_file, format="ligolw", tablename="sim_inspiral"
+            )
         elif injection_file.endswith(".dat"):
             table = Table.read(injection_file, format="csv", delimiter="\t")
         elif injection_file.endswith(".ecsv"):
@@ -382,22 +562,60 @@ class NMMAInjectionCreator(InjectionCreator):
         else:
             raise ValueError("Only understand xml, ecsv and dat")
 
-        injection_values = {key: [] for key in ["simulation_id", "mass_1", "mass_2", 
-            "luminosity_distance", "psi", "phase", "geocent_time", "ra", "dec", 
-            "theta_jn", "a_1", "a_2", "tilt_1", "tilt_2", "phi_12", "phi_jl" ]}
+        injection_values = {
+            key: []
+            for key in [
+                "simulation_id",
+                "mass_1",
+                "mass_2",
+                "luminosity_distance",
+                "psi",
+                "phase",
+                "geocent_time",
+                "ra",
+                "dec",
+                "theta_jn",
+                "a_1",
+                "a_2",
+                "tilt_1",
+                "tilt_2",
+                "phi_12",
+                "phi_jl",
+            ]
+        }
         for row in table:
             coa_phase = row.get("coa_phase", 0)
-            spin_args = [row.get("spin1x", 0.0), row.get("spin1y", 0.0), row["spin1z"],
-                         row.get("spin2x", 0.0), row.get("spin2y", 0.0), row["spin2z"]]
+            spin_args = [
+                row.get("spin1x", 0.0),
+                row.get("spin1y", 0.0),
+                row["spin1z"],
+                row.get("spin2x", 0.0),
+                row.get("spin2y", 0.0),
+                row["spin2z"],
+            ]
 
-            precession_args = [row["inclination"], *spin_args,
-                row["mass1"], row["mass2"], reference_frequency, coa_phase]
+            precession_args = [
+                row["inclination"],
+                *spin_args,
+                row["mass1"],
+                row["mass2"],
+                reference_frequency,
+                coa_phase,
+            ]
             conversion_args = [float(arg) for arg in precession_args]
-            conversion_keys = ["theta_jn","phi_jl", "tilt_1" ,"tilt_2", "phi_12", "a_1","a_2"]
-            
-            for key, val in zip(conversion_keys, lalsim_conversion(*conversion_args) ):
+            conversion_keys = [
+                "theta_jn",
+                "phi_jl",
+                "tilt_1",
+                "tilt_2",
+                "phi_12",
+                "a_1",
+                "a_2",
+            ]
+
+            for key, val in zip(conversion_keys, lalsim_conversion(*conversion_args)):
                 injection_values[key].append(val)
-    
+
             injection_values["simulation_id"].append(int(row["simulation_id"]))
             injection_values["luminosity_distance"].append(float(row["distance"]))
             injection_values["psi"].append(float(row.get("polarization", 0)))
@@ -417,6 +635,7 @@ class NMMAInjectionCreator(InjectionCreator):
         injection_values = pd.DataFrame.from_dict(injection_values)
         return injection_values
 
+
 def multi_run_setup():
     args = parsing_and_logging(slurm_setup_parser)
     injection_creator = NMMAInjectionCreator(args)
@@ -430,8 +649,13 @@ def multi_run_setup():
             analysis = file.read()
 
         for key, data in zip(
-            ('PRIOR', 'OUTDIR', 'INJOUT', 'INJNUM'), 
-            (os.path.join(outdir, "injection.prior"), outdir, os.path.join(outdir, "lc.csv"), str(index))
+            ("PRIOR", "OUTDIR", "INJOUT", "INJNUM"),
+            (
+                os.path.join(outdir, "injection.prior"),
+                outdir,
+                os.path.join(outdir, "lc.csv"),
+                str(index),
+            ),
         ):
             analysis = analysis.replace(key, data)
 
@@ -439,29 +663,26 @@ def multi_run_setup():
             file.write(analysis)
 
 
-        
-#### UTILS ######
+# ------------------------------ UTILS ------------------------------#
+
 
 def BNS_distribution(m1, m2):
-    q= m2/m1
-    return np.where(q<=1., q, 1/q)
+    q = m2 / m1
+    return np.where(q <= 1.0, q, 1 / q)
 
 
+# ------------------------------ MAIN ------------------------------#
 
 
-
-
-
-############################ MAIN ###############################
-
-def generate_injection(args = None):
+def generate_injection(args=None):
     # step 0: parse the arguments
     # handle parsing similar to bilby-pipe and parse from config file
     if args is None:
         args = nmma_base_parsing(injection_parsing)
-    
+
     injection_creator = NMMAInjectionCreator(args)
     injection_creator.generate_injection_file()
+
 
 def main(args=None):
     generate_injection(args)
