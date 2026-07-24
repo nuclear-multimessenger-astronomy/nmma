@@ -17,6 +17,8 @@ from ..core.utils import set_filename, rejection_sample, read_injection_file
 from ..core.conversion import (
     MultimessengerConversion,
     KilonovaEjectaFitting,
+    BNSEjectaFitting,
+    NSBHEjectaFitting,
     bbh_source_frame,
 )
 from ..em import utils, lightcurve_handling as lch
@@ -56,6 +58,13 @@ class NMMAInjectionCreator(InjectionCreator):
         # bilby-pipe injection_creator can only handle dat or json
         self.extension = "dat" if args.extension == "csv" else args.extension
         self.filename = set_filename(args.injection_file, args)
+
+        # FIXME Weizmann: restores nmma 0.2.3's --binary-type/--eject
+        # behaviour -- see joint_parsing.py's --binary-type help for why
+        # this is needed alongside (not instead of) --tests/--post-processing.
+        self.binary_type_filter = getattr(args, "binary_type", None)
+        if self.binary_type_filter is not None and not getattr(args, "eos_file", None):
+            raise ValueError("--binary-type requires --eos-file")
 
         if args.simple_setup:
             self.include_checks = False
@@ -203,7 +212,15 @@ class NMMAInjectionCreator(InjectionCreator):
             dataframe = test_df
             print("All injections passed all tests immediately.")
         else:
-            dataframe["tests_passed"] = test_df["tests_passed"]
+            # FIXME Weizmann: this used to copy only the 'tests_passed'
+            # column onto the original (unconverted) dataframe, discarding
+            # every column test_wrap()/core_conversion() added (e.g.
+            # mass_1_source, lambda_1/2, radius_1/2 from eos conversion) for
+            # rows that passed on the first draw. With --original-parameters
+            # those columns are never recomputed afterwards, so they were
+            # silently missing from the final injection file whenever at
+            # least one row needed a redraw.
+            dataframe = test_df
             dataframe = self.refill_failed_tests(dataframe)
         dataframe.drop(columns=["tests_passed"], inplace=True)
 
@@ -214,7 +231,58 @@ class NMMAInjectionCreator(InjectionCreator):
         # or add expensive information not required for tests
         for postprocess in self.postprocessing:
             postprocess(dataframe)
+
+        # FIXME Weizmann: --binary-type/--eject restoration (nmma 0.2.3
+        # behaviour); see joint_parsing.py's --binary-type help. This is a
+        # one-shot filter (drop and done), never a redraw, so it works even
+        # when masses come from an external --gw-injection-file.
+        if self.binary_type_filter is not None:
+            dataframe = self.filter_by_binary_type(dataframe)
+
         return dataframe
+
+    def filter_by_binary_type(self, dataframe):
+        """Apply a single ejecta formula (BNS or NSBH) to every injection,
+        uniformly, and drop those whose resulting ejecta mass isn't finite
+        -- i.e. the assumed binary type isn't physically consistent with
+        the chosen EOS for that injection's masses. Mirrors nmma 0.2.3's
+        --eject + --binary-type BNS/NSBH:
+            index_taken = np.where(isfinite(log10_mej_dyn) * isfinite(log10_mej_wind))[0]
+            dataframe = dataframe.take(index_taken)
+        applied once, not through the --tests redraw mechanism (which
+        cannot work here: a mass read from --gw-injection-file is fixed and
+        can never be redrawn away from failing a test).
+        """
+        if self.binary_type_filter == "BNS":
+            fitter = BNSEjectaFitting()
+        elif self.binary_type_filter == "NSBH":
+            fitter = NSBHEjectaFitting()
+        else:
+            raise ValueError(f"Unknown binary type: {self.binary_type_filter}")
+
+        # FIXME Weizmann: don't call fitter(dataframe) (EjectaFitting.__call__)
+        # here -- it does parameters[key] = parameters.get(key, val), i.e.
+        # prefers an already-sampled log10_mej_dyn/log10_mej_wind (e.g. from
+        # a prior that samples them directly) over the EOS-derived value.
+        # nmma 0.2.3's --eject had no such preference: it always overwrote
+        # log10_mej_dyn/log10_mej_wind with the freshly computed value,
+        # unconditionally. --binary-type is an explicit request to recompute
+        # ejecta from this EOS + assumed type, so it must overwrite the same
+        # way, not silently no-op against a prior that happens to sample
+        # those two keys directly.
+        conv_parameters = fitter.ejecta_parameter_conversion(dataframe)
+        for key, val in zip(fitter.mass_fitting_keys, conv_parameters):
+            dataframe[key] = val
+
+        mask = np.isfinite(dataframe["log10_mej_dyn"]) & np.isfinite(
+            dataframe["log10_mej_wind"]
+        )
+        kept, total = int(mask.sum()), len(dataframe)
+        print(
+            f"--binary-type {self.binary_type_filter}: kept {kept}/{total} "
+            "injections (dropped those with non-finite ejecta mass)"
+        )
+        return dataframe[mask].reset_index(drop=True)
 
     def test_wrap(self, dataframe):
         test_df = dataframe.copy()
@@ -260,10 +328,15 @@ class NMMAInjectionCreator(InjectionCreator):
 
             dataframe.loc[fail_mask, self.use_prior_columns] = replace_vals.to_numpy()
             retest_df = dataframe[fail_mask].reset_index(drop=True)
-            retest_df["tests_passed"] = self.test_wrap(retest_df)
-            dataframe.loc[fail_mask, "tests_passed"] = retest_df[
-                "tests_passed"
-            ].to_numpy()
+            # FIXME Weizmann: test_wrap() returns the whole dataframe (with a
+            # 'tests_passed' column added), not just that column on its own;
+            # assigning it straight into retest_df["tests_passed"] raised
+            # ValueError: Columns must be same length as key.
+            retest_df = self.test_wrap(retest_df)
+            # FIXME Weizmann: only copying back 'tests_passed' left every
+            # other column (mass_1_source, lambda_1/2, radius_1/2, ...) at
+            # its stale pre-redraw value for rows that got redrawn here.
+            dataframe.loc[fail_mask, retest_df.columns] = retest_df.to_numpy()
 
         raise ValueError(
             f"Redrew {redraws} times, but still {n_fail} failed samples. "
@@ -444,8 +517,11 @@ class NMMAInjectionCreator(InjectionCreator):
 
     def compute_ejecta(self, dataframe):
         """Compute the ejecta parameters for the injections."""
-        # very short wrapper to avoid issues in the initialisation sequence
-        return KilonovaEjectaFitting(dataframe)
+        # FIXME Weizmann: KilonovaEjectaFitting has no __init__ taking a
+        # dataframe argument (only __call__); this raised
+        # TypeError: KilonovaEjectaFitting() takes no arguments.
+        # Instantiate first, then call on the dataframe.
+        return KilonovaEjectaFitting()(dataframe)
 
     # ------------- Legacy functions ----------------#
     def file_to_dataframe(self, injection_file, reference_frequency, trigger_time=0.0):
