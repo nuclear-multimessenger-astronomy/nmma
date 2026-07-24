@@ -145,6 +145,16 @@ class NMMAInjectionCreator(InjectionCreator):
 
     def generate_injection_file(self):
         """Generate the injection file based on the provided parameters."""
+        # FIXME Weizmann: NMMAInjectionCreator overrides
+        # InjectionCreator.generate_injection_file(self, filepath, extension)
+        # with a different signature, which silently dropped the parent's
+        # bilby.core.utils.random.seed(self.generation_seed) call. Without
+        # it, self.priors.sample(n) (called from generate_prelim_dataframe)
+        # draws from bilby's unseeded internal RNG, so --generation-seed had
+        # no effect on the actual prior draws: identical commands (same
+        # seed, same prior, same --gw-injection-file) produced a different
+        # --binary-type filter count on every run.
+        bilby.core.utils.random.seed(self.generation_seed)
         dataframe = self.generate_prelim_dataframe()
         if self.include_checks:
             dataframe = self.testing_and_postprocessing(dataframe)
