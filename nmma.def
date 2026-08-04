@@ -1,0 +1,25 @@
+Bootstrap: docker
+From: continuumio/miniconda3:23.9.0-0
+Stage: build
+
+%files
+pyproject.toml /workdir/nmma/
+requirements.txt /workdir/nmma/
+priors/* /workdir/nmma/priors/
+tools/* /workdir/nmma/tools/
+nmma/* /workdir/nmma/nmma/
+
+%post
+/opt/conda/bin/conda config --add channels conda-forge
+/opt/conda/bin/conda install c-compiler libblas libcblas liblapack mpi4py multinest parallel-bilby
+/opt/conda/bin/pip install --upgrade pip
+/opt/conda/bin/pip install -r /workdir/nmma/requirements.txt
+cd /workdir/nmma && /opt/conda/bin/pip install -e .
+
+%runscript
+#!/bin/bash
+exec "$@"
+
+%labels
+Author NMMA Development team
+Version v0.0.1
