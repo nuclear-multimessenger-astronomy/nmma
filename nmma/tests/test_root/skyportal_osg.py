@@ -12,6 +12,10 @@ import pytest
 
 from nmma import skyportal_osg
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> c7f539e (restructure tests)
 # ---- helpers ----------------------------------------------------------------------------------
 
 CSV_PHOT = (
