@@ -1,6 +1,6 @@
 import pytest
 from yaml import YAMLError
-from ..em.systematics import (
+from nmma.em.systematics import (
     ValidationError,
     validate_only_one_true,
     validate_filters,
@@ -10,7 +10,7 @@ from ..em.systematics import (
     ALLOWED_FILTERS,
     ALLOWED_DISTRIBUTIONS
 )
-from ..core.utils import load_yaml
+from nmma.core.utils import load_yaml
 
 
 @pytest.fixture

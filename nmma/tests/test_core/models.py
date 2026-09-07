@@ -1,6 +1,6 @@
 import pytest
 
-from ..core.gitlab import get_model, refresh_models_list
+from nmma.core.gitlab import get_model, refresh_models_list
 
 # GitLab SVD-models fetch path is retired alongside the rest of the
 # SVD-test suite; surrogate equivalents land via huggingface_hub now.

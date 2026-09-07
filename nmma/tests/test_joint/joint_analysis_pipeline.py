@@ -1,5 +1,5 @@
 from argparse import Namespace
-import os
+from pathlib import Path
 import pytest
 import numpy as np
 import shutil
@@ -23,8 +23,8 @@ from nmma.joint import generation
 # this when the joint EOS+EM pipeline is ported.
 pytestmark = pytest.mark.skip(reason="SVD-model tests retired; see fiesta_smoke")
 
-WORKING_DIR = os.path.dirname(__file__)
-DATA_DIR = os.path.join(WORKING_DIR, "data")
+WORKING_DIR = Path(__file__).parent
+DATA_DIR = WORKING_DIR / "data"
 
 
 def merge_namespaces(*namespaces):
@@ -59,7 +59,7 @@ em_model_args = Namespace(
 )
 
 injection_args = Namespace(
-    injection_file=f"{DATA_DIR}/Bu2019lm_injection.json",
+    injection_file=DATA_DIR / "Bu2019lm_injection.json",
     injection_outfile="outdir/lc.csv",
 )
 
@@ -67,7 +67,7 @@ samling_args = Namespace(nlive=64, local_only=True, sampler="pymultinest")
 
 em_prior_args = Namespace(Ebv_max=0.0)
 eos_args = Namespace(
-    eos_data=f"{DATA_DIR}/eos_macro",
+    eos_data=DATA_DIR / "eos_macro",
     eos_to_ram=True,
     upper_mtov={"upper_dummy": {"mass": 2.23, "error": 0.02}},
     lower_mtov={"lower_dummy": {"mass": 2.17, "error": 0.02}},
@@ -101,7 +101,7 @@ def args():
 @pytest.fixture(autouse=True)
 def cleanup_outdir(args):
     yield
-    if os.path.exists(args.outdir):
+    if Path(args.outdir).exists():
         shutil.rmtree(args.outdir, ignore_errors=True)
 
 

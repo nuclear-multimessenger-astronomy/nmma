@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import pytest
 import shutil
@@ -6,15 +7,14 @@ from argparse import Namespace
 
 from nmma.em import analysis, em_parsing, cluster_handling
 
-WORKING_DIR = os.path.dirname(__file__)
-DATA_DIR = os.path.join(WORKING_DIR, "data")
-os.environ["WORKING_DIR"] = WORKING_DIR
+test_dir = Path(__file__).resolve().parent.parent
+DATA_DIR = test_dir / "data"
 
 
 @pytest.fixture(autouse=True)
 def cleanup_outdir(args):
     yield
-    if os.path.exists(args.outdir):
+    if Path(args.outdir).exists():
         shutil.rmtree(args.outdir, ignore_errors=True)
 
 
@@ -24,20 +24,16 @@ def args():
         em_parsing.multi_wavelength_analysis_parser, []
     )
     non_default_args = dict(
-        em_model="Me2017",
+        em_transient_class="fiesta_kn",
         label="injection",
-        prior_file="priors/Me2017.prior",
-        em_tmin=0.1,
-        em_tmax=14.0,
-        injection_em_tmax=12.0,
-        em_tstep=0.5,
+        prior_file=f"{DATA_DIR}/Bu2026_simplified.prior",
         bestfit=True,
         filters="ztfr",
         Ebv_max=0.0,
         nlive=64,
         sampler="pymultinest",
-        injection_file=f"{DATA_DIR}/Me2017_injection.json",
-        injection_outfile="outdir/lc.csv",
+        # sampler_kwargs={"max_iter": 100},
+        injection=True,
         plot=True,
     )
     for key, value in non_default_args.items():
@@ -48,7 +44,7 @@ def args():
 
 def test_with_Hubble(args):
     test_args = copy.deepcopy(args)
-    test_args.prior_file = "priors/Me2017_Hubble.prior"
+    test_args.prior_file=f"{DATA_DIR}/Bu2026_simplified_Hubble.prior"
     test_args.Hubble = True
     analysis.main(test_args)
 
@@ -74,7 +70,7 @@ def test_analysis_slurm(args):
     args_slurm = dict(
         Ncore=8,
         job_name="lightcurve-analysis",
-        base_dir=os.getcwd(),
+        base_dir=Path(args.outdir),
         logs_dir_name="slurm_logs",
         cluster_name="Expanse",
         partition_type="shared",
@@ -90,11 +86,13 @@ def test_analysis_slurm(args):
     args.__dict__.update(args_slurm)
 
     cluster_handling.slurm_analysis(args)
-    shutil.rmtree(os.path.join(args.base_dir, args.logs_dir_name), ignore_errors=True)
+    shutil.rmtree(Path(args.base_dir) / args.logs_dir_name, ignore_errors=True)
 
 
 def test_analysis_multi():
-    config = os.path.join(WORKING_DIR, "data/multi_config_analysis/config.yaml")
+    config = DATA_DIR / "multi_config.yaml"
+    os.environ["DATA_DIR"] = str(DATA_DIR)
 
-    args = Namespace(config=config, process=2, parallel=False)
+
+    args = Namespace(config=str(config), process=2, parallel=False)
     cluster_handling.multi_config_analysis(args)

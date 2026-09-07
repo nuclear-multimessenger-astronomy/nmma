@@ -1,14 +1,15 @@
-import os
+from pathlib import Path
 import shutil
 from argparse import Namespace
-from ..em.lightcurve_handling import resample_lightcurve_grid
-from ..em.io import convert_skyportal_lcs
+from nmma.em.lightcurve_handling import resample_lightcurve_grid
+from nmma.em.io import convert_skyportal_lcs
+
+data_dir = Path(__file__).parent.parent / "data"
 
 def test_resampling():
-    workingDir = os.path.dirname(__file__)
     base_dirname = "lcs_grid"
     base_filename = "lcs"
-    gridpath = os.path.join(workingDir, "data", "lowmass_collapsar_updated.h5")
+    gridpath = data_dir/ "lowmass_collapsar_updated.h5"
 
     # Start with downsampling by 5x, no shuffle
     args = Namespace(
@@ -39,8 +40,7 @@ def test_resampling():
 
 
 def test_lc_conversion():
-    workingDir = os.path.dirname(__file__)
-    filepath = os.path.join(workingDir, "data", "ZTF23aaxeacr_partial.csv")
+    filepath = data_dir / "ZTF23aaxeacr_partial.csv"
     convert_skyportal_lcs(filepath=filepath)
 
     shutil.rmtree(filepath, ignore_errors=True)
