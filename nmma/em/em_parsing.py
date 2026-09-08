@@ -6,17 +6,12 @@ from ..core.gitlab import DEFAULT_MODELS_HOME
 
 # unused imports kept for forward compatibility
 from ..core.parsing import (
-    parsing_and_logging,
+    parsing_and_logging, # noqa: F401,
+    nmma_base_parsing, # noqa: F401
     single_messenger_analysis_parsing,
     base_injection_parsing,
     yaml_parse,
-    nonefloat,
-    noneint,
-    nonestr,
 )
-
-parsing_and_logging = parsing_and_logging
-noneint = noneint
 
 
 def em_time_parsing(parser):
@@ -28,14 +23,14 @@ def em_time_parsing(parser):
         "--em-tmin",
         "--kilonova-tmin",
         "--tmin",
-        type=nonefloat,
+        type=float,
         help="Days to be started analysing from the trigger time. Default subject to model",
     )
     em_time_parser.add(
         "--em-tmax",
         "--kilonova-tmax",
         "--tmax",
-        type=nonefloat,
+        type=float,
         help="Days to be stoped analysing from the trigger time. Default subject to model",
     )
     em_time_parser.add(
@@ -53,8 +48,7 @@ def em_time_parsing(parser):
     em_time_parser.add(
         "--em-tstep",
         "--dt",
-        type=nonefloat,
-        default=None,
+        type=float,
         help="Time step (in days) for light curve initial evaluation, will overwrite nsteps. Legacy option kept for backward compatibility",
     )
     em_time_parser.add_argument(
@@ -163,7 +157,7 @@ def em_model_parsing(parser):
     )
     # Using Fiesta Surrogate
     em_model_parser.add(
-        "--surrogate-dir", type=nonestr, help="Path to the Fiesta surrogate directory"
+        "--surrogate-dir", help="Path to the Fiesta surrogate directory"
     )
 
     em_model_parser.add_argument(
@@ -351,31 +345,14 @@ def em_injection_parsing(parser):
     )
     lc_injection_parser.add_argument(
         "--ztf-ToO",
-        type=nonestr,
         choices=[None, "180", "300"],
         help="Adds realistic ToO obeservations during the first one or two days. Sampling depends on exposure time specified. Valid values are 180 (<1000sq deg) or 300 (>1000sq deg). Won't work w/o --ztf-sampling",
     )
 
     lc_injection_parser.add_argument(
         "--rubin-ToO-type",
-        type=nonestr,
         choices=[None, "platinum", "gold", "gold_z", "silver", "silver_z"],
         help="Type of ToO observation based on the strategy presented in arxiv.org/abs/2111.01945.",
-    )
-
-    return parser
-
-
-def em_only_injection_parsing(parser):
-    parser = base_injection_parsing(parser)
-    parser.add_argument(
-        "--injection", metavar="PATH", help="Legacy:Path to the injection json file"
-    )
-    parser.add_argument(
-        "--injection-num",
-        type=int,
-        default=0,
-        help="The injection number to be taken from the injection set",
     )
 
     return parser
@@ -512,7 +489,7 @@ def multi_wavelength_analysis_parser(parser):
 
     parser = basic_em_only_analysis_parsing(parser)
     parser = em_analysis_parsing(parser)
-    parser = em_only_injection_parsing(parser)
+    parser = base_injection_parsing(parser)
     parser = skymap_parsing(parser)
 
     # specific arguments
@@ -574,12 +551,12 @@ def svd_model_benchmark_parser(parser):
     )
     parser.add_argument(
         "--tmin",
-        type=nonefloat,
+        type=float,
         help="Days to be started considering from the trigger time (default: set by model)",
     )
     parser.add_argument(
         "--tmax",
-        type=nonefloat,
+        type=float,
         help="Days to be stoped considering from the trigger time (default: set by model)",
     )
     parser.add_argument(
@@ -645,8 +622,7 @@ def lightcurve_parser(parser):
     parser = grb_parsing(parser)
     parser = em_model_parsing(parser)
     parser = multi_wavelength_parsing(parser)
-
-    parser = em_only_injection_parsing(parser)
+    parser = base_injection_parsing(parser)
     parser = em_injection_parsing(parser)
 
     return parser
@@ -665,7 +641,6 @@ def multi_lc_parser(parser):
     )
     parser.add_argument(
         "--file-type",
-        type=nonestr,
         help="Source-file type to be handled, e.g. 'kasen', 'lanl' ",
     )
     parser.add_argument(

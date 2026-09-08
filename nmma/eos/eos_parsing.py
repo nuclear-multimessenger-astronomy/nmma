@@ -1,4 +1,4 @@
-from ..core.parsing import noneint, single_messenger_analysis_parsing, yaml_parse
+from ..core.parsing import single_messenger_analysis_parsing, yaml_parse
 
 def tabulated_eos_parsing(parser):
     tab_eos_input_parser = parser.add_argument_group(
@@ -7,7 +7,7 @@ def tabulated_eos_parsing(parser):
     tab_eos_input_parser.add( "--eos-to-ram", action='store_true',
         help="Depending on cluster architecture, it can be faster to load all EOS files directly to RAM")
     tab_eos_input_parser.add("--eos-data",  help="Path to the EOS directory" )
-    tab_eos_input_parser.add("--Neos", type=noneint, help="Number of EOSs to be used")
+    tab_eos_input_parser.add("--Neos", type=int, help="Number of EOSs to be used")
     tab_eos_input_parser.add("--eos-weight", help="Path to the precalculated EOS weighting")
     return parser
 
