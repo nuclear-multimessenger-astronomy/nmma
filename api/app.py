@@ -38,7 +38,6 @@ default_analysis_parameters = {
     "dt": 0.1,
     "nlive": 512,
     "error_budget": 1.0,
-    "Ebv_max": 0.5724,
     "interpolation-type": "tensorflow",
     "sampler": "pymultinest",
 }
@@ -94,7 +93,6 @@ def run_nmma_model(data_dict):
     dt = analysis_parameters.get("dt")
     nlive = analysis_parameters.get("nlive")
     error_budget = analysis_parameters.get("error_budget")
-    Ebv_max = analysis_parameters.get("Ebv_max")
     interpolation_type = analysis_parameters.get("interpolation-type")
     sampler = analysis_parameters.get("sampler")
 
@@ -204,8 +202,6 @@ def run_nmma_model(data_dict):
             str(error_budget),
             "--nlive",
             str(nlive),
-            "--Ebv-max",
-            str(Ebv_max),
             "--interpolation-type",
             interpolation_type,
             "--sampler",
