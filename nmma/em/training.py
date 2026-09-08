@@ -1,24 +1,27 @@
 import json
-import os
+from pathlib import Path
 import copy
 import inspect
 from glob import glob
-from tqdm.contrib.concurrent import process_map 
+from tqdm.contrib.concurrent import process_map
 import joblib
 import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 
 from .utils import autocomplete_data, interpolate_nans, setup_sample_times
-from ..core.gitlab import get_models_home, get_model  
+from ..core.gitlab import get_models_home, get_model
 
 
 from . import model_parameters, plotting_utils as pu
 from .model import SVDLightCurveModel
 from .io import read_training_data
-from .em_parsing import parsing_and_logging, svd_training_parser, svd_model_benchmark_parser, benchmark_plots_parser
-
-
+from .em_parsing import (
+    parsing_and_logging,
+    svd_training_parser,
+    svd_model_benchmark_parser,
+    benchmark_plots_parser,
+)
 
 try:
     import keras as k
@@ -30,8 +33,8 @@ try:
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import RationalQuadratic
 
-    #NOTE this is used by the keras model!
-    from sklearn.model_selection import train_test_split 
+    # NOTE this is used by the keras model!
+    from sklearn.model_selection import train_test_split
 except ImportError:
     print("Install scikit-learn if you want to use it...")
 
@@ -40,6 +43,7 @@ try:
     from gp_api.kernels import CompactKernel
 except ImportError:
     print("Install gaussian-process-api if you want to use it...")
+
 
 class BaseTrainingModel:
     """A light curve training model object
@@ -86,6 +90,7 @@ class BaseTrainingModel:
     continue_training: bool, optional
         Indicate whether we want to continue training an existing model
     """
+
     def __init__(
         self,
         model,
@@ -99,7 +104,7 @@ class BaseTrainingModel:
         data_type="photometry",
         data_time_unit="days",
         plot=False,
-        plotdir=os.path.join(os.getcwd(), "plot"),
+        plotdir="plot",
         ncpus=1,
         univariate_spline=False,
         univariate_spline_s=2,
@@ -110,8 +115,8 @@ class BaseTrainingModel:
 
         self.model = model
         self.svd_path = get_models_home(svd_path)
-        self.modelfile = os.path.join(self.svd_path, f"{self.model}.joblib")
-        self.outdir = os.path.join(self.svd_path, f"{self.model}{self.model_specifier}")
+        self.modelfile = self.svd_path / f"{self.model}.joblib"
+        self.outdir = self.svd_path / f"{self.model}{self.model_specifier}"
 
         self.data = data
         self.model_parameters = parameters
@@ -122,7 +127,7 @@ class BaseTrainingModel:
         self.data_type = data_type
         self.time_scale_factor = setup_time_conversion(data_time_unit)
         self.plot = plot
-        self.plotdir = plotdir
+        self.plotdir = Path(plotdir)
         self.ncpus = ncpus
         self.univariate_spline = univariate_spline
         self.univariate_spline_s = univariate_spline_s
@@ -130,7 +135,9 @@ class BaseTrainingModel:
         if self.univariate_spline:
             print("The grid will be interpolated to sample_time with UnivariateSpline")
         else:
-            print("The grid will be interpolated to sample_time with linear interpolation")
+            print(
+                "The grid will be interpolated to sample_time with linear interpolation"
+            )
 
         if self.ncpus > 1:
             print(f"Running with {self.ncpus} CPUs")
@@ -160,7 +167,6 @@ class BaseTrainingModel:
 
         self.load_model()
 
-
     def interpolate_data(self):
         if self.univariate_spline:
             extension_mode = "spline"
@@ -174,25 +180,30 @@ class BaseTrainingModel:
             ##FIXME should better use nans!
             self.data[key]["data"] = np.zeros(
                 (len(self.sample_times), len(self.filters))
-                )
-            obs_times = self.data[key]["t"]/ self.time_scale_factor
+            )
+            obs_times = self.data[key]["t"] / self.time_scale_factor
 
             # Interpolate data onto grid
             if self.data_type == "photometry":
                 for j, filt in enumerate(self.filters):
-                    self.data[key]['data'][:, j] = autocomplete_data(
-                        self.sample_times, obs_times, self.data[key][filt], extrapolate=extension_mode, ref_value=ref_value)
+                    self.data[key]["data"][:, j] = autocomplete_data(
+                        self.sample_times,
+                        obs_times,
+                        self.data[key][filt],
+                        extrapolate=extension_mode,
+                        ref_value=ref_value,
+                    )
                     del self.data[key][filt]
 
             elif self.data_type == "spectroscopy":
                 for j, filt in enumerate(self.filters):
                     ref_data = np.log10(self.data[key]["fnu"][:, j])
-                    log_maginterp = autocomplete_data(self.sample_times,
-                        obs_times, ref_data )
-                    self.data[key]["data"][:, j] = 10** log_maginterp
+                    log_maginterp = autocomplete_data(
+                        self.sample_times, obs_times, ref_data
+                    )
+                    self.data[key]["data"][:, j] = 10**log_maginterp
                 del self.data[key]["fnu"]
 
-                
             del self.data[key]["t"]
 
     def generate_svd_model(self) -> dict:
@@ -220,9 +231,7 @@ class BaseTrainingModel:
         # Loop through filters
         for jj, filt in enumerate(self.filters):
             print("Normalizing mag filter %s..." % filt)
-            data_array = [
-                self.data[key]["data"][:, jj] for key in self.data.keys()
-            ] 
+            data_array = [self.data[key]["data"][:, jj] for key in self.data.keys()]
             data_array_postprocess, mins, maxs = min_max_scaling(data_array)
             data_array_postprocess = np.nan_to_num(data_array_postprocess, nan=0.0)
 
@@ -275,12 +284,12 @@ class BaseTrainingModel:
             self.training_func(param_array_postprocess, cAmat, filt)
 
     def check_model(self):
-        if not os.path.isfile(self.modelfile):
+        if self.modelfile.is_file():
             return False
         try:
             for filt in self.filters:
-                outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
-                if not os.path.isfile(outfile):
+                outfile = self.outdir / f"{filt}.{self.file_ending}"
+                if not outfile.is_file():
                     return False
             ## we do not do this for api_gp-model and will fail as it has no file_ending
         except AttributeError:
@@ -289,11 +298,10 @@ class BaseTrainingModel:
         return True
 
     def save_model(self):
-        if not os.path.isdir(self.outdir):
-            os.makedirs(self.outdir)
+        self.outdir.mkdir(parents=True, exist_ok=True)
 
         for filt in self.filters:
-            outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
+            outfile = self.outdir / f"{filt}.{self.file_ending}"
             self.save_routine(filt, outfile)
 
         joblib.dump(self.svd_model, self.modelfile, compress=9)
@@ -304,7 +312,7 @@ class BaseTrainingModel:
 
         for filt in self.svd_model.keys():
             self.load_routine(filt)
-    
+
     def load_routine(self, filt):
         raise NotImplementedError("This method should be implemented by subclasses.")
 
@@ -313,19 +321,19 @@ class BaseTrainingModel:
 
     def training_func(self, param_array_postprocess, cAmat, filt):
         raise NotImplementedError("This method should be implemented by subclasses.")
-    
-    
+
+
 class KerasTrainingModel(BaseTrainingModel):
     def __init__(self, *args, **kwargs):
 
         self.model_specifier = ""
-        self.file_ending = 'keras'
-        super().__init__( *args, **kwargs)
-        if self.plot and not os.path.isdir(self.plotdir):
-            os.mkdir(self.plotdir)
+        self.file_ending = "keras"
+        super().__init__(*args, **kwargs)
+        if self.plot:
+            self.plotdir.mkdir(parents=True, exist_ok=True)
 
     def load_routine(self, filt):
-        outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
+        outfile = self.outdir / f"{filt}.{self.file_ending}"
         self.svd_model[filt]["model"] = k.saving.load_model(outfile, compile=False)
         self.svd_model[filt]["model"].compile(optimizer="adam", loss="mse")
 
@@ -385,9 +393,7 @@ class KerasTrainingModel(BaseTrainingModel):
             plt.legend()
             plt.xlabel("epoch number")
             plt.ylabel("number of losses")
-            plt.savefig(
-                os.path.join(self.plotdir, f"train_history_loss_{filt}.pdf")
-            )
+            plt.savefig(self.plotdir / f"train_history_loss_{filt}.pdf")
             plt.close()
 
         # evaluate the model
@@ -396,32 +402,34 @@ class KerasTrainingModel(BaseTrainingModel):
 
         self.svd_model[filt]["model"] = model
 
+
 class TensorflowTrainingModel(KerasTrainingModel):
     """legacy class for compatibility with older tensorflow.keras-calls"""
-    def __init__(self, *args,  **kwargs):
-        super().__init__( *args, **kwargs)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.model_specifier = "_tf"
-        self.file_ending = 'h5'
+        self.file_ending = "h5"
 
-    
     def save_routine(self, filt, outfile):
         self.svd_model[filt]["model"].save(outfile, save_format=self.file_ending)
         del self.svd_model[filt]["model"]
 
+
 class SklearnGPTrainingModel(BaseTrainingModel):
-    def __init__(self, *args,  **kwargs):
-        
+    def __init__(self, *args, **kwargs):
+
         self.model_specifier = ""
-        self.file_ending = 'joblib'
-        super().__init__( *args, **kwargs)
+        self.file_ending = "joblib"
+        super().__init__(*args, **kwargs)
 
     def load_routine(self, filt):
-        outfile = os.path.join(self.outdir, f"{filt}.{self.file_ending}")
-        if not os.path.isfile(outfile):
+        outfile = self.outdir / f"{filt}.{self.file_ending}"
+        if not outfile.is_file():
             return
         self.svd_model[filt]["gps"] = joblib.load(outfile)
-    
+
     def save_routine(self, filt, outfile):
         joblib.dump(self.svd_model[filt]["gps"], outfile, compress=9)
         del self.svd_model[filt]["gps"]
@@ -452,15 +460,16 @@ class SklearnGPTrainingModel(BaseTrainingModel):
 
         self.svd_model[filt]["gps"] = gps
 
+
 class GPAPITrainingModel(BaseTrainingModel):
-    def __init__(self,  *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.model_specifier = "_api"
-        super().__init__( *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def load_routine(self, filt):
         for i, sub_model in enumerate(self.svd_model[filt]["gps"]):
             self.svd_model[filt]["gps"][i] = load_api_gp_model(sub_model)
-    
+
     def save_model(self):
         get_model(self.svd_path, f"{self.model}_api", self.svd_model.keys())
         joblib.dump(self.svd_model, self.modelfile, compress=9)
@@ -471,8 +480,9 @@ class GPAPITrainingModel(BaseTrainingModel):
         coeffs = [0.5] * nd
 
         # Create the compact kernel
-        kernel = CompactKernel.fit(param_array_postprocess, method="simple", 
-                                 coeffs=coeffs, sparse=True)
+        kernel = CompactKernel.fit(
+            param_array_postprocess, method="simple", coeffs=coeffs, sparse=True
+        )
         gps = []
         for i in range(self.n_coeff):
             # Fit the training data
@@ -514,16 +524,12 @@ class GPAPITrainingModel(BaseTrainingModel):
 
         self.svd_model[filt]["gps"] = gps
 
-def SVDTrainingModel(
-    *args,  
-    interpolation_type="keras",
-    **kwargs
-    ):
+
+def SVDTrainingModel(*args, interpolation_type="keras", **kwargs):
     # NOTE: This function is implemented for backwards compatibility.
     # Directly initiating a KerasTrainingModel, SklearnGPTrainingModel,
     # GPAPITrainingModel should be preferred.
-    
-    
+
     keras_backends = ["keras", "tensorflow", "jax", "torch"]
     if interpolation_type in keras_backends:
         try:
@@ -540,22 +546,22 @@ def SVDTrainingModel(
             "interpolation_type unknown, must be one of: keras, tensorflow, jax, torch, sklearn_gp, api_gp"
         )
 
-      
+
 def create_svdmodel():
     """Create a SVD model from command line arguments."""
 
     args = parsing_and_logging(svd_training_parser)
-    svd_filenames = find_svd_files( args.data_path, args.ignore_bolometric )
+    svd_filenames = find_svd_files(args.data_path, args.ignore_bolometric)
     read_data = prepare_training_data(svd_filenames, args.format, args.data_type, args)
-    training_data, parameters = create_svd_data( args.em_model,read_data)
-    
+    training_data, parameters = create_svd_data(args.em_model, read_data)
+
     # filts = next(iter(training_data.values()))["lambda"] # for spectroscopy
     filts = setup_filters(args.filters, training_data, parameters)
 
     if args.axial_symmetry:
         training_data = axial_symmetry(training_data)
 
-     # Specify the sample times in model training, implying a range of validity
+    # Specify the sample times in model training, implying a range of validity
     sample_times = setup_sample_times(args)
 
     training_args = [
@@ -564,20 +570,20 @@ def create_svdmodel():
         parameters,
         sample_times,
         filts,
-        ]
+    ]
     training_kwargs = dict(
-            n_coeff=args.svd_mag_ncoeff,
-            n_epochs=args.nepochs,
-            svd_path=args.svd_path,
-            data_type=args.data_type,
-            data_time_unit=args.data_time_unit,
-            plot=args.plot,
-            plotdir=args.outdir,
-            ncpus=args.ncpus,
-            univariate_spline=args.use_UnivariateSpline,
-            univariate_spline_s=args.UnivariateSpline_s,
-            random_seed=args.random_seed,
-            continue_training=args.continue_training,
+        n_coeff=args.svd_mag_ncoeff,
+        n_epochs=args.nepochs,
+        svd_path=args.svd_path,
+        data_type=args.data_type,
+        data_time_unit=args.data_time_unit,
+        plot=args.plot,
+        plotdir=args.outdir,
+        ncpus=args.ncpus,
+        univariate_spline=args.use_UnivariateSpline,
+        univariate_spline_s=args.UnivariateSpline_s,
+        random_seed=args.random_seed,
+        continue_training=args.continue_training,
     )
     try:
         training_model = KerasTrainingModel(*training_args, **training_kwargs)
@@ -585,10 +591,10 @@ def create_svdmodel():
         print("Your settings are not compatible with a keras training model.\n \
               Please consider adjusting your setup.\n \
             We will now try to train a legacy SVD model.")
-        training_kwargs['interpolation_type'] = args.interpolation_type
+        training_kwargs["interpolation_type"] = args.interpolation_type
         training_model = SVDTrainingModel(*training_args, **training_kwargs)
 
-    #test-load the just trained model
+    # test-load the just trained model
     light_curve_model = SVDLightCurveModel(
         args.em_model,
         svd_path=args.svd_path,
@@ -601,13 +607,15 @@ def create_svdmodel():
         pu.visualise_model_performance(
             training_data, training_model, light_curve_model, args.data_type
         )
-        
+
+
 def benchmark():
     """Create a SVD model benchmark from command line arguments."""
     parser = svd_model_benchmark_parser()
     args = parser.parse_args()
     create_benchmark(**vars(args))
-    
+
+
 def create_benchmark(
     em_model,
     svd_path,
@@ -623,7 +631,7 @@ def create_benchmark(
     outdir=".",
     ignore_bolometric=True,
     local_only=False,
-    plot= True
+    plot=True,
 ):
     """Create a benchmark for the SVD model.
     Parameters
@@ -661,10 +669,10 @@ def create_benchmark(
     """
     #### get the grid data file path
     # Implicitly set default ignore_bolometric as True for backward compatibility
-    
-    svd_filenames = find_svd_files(data_path, ignore_bolometric )
+
+    svd_filenames = find_svd_files(data_path, ignore_bolometric)
     read_data = prepare_training_data(svd_filenames, format)
-    grid_training_data, parameters = create_svd_data(em_model,read_data)
+    grid_training_data, parameters = create_svd_data(em_model, read_data)
 
     filts = setup_filters(filters, grid_training_data, parameters)
     time_scale_factor = setup_time_conversion(data_time_unit)
@@ -683,7 +691,7 @@ def create_benchmark(
         tmax = light_curve_model.model_times[-1]
 
     def chi2_func(grid_entry):
-        grid_t = np.array(grid_entry["t"])/ time_scale_factor
+        grid_t = np.array(grid_entry["t"]) / time_scale_factor
 
         use_times = (grid_t > tmin) * (grid_t < tmax)
 
@@ -696,36 +704,44 @@ def create_benchmark(
             grid_t[use_times], parameter_entry
         )
         # calculate chi2
-        return {filt: np.nanmean(
-                (np.array(grid_entry[filt])[use_times]  ##grid_mAB 
-                - estimate_mAB[filt])**2
-                )  for filt in filts}
-
+        return {
+            filt: np.nanmean(
+                (np.array(grid_entry[filt])[use_times] - estimate_mAB[filt])  ##grid_mAB
+                ** 2
+            )
+            for filt in filts
+        }
 
     print(f"Benchmarking model {em_model} on filter {filts} with {ncpus} cpus")
 
     grid_entries = list(grid_training_data.values())
     if ncpus == 1:
-        chi2_dict_array = [ chi2_func(entry) for entry in grid_entries ]
+        chi2_dict_array = [chi2_func(entry) for entry in grid_entries]
     else:
-        chi2_dict_array = process_map( chi2_func, grid_entries,  max_workers=ncpus )
+        chi2_dict_array = process_map(chi2_func, grid_entries, max_workers=ncpus)
 
-    chi2_array_by_filt = { filt: 
-        [dict_entry[filt] for dict_entry in chi2_dict_array]
-        for filt in filts } 
+    chi2_array_by_filt = {
+        filt: [dict_entry[filt] for dict_entry in chi2_dict_array] for filt in filts
+    }
 
     # make the outdir
     model_subscript = "_tf" if interpolation_type == "tensorflow" else ""
-    outpath = f"{outdir}/{em_model}{model_subscript}"
-    os.makedirs(outpath, exist_ok=True)
+    outpath = Path(outdir, f"{em_model}{model_subscript}")
+    outpath.mkdir(exist_ok=True)
 
     percentiles = [0, 25, 50, 75, 100]
 
-    filts_dict = {filt:[np.round(np.percentile(chi2_array_by_filt[filt], val), 2) 
-                            for val in percentiles]
-                for filt in filts}
+    filts_dict = {
+        filt: [
+            np.round(np.percentile(chi2_array_by_filt[filt], val), 2)
+            for val in percentiles
+        ]
+        for filt in filts
+    }
 
-    outfile = f"{outpath}/benchmark_chi2_percentiles_{'_'.join(map(str, percentiles))}.json"
+    outfile = (
+        f"{outpath}/benchmark_chi2_percentiles_{'_'.join(map(str, percentiles))}.json"
+    )
     with open(outfile, "w") as f:
         # save json file with filter-by-filter details
         json.dump({em_model: filts_dict}, f, indent=2)
@@ -738,6 +754,7 @@ def create_benchmark(
         pu.chi2_hists_from_dict(chi2_array_by_filt, outpath)
         pu.plot_benchmark_percentiles(em_model, filts_dict, outpath)
 
+
 def plot_many_benchmarks(outdir, search_pattern):
     """
     make barplots of 25th, 50th and 75th percentiles of reduced chi2 distributions for trained models
@@ -746,10 +763,8 @@ def plot_many_benchmarks(outdir, search_pattern):
     :param search_pattern: indicate a common pattern of targets in the outdir, default is "*"
 
     """
-    if not outdir.startswith("/"):
-        outdir = os.path.join(os.getcwd(), outdir)
-    search_path = os.path.join(outdir, search_pattern, "*.json")
-    json_files = glob(search_path)
+    search_path = Path(outdir, search_pattern)
+    json_files = search_path.glob("*.json")
 
     for file in json_files:
         with open(file) as f:
@@ -757,9 +772,11 @@ def plot_many_benchmarks(outdir, search_pattern):
         model, model_benchmarks = benchmark_dict.items()
         pu.plot_benchmark_percentiles(model, model_benchmarks, outdir)
 
+
 def plot_benchmarks_cli():
     args = benchmark_plots_parser()
     plot_many_benchmarks(args.outdir, args.search_pattern)
+
 
 def axial_symmetry(training_data):
 
@@ -778,23 +795,28 @@ def axial_symmetry(training_data):
 
     return training_data
 
+
 def find_svd_files(data_path, ignore_bolometric):
     """
     Set up the SVD data by finding all relevant files in the given data path.
     """
 
-    link_string = '/*[!_Lbol].' if ignore_bolometric else '/*.'
+    link_string = "/*[!_Lbol]." if ignore_bolometric else "/*."
     file_extensions = ["dat", "csv", "dat.gz", "h5"]
-    
-    filenames_lists = [glob(f"{data_path}{link_string}{ext}") for ext in file_extensions]
+
+    filenames_lists = [
+        glob(f"{data_path}{link_string}{ext}") for ext in file_extensions
+    ]
     filenames = [f for ext_list in filenames_lists for f in ext_list]
     if len(filenames) == 0:
         raise ValueError("Need at least one file to interpolate.")
     return filenames
 
-def prepare_training_data( data_path, format="bulla", data_type="photometry", args = None):
+
+def prepare_training_data(data_path, format="bulla", data_type="photometry", args=None):
     prelim_data = read_training_data(data_path, format, data_type, args)
     return interpolate_nans(prelim_data)
+
 
 def create_svd_data(em_model, data):
     # create the SVD training data
@@ -802,11 +824,10 @@ def create_svd_data(em_model, data):
         k: v for k, v in model_parameters.__dict__.items() if inspect.isfunction(v)
     }
     if em_model not in list(MODEL_FUNCTIONS.keys()):
-        raise ValueError(
-            f"{em_model} unknown. Please add to nmma.em.model_parameters"
-        )
+        raise ValueError(f"{em_model} unknown. Please add to nmma.em.model_parameters")
     model_function = MODEL_FUNCTIONS[em_model]
     return model_function(data)
+
 
 def setup_filters(filters, training_data, parameters):
 
@@ -816,7 +837,7 @@ def setup_filters(filters, training_data, parameters):
         filts = filts.split(",")
     elif not filters:
         first_entry = next(iter(training_data.values()))
-        filts = first_entry.keys() - set(["t"]+ parameters)
+        filts = first_entry.keys() - set(["t"] + parameters)
         filts = list(filts)
     else:
         # list input from analysis test code
@@ -825,7 +846,8 @@ def setup_filters(filters, training_data, parameters):
     if len(filts) == 0:
         raise ValueError("Need at least one valid filter.")
     return filts
-    
+
+
 def setup_time_conversion(data_time_unit="days"):
     """Set up the time conversion factor based on the data_time_unit."""
     if data_time_unit in ["days", "day", "d"]:
@@ -842,6 +864,7 @@ def setup_time_conversion(data_time_unit="days"):
         )
     return time_scale_factor
 
+
 def min_max_scaling(data):
     """
     row_wise Min-max scaling of data to [0, 1] range, assuming a 2d array as input
@@ -849,10 +872,10 @@ def min_max_scaling(data):
     data = np.array(data)
     param_mins, param_maxs = np.min(data, axis=0), np.max(data, axis=0)
     rescaled_data = (data - param_mins) / (param_maxs - param_mins)
-    return (rescaled_data, param_mins, param_maxs)  
+    return (rescaled_data, param_mins, param_maxs)
+
 
 def load_api_gp_model(gp):
-
     """Load a gaussian-process-api GaussianProcess model
     Parameters
     ----------
@@ -893,8 +916,12 @@ def load_api_gp_model(gp):
     predictor = gp["predictor"]
 
     return GaussianProcess(
-        x, y, LL,
-        predictor, kernel,
+        x,
+        y,
+        LL,
+        predictor,
+        kernel,
         hypercube_rescale=hypercube_rescale,
-        param_names=param_names, metadata=metadata,
+        param_names=param_names,
+        metadata=metadata,
     )
