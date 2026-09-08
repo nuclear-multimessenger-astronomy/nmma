@@ -31,6 +31,7 @@ dependencies = [
     "future",
     "bilby>=2.7.1",
     "bilby_pipe>=1.7.0",
+    "fiestaEM>=0.2.1",
     "huggingface_hub",
     "schwimmbad",
     "colorcet",
@@ -94,7 +95,6 @@ production = [
     "pyarrow",
     "parquet",
     "dynesty>=3.0.0",
-    "fiestaEM",
 ]
 sampler = [
     "ultranest",
