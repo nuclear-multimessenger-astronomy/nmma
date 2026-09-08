@@ -1,6 +1,7 @@
 import numpy as np
 from nmma.core.conversion import BNSEjectaFitting, KilonovaEjectaFitting
 
+
 def test_bns_ejecta_conversion_rejects_non_ns_component():
     """FIXME Weizmann: regression test for a bug in BNSEjectaFitting.bns_ejecta_conversion.
 
@@ -84,4 +85,3 @@ def test_kn_ejecta_fitting_requires_both_components_to_be_ns():
     assert np.isfinite(
         log10_mej_dyn[1]
     ), "a genuine BNS row should not be affected by the fix"
-

@@ -44,7 +44,7 @@ def args():
 
 def test_with_Hubble(args):
     test_args = copy.deepcopy(args)
-    test_args.prior_file=f"{DATA_DIR}/Bu2026_simplified_Hubble.prior"
+    test_args.prior_file = f"{DATA_DIR}/Bu2026_simplified_Hubble.prior"
     test_args.Hubble = True
     analysis.main(test_args)
 
@@ -92,7 +92,6 @@ def test_analysis_slurm(args):
 def test_analysis_multi():
     config = DATA_DIR / "multi_config.yaml"
     os.environ["DATA_DIR"] = str(DATA_DIR)
-
 
     args = Namespace(config=str(config), process=2, parallel=False)
     cluster_handling.multi_config_analysis(args)

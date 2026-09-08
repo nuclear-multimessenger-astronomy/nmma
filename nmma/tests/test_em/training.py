@@ -14,6 +14,8 @@ pytestmark = pytest.mark.skip(reason="SVD training retired; use fiesta-surrogate
 
 
 MODELPATH = "svdtrainingmodel"
+
+
 @pytest.fixture(autouse=True)
 def cleanup_outdir():
     ModelPath = MODELPATH
@@ -64,7 +66,7 @@ def test_training():
         dataDir,
         interpolation_type=interpolation_type,
         filters=filts,
-        outdir = ModelPath
+        outdir=ModelPath,
     )
 
     interpolation_type = "keras"
@@ -84,5 +86,5 @@ def test_training():
         dataDir,
         interpolation_type=interpolation_type,
         filters=filts,
-        outdir=ModelPath
+        outdir=ModelPath,
     )

@@ -12,7 +12,6 @@ import pytest
 
 from nmma import skyportal_osg
 
-
 # ---- helpers ----------------------------------------------------------------------------------
 
 CSV_PHOT = (

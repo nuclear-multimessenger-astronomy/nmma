@@ -18,13 +18,7 @@ from nmma.joint.joint_likelihood import MultiMessengerLikelihood
 from nmma.core import utils
 from nmma.joint import generation
 
-# Joint-pipeline tests are pinned to Bu2019nsbh / Bu2019lm SVD models retired
-# alongside the GitLab fetch path. The fiesta-surrogate equivalent will replace
-# this when the joint EOS+EM pipeline is ported.
-pytestmark = pytest.mark.skip(reason="SVD-model tests retired; see fiesta_smoke")
-
-WORKING_DIR = Path(__file__).parent
-DATA_DIR = WORKING_DIR / "data"
+DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def merge_namespaces(*namespaces):
@@ -42,7 +36,7 @@ em_args = parsing_and_logging(
 )
 main_args = Namespace(
     label="injection",
-    prior_file="priors/Bu2019lm.prior",
+    prior_file=f"{DATA_DIR}/Bu2026_simplified.prior",
     em_tmin=0.1,
     em_tmax=10.0,
     injection_em_tmax=9.0,
@@ -53,14 +47,11 @@ main_args = Namespace(
     plot=True,
 )
 em_model_args = Namespace(
-    em_model="Bu2019nsbh",
-    interpolation_type="tensorflow",
-    svd_path=DATA_DIR,
+    em_transient_class="fiesta_kn",
 )
 
 injection_args = Namespace(
-    injection_file=DATA_DIR / "Bu2019lm_injection.json",
-    injection_outfile="outdir/lc.csv",
+    injection=True,
 )
 
 samling_args = Namespace(nlive=64, local_only=True, sampler="pymultinest")
@@ -106,17 +97,15 @@ def cleanup_outdir(args):
 
 
 def test_injection_creation(args):
-
-    inj_model = model.create_light_curve_model_from_args(args.em_model, args)
-    injection_df = utils.read_injection_file(args)
-    injection_parameters = injection_df.iloc[args.injection_num].to_dict()
+    inj_model = model.create_light_curve_model_from_args(args)
+    injection_parameters = utils.injection_from_args(args)
     data, injection_parameters = lch.make_injection(
         injection_parameters, args, injection_model=inj_model
     )
 
     assert np.isclose(
         [arr[10] for arr in data["ztfr"].values()],
-        [4.4248125e04, 2.09294036584e01, 1.00000000e-01],
+        [-0.09856092, 20.728512, 1.00000000e-01],
     ).all()
 
 
@@ -135,5 +124,6 @@ def test_single_thread_setup(args):
 
 def test_parallel_setup(args):
     args.sampler = "dynesty"
+    args.injection_dict = utils.injection_from_prior(args)
     generation.generate_runner(**vars(args))
     # main.analysis_runner('outdir', pool_type='multi')

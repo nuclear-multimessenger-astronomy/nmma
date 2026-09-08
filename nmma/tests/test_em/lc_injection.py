@@ -6,16 +6,16 @@ import pytest
 
 from nmma.em import em_parsing, lightcurve_handling as lch
 from nmma.em.io import load_em_observations
-from nmma.em.model import get_lc_model_from_modelname
+from nmma.em.model import single_model_from_mapping
 from nmma.core.utils import read_injection_file
 from nmma.core.parsing import nmma_base_parsing
 from nmma.joint import injection_handling, joint_parsing
-
 
 DATADIR = Path(__file__).parent.parent / "data"
 BASEDIR = DATADIR.parent.parent.parent
 PRIORDIR = BASEDIR / "priors/"
 OUTDIR = DATADIR / "outdir"
+
 
 @pytest.fixture(autouse=True)
 def cleanup_outdir():
@@ -23,7 +23,7 @@ def cleanup_outdir():
     if Path(OUTDIR).exists():
         shutil.rmtree(OUTDIR, ignore_errors=True)
 
-    
+
 def lightcurveInjectionTest(model_name):
     """
     compares the creation of a lightcurve injection from command line with light_curve_generation and through calling the relevant function directly
@@ -33,7 +33,6 @@ def lightcurveInjectionTest(model_name):
     Name of model prior to test (e.g. 'nugent-hyper'). Must be included in ./priors/ directory
     """
     print("running lightcurve injection test for ", model_name)
-    
 
     def create_injection_from_command_line(model_name):
         """
@@ -50,13 +49,13 @@ def lightcurveInjectionTest(model_name):
         """
 
         if model_name == "nugent-hyper":
-            prior_path = PRIORDIR / ("sncosmo-generic" + ".prior")
+            prior_path = PRIORDIR / ("sncosmo-generic.prior")
         elif model_name == "TrPi2018":
-            prior_path = DATADIR / ("TrPi2018_pinned_parameters" + ".prior")
+            prior_path = DATADIR / ("TrPi2018_pinned_parameters.prior")
         else:
             prior_path = PRIORDIR / (model_name + ".prior")
         assert prior_path.exists(), "prior file does not exist"
-        injection_name =OUTDIR /model_name / "injection.json"
+        injection_name = OUTDIR / model_name / "injection.json"
 
         args = nmma_base_parsing(joint_parsing.injection_parsing, [])
         non_default_args = dict(
@@ -100,7 +99,7 @@ def lightcurveInjectionTest(model_name):
             injection_file=str(injection_file),
             label=command_line_lightcurve_label,
             em_model=model_name,
-            svd_path= BASEDIR / "nmma_models" / "svdmodels",
+            svd_path=BASEDIR / "nmma_models" / "svdmodels",
             filters="sdssu",
             outdir=output_directory,
             interpolation_type="tensorflow",
@@ -110,9 +109,13 @@ def lightcurveInjectionTest(model_name):
         args.__dict__.update(non_default_args)
         lch.lcs_from_injection_parameters(args)
 
-        command_line_lightcurve_file = output_directory / f"{command_line_lightcurve_label}_0_lc.json"
-        
-        assert command_line_lightcurve_file.exists(), "command line lightcurve file does not exist"
+        command_line_lightcurve_file = (
+            output_directory / f"{command_line_lightcurve_label}_0_lc.json"
+        )
+
+        assert (
+            command_line_lightcurve_file.exists()
+        ), "command line lightcurve file does not exist"
 
         return load_em_observations(command_line_lightcurve_file)
 
@@ -136,7 +139,7 @@ def lightcurveInjectionTest(model_name):
         init_kwargs = dict(model=model_name, filters=["sdssu"])
         if model_name == "Ka2017":
             init_kwargs["interpolation_type"] = "sklearn_gp"
-        model_class = get_lc_model_from_modelname(model_name)
+        model_class = single_model_from_mapping(model_name)
         lightcurve_model = model_class(**init_kwargs)
         lc_params = lightcurve_model.parameter_conversion(lightcurve_parameters)
         _, func_lc = lightcurve_model.gen_detector_lc(lc_params)
@@ -177,14 +180,11 @@ def lightcurveInjectionTest(model_name):
             ), f"lightcurve tolerance for {filter_name} exceeded"
 
     injection_file = create_injection_from_command_line(model_name)
-    cl_lc_dict = create_lightcurve_from_command_line(
-        model_name, injection_file
-    )
-    func_lc_dict = create_lightcurve_from_function(
-        model_name, injection_file
-    )
-    
+    cl_lc_dict = create_lightcurve_from_command_line(model_name, injection_file)
+    func_lc_dict = create_lightcurve_from_function(model_name, injection_file)
+
     compare_lightcurves(func_lc_dict, cl_lc_dict)
+
 
 def test_injections():
     for model_name in ["salt2", "nugent-hyper", "Me2017", "Piro2021", "TrPi2018"]:

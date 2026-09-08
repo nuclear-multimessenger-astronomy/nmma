@@ -9,6 +9,7 @@ from nmma.joint import injection_handling, joint_parsing
 nmma_dir = Path(__file__).parent.parent.parent.parent
 data_dir = Path(__file__).parent.parent / "data"
 
+
 @pytest.fixture(autouse=True)
 def cleanup_outdir(args):
     yield
@@ -23,7 +24,7 @@ def args():
         prior_file=str(nmma_dir / "priors" / "Bu2019lm.prior"),
         gw_injection_file=data_dir / "binary_type_O4_injections.dat",
         injection_file=Path(args.outdir, "eos_injection.json"),
-        eos_file= nmma_dir / "example_files" / "eos" / "ALF2.dat",
+        eos_file=nmma_dir / "example_files" / "eos" / "ALF2.dat",
         original_parameters=True,
         generation_seed=42,
     )
@@ -102,12 +103,14 @@ def test_binary_type_filter_end_to_end(args):
     even when the prior already samples them directly (nmma 0.2.3 had no
     "prefer the already-sampled value" behaviour, it always overwrote).
     """
-    prior_path = Path(data_dir, "Bu2019lm_binary_type_test.prior")
-    # First 5 rows of the real, tracked example file: a known, fixed mix of
+
+
+    # First rows of the real, tracked example file: a known, fixed mix of
     # one BNS-under-ALF2, one NSBH-under-ALF2 and one BBH-under-ALF2 event
     # (masses verified by hand against ALF2's ~2.0854 Msun TOV mass).
 
-    args.binary_type="BNS"
+    args.binary_type = "BNS"
+    prior_path = Path(data_dir, "Bu2019lm_binary_type_test.prior")
     args.prior_file = str(prior_path)
     injection_handling.generate_injection(args)
 

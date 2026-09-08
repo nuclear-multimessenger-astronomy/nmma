@@ -6,10 +6,11 @@ from nmma.em.io import convert_skyportal_lcs
 
 data_dir = Path(__file__).parent.parent / "data"
 
+
 def test_resampling():
     base_dirname = "lcs_grid"
     base_filename = "lcs"
-    gridpath = data_dir/ "lowmass_collapsar_updated.h5"
+    gridpath = data_dir / "lowmass_collapsar_updated.h5"
 
     # Start with downsampling by 5x, no shuffle
     args = Namespace(
@@ -21,8 +22,9 @@ def test_resampling():
         fragment=False,
         factor=5,
         shuffle=False,
-        remove = True,
+        remove=True,
     )
+
     resample_lightcurve_grid(args)
 
     # Downsample by 5x, shuffle
@@ -41,6 +43,6 @@ def test_resampling():
 
 def test_lc_conversion():
     filepath = data_dir / "ZTF23aaxeacr_partial.csv"
-    convert_skyportal_lcs(filepath=filepath)
-
-    shutil.rmtree(filepath, ignore_errors=True)
+    out_paths = convert_skyportal_lcs(filepath=filepath)
+    for out_path in out_paths:
+        out_path.unlink(missing_ok=True)

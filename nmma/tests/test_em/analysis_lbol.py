@@ -15,12 +15,14 @@ from nmma.em import analysis, em_parsing
 dataDir = Path(__file__).parent.parent / "data"
 non_default_file = dataDir / "config.toml"
 
+
 @pytest.fixture(autouse=True)
 def cleanup_outdir(args):
     yield
     if Path(args.outdir).exists():
         shutil.rmtree(args.outdir, ignore_errors=True)
     non_default_file.unlink(missing_ok=True)
+
 
 @pytest.fixture(scope="module")
 def args():
