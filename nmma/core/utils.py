@@ -4,37 +4,46 @@ import h5py
 import numpy as np
 import pandas as pd
 from argparse import Namespace
-from bilby.core.utils import decode_bilby_json
+from bilby.core.utils import decode_bilby_json, random as bilby_random
 from bilby.core.result import read_in_result
+from bilby.core.prior import PriorDict
 from astropy import time
 
 from pathlib import Path
 import yaml
 
 import logging
+
 logger = logging.getLogger("nmma")
 
+
 def setup_logger(log_level="INFO"):
-    
+
     try:
-       level = getattr(logging, log_level.upper())
+        level = getattr(logging, log_level.upper())
     except:
-        raise ValueError(f"log_level {log_level} not understood. Must either bei 'debug', 'info', or 'warning'.")
+        raise ValueError(
+            f"log_level {log_level} not understood. Must either bei 'debug', 'info', or 'warning'."
+        )
 
     logger.setLevel(level)
 
     if not any([isinstance(h, logging.StreamHandler) for h in logger.handlers]):
         stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(name)s %(levelname)-8s: %(message)s', datefmt='%H:%M'))
+        stream_handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(name)s %(levelname)-8s: %(message)s", datefmt="%H:%M"
+            )
+        )
         stream_handler.setLevel(level)
         logger.addHandler(stream_handler)
-
 
     for handler in logger.handlers:
         handler.setLevel(level)
 
+
 setup_logger()
+
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -44,50 +53,61 @@ class NumpyEncoder(json.JSONEncoder):
 
 
 def load_yaml(file_path):
+    """
+    Load a YAML file and return the parsed content.
+    """
     return yaml.safe_load(os.path.expandvars(Path(file_path).read_text()))
 
-def read_trigger_time(parameters=None, args=None, out_format = 'mjd'):
+
+def read_trigger_time(parameters=None, args=None, out_format="mjd"):
     trigger_time = None
     if parameters is not None:
         if "trigger_time" in parameters:
-            trigger_time = time.Time(parameters["trigger_time"] , format='mjd')
+            trigger_time = time.Time(parameters["trigger_time"], format="mjd")
         elif "geocent_time_x" in parameters:
-            trigger_time = time.Time(parameters["geocent_time_x"],format="gps")
+            trigger_time = time.Time(parameters["geocent_time_x"], format="gps")
         elif "geocent_time" in parameters:
-            trigger_time = time.Time(parameters["geocent_time"] , format="gps")
+            trigger_time = time.Time(parameters["geocent_time"], format="gps")
     if args is not None and trigger_time is None:
         if hasattr(args, "gps") and args.gps:
-            return time.Time( args.gps, format="gps").mjd
+            return time.Time(args.gps, format="gps").mjd
         elif args.trigger_time:
             try:
-                trigger_time=  time.Time(args.trigger_time, format='mjd')
-                trigger_time.datetime # this fails if not a valid time
+                trigger_time = time.Time(args.trigger_time, format="mjd")
+                trigger_time.datetime  # this fails if not a valid time
             except ValueError:
                 format = getattr(args, "time_format", None)
                 if format is None:
-                    format = 'gps'
-                trigger_time= time.Time(args.trigger_time, format=format)
+                    format = "gps"
+                trigger_time = time.Time(args.trigger_time, format=format)
                 trigger_time  # this fails if not a valid time
     elif args is not None:
-        args.trigger_time = trigger_time.mjd if out_format == 'mjd' else trigger_time.gps
+        args.trigger_time = (
+            trigger_time.mjd if out_format == "mjd" else trigger_time.gps
+        )
     if trigger_time is None:
-        logger.warning("Neither trigger_time, geocent_time nor geocent_time_x provided. This is a required argument. If you don't know the exact trigger time, use a free timeshift prior.")
+        logger.warning(
+            "Neither trigger_time, geocent_time nor geocent_time_x provided. This is a required argument. If you don't know the exact trigger time, use a free timeshift prior."
+        )
         return None
-    
-    if out_format == 'mjd':
+
+    if out_format == "mjd":
         return trigger_time.mjd
 
-    elif out_format == 'gps':
+    elif out_format == "gps":
         return trigger_time.gps
 
 
 def read_injection_file(file):
-    #work for both file-str and Namespace
+    # work for both file-str and Namespace
     if isinstance(file, Namespace):
         if isinstance(file.injection, str):
             file.injection_file = file.injection
-        if not file.injection_file.endswith('.json'):
-            file.injection_file = os.path.join(file.outdir, f"{file.injection_file}.json")
+        file.injection_file = str(file.injection_file)
+        if not file.injection_file.endswith(".json"):
+            test_loc = Path(file.outdir) / f"{file.injection_file}.json"
+            if test_loc.is_file():
+                file.injection_file = test_loc
         inj_file = file.injection_file
     else:
         inj_file = file
@@ -95,7 +115,29 @@ def read_injection_file(file):
         injection_dict = json.load(f, object_hook=decode_bilby_json)
     return injection_dict["injections"]
 
-def get_posteriors(posterior_samples, outdir = None):
+
+def injection_from_args(args):
+    if getattr(args, "injection", False) is True and not getattr(
+        args, "injection_file", None
+    ):
+        return injection_from_prior(args)
+    else:
+        return injection_from_file(args)
+
+
+def injection_from_file(args):
+    injection_df = read_injection_file(args)
+    return injection_df.iloc[args.injection_num].to_dict()
+
+
+def injection_from_prior(args):
+    bilby_random.seed(args.generation_seed)
+    prior = getattr(args, "prior_file") or getattr(args, "prior")
+    prior = PriorDict(prior)
+    return prior.sample()
+
+
+def get_posteriors(posterior_samples, outdir=None):
     """
     Load posterior samples from a file or DataFrame.
     """
@@ -103,72 +145,89 @@ def get_posteriors(posterior_samples, outdir = None):
         return posterior_samples
     elif isinstance(posterior_samples, dict):
         return pd.DataFrame(posterior_samples)
-    
+
     if isinstance(posterior_samples, Namespace):
+        possible_suffixes = [".hdf5", ".json", ".h5"]
+        base_name = Path(posterior_samples.label + "_result")
         if outdir is None:
             outdir = posterior_samples.outdir
-        cand_files = [f"{posterior_samples.label}_result.{ext}" for ext in ['hdf5', 'json', 'h5']]
-        cand_files+= [os.path.join(outdir, f) for f in cand_files]
-        for posterior_file in cand_files:
-            if os.path.isfile(posterior_file):
-                return read_in_result(posterior_file).posterior
-        raise FileNotFoundError(f"Could not find posterior samples. Tried: {cand_files}")
-    
-    if isinstance(posterior_samples, str) and not os.path.isfile(posterior_samples):
-        posterior_samples = os.path.join(outdir, posterior_samples)
-        assert os.path.isfile(posterior_samples), f"Posterior samples file {posterior_samples} not found."
+        outdir = Path(outdir)
+        for suff in possible_suffixes:
+            out_path = base_name.with_suffix(suff)
+            if out_path.exists():
+                return read_in_result(out_path).posterior
+            elif (outdir / out_path).exists():
+                return read_in_result(outdir / out_path).posterior
+        raise FileNotFoundError(
+            f"Could not find {base_name} in {outdir} with suffixes {possible_suffixes}."
+        )
 
-    base, ext = os.path.splitext(posterior_samples)
-    format_str = ext[1:].lower()
-    
-    if base.endswith('result'):
+    posterior_samples = Path(posterior_samples)
+    if not posterior_samples.is_file():
+        posterior_samples = Path(outdir) / posterior_samples
+        assert (
+            posterior_samples.is_file()
+        ), f"Posterior samples file {posterior_samples} not found."
+
+    stem, suffix = posterior_samples.stem, posterior_samples.suffix
+
+    if stem.endswith("result"):
         result = read_in_result(posterior_samples)
         return result.posterior
-    
-    elif format_str in ['csv', 'txt', 'dat']:
-        posterior_samples = pd.read_csv(posterior_samples, sep='\s+', header=0)
-    elif format_str == 'json':
-        with open(posterior_samples, 'r') as f:
+
+    elif suffix in [".csv", ".txt", ".dat"]:
+        posterior_samples = pd.read_csv(posterior_samples, sep="\s+", header=0)
+    elif suffix == ".json":
+        with open(posterior_samples, "r") as f:
             samples_dict = json.load(f, object_hook=decode_bilby_json)
         posterior_samples = samples_dict["posterior"]
-    elif format_str == 'hdf5':
-        with h5py.File(posterior_samples, 'r') as f:
-            posterior_group = f['posterior']
-            posterior_samples = pd.DataFrame({key: np.array(posterior_group[key]) for key in posterior_group.keys()})
+    elif suffix == ".hdf5":
+        with h5py.File(posterior_samples, "r") as f:
+            posterior_group = f["posterior"]
+            posterior_samples = pd.DataFrame(
+                {key: np.array(posterior_group[key]) for key in posterior_group.keys()}
+            )
     else:
         raise ValueError("Unsupported file format, must be csv, txt, dat, json or hdf5")
     return posterior_samples
 
-def set_filename(basename, args, identifier=''):
-    base, ext = os.path.splitext(basename)
-    if not ext:
+
+def set_filename(basename, args, identifier=""):
+    outdir = Path(args.outdir)
+    path = Path(basename)
+    if not path.suffix:
         ext = getattr(args, "extension", "json")
-        return os.path.join(args.outdir, f"{basename}{identifier}.{ext}"
-    )
-    elif ext[1:] not in ["json", "csv", "dat"]:
-        raise ValueError(f"Unsupported output file type: {ext}")
-    elif os.path.dirname(basename)=='':
-        os.makedirs(args.outdir, exist_ok=True)
-        return os.path.join(args.outdir, f"{base}{identifier}{ext}"
-    )
-    else:
-        return  f"{base}{identifier}{ext}"
+        return outdir / f"{path.name}{identifier}.{ext}"
+
+    elif path.suffix not in [".json", ".csv", ".dat"]:
+        raise ValueError(f"Unsupported output file type: {path.suffix}")
+
+    if path.parent == Path("."):
+        outdir.mkdir(parents=True, exist_ok=True)
+        return outdir / f"{path.stem}{identifier}{path.suffix}"
+
+    return path.parent / f"{path.stem}{identifier}{path.suffix}"
 
 
-def read_bestfit_from_posterior(args, mode = 'max_likelihood', return_posterior=False):
+def read_bestfit_from_posterior(args, mode="max_likelihood", return_posterior=False):
     posterior_samples = get_posteriors(args)
-    if mode == 'max_likelihood':
+    if mode == "max_likelihood":
         bestfit = posterior_samples.loc[posterior_samples.log_likelihood.idxmax()]
-    elif mode == 'max_posterior':
-        bestfit = posterior_samples.loc[(posterior_samples.log_likelihood + posterior_samples.log_prior).idxmax()]
+    elif mode == "max_posterior":
+        bestfit = posterior_samples.loc[
+            (posterior_samples.log_likelihood + posterior_samples.log_prior).idxmax()
+        ]
     else:
-        raise ValueError(f"Mode {mode} not recognized. Use 'max_likelihood' or 'max_posterior'.")
+        raise ValueError(
+            f"Mode {mode} not recognized. Use 'max_likelihood' or 'max_posterior'."
+        )
     bestfit_params = bestfit.to_dict()
     bestfit_idx = bestfit.name
     print(f"Best fit parameters: {str(bestfit_params)}\nBest fit index: {bestfit_idx}")
     bestfit_params["best_fit_index"] = int(bestfit_idx)
-    
+
     return (bestfit_params, posterior_samples) if return_posterior else bestfit_params
+
 
 def read_bestfit_from_json(bestfit_file_json, cols, verbose=False):
     df = pd.read_json(bestfit_file_json, typ="series")
@@ -178,8 +237,9 @@ def read_bestfit_from_json(bestfit_file_json, cols, verbose=False):
         print(f"Truths from bestfit: {truths}")
     return truths.flatten()
 
+
 def rejection_sample(posterior, weights, rng):
-    keep = (weights > rng.uniform(0, max(weights), weights.shape))
+    keep = weights > rng.uniform(0, max(weights), weights.shape)
     return np.array(posterior)[keep], keep
 
 
@@ -188,23 +248,23 @@ def sig_lims(values, quantiles=None, sig_unc=2):
     if quantiles is None:
         quantiles = [0.16, 0.5, 0.84]
     q_low, q_mean, q_high = np.quantile(values, quantiles)
-    low_err     = q_mean - q_low
-    high_err    = q_high - q_mean
+    low_err = q_mean - q_low
+    high_err = q_high - q_mean
     error_of_interest = min(low_err, high_err)
-    log_err = np.log10(error_of_interest) 
+    log_err = np.log10(error_of_interest)
     int_log = int(log_err) - 1 if log_err < 0 else int(log_err)
-    ord_error   = sig_unc -1 - int_log
-    if error_of_interest / 10.**int_log > 3:
+    ord_error = sig_unc - 1 - int_log
+    if error_of_interest / 10.0**int_log > 3:
         ord_error -= 1
-    if ord_error>=0:
+    if ord_error >= 0:
         fmt = f".{ord_error}f"
         return f"${{{q_mean:{fmt}}}}_{{-{low_err:{fmt}}}}^{{+{high_err:{fmt}}}}$"
     else:
-        q_mean, low_err, high_err =np.around([q_mean, low_err, high_err], ord_error)
+        q_mean, low_err, high_err = np.around([q_mean, low_err, high_err], ord_error)
         return f"${{{int(q_mean)}}}_{{-{int(low_err)}}}^{{+{int(high_err)}}}$"
 
 
-def input_obj_to_str(input_obj, ref_name= None):
+def input_obj_to_str(input_obj, ref_name=None):
     """Convert input object to string representation.
 
     Parameters
@@ -227,12 +287,12 @@ def input_obj_to_str(input_obj, ref_name= None):
     if isinstance(input_obj, list):
         input_obj = input_obj[0]
 
-
     if isinstance(input_obj, str):
         return input_obj
     else:
         raise TypeError("Input object could not be identified.")
-    
+
+
 def nan_level(data, level, weights=None):
     nans, clean_data = np.isnan(data), data[~np.isnan(data)]
     if weights is not None:
@@ -242,6 +302,10 @@ def nan_level(data, level, weights=None):
     if nan_share > level:
         return [np.nan, np.nan]
     rest_level = level - nan_share
-    low = np.quantile(clean_data,   (1-rest_level)/2, weights=weights, method='inverted_cdf')
-    up  = np.quantile(clean_data, 1-(1-rest_level)/2, weights=weights, method='inverted_cdf')
+    low = np.quantile(
+        clean_data, (1 - rest_level) / 2, weights=weights, method="inverted_cdf"
+    )
+    up = np.quantile(
+        clean_data, 1 - (1 - rest_level) / 2, weights=weights, method="inverted_cdf"
+    )
     return [low, up]

@@ -275,9 +275,9 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
         lc_times[filt] = np.array(sub_dict["time"])
         min_time = np.minimum(min_time, np.min(sub_dict["time"]))
 
-    if min_time < 0:
+    if min_time - trigger_time < 0:
         raise ValueError(
-            f"trigger_time is {-min_time} days later than earliest data time. "
+            f"trigger_time is {trigger_time - min_time} days later than earliest data time. "
             "Please provide a valid trigger time."
         )
 
@@ -290,7 +290,7 @@ def check_model_time_consistency(
     light_curve_data, light_curve_model, priors, injection=None
 ):
 
-    (lc_times, lc_mags, lc_uncertainties, trigger_time) = light_curve_data
+    lc_times, lc_mags, lc_uncertainties, trigger_time = light_curve_data
     data_tmin, data_tmax = np.inf, -np.inf
     for key in lc_times.keys():
         detections = np.isfinite(lc_mags[key]) & np.isfinite(lc_uncertainties[key])

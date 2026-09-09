@@ -1,4 +1,3 @@
-import os
 from copy import copy
 import joblib
 import numpy as np
@@ -345,7 +344,9 @@ class LightCurveModelContainer:
         for ext_mag, filt in zip(ext_mags, filters):
             try:
                 mag[filt] += ext_mag
-            except KeyError:  # this catches key error if ext mag also considers filters that are not given in the lc
+            except (
+                KeyError
+            ):  # this catches key error if ext mag also considers filters that are not given in the lc
                 continue
         return mag
 
@@ -590,7 +591,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
         self.interpolation_type = interpolation_type
         self.svd_path = get_models_home(svd_path)
 
-        modelfile = os.path.join(self.svd_path, f"{core_model_name}.joblib")
+        modelfile = self.svd_path / f"{core_model_name}.joblib"
         if interpolation_type == "tensorflow":
             self.model_specifier = "_tf"
         else:
@@ -606,10 +607,8 @@ class SVDLightCurveModel(LightCurveModelContainer):
             }
             self.svd_lbol_model = None  # FIXME: this is not yet implemented
         except ValueError:
-            raise ValueError(
-                "Model file not found: {modelfile}\n \
-                If possible, try removing the --local-only flag and rerun."
-            )
+            raise ValueError("Model file not found: {modelfile}\n \
+                If possible, try removing the --local-only flag and rerun.")
 
         # need to have read the model before identifying the model_times
         super().__init__(core_model_name, filters, model_parameters, sample_times)
@@ -678,12 +677,12 @@ class SVDLightCurveModel(LightCurveModelContainer):
         While svd_mag_model as loaded from the corresponding model file is only
         a dictionary with some model metadata, this step includes the actual
         ml-model and makes it available in the filter-specific sub-dictionary."""
-        outdir = os.path.join(self.svd_path, f"{model}{self.model_specifier}")
+        outdir = self.svd_path / f"{model}{self.model_specifier}"
         found_any_model = False
         not_found = []
         for filt in self.filters:
-            outfile = os.path.join(outdir, f"{filt.replace(':', '_')}.{fn_ext}")
-            if os.path.isfile(outfile):
+            outfile = outdir / f"{filt.replace(':', '_')}.{fn_ext}"
+            if outfile.exists():
                 self.svd_mag_model[filt][target_name] = load_method(outfile)
                 found_any_model = True
             else:
@@ -1100,7 +1099,6 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
                 "Warning: model_parameters are ignored for SupernovaLightCurveModel, using sncosmo defaults."
             )
         model_parameters = self.sn_model.param_names
-
         if sample_times is None:
             sample_times = np.linspace(
                 self.sn_model.mintime(), self.sn_model.maxtime(), 200
@@ -1108,7 +1106,7 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
 
             if (sample_times < 0).any():
                 # NOTE: We assume this means the sncosmo model is relative to peak time.
-                sample_times += sample_times[0]
+                sample_times -= sample_times[0]
                 print(
                     "Warning: Some supernova models are relative to the peak, some relative to the explosion time, "
                     "but nmma always expects times relative to the explosion time. Adjust your t0 prior accordingly."
@@ -1177,7 +1175,8 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         ----------
         parameters: dict
             Parameters of the Supernova model.
-        sample_times: times at which to explore the light curve. If None, uses the default times for the model."""
+        sample_times: times at which to explore the light curve. If None, uses the default times for the model.
+        """
 
         if sample_times is None:
             sample_times = self.model_times
@@ -1339,7 +1338,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
         return mag
 
 
-class CombinedLightCurveModelContainer:
+class CombinedLightCurveModelContainer(LightCurveModelContainer):
     """
     An object to evaluate the combined light curve from a set of parameters
     using multiple light curve models.
@@ -1569,25 +1568,6 @@ class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
         )
 
 
-def get_lc_model_from_modelname(model_name):
-    # FIXME This is incomplete, but identical to handling in NMMA 0.2.2
-    model_name_mapping = {
-        "TrPi2018": GRBLightCurveModel,
-        "Piro2021": ShockCoolingLightCurveModel,
-        "Me2017": SimpleKilonovaLightCurveModel,
-        "PL_BB_fixedT": SimpleKilonovaLightCurveModel,
-        "Sr2023": HostGalaxyLightCurveModel,
-        "Arnett": SimpleBolometricLightCurveModel,  # Addition
-    }
-    if model_name in model_name_mapping.keys():
-        return model_name_mapping[model_name]
-    elif model_name in [val["name"] for val in _SOURCES.get_loaders_metadata()]:
-        return SupernovaLightCurveModel
-    else:
-        # FIXME This is an unclean default, should be more explicit!
-        return SVDLightCurveModel
-
-
 def single_model_from_args(
     model_class, model_name, args, filters, prefixes=["grb_", "em_"]
 ):
@@ -1614,52 +1594,69 @@ def single_model_from_args(
     return instance
 
 
-def create_light_curve_model_from_args(em_transient, args, filters=None):
+def create_light_curve_model_from_args(args, filters=None):
     if filters is None:
         filters = utils.set_filters(args)
-    if isinstance(em_transient, str):
-        em_transient = em_transient.split(",")
-
-    # case 1: we have the model_names and need to find the classes first
-    # this is equivalent to the previous behaviour of this function for em-only analysis
-    if isinstance(em_transient[0], str):
-        model_names = em_transient
-        model_classes = [
-            get_lc_model_from_modelname(model_name) for model_name in model_names
-        ]
-
-    # case 2, we have transient classes, need to identify the corresponding models
-    else:
-        model_classes = em_transient
-        if isinstance(args.em_model, str):
-            prel_model_names = args.em_model.split(",")
-        elif isinstance(args.em_model, list):
-            prel_model_names = args.em_model
+    if getattr(args, "em_transient_class", None):
+        if isinstance(args.em_transient_class, str):
+            transient_classes = args.em_transient_class.split(",")
         else:
-            prel_model_names = []
-        model_names = []
-        for i, model_class in enumerate(model_classes):
-            try:
-                model_names.append(prel_model_names[i])
-            except IndexError:
-                print(
-                    f"Warning: No model name found for {model_class}. Will try using the default model"
-                )
-                model_names.append(None)
+            transient_classes = list(args.em_transient_class)
+        em_model = getattr(args, "em_model", None)
+        model_classes, model_names = lc_model_from_transient_class(
+            transient_classes, em_model
+        )
+
+    else:
+        model_names = args.em_model
+        if isinstance(model_names, str):
+            model_names = model_names.split(",")
+        else:
+            model_names = list(model_names)
+        model_classes = [single_model_from_mapping(mn) for mn in model_names]
 
     models_list = [
         single_model_from_args(mc, mn, args, filters)
         for mc, mn in zip(model_classes, model_names)
     ]
-
-    if len(models_list) == 1:  # if we only have one model, return it directly
+    if len(models_list) == 1:
         return models_list[0]
     print("Running with combination of multiple light curve models")
     return CombinedLightCurveModelContainer(models_list)
 
 
-def identify_model_type(args):
+def lc_model_from_transient_class(transient_class, em_model):
+    model_classes = [
+        single_model_from_mapping(tc, enfore_class=True) for tc in transient_class
+    ]
+
+    if isinstance(em_model, str):
+        prel_model_names = em_model.split(",")
+    elif isinstance(em_model, list):
+        prel_model_names = em_model
+    elif em_model is None:
+        prel_model_names = []
+    else:
+        raise ValueError(f" {em_model} is not a valid input for em_model.")
+
+    model_names = []
+    for i, model_class in enumerate(model_classes):
+        try:
+            model_names.append(prel_model_names[i])
+        except IndexError:
+            print(
+                f"Warning: No model name found for {model_class}. Will try using the default model"
+            )
+            model_names.append(None)
+    return model_classes, model_names
+
+
+def single_model_from_mapping(identifier, enfore_class=False):
     """Routine to identify what kind of transient we are dealing with"""
+    if isinstance(identifier, LightCurveModelContainer):
+        return identifier
+
+    identifier = identifier.strip()
 
     transient_class_map = {
         "svd": SVDLightCurveModel,
@@ -1675,25 +1672,29 @@ def identify_model_type(args):
         "supernova_grb": SupernovaGRBLightCurveModel,
         "supernova_shock": SupernovaShockCoolingLightCurveModel,
     }
-    try:
-        # preferred method is to explicitly pass the desired class
-        class_name = args.em_transient_class
-        if class_name is None:
-            raise AttributeError(
-                "No EM transient class specified, please provide a valid class name or list of names."
-            )
-        elif isinstance(class_name, str):
-            class_name = class_name.lower().split(",")
-        # FIXME get more robust handling of aliases and typos
-        lc_model = [transient_class_map[cn.strip()] for cn in class_name]
-    except KeyError:
-        raise KeyError(
-            f"EM transient classes must be in {list(transient_class_map.keys())}, but was {class_name}"
+    if identifier.casefold() in transient_class_map.keys():
+        return transient_class_map[identifier.casefold()]
+    elif enfore_class:
+        raise ValueError(
+            f"Transient class {identifier} not recognized. Please choose from {list(transient_class_map.keys())}"
         )
-    except AttributeError:
-        # if no class is given, we try to infer it from the model names
-        lc_model = args.em_model
-    return lc_model
+
+    # FIXME This is incomplete, but identical to handling in NMMA 0.2.2
+    model_name_map = {
+        "TrPi2018": GRBLightCurveModel,
+        "Piro2021": ShockCoolingLightCurveModel,
+        "Me2017": SimpleKilonovaLightCurveModel,
+        "PL_BB_fixedT": SimpleKilonovaLightCurveModel,
+        "Sr2023": HostGalaxyLightCurveModel,
+        "Arnett": SimpleBolometricLightCurveModel,
+    }
+    if identifier in model_name_map.keys():
+        return model_name_map[identifier]
+    elif identifier in [val["name"] for val in _SOURCES.get_loaders_metadata()]:
+        return SupernovaLightCurveModel
+    else:
+        # FIXME This is an unclean default, should be more explicit!
+        return SVDLightCurveModel
 
 
 def create_injection_model(args, filters=None):
@@ -1716,5 +1717,4 @@ def create_injection_model(args, filters=None):
         elif arg.startswith("injection_"):  # replace 'injection_' prefix if necessary
             setattr(injection_args, arg.replace("injection_", ""), val)
 
-    lc_model = identify_model_type(injection_args)
-    return create_light_curve_model_from_args(lc_model, injection_args, filters)
+    return create_light_curve_model_from_args(injection_args, filters)

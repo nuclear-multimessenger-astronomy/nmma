@@ -1,5 +1,5 @@
 import json
-import os
+from pathlib import Path
 import argparse
 from astropy.table import Table
 from astropy.time import Time
@@ -42,6 +42,8 @@ def load_em_observations(filename, args=None, format="observations"):
         filename = args.light_curve_data
     if isinstance(filename, dict):
         return filename  # assume it is already in the correct format
+    if isinstance(filename, Path):
+        filename = str(filename)
 
     if filename is None:
         raise ValueError("No filename provided for lightcurve data.")
@@ -133,7 +135,8 @@ def generous_read_csv(filename):
 def strict_read_csv(filename, args):
     with open(filename, "r") as f:
         lines = [line.rstrip("\n") for line in f]
-        lines = filter(None, lines)  # get non-empty lines
+        lines = [l for l in lines if l]  # get non-empty lines
+        lines = [l for l in lines if not l.startswith("#")]
 
         data = {}
         for line in lines:
@@ -167,15 +170,13 @@ def strict_read_csv(filename, args):
 
 def write_em_observations(filename, data, format="observations"):
     # write json file in standard format or csv file, either in observations or model format
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    if filename.endswith(".json"):
+    filename = Path(filename)
+    filename.parent.mkdir(parents=True, exist_ok=True)
+
+    if ".json" == filename.suffix:
         write_lc_to_json(filename, data)
 
-    elif (
-        filename.endswith(".txt")
-        or filename.endswith(".dat")
-        or filename.endswith(".csv")
-    ):
+    elif filename.suffix in [".csv", ".txt", ".dat"]:
         write_lc_to_csv(filename, data, format=format)
 
 
@@ -185,7 +186,7 @@ def write_lc_to_json(injection_outfile, data):
 
 
 def write_lc_to_csv(outfile, data, format="observations"):
-    delimiter = "," if str(outfile).endswith(".csv") else " "
+    delimiter = "," if outfile.suffix == ".csv" else " "
     if format == "observations":
         all_times, all_filters, all_mags, all_errs = [], [], [], []
         for filt, sub_dict in data.items():
@@ -253,20 +254,16 @@ def write_lc_to_csv(outfile, data, format="observations"):
 def convert_skyportal_lcs(filepath=None):
     if filepath is None:
         p = argparse.ArgumentParser()
-        p.add_argument(
-            "--filepath", type=str, nargs="*", help="path to lightcurve files"
-        )
+        p.add_argument("--filepath", nargs="*", help="path to lightcurve files")
         filepath = p.parse_args().filepath
-    if isinstance(filepath, str):
+    if isinstance(filepath, (str, Path)):
         filepathes = [filepath]
     elif isinstance(filepath, list):
         filepathes = filepath
     else:
         raise ValueError("Invalid filepath")
 
-    for f in filepathes:
-        if not f.startswith("/"):
-            f = os.path.join(os.getcwd(), f)
+    for i, f in enumerate(filepathes):
         try:
             data = Table.read(f, format="ascii.csv")
             # output the data in the format desired by NMMA:
@@ -280,6 +277,8 @@ def convert_skyportal_lcs(filepath=None):
         except Exception as e:
             print(f"input data {f} is not in the expected format {e}")
 
+        outfile = Path(f).with_suffix(".dat")
+        filepathes[i] = outfile
         try:
             out_data = np.array(
                 [
@@ -293,8 +292,6 @@ def convert_skyportal_lcs(filepath=None):
                 ],
                 dtype=object,
             )
-            base, ext = os.path.splitext(f)
-            outfile = base + ".dat"
             np.savetxt(
                 outfile,
                 out_data,
@@ -306,6 +303,7 @@ def convert_skyportal_lcs(filepath=None):
             print(f"Wrote reformatted lightcurve to {outfile}")
         except Exception as e:
             print(f"failed to format data in {f} {e}")
+    return filepathes
 
 
 def read_training_data(filenames, format, data_type="photometry", args=None):
@@ -471,24 +469,10 @@ def read_photometry_files(
             mag_d = np.loadtxt(filename)
             mag_d_shape = mag_d.shape
 
-            data[name] = {}
-            data[name]["t"] = mag_d[:, 0]
-            data[name]["u"] = mag_d[:, 1]
-            data[name]["g"] = mag_d[:, 2]
-            data[name]["r"] = mag_d[:, 3]
-            data[name]["i"] = mag_d[:, 4]
-            data[name]["z"] = mag_d[:, 5]
-            data[name]["y"] = mag_d[:, 6]
-            data[name]["J"] = mag_d[:, 7]
-            data[name]["H"] = mag_d[:, 8]
-            data[name]["K"] = mag_d[:, 9]
-
+            filters = ["t", "u", "g", "r", "i", "z", "y", "J", "H", "K"]
             if mag_d_shape[1] == 15:
-                data[name]["U"] = mag_d[:, 10]
-                data[name]["B"] = mag_d[:, 11]
-                data[name]["V"] = mag_d[:, 12]
-                data[name]["R"] = mag_d[:, 13]
-                data[name]["I"] = mag_d[:, 14]
+                filters.extend(["U", "B", "V", "R", "I"])
+            data[name] = {filt: mag_d[:, idx] for idx, filt in enumerate(filters)}
 
         # HDF5 format
         elif format == "hdf5":
@@ -529,9 +513,6 @@ def read_photometry_files(
                     inplace=True,
                 )
                 data[key] = df.to_dict(orient="series")
-                # data[key] = {
-                #     k.replace(":", "_"): v.to_numpy() for k, v in data[key].items()
-                # }
 
         # Finally, extract the desired filters from all filters present in the data
         if filters is not None:

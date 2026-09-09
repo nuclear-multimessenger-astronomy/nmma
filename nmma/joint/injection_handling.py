@@ -1,8 +1,7 @@
 import numpy as np
 import pandas as pd
-import os
+from pathlib import Path
 import bilby
-from bilby_pipe.utils import convert_string_to_dict
 from bilby_pipe.create_injections import InjectionCreator
 
 
@@ -35,7 +34,7 @@ class NMMAInjectionCreator(InjectionCreator):
         # can use a prior_dict or a prior_file
         if isinstance(args.prior_dict, str):
             # convert string to dict
-            args.prior_dict = convert_string_to_dict(args.prior_dict)
+            args.prior_file = args.prior_dict
 
         set_cosmology(getattr(args, "cosmology", None))
         super().__init__(
@@ -86,7 +85,8 @@ class NMMAInjectionCreator(InjectionCreator):
             self.include_checks = True
 
         # legacy
-        self.gw_injection_file = getattr(args, "gw_injection_file", self.filename)
+        gw_injection_file = getattr(args, "gw_injection_file", self.filename)
+        self.gw_injection_file = Path(gw_injection_file) if gw_injection_file else None
         self.reference_frequency = getattr(args, "reference_frequency", 20.0)
 
     def setup_test_routines(self, args):
@@ -205,9 +205,9 @@ class NMMAInjectionCreator(InjectionCreator):
         dataframe_from_prior = self.get_injection_dataframe()
         try:  # FIXME: This could be handled more gracefully...
             swap_mask = dataframe_from_prior["mass_1"] < dataframe_from_prior["mass_2"]
-            dataframe_from_prior.loc[
-                swap_mask, ["mass_1", "mass_2"]
-            ] = dataframe_from_prior.loc[swap_mask, ["mass_2", "mass_1"]].values
+            dataframe_from_prior.loc[swap_mask, ["mass_1", "mass_2"]] = (
+                dataframe_from_prior.loc[swap_mask, ["mass_2", "mass_1"]].values
+            )
         except KeyError:
             pass
         if self.columns_to_remove is not None:
@@ -356,11 +356,11 @@ class NMMAInjectionCreator(InjectionCreator):
     def handle_incomplete_injection_file(self, gw_injection_file=None):
         # check injection file format
         if gw_injection_file:
-            if not gw_injection_file.endswith((".json", ".xml", ".xml.gz", ".dat")):
+            if not gw_injection_file.suffix in (".json", ".xml", ".xml.gz", ".dat"):
                 raise ValueError("Unknown injection file format")
 
             # load the injection json file
-            if gw_injection_file.endswith(".json"):
+            if gw_injection_file.suffix == ".json":
                 dataframe_from_file = read_injection_file(gw_injection_file)
             else:
                 # legacy formats preferably not used anymore
@@ -401,6 +401,7 @@ class NMMAInjectionCreator(InjectionCreator):
 
     def test_detectability(self, df):
         """Test whether the injections are detectable in the light curve model."""
+
         # FIXME: Extend to respect known systems / filters
         def row_check(data_row):
             _, mags = self.lc_model.gen_detector_lc(data_row)
@@ -436,9 +437,7 @@ class NMMAInjectionCreator(InjectionCreator):
             "minimum_frequency": self.f_min,
             "maximum_frequency": f_max,
         }
-        if args.waveform_arguments:
-            waveform_arguments = convert_string_to_dict(args.waveform_arguments)
-            waveform_arguments = default_waveform_arguments | waveform_arguments
+        waveform_arguments = default_waveform_arguments | args.waveform_arguments
 
         self.duration = 2048.0
 
@@ -551,13 +550,13 @@ class NMMAInjectionCreator(InjectionCreator):
                 "You do not have ligo.lw installed: $ pip install python-ligo-lw"
             )
 
-        if injection_file.endswith((".xml", ".xml.gz")):
+        if injection_file.suffix in (".xml", ".xml.gz"):
             table = Table.read(
                 injection_file, format="ligolw", tablename="sim_inspiral"
             )
-        elif injection_file.endswith(".dat"):
+        elif injection_file.suffix == ".dat":
             table = Table.read(injection_file, format="csv", delimiter="\t")
-        elif injection_file.endswith(".ecsv"):
+        elif injection_file.suffix == ".ecsv":
             table = AstroTable.read(injection_file)
         else:
             raise ValueError("Only understand xml, ecsv and dat")
@@ -642,8 +641,8 @@ def multi_run_setup():
     dataframe = injection_creator.generate_prelim_dataframe()
 
     for index, _ in dataframe.iterrows():
-        outdir = os.path.join(args.outdir, str(index))
-        os.makedirs(outdir, exist_ok=True)
+        outdir = Path(args.outdir, str(index))
+        outdir.mkdir(parents=True, exist_ok=True)
         injection_creator.priors.to_file(outdir, label="injection")
         with open(args.analysis_file, "r") as file:
             analysis = file.read()
@@ -651,15 +650,15 @@ def multi_run_setup():
         for key, data in zip(
             ("PRIOR", "OUTDIR", "INJOUT", "INJNUM"),
             (
-                os.path.join(outdir, "injection.prior"),
+                outdir / "injection.prior",
                 outdir,
-                os.path.join(outdir, "lc.csv"),
-                str(index),
+                outdir / "lc.csv",
+                index,
             ),
         ):
-            analysis = analysis.replace(key, data)
+            analysis = analysis.replace(key, str(data))
 
-        with open(os.path.join(outdir, "inference.sh"), "w") as file:
+        with open(outdir / "inference.sh", "w") as file:
             file.write(analysis)
 
 

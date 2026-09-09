@@ -10,8 +10,9 @@ from scipy.integrate import quad, solve_ivp
 from scipy.special import erfc
 from scipy.interpolate import CubicSpline
 
-from . import utils 
+from . import utils
 from ..core.utils import read_trigger_time
+
 try:
     import afterglowpy
 
@@ -31,8 +32,9 @@ except ImportError:
 
 
 ### some frequently used constants:
-from ..core.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D 
-seconds_a_day = 86400.0  
+from ..core.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D
+
+seconds_a_day = 86400.0
 abs_mag_dist_factor = D**2
 
 
@@ -40,12 +42,14 @@ abs_mag_dist_factor = D**2
 def dummy_add(nu):
     return 0.0
 
-def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared = abs_mag_dist_factor):
-    exponent = np.clip(h * nu * inv_temp / kb, None, 700)  # to avoid overflow in exp
-    bb_factor = 2.* h/ c_cgs**2
-    return bb_factor * nu**3 /np.expm1(exponent) * R_photo * R_photo / dist_squared
 
-def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add = dummy_add):
+def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared=abs_mag_dist_factor):
+    exponent = np.clip(h * nu * inv_temp / kb, None, 700)  # to avoid overflow in exp
+    bb_factor = 2.0 * h / c_cgs**2
+    return bb_factor * nu**3 / np.expm1(exponent) * R_photo * R_photo / dist_squared
+
+
+def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add=dummy_add):
     mag = {}
     # nu_host = nu_obs * (1 + redshift)
     for idx, filt in enumerate(filters):
@@ -65,6 +69,7 @@ def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add = dummy_add)
 def arnett_lc_get_int_A_non_vec(x, y):
     def arnett_func(z):
         return 2 * z * np.exp(-2 * z * y + z**2)
+
     r = quad(arnett_func, 0, x)
     return r[0]
 
@@ -75,19 +80,21 @@ arnett_lc_get_int_A = np.vectorize(arnett_lc_get_int_A_non_vec, excluded=["y"])
 def arnett_lc_get_int_B_non_vec(x, y, s):
     def arnett_func(z):
         return 2 * z * np.exp(-2 * z * y + 2 * z * s + z**2)
+
     r = quad(arnett_func, 0, x)
     return r[0]
 
 
-arnett_lc_get_int_B =  np.vectorize(arnett_lc_get_int_B_non_vec, excluded=["y", "s"])
+arnett_lc_get_int_B = np.vectorize(arnett_lc_get_int_B_non_vec, excluded=["y", "s"])
 
 # arnett_constants
 epsilon_ni = 3.9e10  # erg / s / g
 epsilon_co = 6.78e9  # erg / s / g
-tau_ni = 8.8   # days
-tau_co = 111.3   # days
-y_scale = 2* tau_ni
-s_scale =  (2 * tau_co * tau_ni) / (tau_co - tau_ni)
+tau_ni = 8.8  # days
+tau_co = 111.3  # days
+y_scale = 2 * tau_ni
+s_scale = (2 * tau_co * tau_ni) / (tau_co - tau_ni)
+
 
 def arnett_lc(t_day, param_dict):
     """bolometric light curve functions from Arnett model of supernovae
@@ -97,14 +104,14 @@ def arnett_lc(t_day, param_dict):
         Time in days
     param_dict: dict
         Dictionary containing the parameters for the Arnett model
-    
+
     Returns:
     Ls: array-like
         Bolometric light curve
-    
+
     """
-    tau_m = param_dict["tau_m"] 
-    Mni = 10**param_dict["log10_mni"] * msun_cgs
+    tau_m = param_dict["tau_m"]
+    Mni = 10 ** param_dict["log10_mni"] * msun_cgs
 
     y = tau_m / y_scale
     s = tau_m / s_scale
@@ -113,8 +120,8 @@ def arnett_lc(t_day, param_dict):
     int_A = arnett_lc_get_int_A(x, y)
     int_B = arnett_lc_get_int_B(x, y, s)
 
-    lbol = Mni * np.exp(-x**2) * (
-        (epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B
+    lbol = (
+        Mni * np.exp(-(x**2)) * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
     )
 
     return lbol
@@ -128,21 +135,22 @@ def arnett_modified_lc(t_day, param_dict):
         Time in days
     param_dict: dict
         Dictionary containing the parameters for the Arnett model
-    
+
     Returns:
     Ls: array-like
         Bolometric light curve
-    
+
     """
     Lbol_arnett = arnett_lc(t_day, param_dict)
-    return Lbol_arnett* (1. - np.exp(-(param_dict["t_0"]/ t_day)**2))
+    return Lbol_arnett * (1.0 - np.exp(-((param_dict["t_0"] / t_day) ** 2)))
 
 
 ## kilonova from SVD model
-def calc_svd_lbol(sample_times, param_list, svd_lbol_model, lbol_ncoeff = None):
-    tt_interp, lbol_back =eval_svd_model(svd_lbol_model, lbol_ncoeff, param_list)
-    lbol = 10**utils.autocomplete_data(sample_times, tt_interp, lbol_back)
-    return np.squeeze(lbol)  #* (1. + z) FIXME: shouldn't this be (1 + z)**2
+def calc_svd_lbol(sample_times, param_list, svd_lbol_model, lbol_ncoeff=None):
+    tt_interp, lbol_back = eval_svd_model(svd_lbol_model, lbol_ncoeff, param_list)
+    lbol = 10 ** utils.autocomplete_data(sample_times, tt_interp, lbol_back)
+    return np.squeeze(lbol)  # * (1. + z) FIXME: shouldn't this be (1 + z)**2
+
 
 def calc_svd_lc(
     sample_times,
@@ -161,21 +169,29 @@ def calc_svd_lc(
         filters (Array): List/array of filters at which we want to evaluate the model
     """
 
-
     if filters is None:
         filters = list(svd_mag_model.keys())
-        
+
     # add null output for other filters, especially radio and X-ray filters when using with GRB data
-    mAB = {filt: np.full_like(sample_times, np.inf) for filt in filters if filt not in svd_mag_model}
+    mAB = {
+        filt: np.full_like(sample_times, np.inf)
+        for filt in filters
+        if filt not in svd_mag_model
+    }
 
     for filt in filters:
         if filt in mAB:
             continue
-        tt_interp, mag_back = eval_svd_model(svd_mag_model[filt], mag_ncoeff, param_list)
+        tt_interp, mag_back = eval_svd_model(
+            svd_mag_model[filt], mag_ncoeff, param_list
+        )
 
         ### FIXME quick-fix to not trust lightcurve after outside training time range
-        mAB[filt] = utils.autocomplete_data(sample_times, tt_interp, mag_back, extrapolate=np.inf)
+        mAB[filt] = utils.autocomplete_data(
+            sample_times, tt_interp, mag_back, extrapolate=np.inf
+        )
     return mAB
+
 
 def eval_svd_model(svd_model, ass_ncoeff, param_list):
     """Evaluate the SVD model"""
@@ -191,18 +207,18 @@ def eval_svd_model(svd_model, ass_ncoeff, param_list):
     tt_interp = svd_model["tt"]
 
     param_list_postprocess = np.array(param_list)
-    param_list_postprocess = (param_list_postprocess- param_mins) / (param_maxs- param_mins)
+    param_list_postprocess = (param_list_postprocess - param_mins) / (
+        param_maxs - param_mins
+    )
     try:
         model = svd_model["model"]
-        #NOTE: This is much(!) faster for small batch sizes than model.predict. Since we mostly call for single params, we should avoid .predict!!!
+        # NOTE: This is much(!) faster for small batch sizes than model.predict. Since we mostly call for single params, we should avoid .predict!!!
         cAproj = model(np.atleast_2d(param_list_postprocess)).numpy().T.flatten()
     except KeyError:
         cAproj = np.zeros((n_coeff,))
         gps = svd_model["gps"]
         if gps is None:
-            raise ValueError(
-                f"Gaussian process model unavailable."
-            )
+            raise ValueError(f"Gaussian process model unavailable.")
         for i in range(n_coeff):
             gp = gps[i]
             y_pred, sigma2_pred = gp.predict(
@@ -210,10 +226,9 @@ def eval_svd_model(svd_model, ass_ncoeff, param_list):
             )
             cAproj[i] = y_pred.item()
 
-    
     svd_back = np.dot(VA[:, :n_coeff], cAproj)
-    svd_back*= (maxs - mins) 
-    svd_back+= mins
+    svd_back *= maxs - mins
+    svd_back += mins
     return tt_interp, svd_back
 
 
@@ -222,17 +237,19 @@ def eval_svd_model(svd_model, ass_ncoeff, param_list):
 def fluxDensity(t, nu, **params):
     return afterglowpy.fluxDensity(t, nu, **params)
 
+
 def flux_density_on_time_array(default_time, obs_frequencies, param_dict):
     times = np.tile(default_time, (len(obs_frequencies), 1)).T
     nus = np.tile(obs_frequencies, (len(default_time), 1))
     return fluxDensity(times, nus, **param_dict)
 
+
 def flux_density_on_E0_array(default_time, obs_frequencies, param_dict):
     # fetch parameters
-    log10_Eend = param_dict['log10_Eend']
-    t_start = param_dict['t_start']
-    t_end = param_dict['injection_duration']
-    energy_exponential = param_dict['energy_exponential']
+    log10_Eend = param_dict["log10_Eend"]
+    t_start = param_dict["t_start"]
+    t_end = param_dict["injection_duration"]
+    energy_exponential = param_dict["energy_exponential"]
     # populate the E0 along the sample_times
     log10_Estart = log10_Eend + energy_exponential * np.log10(t_start / t_end)
     log10_E0 = np.full_like(default_time, log10_Estart)
@@ -241,26 +258,21 @@ def flux_density_on_E0_array(default_time, obs_frequencies, param_dict):
     mask = (default_time > t_start) * (default_time < t_end)
     time_scale = np.log10(default_time / t_end)
     log10_E0[mask] = log10_Eend + energy_exponential * time_scale[mask]
-    E0 = 10 ** log10_E0
+    E0 = 10**log10_E0
+
     def helper(i):
-        return fluxDensity(
-            default_time[i], 
-            obs_frequencies, 
-            E0=E0[i], 
-            **param_dict
-        )
-    vec_func = np.vectorize(helper, 
-        otypes=[np.ndarray]
-    )
+        return fluxDensity(default_time[i], obs_frequencies, E0=E0[i], **param_dict)
+
+    vec_func = np.vectorize(helper, otypes=[np.ndarray])
     mJys = vec_func(np.arange(len(default_time)))
     return np.stack(mJys)
 
 
 def afterglowpy_lc(sample_times, param_dict, filters, obs_frequencies, flux_func):
-    tStart = max(10 ** (-5), np.amin(sample_times)) 
-    tEnd = (np.amax(sample_times) + 1) 
+    tStart = max(10 ** (-5), np.amin(sample_times))
+    tEnd = np.amax(sample_times) + 1
     tnode = min(len(sample_times), 201)
-    default_time = np.geomspace(tStart, tEnd, num=tnode)* seconds_a_day
+    default_time = np.geomspace(tStart, tEnd, num=tnode) * seconds_a_day
 
     # output flux density is in milliJansky
     try:
@@ -268,15 +280,16 @@ def afterglowpy_lc(sample_times, param_dict, filters, obs_frequencies, flux_func
     except TimeoutError:
         return {}
 
-
     if np.any(mJys <= 0.0):
         return {}
 
     mag = {}
     for filt_idx, filt in enumerate(filters):
-        mag_d = utils.flux_to_ABmag(mJys[:, filt_idx], unit= 'mJy')
-        mag[filt] = utils.autocomplete_data(sample_times, default_time / seconds_a_day, mag_d)
-    
+        mag_d = utils.flux_to_ABmag(mJys[:, filt_idx], unit="mJy")
+        mag[filt] = utils.autocomplete_data(
+            sample_times, default_time / seconds_a_day, mag_d
+        )
+
     return mag
 
 
@@ -293,22 +306,24 @@ def host_lc(sample_times, parameters, filters, host_mag):
         mag[filt] = utils.flux_to_ABmag(flux_per_filt, residual_mag=host_mag[i])
     return mag
 
+
 ## supernova model
 def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
     mag = {}
     for filt, lambda_ in zip(filters, lambdas):
         try:
-            mag[filt] = sn_model.bandmag(filt, 'ab', sample_times_stretched)
+            mag[filt] = sn_model.bandmag(filt, "ab", sample_times_stretched)
         except ValueError:
             lambda_AA = 1e10 * lambda_
             if lambda_AA < sn_model.minwave() or lambda_AA > sn_model.maxwave():
                 mag[filt] = np.full_like(sample_times_stretched, np.inf)
                 continue
-            #NOTE: workaround  for potential bug in sncosmo: buffer error if lambdaa as float 
+            # NOTE: workaround  for potential bug in sncosmo: buffer error if lambdaa as float
             flux_AA = sn_model.flux(sample_times_stretched, [lambda_AA]).flatten()
             # see https://en.wikipedia.org/wiki/AB_magnitude
-            mag[filt] = utils.flux_to_ABmag(flux_AA*3.34e4 * lambda_AA**2, unit='Jy')
+            mag[filt] = utils.flux_to_ABmag(flux_AA * 3.34e4 * lambda_AA**2, unit="Jy")
     return mag
+
 
 ## shock-cooling lightcurve
 def sc_bol_lc(sample_times, param_dict, compute_Rs):
@@ -320,7 +335,6 @@ def sc_bol_lc(sample_times, param_dict, compute_Rs):
     Renv = 10 ** param_dict["log10_Renv"]
     Ee = 10 ** param_dict["log10_Ee"]
 
-
     n = 10
     delta = 1.1
     K = (n - 3) * (3 - delta) / (4 * np.pi * (n - delta))  # K = 0.119
@@ -329,9 +343,9 @@ def sc_bol_lc(sample_times, param_dict, compute_Rs):
     td = np.sqrt((3 * kappa * K * Me) / ((n - 1) * vt * c_cgs))
 
     # evalute the model, lbol first
-    prefactor = np.pi*(n-1) / (3*(n-5)) * c_cgs*Renv*vt*vt/kappa
-    L_early = prefactor * np.power( td/t , 4/(n-2) )
-    L_late = prefactor * np.exp(-0.5 * (t*t /td/td - 1))
+    prefactor = np.pi * (n - 1) / (3 * (n - 5)) * c_cgs * Renv * vt * vt / kappa
+    L_early = prefactor * np.power(td / t, 4 / (n - 2))
+    L_late = prefactor * np.exp(-0.5 * (t * t / td / td - 1))
     lbol = np.zeros_like(t)
     # stiching the two regime
     lbol[t < td] = L_early[t < td]
@@ -339,18 +353,17 @@ def sc_bol_lc(sample_times, param_dict, compute_Rs):
 
     if not compute_Rs:
         return lbol
-    
+
     # else setup for evalution in filters
-    tph = np.sqrt(3*kappa*K*Me / (2*(n-1) *vt*vt))
-    R_early = np.power(tph / t, 2 / (n - 1)) * vt * t
-    R_late = (np.power(1+ (delta-1)/(n-1) * ((t/tph)**2 - 1) , -1/(delta-1))
-        * vt * t )
-    Rs = np.zeros_like(t)
-    Rs[t < tph] = R_early[t < tph]
+    tph = np.sqrt(3 * kappa * K * Me / (2 * (n - 1) * vt * vt))
+    Rs = np.power(tph / t, 2 / (n - 1)) * vt * t
+    late_base = 1 + (delta - 1) / (n - 1) * ((t / tph) ** 2 - 1)
+    R_late = np.power(late_base, -1 / (delta - 1)) * vt * t
     Rs[t >= tph] = R_late[t >= tph]
     return lbol, Rs
 
-def sc_lc(lbol, Rs, nu_host, filters): 
+
+def sc_lc(lbol, Rs, nu_host, filters):
 
     sigmaT4 = lbol / (4 * np.pi * Rs * Rs)
     T = np.power(sigmaT4 / sigSB, 0.25)
@@ -359,19 +372,21 @@ def sc_lc(lbol, Rs, nu_host, filters):
     one_over_T[~np.isfinite(one_over_T)] = np.inf
 
     result = mag_dict_for_blackbody(filters, one_over_T, Rs, nu_host)
-    
+
     return result
+
 
 ## semi-analytical models for kilonovae
 
+
 def heating_rate_Korobkin_Rosswog(t, eth=0.5):
     """Computes the nuclear specific heating rate over time.
-   
+
     This implementation is based on a model from Korobkin et al. 2012
     (DOI: 10.1111/j.1365-2966.2012.21859.x), derived from nucleosynthesis
     simulations in compact binary merger ejecta. The model uses these
     parameters: eps0 = 2e18, t0 = 1.3, sig = 0.11, alpha = 1.3.
-  
+
     Args:
         t: float or numpy.ndarray
            Time (in s) in rest-frame to evaluate the light curve. Can be an array
@@ -379,20 +394,21 @@ def heating_rate_Korobkin_Rosswog(t, eth=0.5):
         eth: float or numpy.ndarray, default=0.5
            Efficiency parameter representing the fraction of nuclear power
            retained in the matter, as defined by Korobkin et al. 2012.
-    
+
     Returns:
         float or numpy.ndarray: Nuclear specific heating rate in erg/g/s
         (units implied but not explicitly used).
     """
     # Define model constants
     eps0 = 2e18  # erg/g/s
-    t0 = 1.3     # s
-    sig = 0.11   # s
+    t0 = 1.3  # s
+    sig = 0.11  # s
     alpha = 1.3  # dimensionless
     # Calculate the time evolution term
-    time_term = 0.5 - 1.0 / np.pi * np.arctan((t-t0) / sig)
+    time_term = 0.5 - 1.0 / np.pi * np.arctan((t - t0) / sig)
     # Return the heating rate
     return 2 * eps0 * eth * np.power(time_term, alpha)
+
 
 def metzger_lc(sample_times, param_dict, nu_host, filters):
     # fetch parameters
@@ -403,7 +419,7 @@ def metzger_lc(sample_times, param_dict, nu_host, filters):
     # z = param_dict["redshift"]
 
     # convert time from day to second
-    t = sample_times * seconds_a_day #/ (1 + z)
+    t = sample_times * seconds_a_day  # / (1 + z)
     tprec = len(t)
 
     if np.any(t == 0):
@@ -422,10 +438,12 @@ def metzger_lc(sample_times, param_dict, nu_host, filters):
 
     # define thermalization efficiency from Barnes+16, eq. 34
     def thermalization_efficiency(time, ca, cb, cd):
-        timescale_factor = 2*cb * time**cd
-        eff_therm = np.exp(-ca*time) + np.log(1.0 + timescale_factor) / timescale_factor
+        timescale_factor = 2 * cb * time**cd
+        eff_therm = (
+            np.exp(-ca * time) + np.log(1.0 + timescale_factor) / timescale_factor
+        )
         return 0.36 * eff_therm
-    
+
     eth = thermalization_efficiency(sample_times, ca=0.56, cb=0.17, cd=0.74)
     # eth2= thermalization_efficiency(t_day, ca= 8.2, cb= 1.2, cd=1.52)
     # eth3= thermalization_efficiency(t_day, ca= 1.3, cb= 0.2, cd= 1.1)
@@ -526,18 +544,15 @@ def metzger_lc(sample_times, param_dict, nu_host, filters):
         ] / 4000.0 ** (5.5)
         kappa_correction[:] = 1
 
-        tdiff[:-1, j] = (0.08 * kappa[:-1, j]
-            * m[:-1] * msun_cgs
-            * 3 * kappa_correction
-            / (vm[:-1] * c_cgs * t[j] * beta)
-        )
+        tdiff[:-1, j] = 0.08 * kappa[:-1, j] * m[:-1] * msun_cgs 
+        tdiff[:-1, j] *= 3 * kappa_correction / (vm[:-1] * c_cgs * t[j] * beta)
         tau[:-1, j] = (
             m[:-1] * msun_cgs * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
         )
         lum[:-1, j] = ene[:-1, j] / (tdiff[:-1, j] + t[j] * (vm[:-1] / c_cgs))
-        ene[:-1, j + 1] = ene[:-1, j] + dt[j]*(
+        ene[:-1, j + 1] = ene[:-1, j] + dt[j] * (
             edot[:-1, j] - (ene[:-1, j] / t[j]) - lum[:-1, j]
-            ) 
+        )
         lum[:-1, j] = lum[:-1, j] * dm * msun_cgs
 
         tau[mprec - 1, j] = tau[mprec - 2, j]
@@ -563,6 +578,7 @@ def metzger_lc(sample_times, param_dict, nu_host, filters):
     one_over_T[~np.isfinite(one_over_T)] = np.inf
     return mag_dict_for_blackbody(filters, one_over_T, R_photo, nu_host)
 
+
 def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
     # fetch parameters
     M0 = 10 ** param_dict["log10_mej"] * msun_cgs  # total ejecta mass
@@ -571,7 +587,7 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
     kappa_r = 10 ** param_dict["log10_kappa_r"]
 
     # convert time from day to second
-    t = sample_times * seconds_a_day 
+    t = sample_times * seconds_a_day
     tprec = len(t)
 
     if np.any(t == 0):
@@ -589,14 +605,16 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
 
     # define thermalization efficiency from Barnes+16, eq. 34
     def thermalization_efficiency(time, ca, cb, cd):
-        timescale_factor = 2*cb * time**cd
-        eff_therm = np.exp(-ca*time) + np.log(1.0 + timescale_factor) / timescale_factor
+        timescale_factor = 2 * cb * time**cd
+        eff_therm = (
+            np.exp(-ca * time) + np.log(1.0 + timescale_factor) / timescale_factor
+        )
         return 0.36 * eff_therm
-    
+
     eth = thermalization_efficiency(sample_times, ca=0.56, cb=0.17, cd=0.74)
 
     # define radioactive heating rates
-    Xn0 = Xn0max * 2 * np.arctan(Mn / m ) / np.pi  # neutron mass fraction
+    Xn0 = Xn0max * 2 * np.arctan(Mn / m) / np.pi  # neutron mass fraction
     Xr = 1.0 - Xn0  # r-process fraction
 
     # define arrays in mass layer and time
@@ -614,27 +632,23 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
 
     # define specific heating rates and opacity of each mass layer
 
-
     # *** define arrays by mass layer/time arrays ***
-    ene = np.zeros(mprec-1)
-    lum = np.zeros((mprec-1, tprec))
+    ene = np.zeros(mprec - 1)
+    lum = np.zeros((mprec - 1, tprec))
     # properties of photosphere
     R_photo = np.zeros((tprec,))
-
 
     dt = t[1:] - t[:-1]
     dm = m[1:] - m[:-1]
 
     for j in range(tprec - 1):
-        tdiff = (0.08* kappa[:-1, j] * m[:-1] * msun_cgs * 3 
-            / (vm[:-1] * c_cgs * t[j] * beta) )
-        tau = (
-            m[:-1] * msun_cgs * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
-        )
-        lum_j= ene / (tdiff+ t[j] * (vm[:-1] / c_cgs))
+        tdiff = 0.08 * kappa[:-1, j] * m[:-1] * msun_cgs * 3
+        tdiff /= (vm[:-1] * c_cgs * t[j] * beta)
+        tau = m[:-1] * msun_cgs * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
+        lum_j = ene / (tdiff + t[j] * (vm[:-1] / c_cgs))
         lum[:, j] = lum_j * dm * msun_cgs
 
-        ene += dt[j]*(edot[:-1, j] - (ene  / t[j]) - lum_j ) 
+        ene += dt[j] * (edot[:-1, j] - (ene / t[j]) - lum_j)
         # photosphere
         pig = np.argmin(np.abs(tau - 1))
         R_photo[j] = vm[pig] * t[j]
@@ -651,26 +665,33 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
     one_over_T[~np.isfinite(one_over_T)] = np.inf
     return mag_dict_for_blackbody(filters, one_over_T, R_photo, nu_host)
 
+
 def HoNa_lc(sample_times, param_dict, nu_host, filters):
 
     # calculate the temperature and luminosity to feed into the blackbody radiation calculation
-    conv_params = setup_HoNa_params(sample_times, param_dict)  
+    conv_params = setup_HoNa_params(sample_times, param_dict)
     inv_temp, R_photo = temp_photosphere_HoNa(*conv_params, param_dict.get("n", 4.5))
     return mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host)
 
+
 def setup_HoNa_params(sample_times, param_dict):
-    sample_times*= seconds_a_day 
-    mej = 10**param_dict["log10_mej"] * msun_cgs
-    vej_max = param_dict["vej_max"]   
+    sample_times *= seconds_a_day
+    mej = 10 ** param_dict["log10_mej"] * msun_cgs
+    vej_max = param_dict["vej_max"]
     vej_min = param_dict["vej_min"]
     vej_range = vej_max - vej_min
-    vej = param_dict["vej_frac"] * vej_range + vej_min  
-    velocities = np.array([vej_min, vej, vej_max]) # in units of c
-    
+    vej = param_dict["vej_frac"] * vej_range + vej_min
+    velocities = np.array([vej_min, vej, vej_max])  # in units of c
+
     # in cm**2 / g
-    opacities = np.array([10**param_dict["log10_kappa_low_vej"],  
-                          10**param_dict["log10_kappa_high_vej"]] )
+    opacities = np.array(
+        [
+            10 ** param_dict["log10_kappa_low_vej"],
+            10 ** param_dict["log10_kappa_high_vej"],
+        ]
+    )
     return sample_times, mej, velocities, opacities
+
 
 # the following functions are for the semi-analytic model using Hotokezaka & Nakar heating rate
 def luminosity_HoNa(E, t, td, be):
@@ -683,6 +704,7 @@ def luminosity_HoNa(E, t, td, be):
     # Return luminosity using complementary error function
     return erfc(ymax) * E / tesc
 
+
 def dEdt_HoNa(t, E, dM, td, be):
     # Calculate heating contribution
     heat = dM * heating_rate_Korobkin_Rosswog(t)
@@ -690,6 +712,7 @@ def dEdt_HoNa(t, E, dM, td, be):
     L = luminosity_HoNa(E, t, td, be)
     dEdt = -E / t - L + heat
     return dEdt
+
 
 def temp_photosphere_HoNa(t, mej, velocities, opacities, n):
     """
@@ -716,41 +739,47 @@ def temp_photosphere_HoNa(t, mej, velocities, opacities, n):
     bes = be_max + be_0 - np.geomspace(be_0, be_max, n_shells)
     bes = np.flipud(bes)[:-1]  # Flip and remove last element in one operation
     dbe = np.diff(np.append(bes, be_max))  # Calculate diff by appending be_max
-    
+
     i = np.searchsorted(velocities, bes)
-    
+
     # Calculate power factors once for reuse
-    bej_power = (velocities / be_0)**(1 - n)
-    bes_power = (bes / be_0)**(1 - n)
-    
+    bej_power = (velocities / be_0) ** (1 - n)
+    bes_power = (bes / be_0) ** (1 - n)
+
     # Vectorized calculation of tau_accum
     tau_accum = -np.cumsum((opacities * np.diff(bej_power))[::-1])[::-1]
-    tau_accum = np.append(tau_accum, 0)    
+    tau_accum = np.append(tau_accum, 0)
     # Vectorized calculation of taus
     taus = tau_accum[i] + opacities[i - 1] * (bes_power - bej_power[i])
 
-    vej_0 = velocities[0] * c_cgs    
-    rho_0 = mej * (n - 3) / (4 * np.pi * vej_0**3) / (1 - (be_max/be_0)**(3 - n))
+    vej_0 = velocities[0] * c_cgs
+    rho_0 = mej * (n - 3) / (4 * np.pi * vej_0**3) / (1 - (be_max / be_0) ** (3 - n))
     taus *= vej_0 * rho_0 / (n - 1)
-    
+
     # Mass and time delay calculations
-    bes_power_2n = (bes / be_0)**(2 - n)  # Calculate power once
-    dMs = 4. * np.pi * vej_0**3 * rho_0 * bes_power_2n * dbe / be_0
+    bes_power_2n = (bes / be_0) ** (2 - n)  # Calculate power once
+    dMs = 4.0 * np.pi * vej_0**3 * rho_0 * bes_power_2n * dbe / be_0
     tds = taus * bes
-    
+
     # Prepare arrays for solve_ivp - use broadcasting directly
     bes_col = bes[:, np.newaxis]
     tds_col = tds[:, np.newaxis]
     dMs_col = dMs[:, np.newaxis]
-    
+
     # Evolve in time
     t0 = 5e-2 * seconds_a_day  # initial time to start the integration
-    out = solve_ivp(dEdt_HoNa, (t[0], t[-1]), np.zeros_like(bes), first_step=t0,
-        args=(dMs_col, tds_col, bes_col), vectorized=True)
-    
+    out = solve_ivp(
+        dEdt_HoNa,
+        (t[0], t[-1]),
+        np.zeros_like(bes),
+        first_step=t0,
+        args=(dMs_col, tds_col, bes_col),
+        vectorized=True,
+    )
+
     # Total luminosity calculation
     LL = luminosity_HoNa(out.y, out.t[np.newaxis, :], tds_col, bes_col).sum(0)
-    
+
     # Log-log space interpolation - preserve only necessary portion
     log_t = np.log(out.t[1:])
     log_LL = np.log(LL[1:])
@@ -770,6 +799,7 @@ def temp_photosphere_HoNa(t, mej, velocities, opacities, n):
     # Return results
     return inv_T, Rphoto
 
+
 def synchrotron_powerlaw(sample_times, param_dict, nu_obs, filters):
     beta = param_dict["beta_freq"]  # frequency index
     alpha = param_dict["alpha_time"]  # time index
@@ -779,37 +809,49 @@ def synchrotron_powerlaw(sample_times, param_dict, nu_obs, filters):
         F_pl = F_ref * np.power(nu_obs[idx], -beta) * np.power(sample_times, -alpha)
         # remove the distance modulus for the synchrotron powerlaw
         # as the reference flux is defined at the observer
-        mag[filt] = utils.flux_to_ABmag(F_pl, unit='mJy') - param_dict["distance_modulus"]
+        mag[filt] = (
+            utils.flux_to_ABmag(F_pl, unit="mJy") - param_dict["distance_modulus"]
+        )
     return mag
+
 
 ## generic blackbody
 def inv_temp_and_photosphere_from_params(param_dict):
     # parameter conversion
     inv_temp = 1.0 / param_dict["temperature"]  # blackbody's temperature in K
-    R_photo = np.sqrt(
-        param_dict["bb_luminosity"] / 4 / np.pi / sigSB # blackboady's total luminosity in erg/s
-    ) * inv_temp * inv_temp
+    R_photo = (
+        np.sqrt(
+            param_dict["bb_luminosity"]
+            / 4
+            / np.pi
+            / sigSB  # blackboady's total luminosity in erg/s
+        )
+        * inv_temp
+        * inv_temp
+    )
     return inv_temp, R_photo
+
 
 def blackbody_constant_temperature(_, param_dict, nu_host, filters):
     inv_temp, R_photo = inv_temp_and_photosphere_from_params(param_dict)
     return mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host)
 
 
-
 def powerlaw_blackbody_constant_temperature_lc(_, param_dict, nu_host, filters):
 
     # calculate the powerlaw prefactor (with the reference filter 'g')
-    nu_ref = nu_host[filters.index("g")]    # FIXME, seems like a legacy hack
+    nu_ref = nu_host[filters.index("g")]  # FIXME, seems like a legacy hack
     powerlaw_prefactor = np.power(nu_ref, param_dict["beta"]) * np.power(
         10, -0.4 * (param_dict["powerlaw_mag"] + 48.6)
     )
+
     def additive_per_freq(nu):
         return powerlaw_prefactor * np.power(nu, -param_dict["beta"])
-    
+
     inv_temp, R_photo = inv_temp_and_photosphere_from_params
-    return mag_dict_for_blackbody(filters, inv_temp, R_photo,
-                    nu_host, add= additive_per_freq)
+    return mag_dict_for_blackbody(
+        filters, inv_temp, R_photo, nu_host, add=additive_per_freq
+    )
 
 
 #### lightcurve data generation
@@ -819,17 +861,17 @@ def create_light_curve_data(
     light_curve_model,
     sample_times=None,
     keep_infinite_data=False,
-    rng= None
+    rng=None,
 ):
-    
+
     injection_parameters = light_curve_model.parameter_conversion(injection_parameters)
     filters = utils.set_filters(args)
     trigger_time = read_trigger_time(injection_parameters, args)
     if trigger_time is None:
-        trigger_time = 0.
+        trigger_time = 0.0
     if rng is None:
         rng = np.random.default_rng(args.generation_seed)
-    if getattr(args, 'absolute', False):
+    if getattr(args, "absolute", False):
         # create lightcurve_data
         if sample_times is None:
             sample_times = light_curve_model.model_times
@@ -837,22 +879,26 @@ def create_light_curve_data(
         # if "timeshift" in injection_parameters: ## included in gen_detector_lc
         #     trigger_time += injection_parameters["timeshift"]
     else:
-        # basic idea: generate lc works on desired times in source_frame, 
+        # basic idea: generate lc works on desired times in source_frame,
         # observing times are redshifted and have extra timeshift (interpreted as missed detections)
-        sample_times, lc = light_curve_model.gen_detector_lc(injection_parameters, sample_times)
+        sample_times, lc = light_curve_model.gen_detector_lc(
+            injection_parameters, sample_times
+        )
     if not lc:
         raise ValueError("Injection parameters return empty light curve.")
-    
     # curate data
-    true_data = {filt: {'time': sample_times + trigger_time,  'mag': lc[filt]}
-                        for filt in filters}
-    observable_data = adjust_lc_for_telescopes(true_data, args, filters, rng, trigger_time)
+    true_data = {
+        filt: {"time": sample_times + trigger_time, "mag": lc[filt]} for filt in filters
+    }
+    observable_data = adjust_lc_for_telescopes(
+        true_data, args, filters, rng, trigger_time
+    )
     observed_data = adjust_lc_for_observations(observable_data, args, filters, rng)
 
     if not keep_infinite_data:
         for filt, val_dict in observed_data.items():
 
-            keep_idx = np.isfinite(val_dict['mag']) & np.isfinite(val_dict['mag_error'])
+            keep_idx = np.isfinite(val_dict["mag"]) & np.isfinite(val_dict["mag_error"])
             observed_data[filt] = {key: val[keep_idx] for key, val in val_dict.items()}
 
     return observed_data
@@ -868,15 +914,15 @@ def adjust_lc_for_telescopes(true_data, args, filters, rng, trigger_time):
     ## use realistic telescope data
     if getattr(args, "rubin_ToO_type", False):
         strategy.extend(rubin_strategy(args.rubin_ToO_type))
-    
+
     if getattr(args, "ztf_sampling", False):
-        # strategy = adjust_data_for_ztf(data, args, filters, 
+        # strategy = adjust_data_for_ztf(data, args, filters,
         #             rng, sample_times, trigger_time, passbands_to_keep)
         strategy.extend(ztf_strategy(rng))
 
     if strategy:
         mjds, filters = [], []
-        for (obstime, filts) in strategy:
+        for obstime, filts in strategy:
             for filt in filts:
                 mjds.append(obstime)
                 filters.append(filt)
@@ -887,14 +933,25 @@ def adjust_lc_for_telescopes(true_data, args, filters, rng, trigger_time):
                 continue
             times = group["mjd"].to_numpy() + trigger_time
             filt_data = data_original[filt]
-            observable_data[filt] = { "time": times, 
-                "mag":np.interp(times, filt_data['time'], filt_data['mag'], left=np.inf,right=np.inf)}
+            observable_data[filt] = {
+                "time": times,
+                "mag": np.interp(
+                    times,
+                    filt_data["time"],
+                    filt_data["mag"],
+                    left=np.inf,
+                    right=np.inf,
+                ),
+            }
     else:
         for filt, filt_data in true_data.items():
             observable_data[filt] = filt_data
-            time_mask = filt_data['time'] >= trigger_time
-            observable_data[filt] = {key: val[time_mask] for key, val in filt_data.items()}
+            time_mask = filt_data["time"] >= trigger_time
+            observable_data[filt] = {
+                key: val[time_mask] for key, val in filt_data.items()
+            }
     return observable_data
+
 
 def adjust_lc_for_observations(observable_data, args, filters, rng):
     """
@@ -904,26 +961,28 @@ def adjust_lc_for_observations(observable_data, args, filters, rng):
     detection_limit = utils.create_detection_limit(args, filters)
     observations = {}
     for filt, filt_data in observable_data.items():
-        det_lim = detection_limit.get(filt,np.inf)
-        error = rng.normal(scale=dmag[filt], size=len(filt_data['mag']))
-        obs_mags = filt_data['mag'] + error
-        observations[filt] = {'time': filt_data['time'],    
-                          'mag': np.full_like(filt_data['mag'], det_lim),# default non-detection
-                          'mag_error': np.full_like(filt_data['mag'], np.inf)}
+        det_lim = detection_limit.get(filt, np.inf)
+        error = rng.normal(scale=dmag[filt], size=len(filt_data["mag"]))
+        obs_mags = filt_data["mag"] + error
+        observations[filt] = {
+            "time": filt_data["time"],
+            "mag": np.full_like(filt_data["mag"], det_lim),  # default non-detection
+            "mag_error": np.full_like(filt_data["mag"], np.inf),
+        }
         det_mask = obs_mags < det_lim
-        observations[filt]['mag'][det_mask] = obs_mags[det_mask]
-        observations[filt]['mag_error'][det_mask] = dmag[filt]
-        
+        observations[filt]["mag"][det_mask] = obs_mags[det_mask]
+        observations[filt]["mag_error"][det_mask] = dmag[filt]
+
     return observations
 
 
 def ztf_strategy(rng):
     # Ad hoc ZTF sampling strategy, vaguely inspired by https://arxiv.org/pdf/2203.17135
-    t0  = rng.uniform(1 / 24.0, 12./24. ) # initial latency between 1-12 hours
+    t0 = rng.uniform(1 / 24.0, 12.0 / 24.0)  # initial latency between 1-12 hours
     filts = ["ztfg", "ztfr", "ztfi"]
-    times = [t0, t0 + 0.2, t0 +0.2, t0 + 0.4, t0+0.4, t0 + 1.0, t0 + 2.0, t0 + 3.0, t0 + 5.0, t0 +7.0]
+    add_times = [0.0, 0.2, 0.2, 0.4, 0.4, 1.0, 2.0, 3.0, 5.0, 7.0]
+    return ((t0 + dt + rng.normal(scale=1.0 / 24), filts) for dt in add_times)
 
-    return ((time+ rng.normal(scale=1./24), filts) for time in times)
 
 def rubin_strategy(rubin_ToO):
     """
@@ -944,27 +1003,30 @@ def rubin_strategy(rubin_ToO):
         # use gri or possibly grz if more sensitive to KNe
         init_filts = ["ps1::g", "ps1::r"]
         init_filts.append("ps1::z" if "gold_z" == rubin_ToO else "ps1::i")
-        # Three pointings Night 0 
-        filts = [init_filts]*3
+        # Three pointings Night 0
+        filts = [init_filts] * 3
         # One scan Night 1,2,3 w/ r+i
-        follow_up_filts = ["ps1::r", "ps1::i"] 
-        filts.extend([follow_up_filts]*3)
+        follow_up_filts = ["ps1::r", "ps1::i"]
+        filts.extend([follow_up_filts] * 3)
         return ((time, filt_list) for time, filt_list in zip(gold_times, filts))
 
     elif "silver" in rubin_ToO:
         # silver means 90% GW skymap <500 sq deg
         # One scan Night 0 w/ g+i or g+z
-        filts = ["ps1::g", "ps1::z"] if rubin_ToO == "silver_z" else ["ps1::g", "ps1::i"]
+        filts = (
+            ["ps1::g", "ps1::z"] if rubin_ToO == "silver_z" else ["ps1::g", "ps1::i"]
+        )
         # One scan each Night 1,2,3 w/ same filters
         silver_times = [1 / 24.0, 1.0, 2.0, 3.0]
         return ((time, filts) for time in silver_times)
 
     else:
-        raise ValueError("args.rubin_ToO_type should be either platinum, gold, or silver")
-    
+        raise ValueError(
+            "args.rubin_ToO_type should be either platinum, gold, or silver"
+        )
 
 
-#FIXME these binaries need to be reworked for py3.12+ envs, currently not working properly
+# FIXME these binaries need to be reworked for py3.12+ envs, currently not working properly
 def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
     """
     Adjust the light curve data for ZTF observations.
@@ -973,13 +1035,9 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
         __package__ + ".data", "ZTF_revisit_kde_public.joblib"
     ) as f:
         ztfrevisit = load(f)
-    with resources.open_binary(
-        __package__ + ".data", "ZTF_sampling_public.pkl"
-    ) as f:
+    with resources.open_binary(__package__ + ".data", "ZTF_sampling_public.pkl") as f:
         ztfsampling = load(f)
-    with resources.open_binary(
-        __package__ + ".data", "ZTF_revisit_kde_i.joblib"
-    ) as f:
+    with resources.open_binary(__package__ + ".data", "ZTF_revisit_kde_i.joblib") as f:
         ztfrevisit_i = load(f)
     with resources.open_binary(__package__ + ".data", "lims_public_g.joblib") as f:
         ztflimg = load(f)
@@ -1021,11 +1079,10 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
         bands_list.append(filter_map[sample["bands"]])
         t += float(ztfrevisit.sample())
 
-    
     # i-band observations may start later
     start = rng.uniform(trigger_time, trigger_time + 4)
     t = start
-    i_times = [] 
+    i_times = []
     while t < sample_times[-1] + trigger_time:
         i_times.append(t)
         t += float(ztfrevisit_i.sample())
@@ -1048,35 +1105,54 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
 
         sim_ToO = pd.DataFrame({"mjd": t_list, "passband": bands_list})
         sim_ToO["ToO"] = True
-        sim = pd.concat([sim, sim_ToO]) # join the two dataframes
+        sim = pd.concat([sim, sim_ToO])  # join the two dataframes
 
     sim.sort_values(by=["mjd"], inplace=True)
     sim.reset_index(drop=True, inplace=True)
-    sim["mag"] = np.nan         # initialize empty mags
+    sim["mag"] = np.nan  # initialize empty mags
     sim["mag_error"] = np.nan
 
     observations = {}
     # interpolate the light curve data on ztf observations
     for filt, group in sim.groupby("passband"):
-        if filt not in filters: # skip if we are not observing this filter
+        if filt not in filters:  # skip if we are not observing this filter
             continue
-        
+
         times = group["mjd"].tolist()
         data_dict = copy.deepcopy(data[filt])
         filt_data = {
             "time": times,
-            "mag": np.interp(times, data_dict['time'], data_dict['mag'], left=np.inf,right=np.inf),
-            "mag_error": np.interp(times, data_dict['time'], data_dict['mag_error'], left=np.inf,right=np.inf)
+            "mag": np.interp(
+                times, data_dict["time"], data_dict["mag"], left=np.inf, right=np.inf
+            ),
+            "mag_error": np.interp(
+                times,
+                data_dict["time"],
+                data_dict["mag_error"],
+                left=np.inf,
+                right=np.inf,
+            ),
         }
 
         if ztf_uncertainties:
-            sim.loc[group.index, "mag"] , sim.loc[group.index, "mag_error"]  = filt_data["mag"], filt_data["mag_error"]
+            sim.loc[group.index, "mag"], sim.loc[group.index, "mag_error"] = (
+                filt_data["mag"],
+                filt_data["mag_error"],
+            )
             mag_err = []
             for idx, row in group.iterrows():
                 if filt == "ztfg":
-                    lim = float(ztftoolimg.sample()) if row["ToO"] else float(ztflimg.sample())
+                    lim = (
+                        float(ztftoolimg.sample())
+                        if row["ToO"]
+                        else float(ztflimg.sample())
+                    )
                 elif filt == "ztfr":
-                    lim = float(ztftoolimr.sample()) if row["ToO"] else float(ztflimr.sample())
+                    lim = (
+                        float(ztftoolimr.sample())
+                        if row["ToO"]
+                        else float(ztflimr.sample())
+                    )
                 else:
                     lim = float(ztflimi.sample())
                 if row["mag"] > lim:
@@ -1095,7 +1171,11 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
 
                     df["mag_err"] = df.apply(
                         lambda x: (ztfuncer["band"] == x["passband"])
-                        & (pd.arrays.IntervalArray(ztfuncer["interval"]).contains(x["mag"])),
+                        & (
+                            pd.arrays.IntervalArray(ztfuncer["interval"]).contains(
+                                x["mag"]
+                            )
+                        ),
                         axis=1,
                     ).apply(
                         lambda x: scipy.stats.skewnorm.rvs(
@@ -1114,13 +1194,14 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
                     sim.loc[row.name, "mag_error"] = float(df["mag_error"])
                     mag_err.append(df["mag_error"].tolist()[0])
 
-            filt_data = {'time':sim.loc[group.index, "mjd"].tolist(),
-                        'mag': sim.loc[group.index, "mag"].tolist(),
-                        'mag_error': mag_err }
-            
+            filt_data = {
+                "time": sim.loc[group.index, "mjd"].tolist(),
+                "mag": sim.loc[group.index, "mag"].tolist(),
+                "mag_error": mag_err,
+            }
+
         observations[filt] = filt_data
 
-    
     if getattr(args, "train_stats", False):
         sim["tc"] = trigger_time
         sim.to_csv(args.outdir + "/too.csv", index=False)

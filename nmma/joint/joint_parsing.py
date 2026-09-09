@@ -1,4 +1,4 @@
-from ..core.parsing import nonestr, base_injection_parsing, pipe_inj_parsing
+from ..core.parsing import base_injection_parsing, pipe_inj_parsing
 from ..em.em_parsing import em_analysis_parsing
 from ..eos.eos_parsing import tabulated_eos_parsing, eos_parsing
 from ..gw.gw_parsing import gw_injection_parsing
@@ -63,14 +63,12 @@ def injection_parsing(parser):
     )
     parser.add_argument(
         "--lc-label",
-        type=nonestr,
         help="optional label for lightcurve-files to be generated;"
         "default derives from injection-file",
     )
 
     parser.add_argument(
         "--peak-magnitude",
-        type=nonestr,
         help="Accept injection only if its peak magnitude matches some setting."
         "If 'any', the lightcurve has to pass the detection limit in any filter."
         "If 'all', the lightcurve has to pass the detection limit in all filters."
@@ -81,9 +79,6 @@ def injection_parsing(parser):
     )
     parser.add_argument(
         "--binary-type",
-        type=nonestr,
-        choices=[None, "BNS", "NSBH"],
-        default=None,
         help="FIXME Weizmann: restores nmma 0.2.3's --binary-type/--eject behaviour, "
         "removed when injection creation switched to the (redraw-based) --tests/--post-processing "
         "system, which cannot filter injections whose masses come from an external "
@@ -100,7 +95,6 @@ def injection_parsing(parser):
     )
     parser.add_argument(
         "--population-model",
-        type=nonestr,
         default="uniform",
         help="The population model to be used for injections (default: uniform)",
     )
@@ -108,7 +102,6 @@ def injection_parsing(parser):
     # Parameters for legacy injection file used in conjunction
     parser.add_argument(
         "--gw-injection-file",
-        type=nonestr,
         help="The xml injection file or bilby injection json file to be used (optional)",
     )
     parser.add_argument(

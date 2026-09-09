@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import sys
 import traceback
 from io import BufferedWriter
@@ -64,9 +65,7 @@ class Worker(bs.NestedSampler):
         self.args = args
         self.outdir = args.outdir
         self.label = args.label
-
-        os.makedirs(args.outdir, exist_ok=True)
-
+        Path(self.outdir).mkdir(parents=True, exist_ok=True)
 
         super().__init__(
             likelihood, prior, self.outdir, self.label,
@@ -157,8 +156,8 @@ class Dynesty(Worker):
         super().__init__(args, prior, likelihood, injection_parameters, 
                         plot, skip_import_verification = False)
         
-        self.resume_file = f"{self.outdir}/{self.label}_checkpoint_resume.pickle" 
-        self.samples_file= f'{self.outdir}/{self.label}_samples.parquet'
+        self.resume_file = Path(self.outdir) / f"{self.label}_checkpoint_resume.pickle"
+        self.samples_file= Path(self.outdir) / f"{self.label}_samples.parquet"
 
         # Create a random generator, which is saved across restarts
         # This ensures that runs are fully deterministic, which is important
@@ -271,7 +270,7 @@ class Dynesty(Worker):
             The current sampling time
         """
 
-        if os.path.isfile(self.resume_file):
+        if self.resume_file.is_file():
             logger.info(f"Reading resume file {self.resume_file}")
             with open(self.resume_file, "rb") as file:
                 sampler = pickle.load(file)
@@ -445,7 +444,9 @@ class Dynesty(Worker):
             The total sampling time in seconds
         """
         print("")
-        cp_time = time()-os.path.getmtime(self.resume_file) if os.path.isfile(self.resume_file) else self.sampling_time
+        cp_time = self.sampling_time
+        if self.resume_file.is_file():
+            cp_time = time() - self.resume_file.stat().st_mtime
         logger.info(f"Write new checkpoint after {timedelta(seconds = cp_time)}")
 
         # avoid expensive pickling of easily rebuilt objects
@@ -460,11 +461,11 @@ class Dynesty(Worker):
             self.sampler.mapper = map
 
             self.sampler.sampling_time = self.sampling_time
-            temp_filename = f"{self.resume_file}.temp"
+            temp_filename = self.resume_file.with_suffix(".temp")
             with open(temp_filename, "wb") as file:
                 with BufferedWriter(file) as buffer:
                     pickle.dump(self.sampler, buffer, protocol=pickle.HIGHEST_PROTOCOL)
-            os.rename(temp_filename, self.resume_file)
+            temp_filename.rename(self.resume_file)
             logger.info(f"Written checkpoint file {self.resume_file}")
 
             # reset after succesful pickle
@@ -575,8 +576,8 @@ class Dynesty(Worker):
         posterior_labels = result.parameter_labels_with_unit.copy()
         posterior_labels.extend([label_mapping.get(k, k) for k in extra_keys])
         result.meta_data["posterior_labels"] = posterior_labels
-        if os.path.isfile(self.samples_file):
-            os.remove(self.samples_file)  # remove temp file after succesful run
+        if self.samples_file.is_file():
+            self.samples_file.unlink()  # remove temp file after succesful run
 
         logger.info(f"Saving result to {self.outdir}/{self.label}_result.{result_format}")
         result.save_to_file(extension=result_format)

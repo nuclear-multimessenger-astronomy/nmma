@@ -1,11 +1,10 @@
-from glob import glob
 from argparse import Namespace
-import os
+from pathlib import Path
 import shutil
 import json
 from ast import literal_eval
 import matplotlib
-from tqdm.contrib.concurrent import process_map 
+from tqdm.contrib.concurrent import process_map
 import numpy as np
 from scipy.special import logsumexp
 from scipy.stats import norm
@@ -16,36 +15,40 @@ from .eos_processing import EoSConverter
 from ..core.base import NMMALikelihood
 from ..core.utils import nan_level
 from ..core.plotting_utils import fading_cmap, setup_multi_axes, fig_setup
+
 nmma_colors = fig_setup()
-    
+
+
 def setup_tabulated_eos_priors(args, priors, logger=None):
-    if logger:    
+    if logger:
         logger.info("Sampling over precomputed EOSs")
-    weights = np.loadtxt(args.eos_weight) if getattr(args, 'eos_weight', None) else None
-    if getattr(args, 'Neos', False):
+    weights = np.loadtxt(args.eos_weight) if getattr(args, "eos_weight", None) else None
+    if getattr(args, "Neos", False):
         n_eos = args.Neos
     elif weights is not None:
         n_eos = len(weights)
     else:
-        n_eos = len(os.listdir(args.eos_data))
+        n_eos = len(list(Path(args.eos_data).iterdir()))
     priors["EOS"] = WeightedCategorical(n_eos, weights, name="EOS")
     return priors
+
 
 def setup_eos_kwargs(data_dump, args, logger):
     # default_eos_kwargs = initialisation_args_from_signature_and_namespace(EquationofStateLikelihood, args)
     # eos_kwargs = default_eos_kwargs | dict(
     eos_kwargs = dict(
-        constraint_dict=data_dump['eos_constraint_dict'],
-        eos_converter=EoSConverter(args, 'emulated'),
+        constraint_dict=data_dump["eos_constraint_dict"],
+        eos_converter=EoSConverter(args, "emulated"),
         # crust_path=args.eos_crust_file
     )
-    return eos_kwargs 
+    return eos_kwargs
+
 
 def tabulated_eos_setup(args):
     priors = PriorDict()
     priors = setup_tabulated_eos_priors(args, priors)
-    args.Neos = priors['EOS'].ncategories
-    eos_converter = EoSConverter(args, 'tabulated')
+    args.Neos = priors["EOS"].ncategories
+    eos_converter = EoSConverter(args, "tabulated")
     eos_converter.parameter_conversion = eos_converter.compute_macro_parameters
     eos_likelihood_kwargs = {
         "constraint_dict": compose_eos_constraints(args),
@@ -53,31 +56,31 @@ def tabulated_eos_setup(args):
     }
     eos_likelihood = EquationofStateLikelihood(priors, **eos_likelihood_kwargs)
     return priors, eos_likelihood, None
-   
+
+
 class EquationofStateLikelihood(NMMALikelihood):
     def __init__(self, priors, constraint_dict, eos_converter, **kwargs):
-        constraint =JointEoSConstraint(constraint_dict, eos_converter=eos_converter)
+        constraint = JointEoSConstraint(constraint_dict, eos_converter=eos_converter)
         # TODO: to be extended for more complex likelihood expressions
         super().__init__(constraint, priors, **kwargs)
 
     def setup_submodel_conversion(self):
         self.conv_functions.append(self.sub_model.parameter_conversion)
-        
-     
-    def final_diagnostics(self, bestfit_params, args, result=None, fig = None):
-        matplotlib.rcParams.update({'font.size': 16, 'font.family': 'serif'})
+
+    def final_diagnostics(self, bestfit_params, args, result=None, fig=None):
+        matplotlib.rcParams.update({"font.size": 16, "font.family": "serif"})
         # matplotlib.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
-        bestfit_params =self.parameter_conversion(bestfit_params)
+        bestfit_params = self.parameter_conversion(bestfit_params)
         radii, masses, lambdas = self.sub_model.eos_converter.macro_parameters.values()
-        fig = getattr(args, 'fig', None)
+        fig = getattr(args, "fig", None)
         if fig is None:
-            x_lim = (min(np.min(radii)-0.3, 9.3), max(np.max(radii)+0.3, 14.5))
-            y_lim = (masses[0], masses[-1]+0.1)
-            fig, ax = setup_multi_axes(1, figsize=(8, 8) )
+            x_lim = (min(np.min(radii) - 0.3, 9.3), max(np.max(radii) + 0.3, 14.5))
+            y_lim = (masses[0], masses[-1] + 0.1)
+            fig, ax = setup_multi_axes(1, figsize=(8, 8))
             ax.set_xlim(x_lim)
             ax.set_ylim(y_lim)
-            ax.set_xlabel(r'Radius\,[km]')
-            ax.set_ylabel(r'Mass\,[M$_\odot$]') 
+            ax.set_xlabel(r"Radius\,[km]")
+            ax.set_ylabel(r"Mass\,[M$_\odot$]")
 
             for constraint in self.sub_model.constraints:
                 ax = constraint.plot(ax=ax)
@@ -85,8 +88,8 @@ class EquationofStateLikelihood(NMMALikelihood):
             ax = fig.axes[0]
             xlow, xhigh = ax.get_xlim()
             ylow, yhigh = ax.get_ylim()
-            ax.set_xlim(min(np.min(radii)-0.3, xlow), max(np.max(radii)+0.3, xhigh))
-            ax.set_ylim(min(masses[0], ylow), max(masses[-1]+0.1, yhigh))
+            ax.set_xlim(min(np.min(radii) - 0.3, xlow), max(np.max(radii) + 0.3, xhigh))
+            ax.set_ylim(min(masses[0], ylow), max(masses[-1] + 0.1, yhigh))
 
             const_labels = [t.get_text() for t in ax.texts]
             for constraint in self.sub_model.constraints:
@@ -94,11 +97,11 @@ class EquationofStateLikelihood(NMMALikelihood):
                     continue
                 color = ax._get_lines.get_next_color()
                 ax = constraint.plot(ax=ax, color=color)
-            fig.legends.clear() ## remove old legend to avoid duplicates
+            fig.legends.clear()  ## remove old legend to avoid duplicates
 
-        
-        line =ax.plot(radii, masses, label=f'{args.label}',linewidth=5, zorder=10, color= next(nmma_colors))
-        
+        line_kwargs = dict(label=args.label, linewidth=5, zorder=10)
+        line = ax.plot(radii, masses, color=next(nmma_colors), **line_kwargs)
+
         if result is not None:
             cmap = fading_cmap(line[0].get_color())
             posterior = self.parameter_conversion(result.posterior)
@@ -106,39 +109,56 @@ class EquationofStateLikelihood(NMMALikelihood):
             max_masses = np.max([eos[1][-1] for eos in eos_data])
             mass_range = np.linspace(1.0, max_masses, 151)
             show_radii = np.empty((len(mass_range), len(eos_data)))
-            
+
             for i, eos in enumerate(eos_data):
-                show_radii[:,i] = np.interp(mass_range, eos[1], eos[0], right = np.nan)
-                
+                show_radii[:, i] = np.interp(mass_range, eos[1], eos[0], right=np.nan)
+
             for i, level in enumerate([0.5, 0.9]):
                 bounds = np.array([nan_level(radii, level) for radii in show_radii])
                 # color=cmap(1-0.4*level)
                 color = cmap(0.75)
                 if i == 0:
-                    kwargs = dict(color = color,  zorder=1)
+                    kwargs = dict(color=color, zorder=1)
                 else:
-                    kwargs = dict(facecolor = 'none', edgecolor=color, zorder=0, hatch='//')
+                    kwargs = dict(
+                        facecolor="none", edgecolor=color, zorder=0, hatch="//"
+                    )
                 ax.fill_betweenx(mass_range, bounds[:, 0], bounds[:, 1], **kwargs)
-                
-            if result.injection_parameters is not None:
-                inj_eos = self.sub_model.eos_converter.macro_conversion(result.injection_parameters)[0]
-                ax.plot(inj_eos[0], inj_eos[1], label='Injection', color='black', linestyle='dashed', linewidth=3, zorder=10)
 
-        fig.legend(loc='upper center',ncols=2, 
-                   bbox_to_anchor=(0.5, 0.00), handlelength=2)
-        fig.savefig(os.path.join(args.outdir, f"{args.label}_mr_curve.png"),bbox_inches='tight')
+            if result.injection_parameters is not None:
+                inj_eos = self.sub_model.eos_converter.macro_conversion(
+                    result.injection_parameters
+                )[0]
+                ax.plot(
+                    inj_eos[0],
+                    inj_eos[1],
+                    label="Injection",
+                    color="black",
+                    linestyle="dashed",
+                    linewidth=3,
+                    zorder=10,
+                )
+
+        fig.legend(
+            loc="upper center", ncols=2, bbox_to_anchor=(0.5, 0.00), handlelength=2
+        )
+        fig.savefig(
+            Path(args.outdir, f"{args.label}_mr_curve.png"), bbox_inches="tight"
+        )
         return fig
 
 
-def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 'mass_radius']):
+def compose_eos_constraints(
+    args, constraint_kinds=["lower_mtov", "upper_mtov", "mass_radius"]
+):
     try:
-        with open(args.eos_constraint_json, 'r') as f:
-            constraint_dict = json.load(f) 
+        with open(args.eos_constraint_json, "r") as f:
+            constraint_dict = json.load(f)
     except:
         constraint_dict = {}
 
     for constraint_kind in constraint_kinds:
-        sub_dict= read_constraint_from_args(args,constraint_kind)
+        sub_dict = read_constraint_from_args(args, constraint_kind)
         if sub_dict is None:
             continue
         try:
@@ -155,43 +175,46 @@ def compose_eos_constraints(args, constraint_kinds=['lower_mtov', 'upper_mtov', 
         pass
     return constraint_dict
 
+
 def read_constraint_from_args(args, constraint_kind):
     "Routine to read prepare constraint in expected dict-format from argparse namespace during generation process"
     ##preferred: Have the dict with the subconstraints already set up
-    prep_dict= getattr(args, constraint_kind, None) 
+    prep_dict = getattr(args, constraint_kind, None)
     if prep_dict:
         if isinstance(prep_dict, str):
             prep_dict = literal_eval(prep_dict)
         return prep_dict
-    
-    ###otherwise try to construct it:
-        ### read in provided attributes like constraint_kind-name, -mass, -error, -arxiv
-    constraint_props = {
-        key.removeprefix(constraint_kind+'_'): ##cut identifier
-                getattr(args, key) 
-                for key in dir(args)            ## search args for attrs 
-                if key.startswith(constraint_kind+'_') ## related with kind
-    } 
 
-    new_constraints = constraint_props.pop('name', None)
-    if new_constraints: ## there needs to be a unique label
+    ###otherwise try to construct it:
+    ### read in provided attributes like constraint_kind-name, -mass, -error, -arxiv
+    constraint_props = {
+        key.removeprefix(constraint_kind + "_"): getattr(args, key)  ##cut identifier
+        for key in dir(args)  ## search args for attrs
+        if key.startswith(constraint_kind + "_")  ## related with kind
+    }
+
+    new_constraints = constraint_props.pop("name", None)
+    if new_constraints:  ## there needs to be a unique label
         for k in list(constraint_props.keys()):
             v = constraint_props[k]
             if v is None:
                 constraint_props.pop(k)
-            elif len(v) != len(new_constraints): 
-                raise ValueError(f'For {constraint_kind}, the number of entries for {k} ({len(v)}) does not match the number of names ({len(new_constraints)})!')
-            
-        ext_dict={} 
+            elif len(v) != len(new_constraints):
+                raise ValueError(
+                    f"For {constraint_kind}, the number of entries for {k} ({len(v)}) does not match the number of names ({len(new_constraints)})!"
+                )
+
+        ext_dict = {}
         ### iterate through constrs.
-        for i, name in enumerate(new_constraints): 
-            ext_dict[name] ={k:v[i] for k,v in constraint_props.items()} 
+        for i, name in enumerate(new_constraints):
+            ext_dict[name] = {k: v[i] for k, v in constraint_props.items()}
         return ext_dict
     else:
         return None
-    
+
+
 class JointEoSConstraint:
-    def __init__(self, *constraints, eos_converter = None):
+    def __init__(self, *constraints, eos_converter=None):
         self.constraints = self.initialise_constraints(constraints)
 
         if eos_converter is None:
@@ -202,12 +225,14 @@ class JointEoSConstraint:
         if len(self.constraints) == 1:
             return f"{self.constraints[0].__repr__()}"
         elif len(self.constraints) == 2:
-            return f"{self.constraints[0].__repr__()} and {self.constraints[1].__repr__()}"
+            return (
+                f"{self.constraints[0].__repr__()} and {self.constraints[1].__repr__()}"
+            )
         else:
             return f"{self.__class__.__name__} of {', '.join([cons.__repr__() for cons in self.constraints[:-1]])} and {self.constraints[-1].__repr__()}"
 
     def initialise_constraints(self, constraint_tuple):
-        constraint_list=[]
+        constraint_list = []
         for constraint in constraint_tuple:
             if isinstance(constraint, EoSConstraint):
                 constraint_list.append(constraint)
@@ -218,51 +243,49 @@ class JointEoSConstraint:
         return constraint_list
 
     def initialise_from_dict(self, constraint_dict):
-        constraint_list=[]
-        for constraint_kind, sub_constraints in constraint_dict.items():
-            if constraint_kind == 'lower_mtov':
-                for label, constraint in sub_constraints.items():
-                    constraint_list.append(LowerMTOVConstraint(
-                        measured_mass=constraint['mass'],
-                        measure_error=constraint.get('error',0.),
+        constraint_list = []
+        for constraint_type, constr_class in zip(
+            ["lower_mtov", "upper_mtov"], [LowerMTOVConstraint, UpperMTOVConstraint]
+        ):
+            for label, constraint in constraint_dict.get(constraint_type, {}).items():
+                constraint_list.append(
+                    constr_class(
+                        measured_mass=constraint["mass"],
+                        measure_error=constraint.get("error", 0.0),
                         name=label,
-                        arxiv_ref=constraint.get('arxiv', None),
-                        plot_kwargs=constraint.get('plot_kwargs', None)
-                    ))
-            elif constraint_kind == 'upper_mtov':
-                for label, constraint in sub_constraints.items():
-                    constraint_list.append(UpperMTOVConstraint(
-                        measured_mass=constraint['mass'],
-                        measure_error=constraint.get('error',0.),
-                        name=label,
-                        arxiv_ref=constraint.get('arxiv', None),
-                        plot_kwargs=constraint.get('plot_kwargs', None)
-                    ))
-            elif constraint_kind == 'mass_radius':
-                for label, constraint in sub_constraints.items():
-                    constraint_list.append(MassRadiusConstraint(
-                        file_path=constraint.get('posterior', constraint.get('file_path', None)),
-                        name=label,
-                        arxiv_ref=constraint.get('arxiv', None),
-                        plot_kwargs=constraint.get('plot_kwargs', None)
-                    ))
-            else:
-                raise ValueError('Unknown type of EoS Constraint. Must be "lower_mtov", \
-                                "upper_mtov", "mass-radius" or "micro\
-                                ')
+                        arxiv_ref=constraint.get("arxiv", None),
+                        plot_kwargs=constraint.get("plot_kwargs", None),
+                    )
+                )
+        for label, constraint in constraint_dict.get("mass_radius", {}).items():
+            constraint_list.append(
+                MassRadiusConstraint(
+                    file_path=constraint.get(
+                        "posterior", constraint.get("file_path", None)
+                    ),
+                    name=label,
+                    arxiv_ref=constraint.get("arxiv", None),
+                    plot_kwargs=constraint.get("plot_kwargs", None),
+                )
+            )
         return constraint_list
-        
+
     def parameter_conversion(self, parameters):
         return self.eos_converter.parameter_conversion(parameters)
-    
+
     def log_likelihood(self, parameters):
-        return sum([constraint.log_likelihood(parameters, self.eos_converter.macro_parameters)
-                     for constraint in self.constraints])
-    
-    def tabulate_weighted_eos(self, parameters, outdir, weight_path=None, normalise=True):  
+        logls = [
+            con.log_likelihood(parameters, self.eos_converter.macro_parameters)
+            for con in self.constraints
+        ]
+        return sum(logls)
+
+    def tabulate_weighted_eos(
+        self, parameters, outdir, weight_path=None, normalise=True
+    ):
         """Given a directory of macroscopic EOSs and nmma.joint.Constraint,
         returns sorted EOSs and the corresponding prior weights
-        
+
         Parameters
         ----------
         parameters: dict | str | int | float
@@ -274,18 +297,22 @@ class JointEoSConstraint:
         normalise: Bool
             Whether to return normalised weights. Default is True"""
 
-        file_path =os.path.join(outdir, 'sorted')
-        if os.path.isdir(file_path) and os.path.isfile(os.path.join(outdir, "eos_weights.dat")):
-            return os.path.join(outdir, "eos_weights.dat"), file_path, len(os.listdir(file_path))
+        file_path = Path(outdir, "sorted")
+        if file_path.is_dir() and Path(outdir, "eos_weights.dat").is_file():
+            return (
+                Path(outdir, "eos_weights.dat"),
+                file_path,
+                len(list(file_path.iterdir())),
+            )
 
-        os.makedirs(file_path, exist_ok=True)
+        file_path.mkdir(parents=True, exist_ok=True)
         if parameters is None:
-            parameters = { 'EOS': np.arange(self.eos_converter.Neos)}
+            parameters = {"EOS": np.arange(self.eos_converter.Neos)}
         if isinstance(parameters, (str, int, float)):
-            parameters = { 'EOS': np.arange(int(parameters))}
+            parameters = {"EOS": np.arange(int(parameters))}
         eos_data = self.eos_converter.macro_conversion(parameters)
 
-        weight_data = process_map(self.eval_eos_data, eos_data, chunksize =5)
+        weight_data = process_map(self.eval_eos_data, eos_data, chunksize=5)
 
         log_weights = []
         good_data = []
@@ -294,26 +321,26 @@ class JointEoSConstraint:
             if weight is not None:
                 log_weights.append(weight)
                 good_data.append(eos_data[i])
-        
-        if isinstance(weight_path, str):
+
+        if isinstance(weight_path, (str, Path)):
             try:
                 previous_weights = np.loadtxt(weight_path)
-                weight_path = os.path.join(outdir, "eos_weights.dat")
+                weight_path = Path(outdir, "eos_weights.dat")
             except FileNotFoundError:
                 previous_weights = np.ones_like(log_weights)
         else:
             previous_weights = np.ones_like(log_weights)
-            weight_path = os.path.join(outdir, "eos_weights.dat")
+            weight_path = Path(outdir, "eos_weights.dat")
 
-        save_weights= np.array(log_weights)
+        save_weights = np.array(log_weights)
         save_weights += np.log(previous_weights)
         if normalise:
-            save_weights-= logsumexp(save_weights)
-        save_weights=np.exp(save_weights)
+            save_weights -= logsumexp(save_weights)
+        save_weights = np.exp(save_weights)
 
         sort_idcs = np.argsort(save_weights)
         for i, idx in enumerate(sort_idcs):
-            np.savetxt(os.path.join(file_path, f"{i+1}.dat"), np.column_stack(good_data[idx]))
+            np.savetxt(file_path / f"{i+1}.dat", np.column_stack(good_data[idx]))
         np.savetxt(weight_path, np.array(save_weights)[sort_idcs])
         return weight_path, file_path, len(good_data)
 
@@ -325,63 +352,81 @@ class JointEoSConstraint:
         except ValueError:
             return None
 
+
 class EoSConstraint:
-    def __init__(self, name = None, arxiv_ref=None, plot_kwargs=None):
-        self.repr_add = ''
-        self.type = 'macro'
+    def __init__(self, name=None, arxiv_ref=None, plot_kwargs=None):
+        self.repr_add = ""
+        self.type = "macro"
         if name is None:
             self.name = self.__class__.__name__
-            self.base_repr = name 
+            self.base_repr = name
         else:
             self.name = name
-            self.base_repr = f'{self.__class__.__name__} based on {name}'
+            self.base_repr = f"{self.__class__.__name__} based on {name}"
         self.arxiv_ref = arxiv_ref
         self.plot_kwargs = plot_kwargs if plot_kwargs is not None else {}
 
     def __repr__(self):
-        out = f'{self.base_repr} {self.repr_add}'
+        out = f"{self.base_repr} {self.repr_add}"
         if self.arxiv_ref:
-            out = f'{out} (see arxiv:{self.arxiv_ref})'
+            out = f"{out} (see arxiv:{self.arxiv_ref})"
         return out
 
+
 class MassConstraint(EoSConstraint):
-    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None, lognorm_method=None):
+    def __init__(
+        self,
+        measured_mass,
+        measure_error,
+        name=None,
+        arxiv_ref=None,
+        plot_kwargs=None,
+        lognorm_method=None,
+    ):
         super().__init__(name, arxiv_ref, plot_kwargs)
         self.mass = measured_mass
         self.error = measure_error
-        self.repr_add = f'of {measured_mass}+-{measure_error} M_sun'
+        self.repr_add = f"of {measured_mass}+-{measure_error} M_sun"
         self.lognorm_method = lognorm_method
-        self.linestyle = '--'
+        self.linestyle = "--"
 
-    
     def __repr__(self):
-        out = f'{self.__class__.__name__} of {self.mass}+-{self.error} M_sun'
+        out = f"{self.__class__.__name__} of {self.mass}+-{self.error} M_sun"
         if self.name != "Mass Constraint":
-            out = f'{out} based on {self.name}'
-        return  out
-    
+            out = f"{out} based on {self.name}"
+        return out
+
     def log_likelihood(self, parameters, local_parameters=None):
-        tov_mass = parameters.get('TOV_mass', None)
+        tov_mass = parameters.get("TOV_mass", None)
         if tov_mass is None:
-            if isinstance(local_parameters['masses'], list):
-                tov_mass = [masses[-1] for masses in local_parameters['masses']]
-            else:   
-                tov_mass = local_parameters['masses'][-1]
+            if isinstance(local_parameters["masses"], list):
+                tov_mass = [masses[-1] for masses in local_parameters["masses"]]
+            else:
+                tov_mass = local_parameters["masses"][-1]
         return self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)
-    
+
     def plot(self, ax, **kwargs):
         """Plot the mass constraint on the given figure."""
         x_lim = ax.get_xlim()
         plot_kwargs = self.plot_kwargs | kwargs
-        if 'color' not in plot_kwargs:
-                plot_kwargs['color'] = ax._get_lines.get_next_color()
-        if 'linestyle' not in plot_kwargs:
-            plot_kwargs['linestyle'] = self.linestyle
-        if 'linewidth' not in plot_kwargs:
-            plot_kwargs['linewidth'] = 2.5
+        if "color" not in plot_kwargs:
+            plot_kwargs["color"] = ax._get_lines.get_next_color()
+        if "linestyle" not in plot_kwargs:
+            plot_kwargs["linestyle"] = self.linestyle
+        if "linewidth" not in plot_kwargs:
+            plot_kwargs["linewidth"] = 2.5
 
         ax.hlines(self.mass, *x_lim, zorder=3, **plot_kwargs)
-        ax.text(x_lim[0]+0.05*(x_lim[1]-x_lim[0]), self.mass, self.name, color=plot_kwargs['color'], fontsize=ax.xaxis.label.get_size(), va='center', zorder = 20, bbox=dict(facecolor='white', edgecolor='none', pad=0.5))
+        ax.text(
+            x_lim[0] + 0.05 * (x_lim[1] - x_lim[0]),
+            self.mass,
+            self.name,
+            color=plot_kwargs["color"],
+            fontsize=ax.xaxis.label.get_size(),
+            va="center",
+            zorder=20,
+            bbox=dict(facecolor="white", edgecolor="none", pad=0.5),
+        )
         # cmap = fading_cmap(plot_kwargs['color'])
         # levels = [0.95, 0.68]
         # for i, level in enumerate(levels):
@@ -390,8 +435,11 @@ class MassConstraint(EoSConstraint):
 
 
 class LowerMTOVConstraint(MassConstraint):
-    '''Constraint that an EOS supports at least a certain TOV mass(within Gaussian uncertainty)'''
-    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None):
+    """Constraint that an EOS supports at least a certain TOV mass(within Gaussian uncertainty)"""
+
+    def __init__(
+        self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None
+    ):
         """
         Parameters
         ----------
@@ -404,12 +452,22 @@ class LowerMTOVConstraint(MassConstraint):
         arxiv_ref: str
             Identifier of a relevant source
         """
-        super().__init__(measured_mass, measure_error, name, arxiv_ref, plot_kwargs, lognorm_method=norm.logcdf)
-    
+        super().__init__(
+            measured_mass,
+            measure_error,
+            name,
+            arxiv_ref,
+            plot_kwargs,
+            lognorm_method=norm.logcdf,
+        )
+
 
 class UpperMTOVConstraint(MassConstraint):
-    '''Constraint that an EOS supports at most a certain TOV mass (within Gaussian uncertainty)'''
-    def __init__(self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None):
+    """Constraint that an EOS supports at most a certain TOV mass (within Gaussian uncertainty)"""
+
+    def __init__(
+        self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None
+    ):
         """
         Parameters
         ----------
@@ -422,13 +480,30 @@ class UpperMTOVConstraint(MassConstraint):
         arxiv_ref: str, optional
             Identifier of a relevant source
         """
-        super().__init__(measured_mass, measure_error, name, arxiv_ref, plot_kwargs, lognorm_method=norm.logsf)
-        self.linestyle = ':'
-    
+        super().__init__(
+            measured_mass,
+            measure_error,
+            name,
+            arxiv_ref,
+            plot_kwargs,
+            lognorm_method=norm.logsf,
+        )
+        self.linestyle = ":"
+
 
 class MassRadiusConstraint(EoSConstraint):
-    '''Constraint that an EOS adheres to  certain mass-radius region'''
-    def __init__(self, mass_array=None, radius_array=None, weights = None, file_path=None, name=None, arxiv_ref=None, plot_kwargs=None):
+    """Constraint that an EOS adheres to  certain mass-radius region"""
+
+    def __init__(
+        self,
+        mass_array=None,
+        radius_array=None,
+        weights=None,
+        file_path=None,
+        name=None,
+        arxiv_ref=None,
+        plot_kwargs=None,
+    ):
         """
         Parameters
         ----------
@@ -448,17 +523,21 @@ class MassRadiusConstraint(EoSConstraint):
         if file_path:
             mass_array, radius_array, weights = self.read_data(file_path)
         elif mass_array is None or radius_array is None:
-            raise ValueError('Must provide data for masses and radii as arrays or file from which to load')
+            raise ValueError(
+                "Must provide data for masses and radii as arrays or file from which to load"
+            )
         self.set_grid(mass_array, radius_array, weights)
-        self.test_masses = np.linspace(1.2, 2.5, 151) 
-   
+        self.test_masses = np.linspace(1.2, 2.5, 151)
+
     def read_data(self, file_path):
         """Read mass-radius data from a file."""
         data = np.loadtxt(file_path, unpack=True)
         if data.shape[0] not in [2, 3]:
             data = data.T
         if data.shape[0] not in [2, 3]:
-            raise ValueError("Data file must have two or three columns for mass, radius (, weights)")
+            raise ValueError(
+                "Data file must have two or three columns for mass, radius (, weights)"
+            )
         try:
             # if three columns it includes weights
             data_1, data_2, weights = data
@@ -466,7 +545,7 @@ class MassRadiusConstraint(EoSConstraint):
             data_1, data_2 = data
             weights = None
 
-        if (data_1 <=3.).any():
+        if (data_1 <= 3.0).any():
             # we assume radii in km and mass in solar masses. 3 km is an arbitrary-ish limit for neutron stars
             masses = data_1
             radius = data_2
@@ -482,15 +561,17 @@ class MassRadiusConstraint(EoSConstraint):
             min_radius = np.min(radius)
             max_radius = np.max(radius)
             median_radius = np.median(radius)
-            raise ValueError("Failed to properly identify mass and radius. Masses should be in solar masses and radii in km, " \
-            "but the identified values seem to fall outside reasonable ranges. " \
-            f"Identified mass range: {min_mass:.2f} - {max_mass:.2f} (median: {median_mass:.2f}), " \
-            f"Identified radius range: {min_radius:.2f} - {max_radius:.2f} (median: {median_radius:.2f}). " \
-            "Please check the input data file format.")
-        
+            raise ValueError(
+                "Failed to properly identify mass and radius. Masses should be in solar masses and radii in km, "
+                "but the identified values seem to fall outside reasonable ranges. "
+                f"Identified mass range: {min_mass:.2f} - {max_mass:.2f} (median: {median_mass:.2f}), "
+                f"Identified radius range: {min_radius:.2f} - {max_radius:.2f} (median: {median_radius:.2f}). "
+                "Please check the input data file format."
+            )
+
         return masses, radius, weights
 
-    def set_grid(self, masses, radii, weights, mass_step = 0.01, radius_step = 0.03):
+    def set_grid(self, masses, radii, weights, mass_step=0.01, radius_step=0.03):
         """Set up a grid upon which to build a histogram of mass-radius data to approximate the pdf.
         Note that when using multiple mass-radius measurements, all measurements should use the same stepsizes!
         Parameters
@@ -503,50 +584,58 @@ class MassRadiusConstraint(EoSConstraint):
             Array with weights of the M-R samples, must be specified along an equal-length mass_array
             mass_step: float
             step size for mass grid in solar masses, default is 0.01 Msun
-        radius_step: float  
+        radius_step: float
             step size for radius grid in km, default is 0.02 km (20 m)
-        
+
         """
         mass_bins = self.set_bins(masses, mass_step)
         rad_bins = self.set_bins(radii, radius_step)
-        if 3*len(mass_bins)*len(rad_bins) > len(masses):
-            print("Warning: The histogram might be to sparsely populated to get meaningful results.")
+        if 3 * len(mass_bins) * len(rad_bins) > len(masses):
+            print(
+                "Warning: The histogram might be to sparsely populated to get meaningful results."
+            )
 
-        histogram, self.rad_edges, self.mass_edges = np.histogram2d(radii, masses, bins=[rad_bins, mass_bins], weights=weights, density=True)
+        histogram, self.rad_edges, self.mass_edges = np.histogram2d(
+            radii, masses, bins=[rad_bins, mass_bins], weights=weights, density=True
+        )
         drad = self.rad_edges[1] - self.rad_edges[0]
         dmass = self.mass_edges[1] - self.mass_edges[0]
 
-        self.histogram = gaussian_filter(histogram*dmass*drad, sigma=3)
+        self.histogram = gaussian_filter(histogram * dmass * drad, sigma=3)
 
     def set_bins(self, array, step_size, sensitivity=0.001):
-        low, high = np.quantile(array, [sensitivity, 1.- sensitivity])
-        bins = np.arange(0.95*low, 1.05*high, step_size, dtype=np.float64) 
+        low, high = np.quantile(array, [sensitivity, 1.0 - sensitivity])
+        bins = np.arange(0.95 * low, 1.05 * high, step_size, dtype=np.float64)
         return bins
-    
+
     def log_likelihood(self, parameters, local_parameters):
         try:
-            tov_mass = parameters.get('TOV_mass', local_parameters['masses'][-1])
-            return self.single_logl(tov_mass, local_parameters['masses'], local_parameters['radii'])
+            tov_mass = parameters.get("TOV_mass", local_parameters["masses"][-1])
+            return self.single_logl(
+                tov_mass, local_parameters["masses"], local_parameters["radii"]
+            )
         except (ValueError, IndexError):
-            self.single_logl(tov_mass, local_parameters['masses'], local_parameters['radii'])
+            self.single_logl(
+                tov_mass, local_parameters["masses"], local_parameters["radii"]
+            )
             return [
-                self.single_logl(masses[-1], masses, local_parameters['radii'][i])
-                for i, masses in enumerate(local_parameters['masses'])
+                self.single_logl(masses[-1], masses, local_parameters["radii"][i])
+                for i, masses in enumerate(local_parameters["masses"])
             ]
 
     def single_logl(self, tov_mass, masses, radii):
         ## interpolate radii along equally spaced mass grid up to MTov
-        test_mass_range=self.test_masses[self.test_masses<tov_mass]
-        test_radii=np.interp(test_mass_range, masses, radii)
-        yi = np.searchsorted(self.mass_edges[1:], test_mass_range) -1
-        xi = np.searchsorted(self.rad_edges[1:], test_radii) -1
+        test_mass_range = self.test_masses[self.test_masses < tov_mass]
+        test_radii = np.interp(test_mass_range, masses, radii)
+        yi = np.searchsorted(self.mass_edges[1:], test_mass_range) - 1
+        xi = np.searchsorted(self.rad_edges[1:], test_radii) - 1
         log_l = np.log(self.histogram[xi, yi].sum())
-        
+
         return log_l
-    
-    def plot(self, ax,**kwargs):
+
+    def plot(self, ax, **kwargs):
         """Plot the mass-radius constraint on the given figure."""
-          
+
         Xc = 0.5 * (self.rad_edges[:-1] + self.rad_edges[1:])
         Yc = 0.5 * (self.mass_edges[:-1] + self.mass_edges[1:])
 
@@ -554,47 +643,65 @@ class MassRadiusConstraint(EoSConstraint):
         order = np.argsort(flat)[::-1]
         cumsum = np.cumsum(flat[order])
         levels = [0.9, 0.5]
-        clevels=[flat[order][np.searchsorted(cumsum, p)] for p in levels]
+        clevels = [flat[order][np.searchsorted(cumsum, p)] for p in levels]
 
         plot_kwargs = self.plot_kwargs | kwargs
-        manual = plot_kwargs.get('manual', False)
-        color = plot_kwargs.get('color', ax._get_lines.get_next_color())
+        manual = plot_kwargs.get("manual", False)
+        color = plot_kwargs.get("color", ax._get_lines.get_next_color())
         cmap = fading_cmap(color)
         colors = cmap(levels[::-1])
         contour = ax.contour(
-            Xc, Yc, self.histogram.T,levels = clevels,
-            colors = colors, linewidths=2
+            Xc, Yc, self.histogram.T, levels=clevels, colors=colors, linewidths=2
         )
 
         if isinstance(manual, bool) or manual is None:
             manual = False
         elif isinstance(manual, (list, tuple)):
-            if len(manual) ==1:
-                assert len(manual[0]) == 2, "Manual position for label must be a tuple of (x,y) coordinates"
+            if len(manual) == 1:
+                assert (
+                    len(manual[0]) == 2
+                ), "Manual position for label must be a tuple of (x,y) coordinates"
             elif (
-                len(manual) == 2 
+                len(manual) == 2
                 and isinstance(manual[0], (int, float, np.floating))
                 and isinstance(manual[1], (int, float, np.floating))
             ):
                 manual = [manual]
 
-        ax.clabel(contour, levels= [clevels[-1]], 
-                  fmt = {clevels[-1]: self.name},  
-                  inline=True, fontsize=ax.xaxis.label.get_size(), 
-                  manual = manual, 
-                    zorder = 20)
+        ax.clabel(
+            contour,
+            levels=[clevels[-1]],
+            fmt={clevels[-1]: self.name},
+            inline=True,
+            fontsize=ax.xaxis.label.get_size(),
+            manual=manual,
+            zorder=20,
+        )
         return ax
-    
+
+
 class PulsarConstraint(LowerMTOVConstraint):
-    '''legacy synonym for general LowerMTOVConstraint'''
+    """legacy synonym for general LowerMTOVConstraint"""
+
+
 class MTOVUpperConstraint(UpperMTOVConstraint):
-    '''legacy synonym for general UpperMTOVConstraint'''
+    """legacy synonym for general UpperMTOVConstraint"""
+
+
 class JointConstraint(JointEoSConstraint):
-    '''legacy synonym for JointEoSConstraint'''
+    """legacy synonym for JointEoSConstraint"""
 
 
 ##### legacy routines to organise a collection of tabulated EoSs
-def weights_for_tabulated_eos_from_constraints(macro_constraints=None, micro_constraints=None, macro_eos_path=None, micro_eos_path=None, eos_identifier='', save_path=None, normalise=True):
+def weights_for_tabulated_eos_from_constraints(
+    macro_constraints=None,
+    micro_constraints=None,
+    macro_eos_path=None,
+    micro_eos_path=None,
+    eos_identifier="",
+    save_path=None,
+    normalise=True,
+):
     """routine to obtain prior weights on pre-computed EOS
 
     Parameters
@@ -624,51 +731,61 @@ def weights_for_tabulated_eos_from_constraints(macro_constraints=None, micro_con
 
     """
     if micro_eos_path:
-        log_weights=[]
-        micro_eos_files=sorted(glob(f'{micro_eos_path}/*{eos_identifier}*'))
+        log_weights = []
+        micro_eos_files = sorted(Path(micro_eos_path).glob(f"*{eos_identifier}*"))
         for eos_file in micro_eos_files:
-            log_weights.append(constraint_weight_from_micro_eos_file(eos_file, micro_constraints))
-        log_weights=np.array(log_weights)
+            log_weights.append(
+                constraint_weight_from_micro_eos_file(eos_file, micro_constraints)
+            )
+        log_weights = np.array(log_weights)
 
     if macro_eos_path:
-        macro_log_weights=[]
-        macro_eos_files=sorted(glob(f'{macro_eos_path}/*{eos_identifier}*'))
+        macro_log_weights = []
+        macro_eos_files = sorted(Path(macro_eos_path).glob(f"*{eos_identifier}*"))
         for eos_file in macro_eos_files:
-            macro_log_weights.append(constraint_weight_from_macro_eos_file(eos_file, macro_constraints))
-        
-        if micro_eos_path:
-            eos_files= micro_eos_files
-            try: 
-                log_weights+=np.array(macro_log_weights)
-            except ValueError: 
-                raise ValueError(f'Your EoS directories contained unequal numbers of microscopic ({len(micro_eos_files)}) and macroscopic ({len(macro_eos_files)}) EoSs!')
-        else:
-            eos_files= macro_eos_files
-            log_weights =np.array(macro_log_weights)
+            macro_log_weights.append(
+                constraint_weight_from_macro_eos_file(eos_file, macro_constraints)
+            )
 
-    save_weights= np.array(log_weights)
+        if micro_eos_path:
+            eos_files = micro_eos_files
+            try:
+                log_weights += np.array(macro_log_weights)
+            except ValueError:
+                raise ValueError(
+                    f"Your EoS directories contained unequal numbers of microscopic ({len(micro_eos_files)}) and macroscopic ({len(macro_eos_files)}) EoSs!"
+                )
+        else:
+            eos_files = macro_eos_files
+            log_weights = np.array(macro_log_weights)
+
+    save_weights = np.array(log_weights)
     if normalise:
-        save_weights-= logsumexp(log_weights)
-    save_weights=np.exp(save_weights)
+        save_weights -= logsumexp(log_weights)
+    save_weights = np.exp(save_weights)
     if save_path:
         np.savetxt(save_path, np.c_[save_weights])
     return save_weights, eos_files
 
+
 def constraint_weight_from_micro_eos_file(filepath, micro_constraints):
-    n, p, eps = np.loadtxt(filepath, usecols=[0,1,2], unpack=True)
-    micro_params=dict(number_density=n, pressur=p, energy_density=eps)
+    n, p, eps = np.loadtxt(filepath, usecols=[0, 1, 2], unpack=True)
+    micro_params = dict(number_density=n, pressur=p, energy_density=eps)
     return eos_weight_from_constraints(micro_params, micro_constraints)
 
+
 def constraint_weight_from_macro_eos_file(filepath, macro_constraints):
-    R, M = np.loadtxt(filepath, usecols=[0,1], unpack=True)
-    macro_params=dict(radii=R, masses=M, TOV_mass=M[-1])
+    R, M = np.loadtxt(filepath, usecols=[0, 1], unpack=True)
+    macro_params = dict(radii=R, masses=M, TOV_mass=M[-1])
     return eos_weight_from_constraints(macro_params, macro_constraints)
 
+
 def eos_weight_from_constraints(eos_params, *constraints):
-    logL_eos=0
+    logL_eos = 0
     for constraint in constraints:
-        logL_eos+=constraint.log_likelihood(eos_params)
+        logL_eos += constraint.log_likelihood(eos_params)
     return logL_eos
+
 
 def EOSSorting(eos_files, out_dir, sort_quantity_array):
     """routine to resort EoS files for more efficient sampling.
@@ -676,18 +793,19 @@ def EOSSorting(eos_files, out_dir, sort_quantity_array):
 
     Parameters
     ----------
-    eos_files: list 
+    eos_files: list
         list of eos_files, such that the ith entry of sort_quantity_array relates to the ith EoS in eos_files
     outdir: str | None
         path to directory where sorted EoSs should be stored
-    sort_quantity_array: iterable 
+    sort_quantity_array: iterable
         Contains the quantity by which EoS files should be sorted, typically prior probability or an associated observable (e.g. Lambda_1.4)
     """
-    sort_quantity_array=np.atleast_1d(sort_quantity_array).argsort()
+    sort_quantity_array = np.atleast_1d(sort_quantity_array).argsort()
     sortIdcs = sort_quantity_array.argsort()
     for i, eos_file in enumerate(eos_files):
         sortedIdx = sortIdcs[i] + 1
         shutil.copy(f"{eos_file}.dat", f"{out_dir}/{sortedIdx}.dat")
+
 
 def EOSConstraints2Prior(macro_eos_path, out_path, Constraint):
     """
@@ -713,18 +831,14 @@ def EOSConstraints2Prior(macro_eos_path, out_path, Constraint):
         log normalization constant for the EOS prior
     """
 
-    
-    logLs, eos_files =weights_for_tabulated_eos_from_constraints(
-        macro_constraints=Constraint, 
-        macro_eos_path=macro_eos_path, 
-        normalise=False
-        )
+    logLs, eos_files = weights_for_tabulated_eos_from_constraints(
+        macro_constraints=Constraint, macro_eos_path=macro_eos_path, normalise=False
+    )
     logNorm = logsumexp(logLs)
 
     weights = np.exp(logLs - logNorm)
     sorted_weights = np.sort(weights)
     EOSSorting(eos_files, out_path, weights)
-    prior = WeightedCategorical(len(eos_files), sorted_weights, name='EOS')
+    prior = WeightedCategorical(len(eos_files), sorted_weights, name="EOS")
 
     return prior, logNorm
-
