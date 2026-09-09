@@ -182,56 +182,39 @@ def inclination_prior_from_fits(priors, args):
 
 
 def extinction_prior(priors, args):
-    # setup for Ebv
-    name = "Ebv"
-    latex_label = "$E(B-V)$"
-    if args.fetch_Ebv_from_dustmap:
-        ra, dec = getattr(args, "ra", None), getattr(args, "dec", None)
-        if not (ra and dec):
-            try:
-                ra = priors["ra"].peak
-                dec = priors["dec"].peak
-            except (KeyError, AttributeError):
-                raise ValueError(
-                    "ra and dec are not provided in the arguments or priors, "
-                    "but are needed to fetch Ebv from dustmap"
-                )
-
-        print(
-            "Fetching value of Ebv from dustmap, overwriting any previous prior on Ebv"
-        )
+    ra, dec = getattr(args, "ra", None), getattr(args, "dec", None)
+    if not (ra and dec):
         try:
-            import dustmaps.sfd
-            from dustmaps.config import config
-            from astropy import coordinates
-        except ImportError:
-            print("Package dustmap is needed")
-            sys.exit(1)
-
-        # check if the dust fits are downloaded
-        data_dir = Path(__file__).parent
-        # config dustmaps to fetch and place fits from default_dir
-        config["data_dir"] = str(data_dir)
-        for f in ["SFD_dust_4096_ngp.fits", "SFD_dust_4096_sgp.fits"]:
-            if not (data_dir / "sfd" / f).is_file():
-                dustmaps.sfd.fetch()
-
-        # fetching the Ebv value
-        coord = coordinates.SkyCoord(ra, dec, unit="rad")
-        val = dustmaps.sfd.SFDQuery()(coord)
-        priors["Ebv"] = DeltaFunction(val, name, latex_label)
-        print(f"The prior on Ebv is set to fixed value of {val}")
-
-    elif "Ebv" not in priors:
-        if args.Ebv_max > 0.0 and args.use_Ebv:
-            Ebv_c = 1.0 / (0.5 * args.Ebv_max)
-            min, max = 0, args.Ebv_max
-            priors["Ebv"] = Interped(
-                [min, max], [Ebv_c, 0], min, max, name, latex_label
+            ra = priors["ra"].peak
+            dec = priors["dec"].peak
+        except (KeyError, AttributeError):
+            raise ValueError(
+                "ra and dec are not provided in the arguments or priors, "
+                "but are needed to fetch Ebv from dustmap"
             )
-        else:
-            priors["Ebv"] = DeltaFunction(0.0, name, latex_label)
 
+    print("Fetching value of Ebv from dustmap, overwriting any previous prior on Ebv")
+    try:
+        import dustmaps.sfd
+        from dustmaps.config import config
+        from astropy import coordinates
+    except ImportError:
+        print("Package dustmap is needed")
+        sys.exit(1)
+
+    # check if the dust fits are downloaded
+    data_dir = Path(__file__).parent
+    # config dustmaps to fetch and place fits from default_dir
+    config["data_dir"] = str(data_dir)
+    for f in ["SFD_dust_4096_ngp.fits", "SFD_dust_4096_sgp.fits"]:
+        if not (data_dir / "sfd" / f).is_file():
+            dustmaps.sfd.fetch()
+
+    # fetching the Ebv value
+    coord = coordinates.SkyCoord(ra, dec, unit="rad")
+    val = dustmaps.sfd.SFDQuery()(coord)
+    priors["Ebv"] = DeltaFunction(val, "Ebv", "$E(B-V)$")
+    print(f"The prior on Ebv is set to fixed value of {val}")
     return priors
 
 
@@ -250,7 +233,8 @@ def create_prior_from_args(args, systematics_handler):
         else PriorDict(args.prior)
     )
     priors = adjust_hubble_prior(priors, args)
-    priors = extinction_prior(priors, args)
+    if args.fetch_Ebv_from_dustmap:
+        priors = extinction_prior(priors, args)
 
     # re-setup the prior if the conditional prior for inclination is used
     if args.conditional_gaussian_prior_thetaObs:

@@ -14,9 +14,9 @@ except Exception as e:
     print("\nInstall m4opt if you want to use uvex filters")
 import healpy as hp
 from astropy.io import fits
-
-import dust_extinction.shapes as dustShp
+from dust_extinction.shapes import P92
 from dust_extinction.parameter_averages import G23
+from dust_extinction.baseclasses import BaseExtModel
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -370,93 +370,66 @@ def transform_to_app_mag_dict(mag_dict, params):
     return mag_dict
 
 
-def extinctionFactorP92SMC(nu, Ebv, z, cutoff_hi=2e16):
-
-    # Return the extinction factor (e ^ -0.4 * Ax) for the
-    # Pei 1992 SMC model
-
-    # Get model wavelength range
-    ext_range_nu_lo = dustShp.P92.x_range[0] * 1e4 * c_cgs
-    ext_range_nu_hi = min(cutoff_hi, dustShp.P92.x_range[1] * 1e4 * c_cgs)
-
-    # host-frame frequencies
-    nu_host = nu * (1 + z)
-
-    # mask for frequencies that dust model is applicable for
-    opt = (nu_host >= ext_range_nu_lo) & (nu_host <= ext_range_nu_hi)
-
-    # host-frame wavelengths
-    lam_host = (c_cgs / nu_host[opt]) * astropy.units.cm
-
-    # amplitudes have to be converted from B reference to V
-    abav = dustShp.P92.AbAv
-
-    # coefficients from Pei 1992
-    extModel = dustShp.P92(
-        BKG_amp=185.0 * abav,
-        BKG_lambda=0.042,
-        BKG_b=90.0,
-        BKG_n=2.0,
-        FUV_amp=27 * abav,
-        FUV_lambda=0.08,
-        FUV_b=5.5,
-        FUV_n=4.0,
-        NUV_amp=0.005 * abav,
-        NUV_lambda=0.22,
-        NUV_b=-1.95,
-        NUV_n=2.0,
-        SIL1_amp=0.010 * abav,
-        SIL1_lambda=9.7,
-        SIL1_b=-1.95,
-        SIL1_n=2.0,
-        SIL2_amp=0.012 * abav,
-        SIL2_lambda=18.0,
-        SIL2_b=-1.80,
-        SIL2_n=2.0,
-        FIR_amp=0.030 * abav,
-        FIR_lambda=25.0,
-        FIR_b=0.0,
-        FIR_n=2.0,
-    )
-
-    Ax_o_Av = extModel(lam_host)
-    Av = 2.93 * Ebv  # Rv = 2.93
-
-    ext = np.ones(nu.shape)
-    ext[opt] = np.power(10.0, -0.4 * Ax_o_Av * Av)
-
-    return ext
-
-
-def extinctionFactorG23MW(nu, Ebv, Rv=3.1):
-    """Galactic-foreground extinction factor.
-
-    Gordon et al. (2023) Milky-Way average curve (912 A - 32 um),
-    evaluated in the OBSERVER frame (the Galactic dust screen is at z=0),
-    following the approach of M4OPT (m4opt.synphot.extinction).
-    Same convention as extinctionFactorP92SMC: returns the multiplicative
-    flux factor e^{-0.4 A_lambda} per input frequency.
-
+def get_extinction_model(ext_model=None, Rv=None):
+    """Prepare Model to compute extinction factors
     Parameters
     ----------
-    nu : array_like
-        Observer-frame frequencies in Hz (one per filter, = model.nu_0s).
-    Ebv : float
-        Colour excess E(B-V) proposed by the sampler (bounded by the
-        dust-map line-of-sight value via the prior).
-    Rv : float, optional
+    ext_model : str or dust_extinction.baseclasses.BaseExtModel
+    Rv : floator, optional
         Total-to-selective extinction; 3.1 is the G23 MW average and must
         stay consistent with the curve (curve and Rv form one package).
-    """
 
-    law = G23(Rv=Rv)
-    x = (np.atleast_1d(nu) * astropy.units.Hz).to(
-        1 / astropy.units.micron, equivalencies=astropy.units.spectral()
-    )
-    ext = np.ones(x.shape)
-    good = (x.value >= law.x_range[0]) & (x.value <= law.x_range[1])
-    ext[good] = law.extinguish(x[good], Ebv=Ebv)
-    return ext
+    Notes
+    -----
+    We currently only support the following extinction models:
+    G23_MW: Gordon et al. (2023) Milky-Way average curve (912 A - 32 um),
+    evaluated in the OBSERVER frame (the Galactic dust screen is at z=0),
+    following the approach of M4OPT (m4opt.synphot.extinction).
+    P92_SMC_host (default): Pei (1992) SMC curve, evaluated in the REST frame of the host galaxy (the dust screen is at z=z_host).
+    """
+    # FIXME: Handle more cases
+
+    if isinstance(ext_model, BaseExtModel):
+        return ext_model, "host"
+    elif ext_model is None:
+        ext_model = "P92_SMC_host"
+    # case P92_SMC
+    if "P92" in ext_model:
+        # amplitudes have to be converted from B reference to V
+        abav = P92.AbAv
+
+        # coefficients from Pei 1992
+        out_model = P92(
+            BKG_amp=185.0 * abav,
+            BKG_lambda=0.042,
+            FUV_amp=27 * abav,
+            FUV_lambda=0.08,
+            FUV_b=5.5,
+            FUV_n=4.0,
+            NUV_amp=0.005 * abav,
+            SIL1_amp=0.010 * abav,
+            SIL2_amp=0.012 * abav,
+            FIR_amp=0.030 * abav,
+        )
+        if Rv is None:
+            Rv = 2.93  # Pei 1992 SMC value
+        out_model.Rv = Rv
+
+    elif "G23" in ext_model:
+        if Rv is None:
+            Rv = 3.1  # G23 MW average value
+        out_model = G23(Rv=Rv)
+        if "host" in ext_model.lower() or "rest" in ext_model.lower():
+            raise ValueError("G23 extinction model is only applicable to MW dust")
+        frame = "obs"
+        return ext_model, frame
+
+    if "host" in ext_model.lower() or "rest" in ext_model.lower():
+        frame = "rest"
+    elif "mw" in ext_model.lower() or "obs" in ext_model.lower():
+        frame = "obs"
+
+    return out_model, frame
 
 
 def get_all_bandpass_metadata():

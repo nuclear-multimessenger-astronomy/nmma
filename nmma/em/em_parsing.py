@@ -430,17 +430,6 @@ def modified_em_prior_parsing(parser):
         help="The input for N_sigma; to be used with conditional-gaussian-prior-thetaObs set to True",
     )
     mod_em_prior_parser.add_argument(
-        "--use-Ebv",
-        action="store_true",
-        help="If using the Ebv extinction during the inference",
-    )
-    mod_em_prior_parser.add_argument(
-        "--Ebv-max",
-        type=float,
-        default=0.5724,
-        help="Maximum allowed value for Ebv (default:0.5724)",
-    )
-    mod_em_prior_parser.add_argument(
         "--fetch-Ebv-from-dustmap",
         action="store_true",
         help="Fetching Ebv from dustmap, to be used as fixed-value prior",
@@ -457,10 +446,7 @@ def modified_em_prior_parsing(parser):
         help="Path to systematics configuration file",
     )
     mod_em_prior_parser.add_argument(
-        "--em-extinction-law",
-        type=str,
-        choices=["P92_SMC_host", "G23_MW"],
-        default="P92_SMC_host",
+        "--em-extinction-model",
         help=(
             "Extinction law for the Ebv parameter: historical Pei-1992 SMC "
             "at the transient redshift (default), or Gordon-2023 Milky-Way "
