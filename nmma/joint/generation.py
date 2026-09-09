@@ -310,7 +310,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             priors = sys_handler.setup_systematics_priors(priors)
             if args.fetch_Ebv_from_dustmap:
                 priors = extinction_prior(priors, args)
-            priors = extinction_prior(priors, args)
             data_dump |= dict(light_curve_data=light_curve_data, filters = filters,
                     systematics_dict = sys_handler.systematics_dict)
 

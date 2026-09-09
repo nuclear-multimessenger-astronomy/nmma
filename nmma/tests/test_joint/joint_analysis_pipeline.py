@@ -56,7 +56,6 @@ injection_args = Namespace(
 
 samling_args = Namespace(nlive=64, local_only=True, sampler="pymultinest")
 
-em_prior_args = Namespace(Ebv_max=0.0)
 eos_args = Namespace(
     eos_data=DATA_DIR / "eos_macro",
     eos_to_ram=True,
@@ -82,7 +81,6 @@ def args():
         em_model_args,
         injection_args,
         samling_args,
-        em_prior_args,
         eos_args,
         # gw_args,
         joint_args,
