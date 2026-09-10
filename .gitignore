@@ -1,37 +1,11 @@
 # essentials
-.version
-
-# python bytecode / caches
-__pycache__/
-*.py[cod]
-*$py.class
-
-# packaging / build artifacts
 build/
-dist/
-*.egg-info/
-.eggs/
-*.egg
-*.so
-
-# testing / coverage
-.pytest_cache/
-.coverage
-.coverage.*
-coverage.xml
-htmlcov/
-
-# notebooks
-.ipynb_checkpoints/
-
-# virtual environments
-venv/
-.venv/
-env/
-ENV/
-
-# OS / editor cruft
+__pycache__/
+.version
+nmma.egg-info/
 .DS_Store
+
+# development
 .vscode/
 
 # models
