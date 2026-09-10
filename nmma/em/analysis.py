@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -12,29 +12,39 @@ from .em_parsing import (
     bolometric_parser,
 )
 from ..core.base import multi_analysis_loop
-from ..core.utils import read_injection_file, set_filename, read_trigger_time
+from ..core.utils import injection_from_args, set_filename, read_trigger_time
 
 
-def data_from_injection(args, filters, detection_limit):
-    injection_df = read_injection_file(args)
+def data_from_injection(args, filters):
     inj_model = model.create_injection_model(args, filters)
-    injection_params = injection_df.iloc[args.injection_num].to_dict()
+    injection_params = injection_from_args(args)
     injection_params = adjust_injection_parameters(injection_params, args, inj_model)
     inj_outfile = set_filename(args.label, args, "_lc")
-    if os.path.isfile(inj_outfile):
+    if inj_outfile.exists():
         print(f"Loading existing injection lc from {inj_outfile}")
-        data = io.load_em_observations(inj_outfile, format="model")
+        full_data = io.load_em_observations(inj_outfile, format="model")
     else:
-        data = create_light_curve_data(injection_params, args, inj_model)
-        io.write_em_observations(inj_outfile, data, format="model")
-    data = inspect_detection_limit(detection_limit, data)
+        # keep_infinite_data=True (full time grid, non-detections marked
+        full_data = create_light_curve_data(
+            injection_params, args, inj_model, keep_infinite_data=True
+        )
+        io.write_em_observations(inj_outfile, full_data, format="model")
+    data = {
+        filt: {
+            key: val[
+                np.isfinite(full_data[filt]["mag"])
+                & np.isfinite(full_data[filt]["mag_error"])
+            ]
+            for key, val in filt_dict.items()
+        }
+        for filt, filt_dict in full_data.items()
+    }
     return data, injection_params
 
 
 def inspect_detection_limit(detection_limit, data):
-    # checking produced data for magnitudes dimmer than the detection limit
+    # checking data for magnitudes dimmer than the detection limit
     for filt, filt_dict in data.items():
-        filt_dict = data[filt]
         non_detections = filt_dict["mag"] > detection_limit[filt]
 
         filt_dict["mag"] = np.where(
@@ -107,30 +117,30 @@ def bolometric_setup(args):
 
     return priors, likelihood, injection_parameters
 
+
 def analysis_setup(args):
-    
+
     filters = utils.set_filters(args)
-    if getattr(args, 'light_curve_data', None):
+    if getattr(args, "light_curve_data", None):
         # load observational data
-        data = io.load_em_observations(args, format='observations')
-        trigger_time = read_trigger_time(None,args)
-        injection_parameters = getattr(args, 'injection_parameters', None)
+        data = io.load_em_observations(args, format="observations")
+        trigger_time = read_trigger_time(None, args)
+        injection_parameters = getattr(args, "injection_parameters", None)
     else:
-        detection_limit = utils.create_detection_limit(args, filters)
         # try to work with injection data instead
-        data, injection_parameters = data_from_injection(args, filters, detection_limit)
-        trigger_time = injection_parameters.get('trigger_time',0)
-        
+        data, injection_parameters = data_from_injection(args, filters)
+        trigger_time = injection_parameters.get("trigger_time", 0)
     data = utils.cut_data_to_time_range(data, args, trigger_time)
+    detection_limit = utils.create_detection_limit(args, data.keys())
+    if injection_parameters is not None:
+        data = inspect_detection_limit(detection_limit, data)
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
-    detection_limit = utils.create_detection_limit(args, filters_to_analyze)
+    detection_limit = {filt: detection_limit[filt] for filt in filters_to_analyze}
 
     # initialize light curve model
     print("Creating light curve model for inference")
-    lc_model_type = model.identify_model_type(args)
     light_curve_model = model.create_light_curve_model_from_args(
-        lc_model_type,
         args,
         filters=filters_to_analyze,
     )
@@ -196,21 +206,22 @@ def nnanalysis(args):
     print(
         "Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters."
     )
-    filters = "ztfg,ztfi,ztfr".split(",")
-    detection_limit = utils.create_detection_limit(args, filters, 22.0)
+    filters = ["ztfg", "ztfi", "ztfr"]
 
     # create the kilonova data if an injection set is given
     if args.injection_file:
-        data, injection_parameters = data_from_injection(args, filters, detection_limit)
+        data, injection_parameters = data_from_injection(args, filters)
     else:
         # load the lightcurve data
         data = io.load_em_observations(args)
 
+    detection_limit = utils.create_detection_limit(args, filters, 22.0)
+    data = inspect_detection_limit(detection_limit, data)
     data = check_detections(data, args.remove_nondetections)
     filters_to_analyze = set_analysis_filters(filters, data)
-    lc_model_type = model.identify_model_type(args)
+    detection_limit = {filt: detection_limit[filt] for filt in filters_to_analyze}
+
     model.create_light_curve_model_from_args(
-        lc_model_type,
         args,
         filters=filters_to_analyze,
     )
@@ -266,7 +277,7 @@ def nnanalysis(args):
         num_dim_final=5,
     ).to(device)
     num_dim = 7
-    SAVEPATH = os.getcwd() + "/nmma/mlmodel/similarity_embedding_weights.pth"
+    SAVEPATH = Path(__file__).parent.parent / "mlmodel/similarity_embedding_weights.pth"
     similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
     for name, param in similarity_embedding.named_parameters():
         param.requires_grad = False
@@ -276,7 +287,7 @@ def nnanalysis(args):
         similarity_embedding, 9, 5, 90, context_features=num_dim, num_dim=num_dim
     )
     flow = Flow(transform, base_dist, embedding_net).to(device=device)
-    PATH_nflow = os.getcwd() + "/nmma/mlmodel/frozen-flow-weights.pth"
+    PATH_nflow = Path(__file__).parent.parent / "mlmodel/frozen-flow-weights.pth"
     flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
 
     nsamples = 20000
@@ -315,8 +326,8 @@ def main(args=None):
         non_default = {}
     args = parsing_and_logging(multi_wavelength_analysis_parser, args)
     args.__dict__.update(non_default)
-    
-    if args.sampler == 'neuralnet':
+
+    if args.sampler == "neuralnet":
         nnanalysis(args)
     else:
         multi_analysis_loop(args, analysis_setup)

@@ -1,10 +1,10 @@
 import zlib
 from datetime import datetime
-import os
+from pathlib import Path
 
 BOLD = "\033[1m"
 NORMAL = "\033[0;0m"
-
+LOGS_DIR = Path("logs")
 
 COLOR_TABLE = [
     "black",
@@ -38,11 +38,9 @@ def save_to_file(app, message):
         None
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # check if logs directory exists
-    if not os.path.exists("logs"):
-        os.mkdir("logs")
+    LOGS_DIR.mkdir(exist_ok=True)
 
-    with open(f"logs/{app}.log", "a") as f:
+    with open(LOGS_DIR / f"{app}.log", "a") as f:
         f.write(f"{timestamp} {message}\n")
 
 

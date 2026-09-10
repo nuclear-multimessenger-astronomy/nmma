@@ -2,17 +2,11 @@ import argparse
 import configargparse
 import yaml
 import sys
-import os
+from pathlib import Path
 import operator
 
 from bilby.core.utils import setup_logger
 from .gitlab import refresh_models_list
-
-# If an argument is not specified while its type is given, 
-# it will still be parsed as None. If, however, we then reparse
-# this argument, e.g. from a stored config-file, it would raise an error.
-# These classes are a workaround to avoid this error.
-from bilby_pipe.utils import nonestr, nonefloat, noneint  # we forward import these elsewhere, do not remove
 
 def yaml_parse(s):
     return yaml.safe_load(s)
@@ -31,7 +25,7 @@ def parsing_and_logging(parser_func, args= None):
 
     try:
         setup_logger(outdir=args.outdir, label=args.label)
-        os.makedirs(args.outdir, exist_ok=True)
+        Path(args.outdir).mkdir(parents=True, exist_ok=True)
         print('Setting up logger and storage directory')
     except Exception as e:
         pass
@@ -79,7 +73,7 @@ def check_for_config(cli_args, parents=[], drop_config =True):
         else:
             config_given = False
 
-        if os.path.isfile(first_arg):
+        if Path(first_arg).is_file():
             if first_arg.endswith((".yaml", ".yml")):
                 pc = configargparse.YAMLConfigFileParser
             elif first_arg.endswith((".ini", ".toml", ".cfg", '.tml')):
@@ -184,19 +178,28 @@ def single_messenger_analysis_parsing(parser):
 
     
 def base_injection_parsing(parser):
-    parser.add_argument("-f", "--injection-file","--filename", default="injection", 
-        help="Path to the file with injection parameters, default: 'injection'.")
+    parser.add_argument("-f", "--injection-file","--filename", 
+        help="Path to the file with injection parameters")
     parser.add_argument("-e", "--extension","--outfile-type", default="json",
         choices=["json", "dat", "csv"], help="Injection file format", )
     parser.add_argument("--generation-seed", type=int, default=42, 
         help="Injection generation seed (default: 42)")
+    parser.add_argument(
+        "--injection", action="store_true", help="Whether to generate injections from prior (default: False)"
+    )
+    parser.add_argument(
+        "--injection-num",
+        type=int,
+        default=0,
+        help="The single injection number to be taken from the injection set", # Fixme: harmonize with --injection-numbers
+    )
     return parser
 
 def pipe_inj_parsing(parser):
     ### bilby-pipe injectionCreator parameters
-    parser.add_argument( "--prior-file", type=nonestr, 
+    parser.add_argument( "--prior-file",
         help="The prior file from which to generate injections. Alternatively, a prior-dict must be given.")
-    parser.add_argument("--prior-dict", type=nonestr, 
+    parser.add_argument("--prior-dict",  
         help=("A prior dict to use for generating injections. If not given, the prior file is used. "))
     parser.add_argument("-n", "--n-injection", type=int, default=20,
         help=("The number of injections to generate: not required" 
@@ -213,7 +216,7 @@ def pipe_inj_parsing(parser):
             " exists in the prior_file" ), )
     
 
-    parser.add_argument( "-g", "--gps-file", type=nonestr, 
+    parser.add_argument( "-g", "--gps-file",
         help=( "A list of gps start times to use for setting a geocent_time"
             "prior. Note, the trigger time is obtained from "
             " start_time + duration - post_trigger_duration." ))
@@ -250,7 +253,7 @@ def slurm_analysis_parser(parser):
     # Slurm-specific arguments
     slurm_args.add_argument("--Ncore", default=8, type=int,
         help="number of cores for mpiexec")
-    slurm_args.add_argument("--base-dir", default=os.getcwd(),
+    slurm_args.add_argument("--base-dir", default=Path.cwd(), type=Path,
         help="base directory for the job")
     slurm_args.add_argument("--job-name")
     slurm_args.add_argument("--logs-dir-name", default="slurm_logs",

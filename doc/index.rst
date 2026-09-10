@@ -20,14 +20,14 @@ can install NMMA using conda as follows:
 
 .. code::
 
-   conda create --name nmma_env python=3.12
+   conda create --name nmma_env python=3.13
    conda install -c conda-forge nmma
 
 If you have an issue, such as ``Solving environment: failed with initial frozen solve``, an option could be:
 
 .. code::
 
-   conda create --name nmma_env python=3.12
+   conda create --name nmma_env python=3.13
    conda install mamba -c conda-forge
    mamba install nmma -c conda-forge
 
@@ -94,7 +94,7 @@ nmma_env in this case):
 
 .. code::
 
-   conda create --name nmma_env python=3.12
+   conda create --name nmma_env python=3.13
    conda activate nmma_env
 
 .. note::
@@ -120,7 +120,7 @@ Check python and pip version like this:
    python --version
    pip --version
 
-Python 3.12 and above and Pip 21.2 and above is ideal for this
+Python 3.13 and above and Pip 21.2 and above is ideal for this
 installation. It is recommended to update these for your installation.
 
 
@@ -170,7 +170,7 @@ requirements.txt file which are necessary for NMMA:
    There is an issue pip installing ``pyfftw`` on arm64 Mac systems; see the dedicated section below for a solution. If any package appeared to have an issue installing, you can first check by attempting to install it again using pip:
 
 .. code::
-   
+
    pip install importlib_resources
    pip install  extinction
    pip install dill
@@ -326,7 +326,7 @@ If you want to install a custom lalsuite version (e.g. with a certain GW templat
 
 .. code::
 
-   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.12
+   conda create -c conda-forge --prefix=YOUR_PREFIX python=3.13
    conda activate YOUR_PREFIX
 
 and then installing mpi4py first before installing the required packages for the build process (here the second line):

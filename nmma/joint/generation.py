@@ -5,7 +5,7 @@ This will create a directory structure for your parallel runs to store the
 output files, logs and plots. It will also generate a `data_dump` that stores
 information on the run settings and data to be analysed.
 """
-import os
+from pathlib import Path
 import sys
 import pickle
 
@@ -73,7 +73,7 @@ def determine_required_args(analysis_categories):
     return required_args
     
 
-def write_complete_config_file(parser, args, inputs):
+def write_complete_config_file(parser, args, inputs, remove_none=True):
     """Wrapper function that uses bilby_pipe's complete config writer.
 
     Note: currently this function does not verify that the written complete config is
@@ -102,8 +102,9 @@ def write_complete_config_file(parser, args, inputs):
         if key == "label":
             continue
         if isinstance(val, str):
-            if os.path.isfile(val) or os.path.isdir(val):
-                setattr(args, key, os.path.abspath(val))
+            val = Path(val)
+            if val.exists():
+                setattr(args, key, str(val.absolute()))
         if isinstance(val, list):
             if len(val) == 0:
                 setattr(args, key, "[]")
@@ -111,12 +112,17 @@ def write_complete_config_file(parser, args, inputs):
                 setattr(args, key, f"[{', '.join(val)}]")
     args.sampler_kwargs = str(inputs.sampler_kwargs)
     args.submit = False
+    if remove_none:
+        non_default_args = {
+            k: v for k, v in args.__dict__.items() if v is not None
+        }
+        args.__dict__ = non_default_args
     parser.write_config_file(args, [inputs.complete_ini_file])
 
 def create_generation_logger(outdir, label):
     logger = bilby.core.utils.logger
     bilby.core.utils.setup_logger(
-        outdir=os.path.join(outdir, "data"), label=label
+        outdir=str(Path(outdir, "data")), label=label
     )
     bilby_pipe.data_generation.logger = logger
     return logger
@@ -302,7 +308,8 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 args.systematics_file, error_budget=args.em_error_budget)
             
             priors = sys_handler.setup_systematics_priors(priors)
-            priors = extinction_prior(priors, args)
+            if args.fetch_Ebv_from_dustmap:
+                priors = extinction_prior(priors, args)
             data_dump |= dict(light_curve_data=light_curve_data, filters = filters,
                     systematics_dict = sys_handler.systematics_dict)
 

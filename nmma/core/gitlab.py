@@ -17,7 +17,6 @@ from tqdm.auto import tqdm
 pbar = {}
 MODELS = {}
 REPO = "https://gitlab.com/Theodlz/nmma-models"
-# DEFAULT_MODELS_HOME = os.path.join("~", "nmma_models")
 code_dir = Path(__file__).resolve().parent.parent
 DEFAULT_MODELS_HOME = code_dir.parent / "nmma_models"
 
@@ -32,11 +31,11 @@ SKIP_FILTERS = [
 ]
 
 
-def get_models_home(models_home=None) -> str:
+def get_models_home(models_home=None) -> Path:
     if not models_home:
         models_home = os.environ.get("NMMA_MODELS", DEFAULT_MODELS_HOME)
-    models_home = os.path.expanduser(models_home)
-    os.makedirs(models_home, exist_ok=True)
+    models_home = Path(models_home).expanduser()
+    models_home.mkdir(parents=True, exist_ok=True)
     return models_home
 
 
@@ -47,36 +46,41 @@ def clear_data_home(models_home=None):
 
 def download(file_info):
     url, filepath = file_info
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
     resp = requests.get(url, stream=True)
     total = int(resp.headers.get("content-length", 0))
     chunk_size = 4096
-    file_content = b""
+    downloaded = 0
 
-    Path(filepath).parent.mkdir(parents=True, exist_ok=True)
-    with open(filepath, "wb") as f, tqdm(
-        total=total,
-        unit="iB",
-        unit_scale=True,
-        unit_divisor=1024,
-        desc=f"{str(filepath).split('/')[-1]}",
-    ) as pbar:
+    with (
+        open(filepath, "wb") as f,
+        tqdm(
+            total=total,
+            unit="iB",
+            unit_scale=True,
+            unit_divisor=1024,
+            desc=filepath.name,
+        ) as pbar,
+    ):
         for chunk in resp.iter_content(chunk_size=chunk_size):
             f.write(chunk)
+            downloaded += len(chunk)
             pbar.update(len(chunk))
 
-    if len(file_content) != total:
+    if downloaded != total:
         raise ValueError(
             f"Downloaded file {filepath} is incomplete. "
-            f"Only {len(file_content)} of {total} bytes were downloaded."
+            f"Only {downloaded} of {total} bytes were downloaded."
         )
 
     return filepath
 
 
 def decompress(file_path):
-    if not file_path.endswith(".lzma"):
+    if not file_path.suffix == ".lzma":
         raise ValueError(f"File {file_path} is not a .lzma file")
-    if not os.path.exists(file_path):
+    if not file_path.exists():
         raise ValueError(f"File {file_path} does not exist")
 
     stdout, stderr = subprocess.Popen(
@@ -88,23 +92,24 @@ def decompress(file_path):
 
 
 def download_and_decompress(file_info):
-    download(file_info)
-    decompress(file_info[1])
+    file_path = download(file_info)
+    if file_path.suffix == ".lzma":
+        decompress(file_path)
 
 
 def download_models_list(models_home=None):
     # first we load the models list from gitlab
     models_home = get_models_home(models_home)
-    os.makedirs(models_home, exist_ok=True)
+    models_home.mkdir(parents=True, exist_ok=True)
     r = requests.get(f"{REPO}/raw/main/models.yaml", allow_redirects=True)
-    with open(Path(models_home, "models.yaml"), "wb") as f:
+    with open(models_home / "models.yaml", "wb") as f:
         f.write(r.content)
 
 
 def load_models_list(models_home=None):
 
     models_home = get_models_home(models_home)
-    models_file = Path(models_home, "models.yaml")
+    models_file = models_home / "models.yaml"
     models = {}
 
     try:
@@ -117,15 +122,15 @@ def load_models_list(models_home=None):
         downloaded_if_missing = False
         print(f"Could not open downloaded models list, using local files instead: {e}")
 
-    files = [f for f in Path(models_home).glob("*") if f.is_dir()]
+    files = [f for f in models_home.glob("*") if f.is_dir()]
     files = [f.stem for f in files]
 
     for f in files:
         name = f.split("/")[-1]
         filters = []
-        if Path(models_home, name).exists():
+        if (models_home / name).exists():
             filter_files = [
-                f.stem for f in Path(models_home, name).glob("*") if f.is_file()
+                f.stem for f in (models_home / name).glob("*") if f.is_file()
             ]
             for ff in filter_files:
                 ff = ff.split("/")[-1]
@@ -150,8 +155,8 @@ def load_models_list(models_home=None):
 def refresh_models_list(models_home=None):
     global MODELS
     models_home = get_models_home(models_home)
-    if Path(models_home, "models.yaml").exists():
-        Path(models_home, "models.yaml").unlink()
+    if (models_home / "models.yaml").exists():
+        (models_home / "models.yaml").unlink()
     models = MODELS
     try:
         models = load_models_list(models_home)[0]
@@ -187,8 +192,7 @@ def get_model(
         raise ValueError(f"model_name {model_name} not found in models list")
     model_info = MODELS[model_name]
 
-    os.makedirs(Path(models_home, model_name), exist_ok=True)
-
+    (models_home / model_name).mkdir(parents=True, exist_ok=True)
     filter_synonyms = [filt.replace("_", ":") for filt in model_info["filters"]]
 
     all_filters = list(set(model_info["filters"] + filter_synonyms))
@@ -223,10 +227,10 @@ def get_model(
     core_model_name = "_".join(model_name_components)
 
     filepaths = (
-        [Path(models_home, f"{core_model_name}.{core_format}")]
+        [models_home / f"{core_model_name}.{core_format}"]
         if not filters_only
         else []
-    ) + [Path(models_home, model_name, f"{f}.{filter_format}") for f in filters]
+    ) + [models_home / model_name / f"{f}.{filter_format}" for f in filters]
     urls = (
         [f"{base_url}/{core_model_name}.{core_format}"] if not filters_only else []
     ) + [f"{base_url}/{model_name}/{f}.{filter_format}" for f in filters]
@@ -254,7 +258,7 @@ def get_model(
                 # Consume the iterator so URLError / OSError from worker threads
                 # surfaces instead of being silently swallowed.
                 list(executor.map(download_and_decompress, missing))
-            still_missing = [str(f) for _, f in missing if not Path(f).exists()]
+            still_missing = [f for _, f in missing if not Path(f).exists()]
             if still_missing:
                 raise OSError(
                     f"failed to download {len(still_missing)} model file(s) for "

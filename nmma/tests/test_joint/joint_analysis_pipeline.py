@@ -1,0 +1,127 @@
+from argparse import Namespace
+from pathlib import Path
+import pytest
+import numpy as np
+import shutil
+
+from nmma.em import (
+    em_parsing as emp,
+    lightcurve_handling as lch,
+    model,
+    analysis as ema,
+)
+from nmma.eos.eos_parsing import tabulated_eos_parsing
+from nmma.eos.eos_likelihood import tabulated_eos_setup
+from nmma.core.base import multi_analysis_loop
+from nmma.core.parsing import parsing_and_logging
+from nmma.joint.joint_likelihood import MultiMessengerLikelihood
+from nmma.core import utils
+from nmma.joint import generation
+
+DATA_DIR = Path(__file__).parent.parent / "data"
+
+
+def merge_namespaces(*namespaces):
+    joint_ns = Namespace()
+    for ns in namespaces:
+        try:
+            joint_ns.__dict__.update(ns.__dict__)
+        except AttributeError:
+            joint_ns.__dict__.update(ns)
+    return joint_ns
+
+
+em_args = parsing_and_logging(
+    (emp.multi_wavelength_analysis_parser, tabulated_eos_parsing), []
+)
+main_args = Namespace(
+    label="injection",
+    prior_file=f"{DATA_DIR}/Bu2026_simplified.prior",
+    em_tmin=0.1,
+    em_tmax=10.0,
+    injection_em_tmax=9.0,
+    em_tstep=0.5,
+    em_error_budget=0.1,
+    bestfit=True,
+    filters="ztfr",
+    plot=True,
+)
+em_model_args = Namespace(
+    em_transient_class="fiesta_kn",
+)
+
+injection_args = Namespace(
+    injection=True,
+)
+
+samling_args = Namespace(nlive=64, local_only=True, sampler="pymultinest")
+
+eos_args = Namespace(
+    eos_data=DATA_DIR / "eos_macro",
+    eos_to_ram=True,
+    upper_mtov={"upper_dummy": {"mass": 2.23, "error": 0.02}},
+    lower_mtov={"lower_dummy": {"mass": 2.17, "error": 0.02}},
+)
+# gw_args = Namespace(
+#     frequency_domain_source_model = 'binary_neutron_star_frequency_sequence',
+#     waveform_approximant = 'IMRPhenomXAS_NRTidalv3',
+#     likelihood_type = 'MBGravitationalWaveTransient',
+#     reference_frequency = 30,
+#     duration = 256,
+#     detectors = ['H1', 'L1', 'V1'],'
+# )
+joint_args = Namespace(ejecta_conversion=False)
+
+
+@pytest.fixture(scope="module")
+def args():
+    return merge_namespaces(
+        em_args,
+        main_args,
+        em_model_args,
+        injection_args,
+        samling_args,
+        eos_args,
+        # gw_args,
+        joint_args,
+    )
+
+
+@pytest.fixture(autouse=True)
+def cleanup_outdir(args):
+    yield
+    if Path(args.outdir).exists():
+        shutil.rmtree(args.outdir, ignore_errors=True)
+
+
+def test_injection_creation(args):
+    inj_model = model.create_light_curve_model_from_args(args)
+    injection_parameters = utils.injection_from_args(args)
+    data, injection_parameters = lch.make_injection(
+        injection_parameters, args, injection_model=inj_model
+    )
+
+    assert np.isclose(
+        [arr[10] for arr in data["ztfr"].values()],
+        [-0.09856092, 20.728512, 1.00000000e-01],
+    ).all()
+
+
+def test_single_thread_setup(args):
+    def setup(args):
+        priors, em_lhood, injection_parameters = ema.analysis_setup(args)
+        eos_priors, eos_lhood, _ = tabulated_eos_setup(args)
+        injection_parameters["EOS"] = 7  # set EOS used in injection
+        priors.update(eos_priors)
+        # priors = ConditionalPriorDict(priors) # FIXME: this will only work in bilby 2.8+
+        combined_likelihood = MultiMessengerLikelihood([em_lhood, eos_lhood], priors)
+        return priors, combined_likelihood, injection_parameters
+
+    multi_analysis_loop(args, setup)
+
+
+def test_parallel_setup(args):
+    args.sampler = "dynesty"
+    args.injection_dict = utils.injection_from_prior(args)
+    generation.generate_runner(**vars(args))
+    # main.analysis_runner('outdir', pool_type='multi')

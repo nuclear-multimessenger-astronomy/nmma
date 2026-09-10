@@ -1,14 +1,18 @@
-
 import sys
-import os
+from pathlib import Path
 from scipy.interpolate import PchipInterpolator
 from scipy.stats import norm
 import healpy as hp
 import numpy as np
 import matplotlib.pyplot as plt
 from bilby.core.prior import (
-    Prior, DeltaFunction, Interped, ConditionalTruncatedGaussian,
-    ConditionalPriorDict, PriorDict)
+    Prior,
+    DeltaFunction,
+    Interped,
+    ConditionalTruncatedGaussian,
+    ConditionalPriorDict,
+    PriorDict,
+)
 from ligo.skymap import io as skymap_io, moc
 
 from ..core.base import adjust_hubble_prior
@@ -29,7 +33,7 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
 
     def __init__(
         self,
-        minimum= -np.inf,
+        minimum=-np.inf,
         maximum=np.inf,
         name=None,
         N_sigma=1,
@@ -39,12 +43,12 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
     ):
         if isinstance(minimum, Prior):
             original_iota_prior = minimum
-            minimum=original_iota_prior.minimum
-            maximum=original_iota_prior.maximum
-            name=original_iota_prior.name
-            latex_label=original_iota_prior.latex_label
-            unit=original_iota_prior.unit
-            boundary=original_iota_prior.boundary
+            minimum = original_iota_prior.minimum
+            maximum = original_iota_prior.maximum
+            name = original_iota_prior.name
+            latex_label = original_iota_prior.latex_label
+            unit = original_iota_prior.unit
+            boundary = original_iota_prior.boundary
 
         super().__init__(
             mu=0,
@@ -83,23 +87,25 @@ def inclination_prior_from_fits(priors, args):
 
     # load the skymap
     skymap = skymap_io.read_sky_map(args.fits_file, moc=True)
-    maP_idx = np.argmax(skymap['PROBDENSITY'])  
+    maP_idx = np.argmax(skymap["PROBDENSITY"])
 
     # check if the sky location is input
     # if not, the maximum posterior point is taken
-    if ('ra' in priors and 'dec' in priors) or (args.ra and args.dec):
+    if ("ra" in priors and "dec" in priors) or (args.ra and args.dec):
         if args.ra and args.dec:
-            print("Using command line input for sky location, ignoring the prior file input")
+            print(
+                "Using command line input for sky location, ignoring the prior file input"
+            )
             ra = args.ra
             dec = args.dec
         else:
             print("Using prior file input for sky location")
-            ra = np.rad2deg(priors['ra'].peak)
-            dec = np.rad2deg(priors['dec'].peak)
+            ra = np.rad2deg(priors["ra"].peak)
+            dec = np.rad2deg(priors["dec"].peak)
 
         print(f"Using the input sky location ra={ra}, dec={dec}")
 
-        uniq_idx = skymap[maP_idx]['UNIQ']
+        uniq_idx = skymap[maP_idx]["UNIQ"]
         order, nest_idx = moc.uniq2nest(uniq_idx)
         nside = hp.order2nside(order)
         nest_idx = get_skymap_idx(ra, dec, nside)
@@ -107,7 +113,7 @@ def inclination_prior_from_fits(priors, args):
         # find the row with the closest nested index
         nest_idxs = []
         for row in skymap:
-            order_per_row, nest_idx_per_row = moc.uniq2nest(row['UNIQ'])
+            order_per_row, nest_idx_per_row = moc.uniq2nest(row["UNIQ"])
             if order_per_row == order:
                 nest_idxs.append(nest_idx_per_row)
             else:
@@ -122,13 +128,15 @@ def inclination_prior_from_fits(priors, args):
     # construct the iota prior
     cosiota_nodes_num = args.cosiota_node_num
     cosiota_nodes = np.cos(np.linspace(0, np.pi, cosiota_nodes_num))
-    colnames = ['PROBDENSITY', 'DISTMU', 'DISTSIGMA', 'DISTNORM']
+    colnames = ["PROBDENSITY", "DISTMU", "DISTSIGMA", "DISTNORM"]
     # do an all-in-one interpolation
     prob_density, dist_mu, dist_sigma, dist_norm = (
         PchipInterpolator(
-            cosiota_nodes[::-1], row['{}_SAMPLES'.format(colname)][::-1],
+            cosiota_nodes[::-1],
+            row["{}_SAMPLES".format(colname)][::-1],
         )
-        for colname in colnames)
+        for colname in colnames
+    )
     # now have the joint distribution evaluated
     u = np.linspace(-1, 1, 1000)  # this is cosiota
     # fetch the fixed distance
@@ -137,8 +145,13 @@ def inclination_prior_from_fits(priors, args):
         dL = args.dL
     else:
         print("Using prior file input for distance")
-        dL = priors['luminosity_distance'].peak
-    prob_u = prob_density(u) * dist_norm(u) * np.square(dL) * norm(dist_mu(u), dist_sigma(u)).pdf(dL)
+        dL = priors["luminosity_distance"].peak
+    prob_u = (
+        prob_density(u)
+        * dist_norm(u)
+        * np.square(dL)
+        * norm(dist_mu(u), dist_sigma(u)).pdf(dL)
+    )
 
     iota = np.arccos(u)
     prob_iota = prob_u * np.absolute(np.sin(iota))
@@ -153,68 +166,55 @@ def inclination_prior_from_fits(priors, args):
     # normalize
     prob_iota /= np.trapezoid(iota_EM, prob_iota_EM)
 
-    priors['inclination_EM'] = Interped(
-        xx=iota_EM,
-        yy=prob_iota_EM,
-        minimum=0,
-        maximum=np.pi / 2)
+    priors["inclination_EM"] = Interped(
+        xx=iota_EM, yy=prob_iota_EM, minimum=0, maximum=np.pi / 2
+    )
 
     if args.plot:
         plt.figure()
-        plt.xlabel('Inclination')
-        plt.ylabel('PDF')
+        plt.xlabel("Inclination")
+        plt.ylabel("PDF")
         plt.plot(iota_EM, prob_iota_EM)
         plt.savefig(f"{args.outdir}/Fits_motivated_inclination_prior.png")
         plt.close()
     print("Inclination prior is set based on the fits file input")
     return priors
 
+
 def extinction_prior(priors, args):
-    # setup for Ebv
-    name = "Ebv"
-    latex_label = "$E(B-V)$"
-    if args.fetch_Ebv_from_dustmap:
-        ra, dec = getattr(args, 'ra', None), getattr(args, 'dec', None)
-        if not (ra and dec):
-            try:
-                ra = priors['ra' ].peak
-                dec= priors['dec'].peak
-            except (KeyError, AttributeError):
-                raise ValueError("ra and dec are not provided in the arguments or priors, "
-                                 "but are needed to fetch Ebv from dustmap")
-
-        print("Fetching value of Ebv from dustmap, overwriting any previous prior on Ebv")
+    ra, dec = getattr(args, "ra", None), getattr(args, "dec", None)
+    if not (ra and dec):
         try:
-            import dustmaps.sfd
-            from dustmaps.config import config
-            from astropy import coordinates
-        except ImportError:
-            print("Package dustmap is needed")
-            sys.exit(1)
+            ra = priors["ra"].peak
+            dec = priors["dec"].peak
+        except (KeyError, AttributeError):
+            raise ValueError(
+                "ra and dec are not provided in the arguments or priors, "
+                "but are needed to fetch Ebv from dustmap"
+            )
 
-        # check if the dust fits are downloaded
-        default_dir = os.path.join(os.path.dirname(__file__))
-        # config dustmaps to fetch and place fits from default_dir
-        config['data_dir'] = default_dir
-        for f in ['sfd/SFD_dust_4096_ngp.fits', 'sfd/SFD_dust_4096_sgp.fits']:
-            if not os.path.isfile(os.path.join(default_dir, f)):
-                dustmaps.sfd.fetch()
+    print("Fetching value of Ebv from dustmap, overwriting any previous prior on Ebv")
+    try:
+        import dustmaps.sfd
+        from dustmaps.config import config
+        from astropy import coordinates
+    except ImportError:
+        print("Package dustmap is needed")
+        sys.exit(1)
 
-        # fetching the Ebv value
-        coord = coordinates.SkyCoord(ra, dec, unit='rad')
-        val = dustmaps.sfd.SFDQuery()(coord)
-        priors['Ebv'] = DeltaFunction(val, name, latex_label)
-        print(f"The prior on Ebv is set to fixed value of {val}")
-    
-    elif 'Ebv' not in priors:
-        if args.Ebv_max > 0.0 and args.use_Ebv:
-            Ebv_c = 1.0 / (0.5 * args.Ebv_max)
-            min, max = 0, args.Ebv_max
-            priors["Ebv"] = Interped([min, max],[Ebv_c, 0], 
-                                     min, max, name, latex_label )
-        else:
-            priors["Ebv"] = DeltaFunction(0.,name, latex_label)
+    # check if the dust fits are downloaded
+    data_dir = Path(__file__).parent
+    # config dustmaps to fetch and place fits from default_dir
+    config["data_dir"] = str(data_dir)
+    for f in ["SFD_dust_4096_ngp.fits", "SFD_dust_4096_sgp.fits"]:
+        if not (data_dir / "sfd" / f).is_file():
+            dustmaps.sfd.fetch()
 
+    # fetching the Ebv value
+    coord = coordinates.SkyCoord(ra, dec, unit="rad")
+    val = dustmaps.sfd.SFDQuery()(coord)
+    priors["Ebv"] = DeltaFunction(val, "Ebv", "$E(B-V)$")
+    print(f"The prior on Ebv is set to fixed value of {val}")
     return priors
 
 
@@ -222,23 +222,30 @@ def create_prior_from_args(args, systematics_handler):
     """Function to create prior dictionary from command line arguments and nmma-LightCurveModel
     Parameters
     ----------
-    args : argparse.Namespace   
+    args : argparse.Namespace
         Command line arguments
     lc_model : nmma.em.model.LightCurveModelContainer
         Light curve model object to compute light curves
     """
-    priors = PriorDict(args.prior_file) if getattr(args, 'prior_file', None) else PriorDict(args.prior)
+    priors = (
+        PriorDict(args.prior_file)
+        if getattr(args, "prior_file", None)
+        else PriorDict(args.prior)
+    )
     priors = adjust_hubble_prior(priors, args)
-    priors = extinction_prior(priors, args)
+    if args.fetch_Ebv_from_dustmap:
+        priors = extinction_prior(priors, args)
 
     # re-setup the prior if the conditional prior for inclination is used
     if args.conditional_gaussian_prior_thetaObs:
         priors_dict = dict(priors)
         priors_dict["inclination_EM"] = ConditionalGaussianIotaGivenThetaCore(
-            priors_dict["inclination_EM"], N_sigma = args.conditional_gaussian_prior_N_sigma)
+            priors_dict["inclination_EM"],
+            N_sigma=args.conditional_gaussian_prior_N_sigma,
+        )
         priors = ConditionalPriorDict(priors_dict)
 
-    if getattr(args,'fits_file', False):
+    if getattr(args, "fits_file", False):
         priors = inclination_prior_from_fits(priors, args)
     priors = systematics_handler.setup_systematics_priors(priors)
     return priors

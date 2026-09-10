@@ -1,27 +1,30 @@
 import os
+
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
-from glob import glob
+from pathlib import Path
 import pickle
 
 try:
     from mpi4py import MPI
+
     rank = MPI.COMM_WORLD.Get_rank()
 except ImportError:
     rank = 0
 
-if rank != 0:   
+if rank != 0:
     devnull = os.open(os.devnull, os.O_WRONLY)
     os.dup2(devnull, 1)
     os.dup2(devnull, 2)
-    
+
 from bilby.core.prior import PriorDict
-from ..core.mpi_setup import pbilby_sampling 
+from ..core.mpi_setup import pbilby_sampling
 from ..core.base import bilby_sampling
 from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args
 from .joint_likelihood import MultiMessengerLikelihood
 from ..core.utils import logger
+
 
 def analysis_runner(
     data_dump,
@@ -37,9 +40,8 @@ def analysis_runner(
 
     ## Load the data dump
     if not data_dump.endswith("_dump.pickle"):
-        test_out = os.path.join(os.getcwd(), data_dump)
-        test_dump = glob(f"{test_out}/data/*_dump.pickle")
-        data_dump = test_dump[0]
+        test_out = Path(data_dump, "data")
+        data_dump = next(test_out.glob("*_dump.pickle"))
     with open(data_dump, "rb") as file:
         data_dump = pickle.load(file)
 
@@ -49,18 +51,19 @@ def analysis_runner(
 
     # If the run dir has not been specified, get it from the args
     if outdir:
-        args.outdir  = outdir
-        
+        args.outdir = outdir
+
     # If the label has not been specified, get it from the args
     if label:
         args.label = label
 
     priors = PriorDict.from_json(data_dump["prior_file"])
-    
+
     ## Set up the likelihood
     likelihood = MultiMessengerLikelihood.setup_from_args(
-        data_dump, priors, args, logger)
-    
+        data_dump, priors, args, logger
+    )
+
     ## adjust meta data to storable format
     meta_data = data_dump.copy()
     waveform_generator = meta_data.pop("waveform_generator", None)
@@ -73,13 +76,20 @@ def analysis_runner(
     if args.sampler == "dynesty":
         logger.info("Using dynesty sampler")
         return pbilby_sampling(
-            likelihood, priors, args, 
-            data_dump.get("injection_parameters", None), rank,
-            plot=plot, meta_data=meta_data, **kwargs)
+            likelihood,
+            priors,
+            args,
+            data_dump.get("injection_parameters", None),
+            rank,
+            plot=plot,
+            meta_data=meta_data,
+            **kwargs,
+        )
     else:
         return bilby_sampling(
-            likelihood, priors, args, 
-            data_dump.get("injection_parameters", None), rank)
+            likelihood, priors, args, data_dump.get("injection_parameters", None), rank
+        )
+
 
 def nmma_analysis():
     """
@@ -94,4 +104,3 @@ def nmma_analysis():
 
     # Run the analysis
     analysis_runner(**vars(input_args))
-
