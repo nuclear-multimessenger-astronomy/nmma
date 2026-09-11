@@ -60,6 +60,22 @@ def load_em_observations(filename, args=None, format="observations"):
 
 
 def read_lc_from_json(filename):
+    """Read a light curve from a JSON file, in either supported layout.
+
+    The standard layout keys everything by filter. The model layout has a
+    single shared time column instead, and is converted on the fly.
+
+    Parameters
+    ----------
+    filename: str
+        Path to the JSON file.
+
+    Returns
+    -------
+    dict
+        Photometry per filter, holding time, mag and mag_error.
+    """
+
     # we assume the json file is in the standard format
     with open(filename, "r") as f:
         data = json.load(f, object_hook=decode_bilby_json)
@@ -80,6 +96,31 @@ def read_lc_from_json(filename):
 
 
 def read_lc_from_csv(filename, args, format):
+    """Read a light curve from a text file, in the requested layout.
+
+    Observations are one row per measurement, models are one column per
+    filter. The standard layout only exists in JSON.
+
+    Parameters
+    ----------
+    filename: str
+        Path to the file.
+    args: argparse.Namespace
+        Parsed command-line arguments, read for the time format.
+    format: str
+        Either ``observations`` or ``model``.
+
+    Returns
+    -------
+    dict
+        Photometry per filter.
+
+    Raises
+    ------
+    ValueError
+        If ``standard`` is requested, which only JSON files can provide.
+    """
+
     if "obs" in format:
         try:
             return strict_read_csv(filename, args)
@@ -115,6 +156,23 @@ def read_lc_from_csv(filename, args, format):
 
 
 def generous_read_csv(filename):
+    """Read observations from a SkyPortal-style table, keeping upper limits.
+
+    Rows whose magnitude is missing are treated as non-detections: they take
+    the limiting magnitude of the row and an infinite uncertainty.
+
+    Parameters
+    ----------
+    filename: str
+        Path to a comma-separated file with filter, mjd, mag_corr, magerr
+        and limiting_mag columns.
+
+    Returns
+    -------
+    dict
+        Photometry per filter.
+    """
+
     data = pd.read_csv(filename)
     out_data = {}
     for filter in data["filter"].unique():
@@ -133,10 +191,30 @@ def generous_read_csv(filename):
 
 
 def strict_read_csv(filename, args):
+    """Read observations from the four-column format NMMA writes itself.
+
+    Each row is a time, a filter, a magnitude and its uncertainty. Times are
+    read as ISO first, then retried with the format given on the command
+    line, defaulting to MJD.
+
+    Parameters
+    ----------
+    filename: str
+        Path to a whitespace-separated file. Blank lines and lines starting
+        with # are skipped, as is a time or mjd header.
+    args: argparse.Namespace
+        Parsed command-line arguments, read for the time format.
+
+    Returns
+    -------
+    dict
+        Photometry per filter, with plain lists rather than arrays.
+    """
+
     with open(filename, "r") as f:
         lines = [line.rstrip("\n") for line in f]
-        lines = [l for l in lines if l]  # get non-empty lines
-        lines = [l for l in lines if not l.startswith("#")]
+        lines = [line for line in lines if line]  # get non-empty lines
+        lines = [line for line in lines if not line.startswith("#")]
 
         data = {}
         for line in lines:
@@ -169,6 +247,21 @@ def strict_read_csv(filename, args):
 
 
 def write_em_observations(filename, data, format="observations"):
+    """Write a light curve, picking the writer from the file extension.
+
+    Parent directories are created as needed.
+
+    Parameters
+    ----------
+    filename: str or pathlib.Path
+        Destination. A .json suffix selects the standard layout, while .csv,
+        .txt and .dat go through the text writer.
+    data: dict
+        Photometry per filter.
+    format: str, optional
+        Layout for text files: observations, model or bolometric.
+    """
+
     # write json file in standard format or csv file, either in observations or model format
     filename = Path(filename)
     filename.parent.mkdir(parents=True, exist_ok=True)
@@ -181,11 +274,38 @@ def write_em_observations(filename, data, format="observations"):
 
 
 def write_lc_to_json(injection_outfile, data):
+    """Write a light curve as JSON, in the standard layout.
+
+    Parameters
+    ----------
+    injection_outfile: str or pathlib.Path
+        Destination file.
+    data: dict
+        Photometry per filter.
+    """
+
     with open(injection_outfile, "w") as f:
         json.dump(data, f, cls=NumpyEncoder, indent=2)
 
 
 def write_lc_to_csv(outfile, data, format="observations"):
+    """Write a light curve as text, in one of three layouts.
+
+    Observations are sorted by time and written one row per measurement,
+    with ISO times. Models keep one column per filter on a shared time grid,
+    and filters whose uncertainties are all NaN get no error column.
+    Bolometric files are a time and a luminosity column.
+
+    Parameters
+    ----------
+    outfile: pathlib.Path
+        Destination. A .csv suffix selects commas, anything else spaces.
+    data: dict
+        Photometry per filter, or time and lbol for the bolometric layout.
+    format: str, optional
+        One of observations, model or bolometric.
+    """
+
     delimiter = "," if outfile.suffix == ".csv" else " "
     if format == "observations":
         all_times, all_filters, all_mags, all_errs = [], [], [], []
@@ -252,6 +372,28 @@ def write_lc_to_csv(outfile, data, format="observations"):
 
 
 def convert_skyportal_lcs(filepath=None):
+    """Entry point of the ``convert-skyportal-lcs`` command.
+
+    Rewrite SkyPortal exports into the four-column format NMMA reads, next
+    to the originals with a .dat suffix. Rows without a usable magnitude or
+    uncertainty are dropped.
+
+    Parameters
+    ----------
+    filepath: str or pathlib.Path or list, optional
+        Files to convert. Read from the command line when omitted.
+
+    Returns
+    -------
+    list
+        Paths of the files that were written.
+
+    Raises
+    ------
+    ValueError
+        If filepath is neither a path nor a list of paths.
+    """
+
     if filepath is None:
         p = argparse.ArgumentParser()
         p.add_argument("--filepath", nargs="*", help="path to lightcurve files")
@@ -307,6 +449,32 @@ def convert_skyportal_lcs(filepath=None):
 
 
 def read_training_data(filenames, format, data_type="photometry", args=None):
+    """Read a grid of training light curves or spectra.
+
+    Parameters
+    ----------
+    filenames: list of str
+        Files making up the grid.
+    format: str
+        Layout of the photometry files, passed on to the reader.
+    data_type: str, optional
+        Either photometry or spectroscopy.
+    args: argparse.Namespace, optional
+        Parsed command-line arguments, read for the wavelength range of
+        spectroscopy.
+
+    Returns
+    -------
+    dict
+        One entry per grid point.
+
+    Raises
+    ------
+    IndexError
+        If bolometric light curves are mixed into a photometry grid.
+    ValueError
+        If data_type is neither photometry nor spectroscopy.
+    """
 
     # read the grid data
     if data_type == "photometry":
@@ -328,6 +496,29 @@ def read_training_data(filenames, format, data_type="photometry", args=None):
 def read_spectroscopy_files(
     files, wavelength_min=3000.0, wavelength_max=10000.0, smooth=False
 ):
+    """Read spectra from a grid, restricted to a wavelength range.
+
+    Each file holds several epochs, which are grouped by time. The
+    wavelength grid is taken from the first epoch and assumed identical
+    across the others.
+
+    Parameters
+    ----------
+    files: list of str
+        Files to read, each with wavelength, time and fnu columns.
+    wavelength_min: float, optional
+        Lower bound of the range to keep, in angstroms.
+    wavelength_max: float, optional
+        Upper bound of the range to keep, in angstroms.
+    smooth: bool, optional
+        If True, run a median filter over each spectrum.
+
+    Returns
+    -------
+    dict
+        One entry per file, holding its time grid, wavelength grid and
+        spectra.
+    """
 
     data = {}
     for filename in files:
@@ -525,6 +716,22 @@ def read_photometry_files(
 
 # FIXME Legacy??? seems unused
 def loadEventSpec(filename):
+    """Read a single spectrum and give it a crude uncertainty.
+
+    The uncertainty is estimated from the difference between neighbouring
+    points, floored at half the flux.
+
+    Parameters
+    ----------
+    filename: str
+        Path to a two-column file: wavelength in angstroms, flux in
+        erg/s/cm2/angstrom.
+
+    Returns
+    -------
+    dict
+        The wavelength grid, the flux and its estimated uncertainty.
+    """
 
     data_out = np.loadtxt(filename)
     spec = {}
