@@ -4,14 +4,14 @@
 
 This policy covers "NMMA," "Nuclear Multi-Messenger Astronomy," the NMMA
 logo, and related NMMA names and branding. The owners of these marks are
-Peter Tsun Ho Pang, Michael Coughlin, and Tim Dietrich.
+Michael Coughlin, Tim Dietrich, and Peter Tsun Ho Pang.
 
 Any one of the three owners may grant written permission under this policy.
 Permission requests should be sent to all three owners:
 
-- tsunhopang@ust.hk
 - cough052@umn.edu
 - tim.dietrich@uni-potsdam.de
+- tsunhopang@ust.hk
 
 The logo was created by Alice L. Y. Chan, who assigned its copyright to
 Peter Tsun Ho Pang in writing. The logo is governed by
