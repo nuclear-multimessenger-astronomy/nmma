@@ -31,7 +31,7 @@ dependencies = [
     "future",
     "bilby>=2.7.1",
     "bilby_pipe>=1.7.0",
-    "fiestaEM>=0.2.1",
+    "fiestaEM>=0.2.1,<0.2.2",
     "huggingface_hub",
     "schwimmbad",
     "colorcet",
@@ -138,7 +138,7 @@ gwemopt = ['data/*/*']
 [tool.coverage.run]
 source = ["nmma"]
 omit = [
-    "nmma/tests/*",
+    "tests/*",
     "nmma/__main__.py",
 ]
 
