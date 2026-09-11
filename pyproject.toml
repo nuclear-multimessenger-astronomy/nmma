@@ -58,7 +58,8 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-aiohttp",
-    "flake8",
+    "ruff",
+    "pre-commit",
     "sqlparse",
     "freezegun",
     "PyJWT",
@@ -167,9 +168,6 @@ exclude_lines = [
     "raise"
     ]
 ignore_errors = true
-
-[tool.isort]
-profile = "black"
 
 [tool.pytest.ini_options]
 addopts = "--verbose -r s"

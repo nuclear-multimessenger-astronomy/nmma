@@ -1,0 +1,132 @@
+name: Build Checks
+
+# Things that confirm the repo still builds into its deliverables, plus RST
+# linting (same push/PR-to-main trigger as everything else here). Docs actually
+# deploys on push to main; the container job here is build-only -- the real
+# publish happens in release.yml, alongside PyPI/Conda, on a published release.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # See ci.yml for why this is pinned instead of always installing whatever's
+  # currently on the default branch.
+  WRAPT_TIMEOUT_DECORATOR_REF: 290c67b64b14bf376d0d122cf4d2ccbe038c1b51
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # setuptools-scm needs tag history to resolve the version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          echo "dir=$(pip cache dir)" >> "$GITHUB_OUTPUT"
+      - name: pip cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-pip-2-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-2-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade "git+https://github.com/bitranox/wrapt_timeout_decorator.git@${{ env.WRAPT_TIMEOUT_DECORATOR_REF }}"
+          python -m pip install .[doc]
+
+      - name: Build docs
+        env:
+          SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.SPHINX_GITHUB_CHANGELOG_TOKEN }}
+        run: |
+          cd doc && make html; cd ../
+          touch doc/_build/html/.nojekyll
+
+      # PRs stop here -- build-only sanity check, nothing to deploy yet.
+      - name: Upload docs artifact
+        if: github.event_name == 'push' && github.repository_owner == 'nuclear-multimessenger-astronomy'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: doc/_build/html/
+
+  deploy-docs:
+    needs: docs
+    if: github.event_name == 'push' && github.repository_owner == 'nuclear-multimessenger-astronomy'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./api/Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  rst-lint:
+    name: DOCtor-RST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker://oskarstark/doctor-rst
+        with:
+          args: --short --error-format=github
+        env:
+          DOCS_DIR: "doc/"
+
+  test-pypi:
+    # Building the sdist/wheel always runs (no secret needed). The actual upload
+    # to TestPyPI is inert until TEST_PYPI_API_TOKEN exists (account/secret setup
+    # is separate work) -- that one step skips instead of failing in the meantime.
+    if: github.repository_owner == 'nuclear-multimessenger-astronomy'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # setuptools-scm needs tag history to resolve the version
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install build
+      - run: python -m build --sdist --wheel --outdir dist/
+      - name: Publish to TestPyPI
+        if: env.TEST_PYPI_API_TOKEN != ''
+        env:
+          TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
+
+  # No conda job here on purpose: nmma's conda-forge recipe lives in the
+  # separate conda-forge/nmma-feedstock repo, not in this one -- see
+  # .github/MANUAL_SETUP.md.
