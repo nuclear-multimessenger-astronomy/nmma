@@ -4,10 +4,11 @@ import numpy as np
 from .utils import DEFAULT_FILTERS
 from ..core.gitlab import DEFAULT_MODELS_HOME
 
-# unused imports kept for forward compatibility
-from ..core.parsing import (
-    parsing_and_logging, # noqa: F401,
-    nmma_base_parsing, # noqa: F401
+# parsing_and_logging is re-exported: analysis, training and the lightcurve
+# handlers reach it through this module rather than through core.parsing.
+from ..core.parsing import (  # noqa: F401
+    parsing_and_logging,
+    nmma_base_parsing,
     single_messenger_analysis_parsing,
     base_injection_parsing,
     yaml_parse,
@@ -15,6 +16,8 @@ from ..core.parsing import (
 
 
 def em_time_parsing(parser):
+    """Add the arguments defining the time grid of an EM analysis."""
+
     em_time_parser = parser.add_argument_group(
         title="EM analysis time arguments",
         description="Specify EM analysis sample times",
@@ -67,6 +70,8 @@ def em_time_parsing(parser):
 
 
 def basic_em_only_parsing(parser):
+    """Add the output arguments every EM-only command shares."""
+
     parser.add_argument(
         "-o", "--outdir", default="outdir", help="Path to the output directory"
     )
@@ -81,6 +86,8 @@ def basic_em_only_parsing(parser):
 
 
 def basic_em_only_analysis_parsing(parser):
+    """Add the arguments locating the observed light curve in time."""
+
     parser = single_messenger_analysis_parsing(parser)
 
     parser.add_argument(
@@ -101,6 +108,8 @@ def basic_em_only_analysis_parsing(parser):
 
 
 def multi_wavelength_parsing(parser):
+    """Add the arguments selecting filters, detectors and their limits."""
+
     em_input_parser = parser.add_argument_group(
         title="EM analysis input arguments", description="Specify EM analysis inputs"
     )
@@ -120,6 +129,8 @@ def multi_wavelength_parsing(parser):
 
 
 def em_model_parsing(parser):
+    """Add the arguments choosing the transient model and its surrogate."""
+
     em_model_parser = parser.add_argument_group(
         title="EM model arguments", description="Specify EM model properties"
     )
@@ -208,6 +219,8 @@ def em_model_parsing(parser):
 
 
 def data_processing_parsing(parser):
+    """Add the arguments describing the training data on disk."""
+
     parser.add_argument(
         "--data-path", help="Path to the directory of light curve files"
     )
@@ -245,6 +258,8 @@ def data_processing_parsing(parser):
 
 
 def ml_training_parsing(parser):
+    """Add the arguments driving the surrogate training run."""
+
     parser.add_argument(
         "--nepochs",
         "--tensorflow-nepochs",
@@ -294,6 +309,8 @@ def ml_training_parsing(parser):
 
 
 def em_injection_parsing(parser):
+    """Add the arguments describing the transient to simulate."""
+
     lc_injection_parser = parser.add_argument_group(
         title="Lightcurve injection arguments",
         description="Specify lightcurve injections",
@@ -359,6 +376,8 @@ def em_injection_parsing(parser):
 
 
 def skymap_parsing(parser):
+    """Add the arguments locating the event on a GW skymap."""
+
     parser.add_argument(
         "--fits-file",
         help="Fits file output from Bayestar, to be used for constructing dL-iota prior",
@@ -392,6 +411,8 @@ def skymap_parsing(parser):
 
 
 def grb_parsing(parser):
+    """Add the arguments of the afterglow models."""
+
     grb_input_parser = parser.add_argument_group(
         title="GRB analysis input arguments", description="Specify GRB analysis inputs"
     )
@@ -414,6 +435,8 @@ def grb_parsing(parser):
 
 
 def modified_em_prior_parsing(parser):
+    """Add the arguments reshaping the priors before sampling."""
+
     mod_em_prior_parser = parser.add_argument_group(
         title="EM Prior modification arguments",
         description="Specify modifications for the EM priors",
@@ -458,6 +481,11 @@ def modified_em_prior_parsing(parser):
 
 
 def em_analysis_parsing(parser):
+    """Gather every argument group an EM inference needs.
+
+    Composes the time, model, GRB, prior, filter and injection groups.
+    """
+
     parser = em_time_parsing(parser)
     parser = em_model_parsing(parser)
     parser = grb_parsing(parser)
@@ -468,6 +496,8 @@ def em_analysis_parsing(parser):
 
 
 def multi_wavelength_analysis_parser(parser):
+    """Build the parser of the ``lightcurve-analysis`` command."""
+
     parser.description = (
         "Inference on transient parameters from multi-wavelength observations."
     )
@@ -489,6 +519,7 @@ def multi_wavelength_analysis_parser(parser):
 
 
 def bolometric_parser(parser):
+    """Build the parser of the ``lightcurve-analysis-lbol`` command."""
 
     parser.description = "Inference on astronomical transient parameters with bolometric luminosity data."
     parser.add_help = True
@@ -514,6 +545,8 @@ def bolometric_parser(parser):
 
 
 def svd_training_parser(parser):
+    """Build the parser of the ``create-svdmodel`` command."""
+
     parser.description = "Train SVD models on kilonova light curves"
     parser = basic_em_only_parsing(parser)
     parser = em_time_parsing(parser)
@@ -525,6 +558,8 @@ def svd_training_parser(parser):
 
 
 def svd_model_benchmark_parser(parser):
+    """Build the parser of the ``svdmodel-benchmark`` command."""
+
     parser.description = "Benchmark the performance of SVD surrogate models"
 
     parser = em_model_parsing(parser)
@@ -559,6 +594,8 @@ def svd_model_benchmark_parser(parser):
 
 
 def benchmark_plots_parser():
+    """Build the parser of the ``plot-svdmodel-benchmarks`` command."""
+
     # this is so miniscule, just keep it like this
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -576,6 +613,8 @@ def benchmark_plots_parser():
 
 
 def lc_validation_parser(parser):
+    """Build the parser checking a light curve has enough detections."""
+
     parser.description = "Validation that a lightcurve meets a minimum number of observations within a set time."
     parser.add_help = True
 
@@ -601,6 +640,8 @@ def lc_validation_parser(parser):
 
 
 def lightcurve_parser(parser):
+    """Build the parser of the ``lightcurve-generation`` command."""
+
     parser.description = "Create lightcurves from injection parameters."
 
     parser = basic_em_only_parsing(parser)
@@ -615,6 +656,8 @@ def lightcurve_parser(parser):
 
 
 def multi_lc_parser(parser):
+    """Build the parser generating light curves over a model grid."""
+
     parser.add_argument(
         "--filters",
         nargs="*",
@@ -660,6 +703,8 @@ def multi_lc_parser(parser):
 
 
 def lc_grid_parser(parser):
+    """Build the parser of the ``resample-grid`` command."""
+
     parser.description = (
         "Resample a grid of light curves, either by downsampling or fragmenting it."
     )
@@ -706,6 +751,8 @@ def lc_grid_parser(parser):
 
 
 def multi_config_parser(parser):
+    """Build the parser of the ``multi-config-analysis`` command."""
+
     parser.description = "Multi config analysis script for NMMA."
 
     parser.add_argument(
