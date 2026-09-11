@@ -1491,67 +1491,6 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
         return stacked_mags
 
 
-class GenericCombineLightCurveModel(CombinedLightCurveModelContainer):
-    "A legacy synonym for CombinedLightCurveModelContainer"
-
-
-class KilonovaGRBLightCurveModel(CombinedLightCurveModelContainer):
-    """
-    A combined light curve model for Kilonova and GRB (Gamma-Ray Burst) events.
-
-    This model integrates the light curves from both Kilonova and GRB models
-    to provide a comprehensive representation of the observed phenomena.
-
-    Parameters
-    ----------
-    kilonova_kwargs : dict
-        Dictionary of keyword arguments for the Kilonova light curve model.
-    grb_resolution : int, optional
-        Resolution parameter for the GRB light curve model. Default is 12.
-    jet_type : int, optional
-        Type of jet model to use for the GRB light curve. Default is 0.
-
-    """
-
-    def __init__(
-        self,
-        kilonova_kwargs,
-        grb_resolution=12,
-        jet_type=0,
-    ):
-
-        kn_model = SVDLightCurveModel(**kilonova_kwargs)
-        grb_model = GRBLightCurveModel(
-            resolution=grb_resolution,
-            jet_type=jet_type,
-        )
-        super().__init__([grb_model, kn_model])
-
-
-class SupernovaGRBLightCurveModel(CombinedLightCurveModelContainer):
-    def __init__(
-        self,
-        supernova_kwargs,
-        grb_resolution=12,
-        jet_type=0,
-    ):
-        grb_model = GRBLightCurveModel(
-            resolution=grb_resolution,
-            jet_type=jet_type,
-        )
-        sn_model = SupernovaLightCurveModel(**supernova_kwargs)
-        super().__init__([grb_model, sn_model])
-
-
-class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
-    def __init__(self, filters=None):
-        super().__init__(
-            [
-                ShockCoolingLightCurveModel(filters=filters),
-                SupernovaLightCurveModel(filters=filters),
-            ]
-        )
-
 
 def single_model_from_args(
     model_class, model_name, args, filters, prefixes=["grb_", "em_"]
@@ -1650,10 +1589,6 @@ def single_model_from_mapping(identifier, enfore_class=False):
         "supernova": SupernovaLightCurveModel,
         "shock": ShockCoolingLightCurveModel,
         "simple_kilonova": SimpleKilonovaLightCurveModel,
-        "combined": CombinedLightCurveModelContainer,
-        "kilonova_grb": KilonovaGRBLightCurveModel,
-        "supernova_grb": SupernovaGRBLightCurveModel,
-        "supernova_shock": SupernovaShockCoolingLightCurveModel,
     }
     if identifier.casefold() in transient_class_map.keys():
         return transient_class_map[identifier.casefold()]
