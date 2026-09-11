@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "setuptools-scm"]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -100,8 +100,9 @@ sampler = [
     "ultranest",
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "nmma.__version__"}
+[tool.setuptools_scm]
+# Version is derived from the latest git tag (e.g. v1.2.3 -> 1.2.3).
+# Untagged commits get a .devN+<hash> suffix. Nothing is stored in the tree.
 
 [project.scripts]
 nmma-generation = "nmma.joint.generation:nmma_generation"
@@ -174,15 +175,3 @@ profile = "black"
 addopts = "--verbose -r s"
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
-
-[tool.bumpver]
-current_version = "1.0.1"
-version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
-commit_message = "bump version {old_version} -> {new_version}"
-commit = true
-tag = true
-push = true
-
-[tool.bumpver.file_patterns]
-"pyproject.toml" = ['current_version = "{version}"']
-"nmma/__init__.py" = ['__version__ = "{version}"']
