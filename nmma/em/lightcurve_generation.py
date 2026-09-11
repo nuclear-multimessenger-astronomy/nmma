@@ -31,7 +31,7 @@ except ImportError:
         return inner
 
 
-### some frequently used constants:
+# some frequently used constants:
 from ..core.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D
 
 seconds_a_day = 86400.0
@@ -40,16 +40,72 @@ abs_mag_dist_factor = D**2
 
 #################################################################
 def dummy_add(nu):
+    """Add nothing to a blackbody spectrum; the default extra component.
+
+    Parameters
+    ----------
+    nu: float or numpy.ndarray
+        Frequency, ignored.
+
+    Returns
+    -------
+    float
+        Always zero.
+    """
+
     return 0.0
 
 
 def bb_flux_from_inv_temp(nu, inv_temp, R_photo, dist_squared=abs_mag_dist_factor):
+    """Planck flux density of a sphere, at the given frequencies.
+
+    Parameters
+    ----------
+    nu: float or numpy.ndarray
+        Rest-frame frequencies, in Hz.
+    inv_temp: float or numpy.ndarray
+        Inverse temperature, in 1/K. Taken inverted because the photosphere
+        can cool to zero, where the temperature itself diverges.
+    R_photo: float or numpy.ndarray
+        Photospheric radius, in cm.
+    dist_squared: float, optional
+        Squared distance to the source, in cm2. Defaults to the 10 pc of the
+        absolute magnitude scale.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Flux density in cgs units.
+    """
+
     exponent = np.clip(h * nu * inv_temp / kb, None, 700)  # to avoid overflow in exp
     bb_factor = 2.0 * h / c_cgs**2
     return bb_factor * nu**3 / np.expm1(exponent) * R_photo * R_photo / dist_squared
 
 
 def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add=dummy_add):
+    """Turn a blackbody into a magnitude per filter.
+
+    Parameters
+    ----------
+    filters: list of str
+        Filters to evaluate.
+    inv_temp: float or numpy.ndarray
+        Inverse photospheric temperature, in 1/K.
+    R_photo: float or numpy.ndarray
+        Photospheric radius, in cm.
+    nu_host: numpy.ndarray
+        Rest-frame frequency of each filter, in Hz.
+    add: callable, optional
+        Extra flux to add at each frequency, for models that sit a power law
+        on top of the blackbody.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter.
+    """
+
     mag = {}
     # nu_host = nu_obs * (1 + redshift)
     for idx, filt in enumerate(filters):
@@ -63,10 +119,27 @@ def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add=dummy_add):
 
 
 #################################################################
-######################### LC MODELS #############################
+# LC MODELS #############################
 #################################################################
-## Arnett model convenience functions
+# Arnett model convenience functions
 def arnett_lc_get_int_A_non_vec(x, y):
+    """Integral A of the Arnett solution, for a single time.
+
+    Wrapped by ``arnett_lc_get_int_A`` to accept arrays.
+
+    Parameters
+    ----------
+    x: float
+        Time in units of the diffusion timescale.
+    y: float
+        Diffusion timescale in units of twice the nickel lifetime.
+
+    Returns
+    -------
+    float
+        Value of the integral.
+    """
+
     def arnett_func(z):
         return 2 * z * np.exp(-2 * z * y + z**2)
 
@@ -78,6 +151,26 @@ arnett_lc_get_int_A = np.vectorize(arnett_lc_get_int_A_non_vec, excluded=["y"])
 
 
 def arnett_lc_get_int_B_non_vec(x, y, s):
+    """Integral B of the Arnett solution, for a single time.
+
+    Wrapped by ``arnett_lc_get_int_B`` to accept arrays. This is the cobalt
+    term, which integral A lacks.
+
+    Parameters
+    ----------
+    x: float
+        Time in units of the diffusion timescale.
+    y: float
+        Diffusion timescale in units of twice the nickel lifetime.
+    s: float
+        Diffusion timescale in units of the combined nickel-cobalt scale.
+
+    Returns
+    -------
+    float
+        Value of the integral.
+    """
+
     def arnett_func(z):
         return 2 * z * np.exp(-2 * z * y + 2 * z * s + z**2)
 
@@ -121,7 +214,9 @@ def arnett_lc(t_day, param_dict):
     int_B = arnett_lc_get_int_B(x, y, s)
 
     lbol = (
-        Mni * np.exp(-(x**2)) * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
+        Mni
+        * np.exp(-(x**2))
+        * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
     )
 
     return lbol
@@ -145,8 +240,27 @@ def arnett_modified_lc(t_day, param_dict):
     return Lbol_arnett * (1.0 - np.exp(-((param_dict["t_0"] / t_day) ** 2)))
 
 
-## kilonova from SVD model
+# kilonova from SVD model
 def calc_svd_lbol(sample_times, param_list, svd_lbol_model, lbol_ncoeff=None):
+    """Evaluate a surrogate model for the bolometric luminosity.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to evaluate, in days.
+    param_list: list
+        Model parameters, in the order the surrogate was trained on.
+    svd_lbol_model: dict
+        Trained surrogate for the bolometric luminosity.
+    lbol_ncoeff: int, optional
+        Keep only this many SVD coefficients. Defaults to all of them.
+
+    Returns
+    -------
+    numpy.ndarray
+        Bolometric luminosity at the requested times.
+    """
+
     tt_interp, lbol_back = eval_svd_model(svd_lbol_model, lbol_ncoeff, param_list)
     lbol = 10 ** utils.autocomplete_data(sample_times, tt_interp, lbol_back)
     return np.squeeze(lbol)  # * (1. + z) FIXME: shouldn't this be (1 + z)**2
@@ -159,14 +273,30 @@ def calc_svd_lc(
     mag_ncoeff: int = None,
     filters: list = None,
 ):
-    """
-    Computes the lightcurve from a surrogate model, given the model parameters.
-    Args:
-        sample_times_source (dict): A filter-specific Time grid on which to evaluate lightcurve
-        param_list (Array): Input parameters for the surrogate model
-        svd_mag_model (SVDTrainingModel): Trained surrogate model for mag
-        mag_ncoeff (int): Number of coefficients after SVD projection for mag
-        filters (Array): List/array of filters at which we want to evaluate the model
+    """Evaluate a surrogate model for the magnitude in each filter.
+
+    Filters the surrogate was not trained on are returned as non-detections,
+    which is what lets a kilonova model be combined with radio or X-ray data
+    from a GRB.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to evaluate, in days.
+    param_list: list
+        Model parameters, in the order the surrogate was trained on.
+    svd_mag_model: dict
+        Trained surrogate, keyed by filter.
+    mag_ncoeff: int, optional
+        Keep only this many SVD coefficients. Defaults to all of them.
+    filters: list of str, optional
+        Filters to evaluate. Defaults to those the surrogate covers.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter. Times outside the range the surrogate was
+        trained on are returned as non-detections.
     """
 
     if filters is None:
@@ -186,7 +316,7 @@ def calc_svd_lc(
             svd_mag_model[filt], mag_ncoeff, param_list
         )
 
-        ### FIXME quick-fix to not trust lightcurve after outside training time range
+        # FIXME quick-fix to not trust lightcurve after outside training time range
         mAB[filt] = utils.autocomplete_data(
             sample_times, tt_interp, mag_back, extrapolate=np.inf
         )
@@ -194,7 +324,32 @@ def calc_svd_lc(
 
 
 def eval_svd_model(svd_model, ass_ncoeff, param_list):
-    """Evaluate the SVD model"""
+    """Project one parameter set back into a light curve.
+
+    The surrogate stores a handful of SVD coefficients per light curve, and
+    either a neural network or Gaussian processes that predict them. This
+    predicts the coefficients, then rebuilds the curve from them.
+
+    Parameters
+    ----------
+    svd_model: dict
+        Trained surrogate: basis, normalisation bounds, time grid and the
+        predictor itself.
+    ass_ncoeff: int or None
+        Keep only this many coefficients. Defaults to all the model has.
+    param_list: list
+        Model parameters, in the order the surrogate was trained on.
+
+    Returns
+    -------
+    tuple
+        The surrogate's own time grid, and the light curve on it.
+
+    Raises
+    ------
+    ValueError
+        If the surrogate has neither a network nor Gaussian processes.
+    """
     if ass_ncoeff:
         n_coeff = min(ass_ncoeff, svd_model["n_coeff"])
     else:
@@ -218,7 +373,7 @@ def eval_svd_model(svd_model, ass_ncoeff, param_list):
         cAproj = np.zeros((n_coeff,))
         gps = svd_model["gps"]
         if gps is None:
-            raise ValueError(f"Gaussian process model unavailable.")
+            raise ValueError("Gaussian process model unavailable.")
         for i in range(n_coeff):
             gp = gps[i]
             y_pred, sigma2_pred = gp.predict(
@@ -232,19 +387,84 @@ def eval_svd_model(svd_model, ass_ncoeff, param_list):
     return tt_interp, svd_back
 
 
-## grb afterglow
+# grb afterglow
 @timeout(60)
 def fluxDensity(t, nu, **params):
+    """Call afterglowpy, giving up after a minute.
+
+    Some corners of the afterglow parameter space are very slow to
+    integrate, which a sampler would otherwise stall on.
+
+    Parameters
+    ----------
+    t: numpy.ndarray
+        Times, in seconds.
+    nu: numpy.ndarray
+        Frequencies, in Hz.
+    **params
+        Afterglow parameters, passed straight through.
+
+    Returns
+    -------
+    numpy.ndarray
+        Flux density in mJy.
+
+    Raises
+    ------
+    TimeoutError
+        If afterglowpy takes more than 60 seconds.
+    """
+
     return afterglowpy.fluxDensity(t, nu, **params)
 
 
 def flux_density_on_time_array(default_time, obs_frequencies, param_dict):
+    """Evaluate the afterglow on the full time-frequency grid at once.
+
+    Parameters
+    ----------
+    default_time: numpy.ndarray
+        Times to evaluate, in seconds.
+    obs_frequencies: numpy.ndarray
+        Observed frequencies, in Hz.
+    param_dict: dict
+        Afterglow parameters, passed straight to afterglowpy.
+
+    Returns
+    -------
+    numpy.ndarray
+        Flux density in mJy, with one row per time and one column per
+        frequency.
+    """
+
     times = np.tile(default_time, (len(obs_frequencies), 1)).T
     nus = np.tile(obs_frequencies, (len(default_time), 1))
     return fluxDensity(times, nus, **param_dict)
 
 
 def flux_density_on_E0_array(default_time, obs_frequencies, param_dict):
+    """Evaluate the afterglow while the jet is still being energised.
+
+    Instead of one fixed energy, the blast energy grows as a power law
+    between the start and the end of the injection, then stays at its final
+    value. Each time therefore needs its own afterglowpy call.
+
+    Parameters
+    ----------
+    default_time: numpy.ndarray
+        Times to evaluate, in seconds.
+    obs_frequencies: numpy.ndarray
+        Observed frequencies, in Hz.
+    param_dict: dict
+        Afterglow parameters, plus the injection ones: log10_Eend, t_start,
+        injection_duration and energy_exponential.
+
+    Returns
+    -------
+    numpy.ndarray
+        Flux density in mJy, with one row per time.
+    """
+
     # fetch parameters
     log10_Eend = param_dict["log10_Eend"]
     t_start = param_dict["t_start"]
@@ -269,6 +489,31 @@ def flux_density_on_E0_array(default_time, obs_frequencies, param_dict):
 
 
 def afterglowpy_lc(sample_times, param_dict, filters, obs_frequencies, flux_func):
+    """Compute a GRB afterglow light curve with afterglowpy.
+
+    The afterglow is evaluated on a geometric time grid of its own, then
+    interpolated onto the requested times.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to return, in days.
+    param_dict: dict
+        Afterglow parameters.
+    filters: list of str
+        Filters to evaluate.
+    obs_frequencies: numpy.ndarray
+        Observed frequency of each filter, in Hz.
+    flux_func: callable
+        Either the fixed-energy or the energy-injection evaluator.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter, or an empty dict when afterglowpy timed out
+        or returned a non-positive flux.
+    """
+
     tStart = max(10 ** (-5), np.amin(sample_times))
     tEnd = np.amax(sample_times) + 1
     tnode = min(len(sample_times), 201)
@@ -293,8 +538,30 @@ def afterglowpy_lc(sample_times, param_dict, filters, obs_frequencies, flux_func
     return mag
 
 
-## hostmodel lightcurve
+# hostmodel lightcurve
 def host_lc(sample_times, parameters, filters, host_mag):
+    """Add a fading afterglow on top of a constant host galaxy.
+
+    Follows arXiv:2303.12849: a power law in time per filter, on a constant
+    host flux.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to evaluate, in days.
+    parameters: dict
+        Holds alpha_AG, and a_AG and f_nu for each filter.
+    filters: list of str
+        Filters to evaluate.
+    host_mag: list of float
+        Host magnitude per filter, kept out of the fit.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter.
+    """
+
     # Based on arxiv:2303.12849
     mag = {}
     alpha = parameters["alpha_AG"]
@@ -307,8 +574,31 @@ def host_lc(sample_times, parameters, filters, host_mag):
     return mag
 
 
-## supernova model
+# supernova model
 def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
+    """Read magnitudes off an sncosmo supernova model.
+
+    Filters sncosmo does not know are evaluated from the spectrum at their
+    effective wavelength instead. Filters falling outside the wavelength
+    range the model covers are returned as non-detections.
+
+    Parameters
+    ----------
+    sample_times_stretched: numpy.ndarray
+        Times to evaluate, already stretched into the model frame.
+    sn_model: sncosmo.Model
+        The supernova model.
+    filters: list of str
+        Filters to evaluate.
+    lambdas: list of float
+        Effective wavelength of each filter, in metres.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter.
+    """
+
     mag = {}
     for filt, lambda_ in zip(filters, lambdas):
         try:
@@ -321,12 +611,34 @@ def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
             # NOTE: workaround  for potential bug in sncosmo: buffer error if lambdaa as float
             flux_AA = sn_model.flux(sample_times_stretched, [lambda_AA]).flatten()
             # see https://en.wikipedia.org/wiki/AB_magnitude
-            mag[filt] = utils.flux_to_ABmag(flux_AA * 3.34e4 * lambda_AA**2, unit="Jy")
+            mag[filt] = utils.flux_to_ABmag(
+                flux_AA * 3.34e4 * lambda_AA**2, unit="Jy"
+            )
     return mag
 
 
-## shock-cooling lightcurve
+# shock-cooling lightcurve
 def sc_bol_lc(sample_times, param_dict, compute_Rs):
+    """Bolometric light curve of a shock cooling envelope.
+
+    Two regimes are stitched at the diffusion time: a power-law decline
+    while the envelope is still optically thick, an exponential one after.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to evaluate, in days.
+    param_dict: dict
+        Holds log10_Menv, log10_Renv and log10_Ee.
+    compute_Rs: bool
+        If True, also return the photospheric radius, which the filter
+        evaluation needs.
+
+    Returns
+    -------
+    numpy.ndarray or tuple
+        The luminosity, or the luminosity and the photospheric radius.
+    """
 
     t = sample_times * seconds_a_day
 
@@ -364,6 +676,27 @@ def sc_bol_lc(sample_times, param_dict, compute_Rs):
 
 
 def sc_lc(lbol, Rs, nu_host, filters):
+    """Turn a shock cooling luminosity into magnitudes per filter.
+
+    The effective temperature follows from the luminosity and the
+    photospheric radius, assuming the envelope radiates as a blackbody.
+
+    Parameters
+    ----------
+    lbol: numpy.ndarray
+        Bolometric luminosity, in erg/s.
+    Rs: numpy.ndarray
+        Photospheric radius, in cm.
+    nu_host: numpy.ndarray
+        Rest-frame frequency of each filter, in Hz.
+    filters: list of str
+        Filters to evaluate.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter.
+    """
 
     sigmaT4 = lbol / (4 * np.pi * Rs * Rs)
     T = np.power(sigmaT4 / sigSB, 0.25)
@@ -376,7 +709,7 @@ def sc_lc(lbol, Rs, nu_host, filters):
     return result
 
 
-## semi-analytical models for kilonovae
+# semi-analytical models for kilonovae
 
 
 def heating_rate_Korobkin_Rosswog(t, eth=0.5):
@@ -411,6 +744,30 @@ def heating_rate_Korobkin_Rosswog(t, eth=0.5):
 
 
 def metzger_lc(sample_times, param_dict, nu_host, filters):
+    """Kilonova light curve from the Metzger semi-analytical model.
+
+    The ejecta are split into velocity shells, each heated by r-process
+    decay and cooled by expansion and radiation. The shells are evolved
+    together, and the photosphere is read off where the optical depth
+    reaches unity.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to evaluate, in days.
+    param_dict: dict
+        Holds log10_mej, log10_vej, beta and log10_kappa_r.
+    nu_host: numpy.ndarray
+        Rest-frame frequency of each filter, in Hz.
+    filters: list of str
+        Filters to evaluate.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter.
+    """
+
     # fetch parameters
     M0 = 10 ** param_dict["log10_mej"] * msun_cgs  # total ejecta mass
     v0 = 10 ** param_dict["log10_vej"] * c_cgs  # minimum escape velocity
@@ -544,7 +901,7 @@ def metzger_lc(sample_times, param_dict, nu_host, filters):
         ] / 4000.0 ** (5.5)
         kappa_correction[:] = 1
 
-        tdiff[:-1, j] = 0.08 * kappa[:-1, j] * m[:-1] * msun_cgs 
+        tdiff[:-1, j] = 0.08 * kappa[:-1, j] * m[:-1] * msun_cgs
         tdiff[:-1, j] *= 3 * kappa_correction / (vm[:-1] * c_cgs * t[j] * beta)
         tau[:-1, j] = (
             m[:-1] * msun_cgs * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
@@ -580,6 +937,28 @@ def metzger_lc(sample_times, param_dict, nu_host, filters):
 
 
 def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
+    """Kilonova light curve from the Metzger model, evaluated cheaply.
+
+    Same physics as the full version, restructured for speed so that a
+    sampler can afford to call it.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to evaluate, in days.
+    param_dict: dict
+        Holds log10_mej, log10_vej, beta and log10_kappa_r.
+    nu_host: numpy.ndarray
+        Rest-frame frequency of each filter, in Hz.
+    filters: list of str
+        Filters to evaluate.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter.
+    """
+
     # fetch parameters
     M0 = 10 ** param_dict["log10_mej"] * msun_cgs  # total ejecta mass
     v0 = 10 ** param_dict["log10_vej"] * c_cgs  # minimum escape velocity
@@ -643,7 +1022,7 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
 
     for j in range(tprec - 1):
         tdiff = 0.08 * kappa[:-1, j] * m[:-1] * msun_cgs * 3
-        tdiff /= (vm[:-1] * c_cgs * t[j] * beta)
+        tdiff /= vm[:-1] * c_cgs * t[j] * beta
         tau = m[:-1] * msun_cgs * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
         lum_j = ene / (tdiff + t[j] * (vm[:-1] / c_cgs))
         lum[:, j] = lum_j * dm * msun_cgs
@@ -667,6 +1046,25 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
 
 
 def HoNa_lc(sample_times, param_dict, nu_host, filters):
+    """Kilonova light curve from the Hotokezaka and Nakar model.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to evaluate, in days.
+    param_dict: dict
+        Holds log10_mej, the velocity range, the opacities, and optionally
+        the density slope n.
+    nu_host: numpy.ndarray
+        Rest-frame frequency of each filter, in Hz.
+    filters: list of str
+        Filters to evaluate.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter.
+    """
 
     # calculate the temperature and luminosity to feed into the blackbody radiation calculation
     conv_params = setup_HoNa_params(sample_times, param_dict)
@@ -675,6 +1073,26 @@ def HoNa_lc(sample_times, param_dict, nu_host, filters):
 
 
 def setup_HoNa_params(sample_times, param_dict):
+    """Unpack the Hotokezaka and Nakar parameters into physical units.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times in days. Converted to seconds in place.
+    param_dict: dict
+        Holds log10_mej, vej_min, vej_max, vej_frac and the two opacities.
+
+    Returns
+    -------
+    tuple
+        Times in seconds, ejecta mass in grams, the three-point velocity
+        grid in units of c, and the two opacities in cm2/g.
+
+    Notes
+    -----
+    sample_times is scaled in place, so the caller's array is modified.
+    """
+
     sample_times *= seconds_a_day
     mej = 10 ** param_dict["log10_mej"] * msun_cgs
     vej_max = param_dict["vej_max"]
@@ -695,6 +1113,25 @@ def setup_HoNa_params(sample_times, param_dict):
 
 # the following functions are for the semi-analytic model using Hotokezaka & Nakar heating rate
 def luminosity_HoNa(E, t, td, be):
+    """Luminosity escaping one ejecta shell.
+
+    Parameters
+    ----------
+    E: numpy.ndarray
+        Energy stored in the shell, in erg.
+    t: numpy.ndarray
+        Time, in seconds.
+    td: numpy.ndarray
+        Diffusion timescale of the shell, in seconds.
+    be: numpy.ndarray
+        Shell velocity, in units of c.
+
+    Returns
+    -------
+    numpy.ndarray
+        Escaping luminosity, in erg/s.
+    """
+
     # Calculate diffusion time ratio
     t_dif = td / t
     # Determine escape time
@@ -706,6 +1143,30 @@ def luminosity_HoNa(E, t, td, be):
 
 
 def dEdt_HoNa(t, E, dM, td, be):
+    """Energy budget of the ejecta shells, for the ODE solver.
+
+    Each shell gains radioactive heat, loses energy to expansion, and loses
+    what escapes as light.
+
+    Parameters
+    ----------
+    t: float
+        Time, in seconds.
+    E: numpy.ndarray
+        Energy currently stored in each shell, in erg.
+    dM: numpy.ndarray
+        Mass of each shell, in grams.
+    td: numpy.ndarray
+        Diffusion timescale of each shell, in seconds.
+    be: numpy.ndarray
+        Velocity of each shell, in units of c.
+
+    Returns
+    -------
+    numpy.ndarray
+        Rate of change of the stored energy, in erg/s.
+    """
+
     # Calculate heating contribution
     heat = dM * heating_rate_Korobkin_Rosswog(t)
     # Calculate luminosity
@@ -715,20 +1176,31 @@ def dEdt_HoNa(t, E, dM, td, be):
 
 
 def temp_photosphere_HoNa(t, mej, velocities, opacities, n):
-    """
-    Generates the temperature and photospheric radius evolution based on
-    the HoNa semi-analytical model.
-    # Arguments:
-        t: numpy.ndarray
-            Time array in seconds.
-        mej: float
-            Ejecta mass in grams.
-        velocities: numpy.ndarray
-            Velocity grid in units of c (speed of light).
-        opacities: numpy.ndarray
-            Opacity values in cm^2/g.
-        n: float
-            Power-law index for the density profile.
+    """Evolve the ejecta shells and read off the photosphere.
+
+    The ejecta are divided into a hundred velocity shells whose stored
+    energy is integrated in time. The photosphere is then located where the
+    accumulated optical depth reaches unity, and its temperature follows
+    from the total luminosity.
+
+    Parameters
+    ----------
+    t: numpy.ndarray
+        Times to evaluate, in seconds.
+    mej: float
+        Ejecta mass, in grams.
+    velocities: numpy.ndarray
+        Velocity grid, in units of c.
+    opacities: numpy.ndarray
+        Opacity of each velocity range, in cm2/g.
+    n: float
+        Power-law index of the density profile.
+
+    Returns
+    -------
+    tuple
+        Inverse photospheric temperature in 1/K, and photospheric radius
+        in cm.
     """
     # Prepare velocity grid
     be_0 = velocities[0]
@@ -801,6 +1273,26 @@ def temp_photosphere_HoNa(t, mej, velocities, opacities, n):
 
 
 def synchrotron_powerlaw(sample_times, param_dict, nu_obs, filters):
+    """Light curve of a source that is a power law in time and frequency.
+
+    Parameters
+    ----------
+    sample_times: numpy.ndarray
+        Times to evaluate, in days.
+    param_dict: dict
+        Holds beta_freq, alpha_time, F_ref and distance_modulus.
+    nu_obs: numpy.ndarray
+        Observed frequency of each filter, in Hz.
+    filters: list of str
+        Filters to evaluate.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter. The distance modulus is subtracted back
+        out, the reference flux being defined at the observer.
+    """
+
     beta = param_dict["beta_freq"]  # frequency index
     alpha = param_dict["alpha_time"]  # time index
     F_ref = param_dict["F_ref"]  # in mJy for t=1day and nu=1Hz
@@ -815,8 +1307,21 @@ def synchrotron_powerlaw(sample_times, param_dict, nu_obs, filters):
     return mag
 
 
-## generic blackbody
+# generic blackbody
 def inv_temp_and_photosphere_from_params(param_dict):
+    """Derive the photospheric radius of a blackbody from its luminosity.
+
+    Parameters
+    ----------
+    param_dict: dict
+        Holds temperature in K and bb_luminosity in erg/s.
+
+    Returns
+    -------
+    tuple
+        Inverse temperature in 1/K, and photospheric radius in cm.
+    """
+
     # parameter conversion
     inv_temp = 1.0 / param_dict["temperature"]  # blackbody's temperature in K
     R_photo = (
@@ -833,11 +1338,51 @@ def inv_temp_and_photosphere_from_params(param_dict):
 
 
 def blackbody_constant_temperature(_, param_dict, nu_host, filters):
+    """Light curve of a blackbody that never cools.
+
+    Parameters
+    ----------
+    _: numpy.ndarray
+        Times, unused: the source does not evolve.
+    param_dict: dict
+        Holds temperature and bb_luminosity.
+    nu_host: numpy.ndarray
+        Rest-frame frequency of each filter, in Hz.
+    filters: list of str
+        Filters to evaluate.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter, constant in time.
+    """
+
     inv_temp, R_photo = inv_temp_and_photosphere_from_params(param_dict)
     return mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host)
 
 
 def powerlaw_blackbody_constant_temperature_lc(_, param_dict, nu_host, filters):
+    """Light curve of a non-cooling blackbody under a power law.
+
+    The power law is normalised on the g band and added to the blackbody
+    flux at every frequency.
+
+    Parameters
+    ----------
+    _: numpy.ndarray
+        Times, unused: the source does not evolve.
+    param_dict: dict
+        Holds temperature, bb_luminosity, beta and powerlaw_mag.
+    nu_host: numpy.ndarray
+        Rest-frame frequency of each filter, in Hz.
+    filters: list of str
+        Filters to evaluate. Must contain g, used as the reference.
+
+    Returns
+    -------
+    dict
+        AB magnitude per filter.
+    """
 
     # calculate the powerlaw prefactor (with the reference filter 'g')
     nu_ref = nu_host[filters.index("g")]  # FIXME, seems like a legacy hack
@@ -854,7 +1399,7 @@ def powerlaw_blackbody_constant_temperature_lc(_, param_dict, nu_host, filters):
     )
 
 
-#### lightcurve data generation
+# lightcurve data generation
 def create_light_curve_data(
     injection_parameters,
     args,
@@ -863,6 +1408,36 @@ def create_light_curve_data(
     keep_infinite_data=False,
     rng=None,
 ):
+    """Simulate what a follow-up campaign would have observed.
+
+    Generates the true light curve from the model, samples it down to a
+    telescope cadence, adds noise and applies the detection limits.
+
+    Parameters
+    ----------
+    injection_parameters: dict
+        Parameters of the transient to simulate.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    light_curve_model: nmma.em.model.LightCurveModelContainer
+        Model used to generate the curve.
+    sample_times: numpy.ndarray, optional
+        Times to evaluate. Defaults to the model's own grid.
+    keep_infinite_data: bool, optional
+        If True, keep the non-detections. They are dropped otherwise.
+    rng: numpy.random.Generator, optional
+        Source of randomness. Seeded from args when omitted.
+
+    Returns
+    -------
+    dict
+        Photometry per filter.
+
+    Raises
+    ------
+    ValueError
+        If the parameters yield an empty light curve.
+    """
 
     injection_parameters = light_curve_model.parameter_conversion(injection_parameters)
     filters = utils.set_filters(args)
@@ -905,13 +1480,34 @@ def create_light_curve_data(
 
 
 def adjust_lc_for_telescopes(true_data, args, filters, rng, trigger_time):
-    """
-    adjust the light curve data for specific telescope observations.
+    """Keep only what a real observing campaign would have caught.
+
+    The true light curve is sampled down to the epochs and filters a given
+    cadence would have visited, so that an injection looks like a real
+    follow-up campaign rather than a continuous curve.
+
+    Parameters
+    ----------
+    true_data: dict
+        The continuous light curve, per filter.
+    args: argparse.Namespace
+        Parsed command-line arguments, read for the observing strategy.
+    filters: list of str
+        Filters to process.
+    rng: numpy.random.Generator
+        Source of the cadence jitter.
+    trigger_time: float
+        Time of the trigger, in MJD.
+
+    Returns
+    -------
+    dict
+        Light curve restricted to the epochs that were observed.
     """
     strategy = []
     observable_data = {}
     data_original = copy.deepcopy(true_data)
-    ## use realistic telescope data
+    # use realistic telescope data
     if getattr(args, "rubin_ToO_type", False):
         strategy.extend(rubin_strategy(args.rubin_ToO_type))
 
@@ -954,8 +1550,28 @@ def adjust_lc_for_telescopes(true_data, args, filters, rng, trigger_time):
 
 
 def adjust_lc_for_observations(observable_data, args, filters, rng):
-    """
-    adjust the light curve data for detection limits and observational errors.
+    """Add measurement noise and apply the detection limits.
+
+    Gaussian noise is drawn per filter, then every point fainter than its
+    detection limit is replaced by the limit itself with an infinite
+    uncertainty, which is how NMMA marks a non-detection.
+
+    Parameters
+    ----------
+    observable_data: dict
+        Light curve restricted to the epochs that were observed.
+    args: argparse.Namespace
+        Parsed command-line arguments, read for the error budget and the
+        detection limits.
+    filters: list of str
+        Filters to process.
+    rng: numpy.random.Generator
+        Source of the measurement noise.
+
+    Returns
+    -------
+    dict
+        Photometry per filter, with detections and non-detections mixed.
     """
     dmag = utils.set_filter_associated_dict(args.injection_error_budget, filters, 0.1)
     detection_limit = utils.create_detection_limit(args, filters)
@@ -977,6 +1593,22 @@ def adjust_lc_for_observations(observable_data, args, filters, rng):
 
 
 def ztf_strategy(rng):
+    """Epochs and filters of an ad hoc ZTF follow-up campaign.
+
+    Loosely follows arXiv:2203.17135: a latency of a few hours, then visits
+    that thin out over the first week, each jittered by about an hour.
+
+    Parameters
+    ----------
+    rng: numpy.random.Generator
+        Source of the latency and the jitter.
+
+    Returns
+    -------
+    generator
+        Pairs of observing time in days and filters visited then.
+    """
+
     # Ad hoc ZTF sampling strategy, vaguely inspired by https://arxiv.org/pdf/2203.17135
     t0 = rng.uniform(1 / 24.0, 12.0 / 24.0)  # initial latency between 1-12 hours
     filts = ["ztfg", "ztfr", "ztfi"]
@@ -985,9 +1617,21 @@ def ztf_strategy(rng):
 
 
 def rubin_strategy(rubin_ToO):
-    """
-    Adjust the light curve data for Rubin observations.
-    Names taken from Rubin 2024 Workshop write-up.
+    """Epochs and filters of a Rubin target-of-opportunity campaign.
+
+    The tier names come from the Rubin 2024 workshop write-up and reflect
+    how well the event is localised: the better the skymap, the deeper and
+    the more filters are used.
+
+    Parameters
+    ----------
+    rubin_ToO: str
+        Tier to follow: platinum, gold, gold_z, silver or silver_z.
+
+    Returns
+    -------
+    generator
+        Pairs of observing time in days and filters visited then.
     """
     gold_times = [1 / 24.0, 2 / 24.0, 4 / 24.0, 1.0, 2.0, 3.0]
     if rubin_ToO == "platinum":
@@ -1028,8 +1672,31 @@ def rubin_strategy(rubin_ToO):
 
 # FIXME these binaries need to be reworked for py3.12+ envs, currently not working properly
 def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
-    """
-    Adjust the light curve data for ZTF observations.
+    """Resample a light curve onto a realistic ZTF observing history.
+
+    Rather than an idealised cadence, this draws from the survey's own
+    recorded sampling and revisit statistics, so that gaps, weather and
+    filter choices look like those of a real ZTF campaign.
+
+    Parameters
+    ----------
+    data: dict
+        The continuous light curve, per filter.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    filters: list of str
+        Filters to process.
+    rng: numpy.random.Generator
+        Source of the sampling draws.
+    sample_times: numpy.ndarray
+        Times spanned by the light curve, in days.
+    trigger_time: float
+        Time of the trigger, in MJD.
+
+    Returns
+    -------
+    dict
+        Light curve restricted to the epochs ZTF would have observed.
     """
     with resources.open_binary(
         __package__ + ".data", "ZTF_revisit_kde_public.joblib"
