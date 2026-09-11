@@ -4,7 +4,7 @@ abstract: "An updated nuclear-physics and multi-messenger astrophysics framework
 message: "If you use this code, please cite this repository along with the paper"
 repository-code: "https://github.com/nuclear-multimessenger-astronomy/nmma"
 url: "https://gitlab.com/Theodlz/nmma-models"
-license: "GPL-3.0"
+license: "GPL-3.0-only"
 authors:
 - given-names: "Peter"
   name-particle: "T. H."

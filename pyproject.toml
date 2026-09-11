@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "setuptools-scm"]
+requires = ["setuptools>=77", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,8 @@ authors = [
 description = "A nuclear physics multi-messenger Bayesian inference library"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
-license = {text = "GPLv3"}
+license = "GPL-3.0-only"
+license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md", "LICENSES/LicenseRef-NMMA-Logo.txt"]
 classifiers = [
     "Programming Language :: Python :: 3",
     'Programming Language :: Python :: 3.12',
@@ -24,7 +25,6 @@ classifiers = [
     'Topic :: Scientific/Engineering :: Physics',
     'Operating System :: POSIX',
     'Operating System :: Unix',
-    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 ]
 dynamic = ["version"]
 dependencies = [
