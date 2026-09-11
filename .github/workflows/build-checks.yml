@@ -128,5 +128,4 @@ jobs:
           skip-existing: true
 
   # No conda job here on purpose: nmma's conda-forge recipe lives in the
-  # separate conda-forge/nmma-feedstock repo, not in this one -- see
-  # .github/MANUAL_SETUP.md.
+  # separate conda-forge/nmma-feedstock repo.
