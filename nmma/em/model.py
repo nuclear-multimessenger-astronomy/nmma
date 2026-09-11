@@ -7,6 +7,7 @@ import sncosmo
 from sncosmo.models import _SOURCES
 from ast import literal_eval
 from bilby.gw.cosmology import get_cosmology
+from fiesta.inference.lightcurve_model import FluxModel
 from . import utils
 from . import lightcurve_generation as lc_gen
 
@@ -19,6 +20,7 @@ from ..core.conversion import (
     get_cosmo_grids,
 )
 from ..core.gitlab import get_models_home, get_model
+from pathlib import Path
 
 ln10 = np.log(10)
 
@@ -429,28 +431,61 @@ class LightCurveModelContainer:
 
 
 class FiestaModel(LightCurveModelContainer):
-    def __init__(self, fiesta_model, filters, sample_times=None, **kwargs):
+    
+    load_dir_string = None
+    
+    def __init__(self, model, filters=None, surrogate_dir=None, sample_times=None, **kwargs):
         """A light curve model object for evaluating light curves using fiesta.
 
         Parameters
         ----------
-        fiesta_model: fiesta.inference.lightcurve_model.SurrogateModel
-            The fiesta model to use.
+        model: str
+            Name of the fiesta surrogate model to load.
         filters: str or list of str, optional
             Filters to use for the light curve. Defaults to all trained filters.
+        surrogate_dir: str, optional
+            Path to the directory containing the surrogate models.
         sample_times: array_like, optional
             Unused, included for compatibility with other Models.
         **kwargs
             Additional keyword arguments for LightCurveModelContainer, might be unused.
         """
 
-        self.fiesta_model = fiesta_model
-        if filters is None:
-            filters = fiesta_model.filters
+        # fiesta requires a non-empty in-range filter list at construction;
+        # there is no "all trained filters" default. Pick a safe optical/NIR
+        # set that fits every published Bu* surrogate.
+        # FIXME: investigate better ways to do this
+        filters = (
+            list(filters)
+            if filters
+            else [
+                "sdssg",
+                "sdssr",
+                "sdssi",
+                "sdssz",
+                "ztfg",
+                "ztfr",
+                "ztfi",
+                "2massj",
+                "2massh",
+                "2massks",
+            ]
+        )
+
+        fiesta_kwargs = dict(
+            name=model,
+            filters=filters,
+            directory=surrogate_dir,
+        )
+        try:
+            self.fiesta_model = FluxModel(**fiesta_kwargs)
+        except OSError:
+            fiesta_kwargs["directory"] = Path(surrogate_dir, self.load_dir_string, model, "model")
+            self.fiesta_model = FluxModel(**fiesta_kwargs)
         if sample_times is not None:
             print("Warning: sample_times are not used in FiestaModel, ignoring.")
-        kwargs["model_parameters"] = fiesta_model.parameter_names
-        super().__init__(fiesta_model.name, filters, **kwargs)
+        kwargs["model_parameters"] = self.fiesta_model.parameter_names
+        super().__init__(self.fiesta_model.name, filters, **kwargs)
 
     def setup_model_times(self):
         return self.fiesta_model.times  # default sample times for fiesta model
@@ -775,45 +810,9 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-
-    def __init__(self, model="Bu2026_MLP", filters=None, surrogate_dir=None, **kwargs):
-        if model.endswith("_lc"):
-            from fiesta.inference.lightcurve_model import (
-                BullaLightcurveModel as BullaSurrogate,
-            )
-        else:
-            from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
-        # fiesta requires a non-empty in-range filter list at construction;
-        # there is no "all trained filters" default. Pick a safe optical/NIR
-        # set that fits every published Bu* surrogate.
-        fiesta_filters = (
-            list(filters)
-            if filters
-            else [
-                "sdssg",
-                "sdssr",
-                "sdssi",
-                "sdssz",
-                "ztfg",
-                "ztfr",
-                "ztfi",
-                "2massj",
-                "2massh",
-                "2massks",
-            ]
-        )
-        fiesta_kwargs = dict(
-            name=model,
-            filters=fiesta_filters,
-            directory=surrogate_dir,
-        )
-        try:
-            fiesta_model = BullaSurrogate(**fiesta_kwargs)
-        except OSError:
-            fiesta_kwargs["directory"] = f"{surrogate_dir}/KN/{model}/model"
-            fiesta_model = BullaSurrogate(**fiesta_kwargs)
-
-        super().__init__(fiesta_model, filters, **kwargs)
+    load_dir_string = "KN"
+    def __init__(self, model="Bu2026_MLP", **kwargs):
+        super().__init__(model, **kwargs)
 
 
 class GRBMixin:
@@ -881,24 +880,11 @@ class FiestaGRBModel(GRBMixin, FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-
+    load_dir_string ="GRB"
     def __init__(
-        self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **kwargs
+        self, model="afgpy_gaussian_CVAE", **kwargs
     ):
-        from fiesta.inference.lightcurve_model import AfterglowFlux
-
-        fiesta_kwargs = dict(
-            name=model,
-            filters=filters,
-            directory=surrogate_dir,
-        )
-        try:
-            fiesta_model = AfterglowFlux(**fiesta_kwargs)
-        except OSError:
-            fiesta_kwargs["directory"] = f"{surrogate_dir}/GRB/{model}/model"
-            fiesta_model = AfterglowFlux(**fiesta_kwargs)
-
-        super().__init__(fiesta_model, filters, **kwargs)
+        super().__init__(model, **kwargs)
 
 
 class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
@@ -1491,67 +1477,6 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
         return stacked_mags
 
 
-class GenericCombineLightCurveModel(CombinedLightCurveModelContainer):
-    "A legacy synonym for CombinedLightCurveModelContainer"
-
-
-class KilonovaGRBLightCurveModel(CombinedLightCurveModelContainer):
-    """
-    A combined light curve model for Kilonova and GRB (Gamma-Ray Burst) events.
-
-    This model integrates the light curves from both Kilonova and GRB models
-    to provide a comprehensive representation of the observed phenomena.
-
-    Parameters
-    ----------
-    kilonova_kwargs : dict
-        Dictionary of keyword arguments for the Kilonova light curve model.
-    grb_resolution : int, optional
-        Resolution parameter for the GRB light curve model. Default is 12.
-    jet_type : int, optional
-        Type of jet model to use for the GRB light curve. Default is 0.
-
-    """
-
-    def __init__(
-        self,
-        kilonova_kwargs,
-        grb_resolution=12,
-        jet_type=0,
-    ):
-
-        kn_model = SVDLightCurveModel(**kilonova_kwargs)
-        grb_model = GRBLightCurveModel(
-            resolution=grb_resolution,
-            jet_type=jet_type,
-        )
-        super().__init__([grb_model, kn_model])
-
-
-class SupernovaGRBLightCurveModel(CombinedLightCurveModelContainer):
-    def __init__(
-        self,
-        supernova_kwargs,
-        grb_resolution=12,
-        jet_type=0,
-    ):
-        grb_model = GRBLightCurveModel(
-            resolution=grb_resolution,
-            jet_type=jet_type,
-        )
-        sn_model = SupernovaLightCurveModel(**supernova_kwargs)
-        super().__init__([grb_model, sn_model])
-
-
-class SupernovaShockCoolingLightCurveModel(CombinedLightCurveModelContainer):
-    def __init__(self, filters=None):
-        super().__init__(
-            [
-                ShockCoolingLightCurveModel(filters=filters),
-                SupernovaLightCurveModel(filters=filters),
-            ]
-        )
-
 
 def single_model_from_args(
     model_class, model_name, args, filters, prefixes=["grb_", "em_"]
@@ -1650,10 +1575,6 @@ def single_model_from_mapping(identifier, enfore_class=False):
         "supernova": SupernovaLightCurveModel,
         "shock": ShockCoolingLightCurveModel,
         "simple_kilonova": SimpleKilonovaLightCurveModel,
-        "combined": CombinedLightCurveModelContainer,
-        "kilonova_grb": KilonovaGRBLightCurveModel,
-        "supernova_grb": SupernovaGRBLightCurveModel,
-        "supernova_shock": SupernovaShockCoolingLightCurveModel,
     }
     if identifier.casefold() in transient_class_map.keys():
         return transient_class_map[identifier.casefold()]
