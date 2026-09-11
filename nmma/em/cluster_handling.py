@@ -9,6 +9,19 @@ from ..core.utils import read_injection_file, load_yaml
 
 
 def lc_creation():
+    """Entry point of the ``create-lightcurve-slurm`` command.
+
+    Split an injection set into batches of ``--n-per-job`` events and write
+    one shell script per batch into ``--outdir``, each obtained by replacing
+    the ``INJRANGE`` placeholder of ``--analysis-file`` with the index range
+    that batch covers.
+
+    Notes
+    -----
+    Non-functional as it stands: ``em_parsing.slurm_lc_parser`` does not
+    exist, so the first statement raises ``AttributeError``.
+    """
+
     args = emp.parsing_and_logging(emp.slurm_lc_parser)
     outdir = Path(args.outdir)
     log_dir = outdir / "logs"
@@ -20,13 +33,34 @@ def lc_creation():
     for ii in range(n_jobs):
         with open(args.analysis_file, "r") as file:
             analysis = file.read()
-        analysis = analysis.replace("INJRANGE", f"{ii*n_jobs:i},{(ii+1)*n_jobs:i}")
+        analysis = analysis.replace(
+            "INJRANGE", f"{ii * n_jobs:i},{(ii + 1) * n_jobs:i}"
+        )
 
         with open(outdir / f"inference_{ii:i}.sh", "w") as file:
             file.write(analysis)
 
 
 def slurm_analysis(args=None):
+    """Write a SLURM batch script running ``lightcurve-analysis`` under MPI.
+
+    Analysis arguments are forwarded verbatim to the generated script, the
+    SLURM ones excepted. Arguments left unset -- None, ``"None"`` or NaN --
+    are replaced by shell variables (``$MODEL``, ``$LABEL``, ``$TT``,
+    ``$DATA``, ``$PRIOR``, ``$TMIN``, ``$TMAX``, ``$DT``), so that a single
+    script can be reused across runs through ``sbatch --export``.
+
+    Parameters
+    ----------
+    args: argparse.Namespace or None, optional
+        Parsed arguments. Read from the command line when None.
+
+    Notes
+    -----
+    The script is written to ``<base_dir>/<logs_dir_name>/<script_name>``,
+    inside the log directory, which is created if needed.
+    """
+
     parser = nmma_base_parsing(
         (slurm_analysis_parser, emp.multi_wavelength_analysis_parser),
         return_parser=True,
@@ -119,10 +153,36 @@ def slurm_analysis(args=None):
 
 
 def run_cmd_in_subprocess(cmd):
+    """Run a command and block until it finishes.
+
+    Parameters
+    ----------
+    cmd: list of str
+        Command and its arguments, as accepted by :func:`subprocess.run`.
+    """
+
     subprocess.run(cmd)
 
 
 def multi_config_analysis(args=None):
+    """Entry point of the ``multi-config-analysis`` command.
+
+    Run one ``lightcurve-analysis`` per entry of a YAML configuration file,
+    each under ``mpiexec``. With ``--parallel`` the runs are submitted
+    concurrently and the ``--process`` budget is split evenly between them;
+    otherwise they run one after another.
+
+    Parameters
+    ----------
+    args: argparse.Namespace or None, optional
+        Parsed arguments. Read from the command line when None.
+
+    Raises
+    ------
+    ValueError
+        If a YAML key is not an argument accepted by ``lightcurve-analysis``.
+    """
+
     parser = nmma_base_parsing(emp.multi_config_parser, return_parser=True)
     args, _ = parser.parse_known_args(namespace=args)
 
@@ -159,10 +219,10 @@ def multi_config_analysis(args=None):
                     cmd.append(str(value))
 
             if not args.parallel:
-                print(f"{'#'*100}")
+                print(f"{'#' * 100}")
                 print(f"Running analysis set:  {label} with {processes} processes")
                 run_cmd_in_subprocess(cmd)
-                print(f"{'#'*100}")
+                print(f"{'#' * 100}")
             else:
                 future = executor.submit(run_cmd_in_subprocess, cmd)
                 futures.append(future)
