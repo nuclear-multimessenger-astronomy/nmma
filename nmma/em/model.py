@@ -7,6 +7,7 @@ import sncosmo
 from sncosmo.models import _SOURCES
 from ast import literal_eval
 from bilby.gw.cosmology import get_cosmology
+from fiesta.inference.lightcurve_model import FluxModel
 from . import utils
 from . import lightcurve_generation as lc_gen
 
@@ -777,12 +778,6 @@ class FiestaKilonovaModel(FiestaModel):
     """
 
     def __init__(self, model="Bu2026_MLP", filters=None, surrogate_dir=None, **kwargs):
-        if model.endswith("_lc"):
-            from fiesta.inference.lightcurve_model import (
-                LightcurveModel as BullaSurrogate,
-            )
-        else:
-            from fiesta.inference.lightcurve_model import FluxModel as BullaSurrogate
         # fiesta requires a non-empty in-range filter list at construction;
         # there is no "all trained filters" default. Pick a safe optical/NIR
         # set that fits every published Bu* surrogate.
@@ -807,11 +802,13 @@ class FiestaKilonovaModel(FiestaModel):
             filters=fiesta_filters,
             directory=surrogate_dir,
         )
+        
+        # FIXME: specify directory after https://github.com/nuclear-multimessenger-astronomy/fiestaEM/pull/75
         try:
-            fiesta_model = BullaSurrogate(**fiesta_kwargs)
+            fiesta_model = FluxModel(**fiesta_kwargs)
         except OSError:
             fiesta_kwargs["directory"] = f"{surrogate_dir}/KN/{model}/model"
-            fiesta_model = BullaSurrogate(**fiesta_kwargs)
+            fiesta_model = FluxModel(**fiesta_kwargs)
 
         super().__init__(fiesta_model, filters, **kwargs)
 
@@ -885,13 +882,13 @@ class FiestaGRBModel(GRBMixin, FiestaModel):
     def __init__(
         self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **kwargs
     ):
-        from fiesta.inference.lightcurve_model import FluxModel
-
         fiesta_kwargs = dict(
             name=model,
             filters=filters,
             directory=surrogate_dir,
         )
+        
+        # FIXME: specify directory after https://github.com/nuclear-multimessenger-astronomy/fiestaEM/pull/75
         try:
             fiesta_model = FluxModel(**fiesta_kwargs)
         except OSError:
