@@ -440,9 +440,11 @@ Beautiful fonts should be yours.
 Contributing
 ------------
 
-nmma is released under the MIT license.  We encourage you to
-modify it, reuse it, and contribute changes back for the benefit of
-others.  We follow standard open source development practices: changes
+NMMA source code is licensed under GNU GPL version 3 only
+(``GPL-3.0-only``). We encourage you to modify it, reuse it, and
+contribute changes back for the benefit of others. The NMMA name and
+logo are governed separately by the project's trademark policy. We
+follow standard open source development practices: changes
 are submitted as pull requests and, once they pass the test suite,
 reviewed by the team before inclusion.  Please also see
 `our contributing guide <./contributing.html>`_.

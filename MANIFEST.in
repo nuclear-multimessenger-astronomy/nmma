@@ -1,5 +1,8 @@
 include AUTHORS
-include COPYING
+include LICENSE
+include NOTICE
+include TRADEMARKS.md
+include GOVERNANCE.md
 include MANIFEST.in
 include README.rst
 include TODO.rst
@@ -9,5 +12,8 @@ include production_requirements.txt
 include doc_requirements.txt
 include grb_requirements.txt
 
+recursive-include LICENSES *.txt
+
 include doc/*.rst doc/*.md doc/images/*.png doc/images/*.svg
+include doc/_static/favicon-light.png doc/_static/favicon-light.png.license
 include doc/conf.py doc/Makefile
