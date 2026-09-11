@@ -1,0 +1,47 @@
+NMMA Notices
+============
+
+NMMA was initiated and developed by the authors of the NMMA Nature
+Communications paper, DOI: 10.1038/s41467-023-43932-6, and subsequently by
+its contributors.
+
+The current NMMA source code is licensed under GNU GPL version 3 only
+(GPL-3.0-only). Individual contributors retain copyright in their
+contributions unless those rights have been assigned in writing.
+
+The NMMA name and logo are governed separately by TRADEMARKS.md. The
+software licence does not grant rights in those marks or branding.
+
+Third-party content included with NMMA retains its own copyright, licence,
+and other applicable terms.
+
+Historical licensing notice
+----------------------------
+
+Before the repository adopted the GNU GPL version 3 licence text on
+19 August 2022, its top-level LICENSE.md contained the following MIT notice.
+It is preserved for historical attribution and compliance. It does not offer
+MIT as an alternative licence for the current release, and nothing here
+revokes permissions already granted for earlier copies.
+
+MIT License
+
+Copyright (c) 2020 Peter T. H. Pang
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
