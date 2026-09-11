@@ -779,10 +779,10 @@ class FiestaKilonovaModel(FiestaModel):
     def __init__(self, model="Bu2026_MLP", filters=None, surrogate_dir=None, **kwargs):
         if model.endswith("_lc"):
             from fiesta.inference.lightcurve_model import (
-                BullaLightcurveModel as BullaSurrogate,
+                LightcurveModel as BullaSurrogate,
             )
         else:
-            from fiesta.inference.lightcurve_model import BullaFlux as BullaSurrogate
+            from fiesta.inference.lightcurve_model import FluxModel as BullaSurrogate
         # fiesta requires a non-empty in-range filter list at construction;
         # there is no "all trained filters" default. Pick a safe optical/NIR
         # set that fits every published Bu* surrogate.
@@ -885,7 +885,7 @@ class FiestaGRBModel(GRBMixin, FiestaModel):
     def __init__(
         self, model="afgpy_gaussian_CVAE", filters=None, surrogate_dir=None, **kwargs
     ):
-        from fiesta.inference.lightcurve_model import AfterglowFlux
+        from fiesta.inference.lightcurve_model import FluxModel
 
         fiesta_kwargs = dict(
             name=model,
@@ -893,10 +893,10 @@ class FiestaGRBModel(GRBMixin, FiestaModel):
             directory=surrogate_dir,
         )
         try:
-            fiesta_model = AfterglowFlux(**fiesta_kwargs)
+            fiesta_model = FluxModel(**fiesta_kwargs)
         except OSError:
             fiesta_kwargs["directory"] = f"{surrogate_dir}/GRB/{model}/model"
-            fiesta_model = AfterglowFlux(**fiesta_kwargs)
+            fiesta_model = FluxModel(**fiesta_kwargs)
 
         super().__init__(fiesta_model, filters, **kwargs)
 
