@@ -378,7 +378,7 @@ class Dynesty(Worker):
         
         for it, res in enumerate(self.sampler.sample(**self.sampler_kwargs)):
 
-            self.stdout_sampling_log(results=res, niter=it)
+            self.stdout_sampling_log(itresult=res, niter=it)
             run_time = time() - t_start
             checkpoint_interval = time()- last_checkpoint_time
 
@@ -398,7 +398,7 @@ class Dynesty(Worker):
                 last_checkpoint_time = time() 
                 last_checkpoint_it = it
                 self.checkpointing(checkpoint_plot, 
-                    self.get_step_info_str(results=res, niter=it))
+                    self.get_step_info_str(itresult=res, niter=it))
 
         # Adding the final set of live points.
         for it_final, res in enumerate(self.sampler.add_live_points()):
