@@ -422,7 +422,6 @@ def get_extinction_model(ext_model=None, Rv=None):
         if "host" in ext_model.lower() or "rest" in ext_model.lower():
             raise ValueError("G23 extinction model is only applicable to MW dust")
         frame = "obs"
-        return ext_model, frame
 
     if "host" in ext_model.lower() or "rest" in ext_model.lower():
         frame = "rest"
