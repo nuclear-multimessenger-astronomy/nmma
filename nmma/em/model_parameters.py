@@ -6,6 +6,20 @@ from .utils import get_knprops_from_LANLfilename
 
 
 def AnBa2022_linear(data):
+    """Read the Anand 2022 parameters off the file names, in linear space.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -30,6 +44,23 @@ def AnBa2022_linear(data):
 
 
 def AnBa2022_log(data):
+    """Read the Anand 2022 parameters off the file names, in log space.
+
+    The masses are interpolated in log space, where the grid is far more
+    evenly sampled than in linear space.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -59,6 +90,20 @@ def AnBa2022_log(data):
 
 
 def AnBa2022_sparse(data):
+    """Read only the two Anand 2022 parameters a sparse grid varies.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -82,6 +127,23 @@ def AnBa2022_sparse(data):
 
 
 def CV(data):
+    """Index cataclysmic variable light curves by their example number.
+
+    These grids carry no physical parameter in their file names, only a
+    running index.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -96,6 +158,20 @@ def CV(data):
 
 
 def Bu2019lm_sparse(data):
+    """Read only the two ejecta masses of a sparse Bulla 2019 grid.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -123,6 +199,23 @@ def Bu2019lm_sparse(data):
 
 
 def Bu2019lm(data):
+    """Read the Bulla 2019 kilonova parameters off the file names.
+
+    Covers the two ejecta components, the half-opening angle of the
+    lanthanide-rich region, and the viewing angle.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -150,6 +243,23 @@ def Bu2019lm(data):
 
 
 def Bu2019nsbh(data):
+    """Read the Bulla 2019 parameters of a neutron star black hole grid.
+
+    Unlike the binary neutron star case, no opening angle is varied: the
+    disc geometry is set by the tidal disruption.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -177,6 +287,24 @@ def Bu2019nsbh(data):
 
 
 def Bu2022Ye(data):
+    """Read the Bulla 2022 parameters, electron fraction included.
+
+    Adds the velocity of each ejecta component and the electron fraction of
+    the dynamical ejecta, which drives how many lanthanides form and hence
+    how red the kilonova is.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -211,6 +339,23 @@ def Bu2022Ye(data):
 
 
 def Bu2023Ye(data):
+    """Read the Bulla 2023 parameters, with both electron fractions.
+
+    Extends the 2022 grid by varying the electron fraction of the wind as
+    well as that of the dynamical ejecta.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     data_out = {}
 
@@ -246,6 +391,23 @@ def Bu2023Ye(data):
 
 
 def Ka2017(data):
+    """Read the Kasen 2017 parameters off the file names.
+
+    A one-component model: an ejecta mass, a velocity, and the lanthanide
+    mass fraction that sets the opacity.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     parameters = [
         "log10_mej",
@@ -279,6 +441,23 @@ def Ka2017(data):
 
 
 def LANLTP1(data):
+    """Read the parameters of a LANL TP1 grid.
+
+    TP stands for the toroidal-peanut ejecta geometry, 1 for the first
+    wind configuration.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     parameters = [
         # "Ye_wind",
@@ -309,6 +488,23 @@ def LANLTP1(data):
 
 
 def LANLTS1(data):
+    """Read the parameters of a LANL TS1 grid.
+
+    TS stands for the toroidal-spherical ejecta geometry, 1 for the first
+    wind configuration.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     parameters = [
         # "Ye_wind",
@@ -339,6 +535,22 @@ def LANLTS1(data):
 
 
 def LANLTP2(data):
+    """Read the parameters of a LANL TP2 grid.
+
+    Toroidal-peanut ejecta geometry, second wind configuration.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     parameters = [
         # "Ye_wind",
@@ -369,6 +581,22 @@ def LANLTP2(data):
 
 
 def LANLTS2(data):
+    """Read the parameters of a LANL TS2 grid.
+
+    Toroidal-spherical ejecta geometry, second wind configuration.
+
+    Parameters
+    ----------
+    data: dict
+        Training grid, keyed by the file name each light curve came from.
+
+    Returns
+    -------
+    data_out: dict
+        The same grid, each entry carrying its extracted parameters.
+    parameters: list of str
+        Names of the parameters, in the order the surrogate expects them.
+    """
 
     parameters = [
         # "Ye_wind",
