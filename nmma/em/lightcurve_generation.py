@@ -38,7 +38,7 @@ seconds_a_day = 86400.0
 abs_mag_dist_factor = D**2
 
 
-#################################################################
+# =======================================================
 def dummy_add(nu):
     """Add nothing to a blackbody spectrum; the default extra component.
 
@@ -112,15 +112,15 @@ def mag_dict_for_blackbody(filters, inv_temp, R_photo, nu_host, add=dummy_add):
         nu_of_filt = nu_host[idx]
         F = bb_flux_from_inv_temp(nu_of_filt, inv_temp, R_photo)
         F += add(nu_of_filt)
-        # F *= 1 + redshift ## correction factor for shifted flux density bin
+        # F *= 1 + redshift # correction factor for shifted flux density bin
         mag[filt] = utils.flux_to_ABmag(F)
 
     return mag
 
 
-#################################################################
-# LC MODELS #############################
-#################################################################
+# =======================================================
+# LC MODELS
+# =======================================================
 # Arnett model convenience functions
 def arnett_lc_get_int_A_non_vec(x, y):
     """Integral A of the Arnett solution, for a single time.
@@ -1451,7 +1451,7 @@ def create_light_curve_data(
         if sample_times is None:
             sample_times = light_curve_model.model_times
         lc = light_curve_model.generate_lightcurve(sample_times, injection_parameters)
-        # if "timeshift" in injection_parameters: ## included in gen_detector_lc
+        # if "timeshift" in injection_parameters: # included in gen_detector_lc
         #     trigger_time += injection_parameters["timeshift"]
     else:
         # basic idea: generate lc works on desired times in source_frame,
