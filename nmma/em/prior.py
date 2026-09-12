@@ -68,12 +68,36 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
         self.__class__.__qualname__ = "ConditionalGaussianIotaGivenThetaCore"
 
     def _condition_function(self, reference_params, **kwargs):
+        """Set the width of the Gaussian from the jet opening angle.
+
+        Parameters
+        ----------
+        reference_params: dict
+            Unconditioned parameters, unused here.
+        **kwargs
+            Must carry thetaCore, the jet opening angle.
+
+        Returns
+        -------
+        dict
+            The sigma to use for this draw.
+        """
         return dict(sigma=(1.0 / self.N_sigma) * kwargs[self._required_variables[0]])
 
     def __repr__(self):
         return Prior.__repr__(self)
 
     def get_instantiation_dict(self):
+        """Arguments needed to rebuild this prior, for serialisation.
+
+        The reference parameters override what the base class reports, so
+        that a prior read back from disk conditions the same way.
+
+        Returns
+        -------
+        dict
+            Constructor arguments of this prior.
+        """
         instantiation_dict = Prior.get_instantiation_dict(self)
         for key, value in self.reference_params.items():
             if key in instantiation_dict:
@@ -82,6 +106,31 @@ class ConditionalGaussianIotaGivenThetaCore(ConditionalTruncatedGaussian):
 
 
 def inclination_prior_from_fits(priors, args):
+    """Build an inclination prior from a gravitational-wave skymap.
+
+    The skymap gives a distance distribution in every direction. At the
+    chosen sky position, that distribution is read as a function of the
+    cosine of the inclination and, combined with the known distance, turned
+    into a probability over the inclination itself.
+
+    Gravitational waves cannot tell a jet pointing towards us from one
+    pointing away, so the distribution spans a half-turn; the electromagnetic
+    models only span a quarter, and the two halves are folded together.
+
+    Parameters
+    ----------
+    priors: bilby.core.prior.PriorDict
+        Priors to extend, read for the sky position and the distance when
+        the command line does not give them.
+    args: argparse.Namespace
+        Parsed command-line arguments, holding the skymap file, and
+        optionally the sky position and the distance.
+
+    Returns
+    -------
+    bilby.core.prior.PriorDict
+        The priors, with inclination_EM replaced.
+    """
 
     print("Constructing prior on inclination with fits input")
 
@@ -182,6 +231,29 @@ def inclination_prior_from_fits(priors, args):
 
 
 def extinction_prior(priors, args):
+    """Pin the extinction to what the dust map gives at the sky position.
+
+    The reddening along the line of sight is looked up in the SFD dust map
+    and fixed, rather than sampled. The map is downloaded on first use.
+
+    Parameters
+    ----------
+    priors: bilby.core.prior.PriorDict
+        Priors to extend, read for the sky position when the command line
+        does not give it.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+
+    Returns
+    -------
+    bilby.core.prior.PriorDict
+        The priors, with Ebv fixed to the value read off the map.
+
+    Raises
+    ------
+    ValueError
+        If no sky position can be found, neither in args nor in the priors.
+    """
     ra, dec = getattr(args, "ra", None), getattr(args, "dec", None)
     if not (ra and dec):
         try:
@@ -219,13 +291,25 @@ def extinction_prior(priors, args):
 
 
 def create_prior_from_args(args, systematics_handler):
-    """Function to create prior dictionary from command line arguments and nmma-LightCurveModel
+    """Assemble the priors an EM analysis will sample.
+
+    Starts from the prior file, then applies whatever the command line asks
+    for: a Hubble constant, an extinction read off a dust map, an
+    inclination conditioned on the jet opening angle or read off a skymap,
+    and the parameters the systematics handler adds.
+
     Parameters
     ----------
-    args : argparse.Namespace
-        Command line arguments
-    lc_model : nmma.em.model.LightCurveModelContainer
-        Light curve model object to compute light curves
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    systematics_handler: nmma.em.systematics.SystematicsHandler
+        Handler whose own parameters are added to the priors.
+
+    Returns
+    -------
+    bilby.core.prior.PriorDict or ConditionalPriorDict
+        The priors. Conditional when the inclination is tied to the jet
+        opening angle.
     """
     priors = (
         PriorDict(args.prior_file)
