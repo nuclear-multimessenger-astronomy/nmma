@@ -1,5 +1,5 @@
 :::{important}
-Likelihood-free inference is no longer supported in NMMA versions after [v1.0.2](https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/v1.0.2). The legacy code can be found at <https://github.com/nuclear-multimessenger-astronomy/sim_based_inference>.
+Likelihood-free inference is no longer supported in NMMA versions after [v1.0.2](https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/v1.0.2). The legacy code can be found at <https://github.com/nuclear-multimessenger-astronomy/sim_based_inference>. This documentation is likely to be removed in a future release but will remain present in a modified form in the aforementioned repository.
 :::
 
 # Perform Parameter Estimation Using Liklihood Free Inference (LFI)
