@@ -1272,7 +1272,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
     """
 
     lc_dict = {
-        "HoHa2020": lc_gen.HoNa_lc,
+        "HoNa2020": lc_gen.HoNa_lc,
         "Me2017": lc_gen.eff_metzger_lc,
         "PL_BB_fixedT": lc_gen.powerlaw_blackbody_constant_temperature_lc,
         "blackbody_fixedT": lc_gen.blackbody_constant_temperature,
