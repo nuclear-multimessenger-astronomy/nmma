@@ -26,6 +26,8 @@ from .parsing import process_sampler_kwargs
 
 
 def time_storage(func):
+    """Decorator that logs how long the wrapped call took, via
+    ``logger.info``."""
     @wraps(func)
     def wrapper(*args, **kwargs):
         start = time()
@@ -88,8 +90,9 @@ class Worker(bs.NestedSampler):
 
         Returns
         =======
-        float: Log-likelihood or log-likelihood-ratio given the current
-            likelihood.parameter values
+        float: Log-likelihood-ratio for ``theta`` (sampling works in
+            ratio space; the noise log-likelihood is added back in
+            later to recover the full log-likelihood).
 
         """
 
@@ -135,11 +138,44 @@ class Worker(bs.NestedSampler):
         message: str
             Message to log after checkpointing
         """
+        # FIX ME: os.wait() waits for a CHILD OS PROCESS to terminate --
+        # confirmed it raises ChildProcessError ("No child processes")
+        # when there are none, which is the normal case here. This is
+        # the graceful-shutdown handler for non-rank-0 workers
+        # (pbilby_sampling's handle_sigterm calls worker.checkpointing),
+        # and that call site wraps it in a bare `except Exception: pass`
+        # -- so the error is silently swallowed, but that also means the
+        # `sys.exit()` right after it never runs. Net effect: graceful
+        # shutdown for worker processes does nothing and doesn't even
+        # exit. Present unchanged since this file was introduced (across
+        # two refactors) -- looks like either a copy-paste leftover or a
+        # misunderstanding of what os.wait() does.
         os.wait()
         pass  # only to be executed in main process
 
 class Dynesty(Worker):
-   
+    """The rank-0 driver: initializes or resumes a dynesty NestedSampler,
+    runs it with periodic checkpointing, and formats the final bilby
+    Result. Other ranks use the lighter ``Worker`` instead.
+
+    Parameters
+    ----------
+    args, prior, likelihood, injection_parameters, plot
+        See ``Worker``.
+    maxmcmc, naccept, nact
+        See ``_init_sampler_kwargs``.
+    sampling_seed: int, default 42
+        Seeds this run's random Generator (saved/restored across
+        checkpoints for reproducibility).
+    sampler_kwargs: dict
+        Passed to the sampler's ``sample(...)`` call each run; must
+        include "dlogz".
+    sampler_init_kwargs: dict
+        Passed (via ``_init_sampler_kwargs``) to ``dynesty.NestedSampler``;
+        must include "nlive", "sample", "bound".
+    meta_data: dict, optional
+        Extra metadata to store alongside the result.
+    """
     def __init__(
         self,
         args, prior, likelihood,
@@ -261,13 +297,9 @@ class Dynesty(Worker):
         ----------
         pool: a Schwimmbad-pool object
 
-        Returns
-        -------
-        sampler: dynesty.NestedSampler
-            If a resume file exists and was successfully read, the nested sampler 
-            instance updated with the values stored to disk. If unavailable, create the initial state from scratch.
-        sampling_time: float
-            The current sampling time
+        Sets ``self.sampler`` (a resumed instance if a resume file exists
+        and was read successfully, else a freshly-created one) and
+        ``self.sampling_time`` in place; nothing is returned.
         """
 
         if self.resume_file.is_file():
@@ -321,7 +353,7 @@ class Dynesty(Worker):
 
         Returns
         -------
-        (numpy.ndarraym, numpy.ndarray, numpy.ndarray)
+        (numpy.ndarray, numpy.ndarray, numpy.ndarray)
             Returns a tuple (unit, theta, logl) where
             unit: point in the unit cube
             theta: scaled value to prior space
@@ -369,6 +401,31 @@ class Dynesty(Worker):
     
 
     def run_sampler(self, check_point_delta_t=1800, n_check_point=1000, max_its=1e10, max_run_time=1e10, checkpoint_plot=False):
+        """Drive the dynesty sampling loop: log progress each step, and
+        checkpoint every ``check_point_delta_t`` seconds or
+        ``n_check_point`` iterations. Stops early (checkpointing first)
+        if ``max_its``/``max_run_time`` is reached; otherwise runs to
+        completion, adds the final live points, writes a last
+        checkpoint, and formats the result.
+
+        Parameters
+        ----------
+        check_point_delta_t: float, default 1800
+            Seconds between checkpoints.
+        n_check_point: int, default 1000
+            Iterations between checkpoints.
+        max_its: float, default 1e10
+            Stop (without finishing) after this many iterations.
+        max_run_time: float, default 1e10
+            Stop (without finishing) after this many seconds.
+        checkpoint_plot: bool, default False
+            Whether checkpoints also produce diagnostic plots.
+
+        Returns
+        -------
+        dynesty.results.Results or None
+            None if stopped early via max_its/max_run_time.
+        """
         logger.info(f"Beginning sampling with checkpoints every {check_point_delta_t} seconds or {n_check_point} iterations \n "
                     f" until max {max_its} iterations or max run time {timedelta(seconds=max_run_time)}.")
         run_time = 0.
@@ -411,10 +468,14 @@ class Dynesty(Worker):
         return self.sampler.results
     
     def stdout_sampling_log(self, **kwargs):
+        """Overwrite the current terminal line with ``get_step_info_str``'s
+        one-line progress summary."""
         sys.stdout.write(f"\033[K {self.get_step_info_str(**kwargs)}\r")
         sys.stdout.flush()
 
     def checkpointing(self, checkpoint_plot=False, message= None):
+        """Write the sampler state and sample dump to disk (optionally
+        plotting), and log ``message`` if given."""
         self.write_current_state()
         self.write_sample_dump(self.sampler.saved_run.D)
         if checkpoint_plot:
@@ -434,15 +495,11 @@ class Dynesty(Worker):
 
     @time_storage
     def write_current_state(self):
-        """Writes a checkpoint file
-
-        Parameters
-        ----------
-        sampler: dynesty.NestedSampler
-            The sampler object itself
-        sampling_time: float
-            The total sampling time in seconds
-        """
+        """Pickle ``self.sampler`` (with ``self.sampling_time`` attached)
+        to ``self.resume_file``, via a temp file for an atomic write.
+        Temporarily strips the pool/loglikelihood/prior_transform
+        references first, so they aren't (expensively, and often
+        unpicklably) pickled along with it."""
         print("")
         cp_time = self.sampling_time
         if self.resume_file.is_file():
@@ -478,6 +535,10 @@ class Dynesty(Worker):
 
     @time_storage
     def plot_current_state(self):
+        """Save trace/run/stats checkpoint plots to
+        ``{outdir}/{label}_checkpoint_{trace,run,stats}.png``. Each plot
+        failing is caught and logged individually, without aborting the
+        others."""
         # labels = [label.replace("_", " ") for label in search_parameter_keys]
         for name, func, obj in zip (
             ["trace", "run", "stats"],
@@ -496,6 +557,12 @@ class Dynesty(Worker):
                 plt.close("all")
 
     def storable_metadata(self):
+        """Assemble this run's metadata for the bilby Result.
+
+        Returns
+        -------
+        dict
+        """
         meta_data = self.meta_data
         meta_data["args"] = vars(self.args).copy() # convert Namespace to dict for storing
         meta_data["likelihood"] = self.likelihood.meta_data
@@ -505,6 +572,10 @@ class Dynesty(Worker):
         return meta_data
     
     def floatify_dict(self, d):
+        """Recursively convert numpy floating values in ``d`` (mutated
+        and returned) to plain Python floats, e.g. so it's
+        JSON/YAML-serializable. Leaves other value types (ints,
+        strings, lists) untouched."""
         for k, v in d.items():
             if isinstance(v, dict):
                 d[k] = self.floatify_dict(v)
@@ -603,13 +674,41 @@ class Dynesty(Worker):
 
 
 def pbilby_sampling(
-    likelihood, prior, args, 
+    likelihood, prior, args,
     injection_parameters, rank,
     pool_type = 'mpi',
     meta_data = {},
     **kwargs
 ):
-    # kwargs > args in priority, so that command line arguments can override the config      
+    """Run dynesty nested sampling in parallel via a schwimmbad pool:
+    rank 0 builds a Dynesty worker and drives the whole run (init/resume,
+    sample, checkpoint, format the result); other ranks just build a
+    plain Worker to evaluate the likelihood/prior for the pool. Sets up
+    graceful-shutdown signal handlers that checkpoint before exiting.
+
+    Parameters
+    ----------
+    likelihood, prior
+        As elsewhere in NMMA.
+    args: argparse.Namespace
+        CLI args; also updated in place from ``kwargs``.
+    injection_parameters: dict, optional
+    rank: int
+        This process's MPI rank.
+    pool_type: {"mpi", "multi"}, default "mpi"
+        ``MPIPool`` for real MPI runs, ``MultiPool`` for local
+        multiprocessing.
+    meta_data: dict, optional
+    **kwargs
+        Merged onto ``args`` (kwargs take priority), so CLI args can be
+        overridden at the call site.
+
+    Returns
+    -------
+    bilby.core.result.Result or None
+        The formatted result on the pool's master process, else None.
+    """
+    # kwargs > args in priority, so that command line arguments can override the config
     args.__dict__.update(kwargs)
 
     # Initialise a worker. this needs a global scope to allow 
@@ -675,10 +774,17 @@ def pbilby_sampling(
 
 # Worker functions. These are read in the global scope by each worker
 def pooled_initial_point_from_prior(args):
+    """``worker.get_initial_point_from_prior(args)``, for dispatch via
+    the schwimmbad pool (reads the module-level ``worker`` set by
+    ``pbilby_sampling``)."""
     return worker.get_initial_point_from_prior(args)
 
 def pooled_log_likelihood(v_array):
+    """``worker.log_likelihood(v_array)``, for dispatch via the
+    schwimmbad pool."""
     return worker.log_likelihood(v_array)
 
 def pooled_prior_transform(u_array):
+    """``worker.prior_transform(u_array)``, for dispatch via the
+    schwimmbad pool."""
     return worker.prior_transform(u_array)

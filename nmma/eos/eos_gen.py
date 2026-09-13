@@ -5,6 +5,8 @@ from scipy.optimize import minimize_scalar
 from .tov import TOVSolver
 import lal
 
+# CHECK ME: Can this be removed? It is not used anywhere in the code.
+
 ### Test routine for EOS generation, to be replaced
 def eos_from_nep (S0_val, L_val, nsat_val = 0.16, 
 	Esat_val = -16.0, Ksat_val = 220.0, Qsat_val = 0.0, Zsat_val = 0.0,

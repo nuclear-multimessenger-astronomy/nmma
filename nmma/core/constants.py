@@ -42,13 +42,21 @@ einstein_factor = (const.G*const.M_sun/const.c**3).value**(2/3)
 
 default_cosmology = cosmology.Planck18
 def set_cosmology(cosmology_input=None):
-    """Set the cosmology for the NMMA package.
+    """Set the cosmology used by NMMA and bilby (globally, via
+    ``bilby.gw.cosmology.set_cosmology``), and cache it for
+    ``get_cosmology``.
 
     Parameters
     ----------
-    cosmology_input: astropy.cosmology.Cosmology or str
-        The cosmology to be used. If a string is provided, it should correspond to a valid astropy cosmology name.
-        Default is astropy's Planck18 cosmology.
+    cosmology_input: astropy.cosmology.Cosmology | str | dict, optional
+        The cosmology to use -- an astropy Cosmology instance, the name
+        of a known astropy cosmology (e.g. "Planck13"), or a dict of
+        constructor args. Defaults to ``default_cosmology`` (Planck18).
+
+    Returns
+    -------
+    astropy.cosmology.Cosmology
+        The resolved cosmology now in effect.
     """
     global COSMOLOGY
     if cosmology_input is None:
