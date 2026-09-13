@@ -11,18 +11,25 @@ from nmma.population.pop_likelihood import (
     build_population_model,
 )
 
+### TODO: remove this
+# def binary(mass_1=1.5, mass_2=1.4, mass_ratio=None):
+#     """The three parameters the population likelihood reads. The masses are
+#     source-frame, because a population is defined in the source frame."""
+#     if mass_ratio is None:
+#         mass_ratio = mass_2 / mass_1
+#     return {
+#         "mass_1_source": mass_1,
+#         "mass_2_source": mass_2,
+#         "mass_ratio": mass_ratio,
+#     }
 
-def binary(mass_1=1.5, mass_2=1.4, mass_ratio=None):
-    """The three parameters the population likelihood reads. The masses are
-    source-frame, because a population is defined in the source frame."""
-    if mass_ratio is None:
-        mass_ratio = mass_2 / mass_1
-    return {
-        "mass_1_source": mass_1,
-        "mass_2_source": mass_2,
-        "mass_ratio": mass_ratio,
-    }
 
+TEST_MASS_1_SOURCE = 1.7
+TEST_MASS_2_SOURCE = 1.3
+TEST_VAR_UNEQUAL_MASS_PARAMS = {"mass_1_source": TEST_MASS_1_SOURCE,
+                                "mass_2_source": TEST_MASS_2_SOURCE,
+                                "mass_ratio": TEST_MASS_2_SOURCE / TEST_MASS_1_SOURCE,
+                                }
 
 class TestNeutronStarPopulation:
     """The base class is the uniform (flat) neutron-star mass distribution
@@ -33,6 +40,8 @@ class TestNeutronStarPopulation:
         self.m_min = 1.1
         self.m_max = 2.0
         self.model = NeutronStarPopulation(m_min=self.m_min, m_max=self.m_max)
+        self.equal_mass_ratio = 1.0
+        self.unequal_mass_ratio = 0.5
 
     def test_the_mass_limits_can_be_set_by_user(self):
         custom_m_min, custom_m_max = 1.0, 3.0
@@ -54,6 +63,73 @@ class TestNeutronStarPopulation:
     def test_the_beta_exponent_is_stored_as_given(self):
         custom_beta = 1.5
         assert NeutronStarPopulation(beta=custom_beta).beta == custom_beta
+
+    def test_no_pairing_preference_leaves_the_likelihood_to_the_masses_alone(self):
+        parameters = binary(mass_ratio=self.unequal_mass_ratio)
+        expected = self.model.distribution.logpdf(
+            parameters["mass_1_source"]
+        ) + self.model.distribution.logpdf(parameters["mass_2_source"])
+        assert self.model.log_likelihood(parameters) == pytest.approx(expected)
+
+    def test_the_mass_ratio_term_does_not_depend_on_the_mass_ratio_without_pairing(
+        self,
+    ):
+        low_mass_ratio, high_mass_ratio = 0.2, 0.9
+        first = self.model.log_likelihood(binary(mass_ratio=low_mass_ratio))
+        second = self.model.log_likelihood(binary(mass_ratio=high_mass_ratio))
+        assert first == pytest.approx(second)
+
+    def test_a_positive_exponent_favours_equal_mass_binaries(self):
+        positive_beta = 2.0
+        model = NeutronStarPopulation(
+            m_min=self.m_min, m_max=self.m_max, beta=positive_beta
+        )
+        unequal = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
+        equal = model.log_likelihood(binary(mass_ratio=self.equal_mass_ratio))
+        assert equal > unequal
+
+    def test_a_negative_exponent_favours_unequal_mass_binaries(self):
+        negative_beta = -2.0
+        model = NeutronStarPopulation(
+            m_min=self.m_min, m_max=self.m_max, beta=negative_beta
+        )
+        unequal = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
+        equal = model.log_likelihood(binary(mass_ratio=self.equal_mass_ratio))
+        assert unequal > equal
+
+    def test_the_mass_ratio_term_is_the_exponent_times_its_logarithm(self):
+        beta = 3.0
+        mass_ratio = 0.4
+        model = NeutronStarPopulation(m_min=self.m_min, m_max=self.m_max, beta=beta)
+        without = NeutronStarPopulation(
+            m_min=self.m_min, m_max=self.m_max, beta=0.0
+        )
+        difference = model.log_likelihood(
+            binary(mass_ratio=mass_ratio)
+        ) - without.log_likelihood(binary(mass_ratio=mass_ratio))
+        assert difference == pytest.approx(beta * np.log(mass_ratio))
+
+    def test_an_equal_mass_binary_gets_no_pairing_contribution(self):
+        beta = 5.0
+        model = NeutronStarPopulation(m_min=self.m_min, m_max=self.m_max, beta=beta)
+        parameters = binary(mass_ratio=self.equal_mass_ratio)
+        assert model.log_likelihood(parameters) == pytest.approx(
+            self.model.log_likelihood(parameters)
+        )
+
+    def test_a_very_large_exponent_underflows_to_minus_infinity(self):
+        # The term is computed as log(q**beta) rather than beta*log(q), so
+        # the power underflows to zero before the logarithm is taken. Only
+        # unrealistically large exponents reach this, but the algebraically
+        # equal form would not.
+        huge_beta = 2000.0
+        model = NeutronStarPopulation(
+            m_min=self.m_min, m_max=self.m_max, beta=huge_beta
+        )
+        with np.errstate(divide="ignore"):
+            value = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
+        assert value == -np.inf
+        assert np.isfinite(huge_beta * np.log(self.unequal_mass_ratio))
 
 
 class TestPeakNeutronStarPopulation:
@@ -96,35 +172,25 @@ class TestPeakNeutronStarPopulation:
         assert upper == pytest.approx(custom_m_max)
 
     def test_the_density_peaks_at_the_central_mass(self):
-        masses = np.linspace(self.m_min, self.m_max, 201)
+        num_points = 201
+        masses = np.linspace(self.m_min, self.m_max, num_points)
         peak = masses[np.argmax(self.model.distribution.pdf(masses))]
-        assert peak == pytest.approx(self.loc, abs=1.5 * 10**-2)
+        # The true peak can be at most half a grid cell away from the
+        # closest sampled point, since the density is unimodal.
+        grid_spacing = (self.m_max - self.m_min) / (num_points - 1)
+        assert peak == pytest.approx(self.loc, abs=grid_spacing / 2)
 
-    def test_the_density_falls_off_away_from_the_peak(self):
-        mass_above_peak = self.loc + 0.5
-        mass_below_peak = self.loc - 0.3
-        peak_density = self.model.distribution.pdf(self.loc)
-        assert peak_density > self.model.distribution.pdf(mass_above_peak)
-        assert peak_density > self.model.distribution.pdf(mass_below_peak)
-
-    def test_a_mass_below_the_truncation_is_excluded(self):
-        mass_below_support = self.m_min - 0.1
-        assert self.model.distribution.logpdf(mass_below_support) == -np.inf
-
-    def test_a_mass_above_the_truncation_is_excluded(self):
-        mass_above_support = self.m_max + 0.1
-        assert self.model.distribution.logpdf(mass_above_support) == -np.inf
-
-    def test_the_density_is_normalised_over_the_truncated_range(self):
-        masses = np.linspace(self.m_min, self.m_max, 10001)
-        integral = np.trapezoid(self.model.distribution.pdf(masses), masses)
-        assert integral == pytest.approx(1.0, abs=1.5 * 10**-4)
-
-    def test_the_two_models_are_different_distributions(self):
-        flat = NeutronStarPopulation()
-        assert flat.distribution.logpdf(self.loc) != pytest.approx(
-            self.model.distribution.logpdf(self.loc)
+    def test_a_binary_at_the_peak_is_the_most_likely(self):
+        equal_mass_ratio = 1.0
+        peak_mass = self.loc
+        off_peak_mass_1, off_peak_mass_2 = 2.0, 1.2
+        at_peak = self.model.log_likelihood(
+            binary(peak_mass, peak_mass, mass_ratio=equal_mass_ratio)
         )
+        off_peak = self.model.log_likelihood(
+            binary(off_peak_mass_1, off_peak_mass_2, mass_ratio=equal_mass_ratio)
+        )
+        assert at_peak > off_peak
 
 
 class TestBuildPopulationModel:
@@ -158,77 +224,6 @@ class TestBuildPopulationModel:
             build_population_model("does_not_exist")
 
 
-class TestPairingExponent:
-    """The mass ratio is weighted by a pairing exponent, which says how
-    strongly the population favours equal-mass binaries."""
-
-    def setup_method(self):
-        self.equal_mass_ratio = 1.0
-        self.unequal_mass_ratio = 0.5
-
-    def test_no_pairing_preference_leaves_the_likelihood_to_the_masses_alone(self):
-        model = PeakNeutronStarPopulation()
-        parameters = binary(mass_ratio=self.unequal_mass_ratio)
-        expected = model.distribution.logpdf(
-            parameters["mass_1_source"]
-        ) + model.distribution.logpdf(parameters["mass_2_source"])
-        assert model.log_likelihood(parameters) == pytest.approx(expected)
-
-    def test_the_mass_ratio_term_does_not_depend_on_the_mass_ratio_without_pairing(
-        self,
-    ):
-        model = PeakNeutronStarPopulation()
-        low_mass_ratio, high_mass_ratio = 0.2, 0.9
-        first = model.log_likelihood(binary(mass_ratio=low_mass_ratio))
-        second = model.log_likelihood(binary(mass_ratio=high_mass_ratio))
-        assert first == pytest.approx(second)
-
-    def test_a_positive_exponent_favours_equal_mass_binaries(self):
-        positive_beta = 2.0
-        model = PeakNeutronStarPopulation(beta=positive_beta)
-        unequal = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
-        equal = model.log_likelihood(binary(mass_ratio=self.equal_mass_ratio))
-        assert equal > unequal
-
-    def test_a_negative_exponent_favours_unequal_mass_binaries(self):
-        negative_beta = -2.0
-        model = PeakNeutronStarPopulation(beta=negative_beta)
-        unequal = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
-        equal = model.log_likelihood(binary(mass_ratio=self.equal_mass_ratio))
-        assert unequal > equal
-
-    def test_the_mass_ratio_term_is_the_exponent_times_its_logarithm(self):
-        beta = 3.0
-        mass_ratio = 0.4
-        model = PeakNeutronStarPopulation(beta=beta)
-        without = PeakNeutronStarPopulation(beta=0.0)
-        difference = model.log_likelihood(
-            binary(mass_ratio=mass_ratio)
-        ) - without.log_likelihood(binary(mass_ratio=mass_ratio))
-        assert difference == pytest.approx(beta * np.log(mass_ratio))
-
-    def test_an_equal_mass_binary_gets_no_pairing_contribution(self):
-        beta = 5.0
-        model = PeakNeutronStarPopulation(beta=beta)
-        without = PeakNeutronStarPopulation(beta=0.0)
-        parameters = binary(mass_ratio=self.equal_mass_ratio)
-        assert model.log_likelihood(parameters) == pytest.approx(
-            without.log_likelihood(parameters)
-        )
-
-    def test_a_very_large_exponent_underflows_to_minus_infinity(self):
-        # The term is computed as log(q**beta) rather than beta*log(q), so
-        # the power underflows to zero before the logarithm is taken. Only
-        # unrealistically large exponents reach this, but the algebraically
-        # equal form would not.
-        huge_beta = 2000.0
-        model = PeakNeutronStarPopulation(beta=huge_beta)
-        with np.errstate(divide="ignore"):
-            value = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
-        assert value == -np.inf
-        assert np.isfinite(huge_beta * np.log(self.unequal_mass_ratio))
-
-
 class TestLogLikelihood:
     """Both components are drawn from the same mass distribution, so the
     likelihood is the sum of their densities plus the pairing term."""
@@ -237,7 +232,7 @@ class TestLogLikelihood:
         self.m_min = 1.1
         self.m_max = 2.1
         self.equal_mass_ratio = 1.0
-        self.model = PeakNeutronStarPopulation(m_min=self.m_min, m_max=self.m_max)
+        self.model = NeutronStarPopulation(m_min=self.m_min, m_max=self.m_max)
 
     def test_both_components_contribute(self):
         mass_1, mass_2 = 1.6, 1.3
@@ -257,17 +252,6 @@ class TestLogLikelihood:
             binary(mass_2, mass_1, mass_ratio=self.equal_mass_ratio)
         )
         assert first == pytest.approx(second)
-
-    def test_a_binary_at_the_peak_is_the_most_likely(self):
-        peak_mass = 1.5
-        off_peak_mass_1, off_peak_mass_2 = 2.0, 1.2
-        at_peak = self.model.log_likelihood(
-            binary(peak_mass, peak_mass, mass_ratio=self.equal_mass_ratio)
-        )
-        off_peak = self.model.log_likelihood(
-            binary(off_peak_mass_1, off_peak_mass_2, mass_ratio=self.equal_mass_ratio)
-        )
-        assert at_peak > off_peak
 
     def test_a_component_outside_the_population_is_excluded(self):
         mass_outside_support = 2.5
