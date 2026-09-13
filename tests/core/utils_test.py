@@ -2,39 +2,39 @@ import json
 import logging
 import shutil
 import tempfile
-import unittest
 from argparse import Namespace
 from pathlib import Path
 
 import h5py
 import numpy as np
 import pandas as pd
+import pytest
 from astropy import time
 
 from nmma.core import utils
 
 
-class TestSetupLogger(unittest.TestCase):
-    def setUp(self):
+class TestSetupLogger:
+    def setup_method(self):
         self.original_level = utils.logger.level
         self.original_handlers = list(utils.logger.handlers)
 
-    def tearDown(self):
+    def teardown_method(self):
         utils.logger.handlers = self.original_handlers
         utils.logger.setLevel(self.original_level)
 
     def test_default_level_is_info(self):
         utils.setup_logger()
-        self.assertEqual(utils.logger.level, logging.INFO)
+        assert utils.logger.level == logging.INFO
 
     def test_level_is_case_insensitive(self):
         utils.setup_logger("debug")
-        self.assertEqual(utils.logger.level, logging.DEBUG)
+        assert utils.logger.level == logging.DEBUG
         utils.setup_logger("WARNING")
-        self.assertEqual(utils.logger.level, logging.WARNING)
+        assert utils.logger.level == logging.WARNING
 
     def test_unknown_level_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             utils.setup_logger("not_a_level")
 
     def test_stream_handler_is_added_only_once(self):
@@ -44,36 +44,36 @@ class TestSetupLogger(unittest.TestCase):
         stream_handlers = [
             h for h in utils.logger.handlers if isinstance(h, logging.StreamHandler)
         ]
-        self.assertEqual(len(stream_handlers), 1)
+        assert len(stream_handlers) == 1
 
     def test_existing_handlers_follow_the_new_level(self):
         utils.setup_logger("info")
         utils.setup_logger("debug")
         for handler in utils.logger.handlers:
-            self.assertEqual(handler.level, logging.DEBUG)
+            assert handler.level == logging.DEBUG
 
 
-class TestNumpyEncoder(unittest.TestCase):
+class TestNumpyEncoder:
     def test_encodes_numpy_arrays_as_lists(self):
         encoded = json.dumps({"a": np.array([1.0, 2.0])}, cls=utils.NumpyEncoder)
-        self.assertEqual(json.loads(encoded), {"a": [1.0, 2.0]})
+        assert json.loads(encoded) == {"a": [1.0, 2.0]}
 
     def test_falls_back_to_the_default_encoder(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             json.dumps({"a": object()}, cls=utils.NumpyEncoder)
 
 
-class TestLoadYaml(unittest.TestCase):
-    def setUp(self):
+class TestLoadYaml:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_loads_a_mapping(self):
         path = self.tmp_dir / "conf.yaml"
         path.write_text("label: test\nnlive: 32\n")
-        self.assertEqual(utils.load_yaml(path), {"label": "test", "nlive": 32})
+        assert utils.load_yaml(path) == {"label": "test", "nlive": 32}
 
     def test_expands_environment_variables(self):
         import os
@@ -82,62 +82,54 @@ class TestLoadYaml(unittest.TestCase):
         path.write_text("outdir: $NMMA_TEST_OUTDIR\n")
         os.environ["NMMA_TEST_OUTDIR"] = "/some/where"
         try:
-            self.assertEqual(utils.load_yaml(path), {"outdir": "/some/where"})
+            assert utils.load_yaml(path) == {"outdir": "/some/where"}
         finally:
             del os.environ["NMMA_TEST_OUTDIR"]
 
 
-class TestReadTriggerTime(unittest.TestCase):
+class TestReadTriggerTime:
     def test_reads_mjd_from_parameters(self):
-        self.assertAlmostEqual(
-            utils.read_trigger_time(parameters={"trigger_time": 59000.0}), 59000.0
-        )
+        assert utils.read_trigger_time(parameters={"trigger_time": 59000.0}) == pytest.approx(59000.0)
 
     def test_reads_geocent_time_as_gps(self):
         gps = 1187008882.43
         expected = time.Time(gps, format="gps").mjd
-        self.assertAlmostEqual(
-            utils.read_trigger_time(parameters={"geocent_time": gps}), expected
-        )
+        assert utils.read_trigger_time(parameters={"geocent_time": gps}) == pytest.approx(expected)
 
     def test_geocent_time_x_takes_precedence_over_geocent_time(self):
         # a joint run carries the GW trigger as geocent_time_x
         parameters = {"geocent_time_x": 1187008882.43, "geocent_time": 0.0}
         expected = time.Time(1187008882.43, format="gps").mjd
-        self.assertAlmostEqual(utils.read_trigger_time(parameters), expected)
+        assert utils.read_trigger_time(parameters) == pytest.approx(expected)
 
     def test_gps_output_format(self):
         gps = 1187008882.43
-        self.assertAlmostEqual(
-            utils.read_trigger_time(parameters={"geocent_time": gps}, out_format="gps"),
-            gps,
-            places=3,
-        )
+        assert utils.read_trigger_time(parameters={"geocent_time": gps}, out_format="gps") == pytest.approx(gps, abs=1.5 * 10**(-3))
 
     def test_args_gps_attribute_wins(self):
         args = Namespace(gps=1187008882.43, trigger_time=None)
         expected = time.Time(1187008882.43, format="gps").mjd
-        self.assertAlmostEqual(utils.read_trigger_time(args=args), expected)
+        assert utils.read_trigger_time(args=args) == pytest.approx(expected)
 
     def test_args_trigger_time_is_read_as_mjd(self):
         args = Namespace(gps=None, trigger_time=59000.0)
-        self.assertAlmostEqual(utils.read_trigger_time(args=args), 59000.0)
+        assert utils.read_trigger_time(args=args) == pytest.approx(59000.0)
 
     def test_missing_trigger_time_returns_none(self):
-        self.assertIsNone(utils.read_trigger_time(parameters={}))
+        assert utils.read_trigger_time(parameters={}) is None
 
     def test_parameters_take_precedence_and_are_written_back_to_args(self):
         args = Namespace(gps=None, trigger_time=None)
         result = utils.read_trigger_time(parameters={"trigger_time": 59000.0}, args=args)
-        self.assertAlmostEqual(result, 59000.0)
-        self.assertAlmostEqual(args.trigger_time, 59000.0)
+        assert result == pytest.approx(59000.0)
+        assert args.trigger_time == pytest.approx(59000.0)
 
 
 class InjectionFileMixin:
     """Writes the bilby-style injection JSON that read_injection_file expects:
     a {"injections": <bilby-encoded DataFrame>} document."""
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.injections = pd.DataFrame(
             {"luminosity_distance": [40.0, 100.0], "log10_mej": [-2.0, -1.5]}
@@ -154,11 +146,11 @@ class InjectionFileMixin:
             )
         )
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
 
-class TestReadInjectionFile(InjectionFileMixin, unittest.TestCase):
+class TestReadInjectionFile(InjectionFileMixin):
     def test_reads_a_path(self):
         df = utils.read_injection_file(str(self.injection_file))
         pd.testing.assert_frame_equal(df, self.injections)
@@ -178,10 +170,10 @@ class TestReadInjectionFile(InjectionFileMixin, unittest.TestCase):
         )
         df = utils.read_injection_file(args)
         pd.testing.assert_frame_equal(df, self.injections)
-        self.assertEqual(Path(args.injection_file), self.injection_file)
+        assert Path(args.injection_file) == self.injection_file
 
 
-class TestInjectionFromArgs(InjectionFileMixin, unittest.TestCase):
+class TestInjectionFromArgs(InjectionFileMixin):
     def test_injection_from_file_selects_by_injection_num(self):
         args = Namespace(
             injection=str(self.injection_file),
@@ -189,10 +181,7 @@ class TestInjectionFromArgs(InjectionFileMixin, unittest.TestCase):
             outdir=str(self.tmp_dir),
             injection_num=1,
         )
-        self.assertEqual(
-            utils.injection_from_file(args),
-            {"luminosity_distance": 100.0, "log10_mej": -1.5},
-        )
+        assert utils.injection_from_file(args) == {"luminosity_distance": 100.0, "log10_mej": -1.5}
 
     def test_injection_from_args_dispatches_to_the_file(self):
         args = Namespace(
@@ -201,10 +190,7 @@ class TestInjectionFromArgs(InjectionFileMixin, unittest.TestCase):
             outdir=str(self.tmp_dir),
             injection_num=0,
         )
-        self.assertEqual(
-            utils.injection_from_args(args),
-            {"luminosity_distance": 40.0, "log10_mej": -2.0},
-        )
+        assert utils.injection_from_args(args) == {"luminosity_distance": 40.0, "log10_mej": -2.0}
 
     def test_injection_from_args_dispatches_to_the_prior(self):
         prior_file = self.tmp_dir / "test.prior"
@@ -220,8 +206,8 @@ class TestInjectionFromArgs(InjectionFileMixin, unittest.TestCase):
             outdir=str(self.tmp_dir),
         )
         sample = utils.injection_from_args(args)
-        self.assertIn("log10_mej", sample)
-        self.assertTrue(-3 <= sample["log10_mej"] <= -1)
+        assert "log10_mej" in sample
+        assert -3 <= sample["log10_mej"] <= -1
 
     def test_injection_from_prior_is_reproducible_for_a_fixed_seed(self):
         prior_file = self.tmp_dir / "test.prior"
@@ -233,11 +219,11 @@ class TestInjectionFromArgs(InjectionFileMixin, unittest.TestCase):
         )
         first = utils.injection_from_prior(args)
         second = utils.injection_from_prior(args)
-        self.assertEqual(first, second)
+        assert first == second
 
 
-class TestGetPosteriors(unittest.TestCase):
-    def setUp(self):
+class TestGetPosteriors:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.posterior = pd.DataFrame(
             {
@@ -247,11 +233,11 @@ class TestGetPosteriors(unittest.TestCase):
             }
         )
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_dataframe_is_passed_through(self):
-        self.assertIs(utils.get_posteriors(self.posterior), self.posterior)
+        assert utils.get_posteriors(self.posterior) is self.posterior
 
     def test_dict_is_converted_to_a_dataframe(self):
         result = utils.get_posteriors({"a": [1, 2]})
@@ -265,9 +251,7 @@ class TestGetPosteriors(unittest.TestCase):
     def test_reads_a_json(self):
         path = self.tmp_dir / "samples.json"
         path.write_text(json.dumps({"posterior": self.posterior.to_dict(orient="list")}))
-        self.assertEqual(
-            utils.get_posteriors(path)["log10_mej"], self.posterior["log10_mej"].tolist()
-        )
+        assert utils.get_posteriors(path)["log10_mej"] == self.posterior["log10_mej"].tolist()
 
     def test_reads_an_hdf5(self):
         path = self.tmp_dir / "samples.hdf5"
@@ -289,62 +273,52 @@ class TestGetPosteriors(unittest.TestCase):
     def test_unsupported_suffix_raises(self):
         path = self.tmp_dir / "samples.nonsense"
         path.touch()
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             utils.get_posteriors(path)
 
     def test_missing_file_raises(self):
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             utils.get_posteriors("does_not_exist.dat", outdir=self.tmp_dir)
 
     def test_namespace_without_a_result_file_raises(self):
         args = Namespace(label="missing", outdir=str(self.tmp_dir))
-        with self.assertRaises(FileNotFoundError):
+        with pytest.raises(FileNotFoundError):
             utils.get_posteriors(args)
 
 
-class TestSetFilename(unittest.TestCase):
-    def setUp(self):
+class TestSetFilename:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.args = Namespace(outdir=str(self.tmp_dir))
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_extensionless_name_uses_the_default_extension(self):
-        self.assertEqual(
-            utils.set_filename("bestfit", self.args), self.tmp_dir / "bestfit.json"
-        )
+        assert utils.set_filename("bestfit", self.args) == self.tmp_dir / "bestfit.json"
 
     def test_extensionless_name_honours_the_extension_argument(self):
         self.args.extension = "csv"
-        self.assertEqual(
-            utils.set_filename("bestfit", self.args), self.tmp_dir / "bestfit.csv"
-        )
+        assert utils.set_filename("bestfit", self.args) == self.tmp_dir / "bestfit.csv"
 
     def test_identifier_is_inserted_before_the_suffix(self):
-        self.assertEqual(
-            utils.set_filename("bestfit.json", self.args, identifier="_0"),
-            self.tmp_dir / "bestfit_0.json",
-        )
+        assert utils.set_filename("bestfit.json", self.args, identifier="_0") == self.tmp_dir / "bestfit_0.json"
 
     def test_a_name_with_a_parent_directory_bypasses_outdir(self):
-        self.assertEqual(
-            utils.set_filename("/elsewhere/bestfit.json", self.args),
-            Path("/elsewhere/bestfit.json"),
-        )
+        assert utils.set_filename("/elsewhere/bestfit.json", self.args) == Path("/elsewhere/bestfit.json")
 
     def test_unsupported_suffix_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             utils.set_filename("bestfit.hdf5", self.args)
 
     def test_outdir_is_created(self):
         outdir = self.tmp_dir / "new" / "nested"
         utils.set_filename("bestfit.json", Namespace(outdir=str(outdir)))
-        self.assertTrue(outdir.is_dir())
+        assert outdir.is_dir()
 
 
-class TestReadBestfit(unittest.TestCase):
-    def setUp(self):
+class TestReadBestfit:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.posterior = pd.DataFrame(
             {
@@ -354,28 +328,28 @@ class TestReadBestfit(unittest.TestCase):
             }
         )
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_max_likelihood_picks_the_highest_log_likelihood(self):
         bestfit = utils.read_bestfit_from_posterior(self.posterior)
-        self.assertAlmostEqual(bestfit["log10_mej"], -1.5)
-        self.assertEqual(bestfit["best_fit_index"], 1)
+        assert bestfit["log10_mej"] == pytest.approx(-1.5)
+        assert bestfit["best_fit_index"] == 1
 
     def test_max_posterior_adds_the_log_prior(self):
         bestfit = utils.read_bestfit_from_posterior(self.posterior, mode="max_posterior")
-        self.assertAlmostEqual(bestfit["log10_mej"], -1.0)
-        self.assertEqual(bestfit["best_fit_index"], 2)
+        assert bestfit["log10_mej"] == pytest.approx(-1.0)
+        assert bestfit["best_fit_index"] == 2
 
     def test_unknown_mode_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             utils.read_bestfit_from_posterior(self.posterior, mode="max_nonsense")
 
     def test_return_posterior_also_returns_the_samples(self):
         bestfit, posterior = utils.read_bestfit_from_posterior(
             self.posterior, return_posterior=True
         )
-        self.assertIn("best_fit_index", bestfit)
+        assert "best_fit_index" in bestfit
         pd.testing.assert_frame_equal(posterior, self.posterior)
 
     def test_read_bestfit_from_json_selects_the_requested_columns(self):
@@ -391,21 +365,21 @@ class TestReadBestfit(unittest.TestCase):
         np.testing.assert_allclose(truths, [-2.0])
 
 
-class TestRejectionSample(unittest.TestCase):
+class TestRejectionSample:
     def test_uniform_weights_keep_roughly_half_the_samples(self):
         rng = np.random.default_rng(42)
         posterior = np.arange(1000.0)
         weights = np.ones(1000)
         kept, keep = utils.rejection_sample(posterior, weights, rng)
-        self.assertEqual(len(kept), keep.sum())
-        self.assertGreater(len(kept), 400)
+        assert len(kept) == keep.sum()
+        assert len(kept) > 400
 
     def test_zero_weights_are_always_rejected(self):
         rng = np.random.default_rng(42)
         weights = np.array([0.0, 1.0, 0.0, 1.0])
         _, keep = utils.rejection_sample(np.arange(4.0), weights, rng)
-        self.assertFalse(keep[0])
-        self.assertFalse(keep[2])
+        assert not keep[0]
+        assert not keep[2]
 
     def test_kept_samples_match_the_mask(self):
         rng = np.random.default_rng(0)
@@ -415,87 +389,82 @@ class TestRejectionSample(unittest.TestCase):
         np.testing.assert_allclose(kept, posterior[keep])
 
 
-class TestSigLims(unittest.TestCase):
+class TestSigLims:
     def test_returns_a_latex_string_with_asymmetric_errors(self):
         rng = np.random.default_rng(0)
         label = utils.sig_lims(rng.normal(100.0, 3.0, 100000))
-        self.assertTrue(label.startswith("$") and label.endswith("$"))
-        self.assertIn("_{-", label)
-        self.assertIn("^{+", label)
+        assert label.startswith("$") and label.endswith("$")
+        assert "_{-" in label
+        assert "^{+" in label
 
     def test_quantiles_can_be_overridden(self):
         values = np.linspace(0.0, 1.0, 10001)
         default = utils.sig_lims(values)
         narrow = utils.sig_lims(values, quantiles=[0.25, 0.5, 0.75])
-        self.assertNotEqual(default, narrow)
+        assert default != narrow
 
     def test_large_values_are_rounded_to_integers(self):
         rng = np.random.default_rng(0)
         label = utils.sig_lims(rng.normal(1e6, 3e4, 100000))
         # ord_error < 0 here, so the branch that rounds to whole numbers runs
-        self.assertNotIn(".", label)
+        assert "." not in label
 
     def test_significant_digits_can_be_widened(self):
         rng = np.random.default_rng(0)
         values = rng.normal(100.0, 3.0, 100000)
-        self.assertNotEqual(
-            utils.sig_lims(values, sig_unc=2), utils.sig_lims(values, sig_unc=3)
-        )
+        assert utils.sig_lims(values, sig_unc=2) != utils.sig_lims(values, sig_unc=3)
 
 
-class TestInputObjToStr(unittest.TestCase):
+class TestInputObjToStr:
     def test_string_is_passed_through(self):
-        self.assertEqual(utils.input_obj_to_str("a_file.dat"), "a_file.dat")
+        assert utils.input_obj_to_str("a_file.dat") == "a_file.dat"
 
     def test_namespace_attribute_is_read_by_name(self):
         args = Namespace(prior_file="my.prior")
-        self.assertEqual(utils.input_obj_to_str(args, "prior_file"), "my.prior")
+        assert utils.input_obj_to_str(args, "prior_file") == "my.prior"
 
     def test_missing_namespace_attribute_gives_none(self):
-        self.assertIsNone(utils.input_obj_to_str(Namespace(), "prior_file"))
+        assert utils.input_obj_to_str(Namespace(), "prior_file") is None
 
     def test_dict_lookup_by_reference_name(self):
-        self.assertEqual(utils.input_obj_to_str({"prior_file": "my.prior"}, "prior_file"), "my.prior")
+        assert utils.input_obj_to_str({"prior_file": "my.prior"}, "prior_file") == "my.prior"
 
     def test_dict_without_the_reference_name_falls_back_to_the_first_value(self):
-        self.assertEqual(utils.input_obj_to_str({"other": "my.prior"}, "prior_file"), "my.prior")
+        assert utils.input_obj_to_str({"other": "my.prior"}, "prior_file") == "my.prior"
 
     def test_list_falls_back_to_the_first_entry(self):
-        self.assertEqual(utils.input_obj_to_str(["first.dat", "second.dat"]), "first.dat")
+        assert utils.input_obj_to_str(["first.dat", "second.dat"]) == "first.dat"
 
     def test_unidentifiable_input_raises(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             utils.input_obj_to_str(3.0)
 
 
-class TestNanLevel(unittest.TestCase):
+class TestNanLevel:
     def test_credible_interval_without_nans(self):
         data = np.linspace(0.0, 1.0, 1001)
         low, high = utils.nan_level(data, 0.9)
-        self.assertAlmostEqual(low, 0.05, places=2)
-        self.assertAlmostEqual(high, 0.95, places=2)
+        assert low == pytest.approx(0.05, abs=1.5 * 10**(-2))
+        assert high == pytest.approx(0.95, abs=1.5 * 10**(-2))
 
     def test_nans_narrow_the_interval(self):
         data = np.linspace(0.0, 1.0, 1000)
         clean = utils.nan_level(data, 0.9)
         with_nans = utils.nan_level(np.concatenate([data[:900], np.full(100, np.nan)]), 0.9)
-        self.assertGreater(with_nans[0], clean[0])
+        assert with_nans[0] > clean[0]
 
     def test_too_many_nans_gives_nan_bounds(self):
         data = np.array([1.0, 2.0, np.nan, np.nan])
-        self.assertTrue(np.all(np.isnan(utils.nan_level(data, 0.4))))
+        assert np.all(np.isnan(utils.nan_level(data, 0.4)))
 
     def test_weights_shift_the_interval(self):
         data = np.linspace(0.0, 1.0, 1000)
         unweighted = utils.nan_level(data, 0.5)
         weighted = utils.nan_level(data, 0.5, weights=np.linspace(0.0, 1.0, 1000))
-        self.assertGreater(weighted[0], unweighted[0])
+        assert weighted[0] > unweighted[0]
 
     def test_weights_are_masked_alongside_the_nans(self):
         data = np.concatenate([np.linspace(0.0, 1.0, 900), np.full(100, np.nan)])
         low, high = utils.nan_level(data, 0.5, weights=np.ones(1000))
-        self.assertTrue(np.isfinite(low) and np.isfinite(high))
+        assert np.isfinite(low) and np.isfinite(high)
 
-
-if __name__ == "__main__":
-    unittest.main()

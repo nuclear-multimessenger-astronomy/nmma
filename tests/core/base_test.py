@@ -2,7 +2,6 @@ import inspect
 import shutil
 import sys
 import tempfile
-import unittest
 from argparse import Namespace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -11,6 +10,7 @@ import bilby
 import h5py
 import numpy as np
 import pandas as pd
+import pytest
 from bilby.core.prior import (
     ConditionalPriorDict,
     Constraint,
@@ -52,7 +52,7 @@ def simple_priors():
     return priors
 
 
-class TestInitialisationArgsFromSignatureAndNamespace(unittest.TestCase):
+class TestInitialisationArgsFromSignatureAndNamespace:
     @staticmethod
     def example(required, first=1, second=2):
         pass
@@ -61,50 +61,50 @@ class TestInitialisationArgsFromSignatureAndNamespace(unittest.TestCase):
         kwargs = base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace()
         )
-        self.assertEqual(kwargs, {"first": 1, "second": 2})
+        assert kwargs == {"first": 1, "second": 2}
 
     def test_parameters_without_a_default_are_not_invented(self):
         kwargs = base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace()
         )
-        self.assertNotIn("required", kwargs)
+        assert "required" not in kwargs
 
     def test_namespace_values_override_the_defaults(self):
         kwargs = base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace(first=10)
         )
-        self.assertEqual(kwargs["first"], 10)
+        assert kwargs["first"] == 10
 
     def test_a_required_parameter_is_filled_from_the_namespace(self):
         kwargs = base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace(required="value")
         )
-        self.assertEqual(kwargs["required"], "value")
+        assert kwargs["required"] == "value"
 
     def test_a_none_in_the_namespace_does_not_override_the_default(self):
         kwargs = base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace(first=None)
         )
-        self.assertEqual(kwargs["first"], 1)
+        assert kwargs["first"] == 1
 
     def test_a_prefix_lets_a_shorthand_argument_reach_the_parameter(self):
         # this is how e.g. --tmin reaches a "min" constructor parameter
         kwargs = base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace(prefix_first=10), ["prefix_"]
         )
-        self.assertEqual(kwargs["first"], 10)
+        assert kwargs["first"] == 10
 
     def test_the_unprefixed_name_is_tried_after_the_given_prefixes(self):
         kwargs = base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace(first=10), ["prefix_"]
         )
-        self.assertEqual(kwargs["first"], 10)
+        assert kwargs["first"] == 10
 
     def test_the_first_matching_prefix_wins(self):
         kwargs = base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace(a_first=1, b_first=2), ["a_", "b_"]
         )
-        self.assertEqual(kwargs["first"], 1)
+        assert kwargs["first"] == 1
 
     def test_it_maps_onto_a_real_class_constructor(self):
         class Example:
@@ -114,8 +114,8 @@ class TestInitialisationArgsFromSignatureAndNamespace(unittest.TestCase):
         kwargs = base.initialisation_args_from_signature_and_namespace(
             Example, Namespace(model="Me2017", nlive=32, unrelated="ignored")
         )
-        self.assertEqual(kwargs, {"model": "Me2017", "filters": None, "nlive": 32})
-        self.assertNotIn("unrelated", kwargs)
+        assert kwargs == {"model": "Me2017", "filters": None, "nlive": 32}
+        assert "unrelated" not in kwargs
 
     def test_the_prefix_default_accumulates_across_calls(self):
         # prefixes defaults to a mutable list and the function appends "" to
@@ -126,60 +126,56 @@ class TestInitialisationArgsFromSignatureAndNamespace(unittest.TestCase):
         shared_default = signature.parameters["prefixes"].default
         before = len(shared_default)
         base.initialisation_args_from_signature_and_namespace(self.example, Namespace())
-        self.assertEqual(len(shared_default), before + 1)
+        assert len(shared_default) == before + 1
 
         caller_list = ["prefix_"]
         base.initialisation_args_from_signature_and_namespace(
             self.example, Namespace(), caller_list
         )
-        self.assertEqual(caller_list, ["prefix_", ""])
+        assert caller_list == ["prefix_", ""]
 
 
-class TestNMMALikelihood(unittest.TestCase):
-    def setUp(self):
+class TestNMMALikelihood:
+    def setup_method(self):
         self.sub_model = StubSubModel()
         self.priors = simple_priors()
         self.likelihood = base.NMMALikelihood(self.sub_model, self.priors)
 
     def test_the_sub_model_is_stored(self):
-        self.assertIs(self.likelihood.sub_model, self.sub_model)
+        assert self.likelihood.sub_model is self.sub_model
 
     def test_repr_names_the_sub_model(self):
-        self.assertIn("NMMALikelihood", repr(self.likelihood))
-        self.assertIn("StubSubModel", repr(self.likelihood))
+        assert "NMMALikelihood" in repr(self.likelihood)
+        assert "StubSubModel" in repr(self.likelihood)
 
     def test_the_noise_log_likelihood_is_cached_from_the_sub_model(self):
-        self.assertEqual(self.likelihood.noise_log_likelihood(), -5.0)
+        assert self.likelihood.noise_log_likelihood() == -5.0
 
     def test_a_sub_model_without_a_noise_likelihood_gives_zero(self):
         likelihood = base.NMMALikelihood(StubSubModelWithoutNoise(), simple_priors())
-        self.assertEqual(likelihood.noise_log_likelihood(), 0.0)
+        assert likelihood.noise_log_likelihood() == 0.0
 
     def test_log_likelihood_delegates_to_the_sub_model(self):
-        self.assertEqual(self.likelihood.log_likelihood({"x": 0.5}), -1.0)
-        self.assertEqual(self.sub_model.seen_parameters, {"x": 0.5})
+        assert self.likelihood.log_likelihood({"x": 0.5}) == -1.0
+        assert self.sub_model.seen_parameters == {"x": 0.5}
 
     def test_calling_the_likelihood_exponentiates_the_log_likelihood(self):
-        self.assertAlmostEqual(self.likelihood({"x": 0.5}), np.exp(-1.0))
+        assert self.likelihood({"x": 0.5}) == pytest.approx(np.exp(-1.0))
 
     def test_a_non_finite_sub_likelihood_is_clipped(self):
         likelihood = base.NMMALikelihood(StubSubModel(np.nan), simple_priors())
-        self.assertEqual(
-            likelihood.log_likelihood({"x": 0.5}), np.nan_to_num(-np.inf)
-        )
+        assert likelihood.log_likelihood({"x": 0.5}) == np.nan_to_num(-np.inf)
 
     def test_an_infinite_sub_likelihood_is_clipped(self):
         likelihood = base.NMMALikelihood(StubSubModel(-np.inf), simple_priors())
-        self.assertEqual(
-            likelihood.log_likelihood({"x": 0.5}), np.nan_to_num(-np.inf)
-        )
+        assert likelihood.log_likelihood({"x": 0.5}) == np.nan_to_num(-np.inf)
 
     def test_identity_conversion_returns_its_input(self):
         parameters = {"x": 0.5}
-        self.assertIs(self.likelihood.identity_conversion(parameters), parameters)
+        assert self.likelihood.identity_conversion(parameters) is parameters
 
     def test_no_conversion_functions_leaves_the_parameters_alone(self):
-        self.assertEqual(self.likelihood.parameter_conversion({"x": 0.5}), {"x": 0.5})
+        assert self.likelihood.parameter_conversion({"x": 0.5}) == {"x": 0.5}
 
     def test_conversion_functions_are_applied_in_reverse_order(self):
         # the "main" conversions are appended last and must run first
@@ -189,33 +185,33 @@ class TestNMMALikelihood(unittest.TestCase):
             lambda p: (calls.append("added_last"), p)[1],
         ]
         self.likelihood.parameter_conversion({"x": 0.5})
-        self.assertEqual(calls, ["added_last", "added_first"])
+        assert calls == ["added_last", "added_first"]
 
     def test_posterior_conversion_uses_the_same_chain(self):
         self.likelihood.conv_functions = [lambda p: dict(p, converted=True)]
-        self.assertTrue(self.likelihood.posterior_conversion({"x": 0.5})["converted"])
+        assert self.likelihood.posterior_conversion({"x": 0.5})["converted"]
 
     def test_setup_parameter_conversion_adds_the_cosmology_conversion(self):
         priors = simple_priors()
         priors["Hubble_constant"] = Uniform(50, 100, "Hubble_constant")
         likelihood = base.NMMALikelihood(StubSubModel(), priors)
         likelihood.setup_parameter_conversion()
-        self.assertIn(base.cosmology_to_distance, likelihood.conv_functions)
+        assert base.cosmology_to_distance in likelihood.conv_functions
 
     def test_no_cosmology_conversion_without_a_hubble_prior(self):
         self.likelihood.setup_parameter_conversion()
-        self.assertEqual(self.likelihood.conv_functions, [])
+        assert self.likelihood.conv_functions == []
 
     def test_sanity_checks_pass_by_default(self):
-        self.assertTrue(self.likelihood.sanity_checks())
+        assert self.likelihood.sanity_checks()
 
     def test_final_diagnostics_is_forwarded_to_the_sub_model(self):
         self.sub_model.final_diagnostics = MagicMock(return_value="figure")
         result = self.likelihood.final_diagnostics({"x": 0.5}, Namespace())
-        self.assertEqual(result, "figure")
+        assert result == "figure"
 
     def test_final_diagnostics_is_silent_when_the_sub_model_has_none(self):
-        self.assertIsNone(self.likelihood.final_diagnostics({"x": 0.5}, Namespace()))
+        assert self.likelihood.final_diagnostics({"x": 0.5}, Namespace()) is None
 
     def test_post_process_bestfit_converts_the_best_fit_parameters(self):
         posterior = pd.DataFrame({"x": [0.1, 0.9], "log_likelihood": [1.0, 3.0]})
@@ -223,59 +219,57 @@ class TestNMMALikelihood(unittest.TestCase):
         with patch.object(base, "read_bestfit_from_posterior") as mock_read:
             mock_read.return_value = posterior.loc[1].to_dict()
             result = self.likelihood.post_process_bestfit(Namespace())
-        self.assertEqual(result, "figure")
-        self.assertAlmostEqual(
-            self.sub_model.final_diagnostics.call_args[0][0]["x"], 0.9
-        )
+        assert result == "figure"
+        assert self.sub_model.final_diagnostics.call_args[0][0]["x"] == pytest.approx(0.9)
 
 
-class TestNMMALikelihoodConstraints(unittest.TestCase):
+class TestNMMALikelihoodConstraints:
     def test_constraints_are_split_out_of_the_priors(self):
         priors = simple_priors()
         priors["con"] = Constraint(0, 1, "con")
         likelihood = base.NMMALikelihood(StubSubModel(), priors)
-        self.assertEqual(list(likelihood.constraints), ["con"])
+        assert list(likelihood.constraints) == ["con"]
 
     def test_the_full_prior_dict_is_still_stored(self):
         priors = simple_priors()
         priors["con"] = Constraint(0, 1, "con")
         likelihood = base.NMMALikelihood(StubSubModel(), priors)
-        self.assertIs(likelihood.priors, priors)
+        assert likelihood.priors is priors
 
     def test_no_constraints_gives_an_empty_mapping(self):
         likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
-        self.assertEqual(likelihood.constraints, {})
+        assert likelihood.constraints == {}
 
     def test_a_bare_constraint_is_accepted(self):
         likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
         likelihood.constraints = Constraint(0, 1, "con")
-        self.assertEqual(list(likelihood.constraints), ["con"])
+        assert list(likelihood.constraints) == ["con"]
 
     def test_a_plain_dict_of_constraints_is_accepted(self):
         likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
         likelihood.constraints = {"con": Constraint(0, 1, "con")}
-        self.assertEqual(list(likelihood.constraints), ["con"])
+        assert list(likelihood.constraints) == ["con"]
 
     def test_a_plain_dict_of_non_constraints_is_rejected(self):
         likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             likelihood.constraints = {"x": Uniform(0, 1, "x")}
 
     def test_a_satisfied_constraint_evaluates_to_true(self):
         priors = simple_priors()
         priors["con"] = Constraint(0, 1, "con")
         likelihood = base.NMMALikelihood(StubSubModel(), priors)
-        self.assertTrue(likelihood.evaluate_constraints({"con": 0.5}))
+        assert likelihood.evaluate_constraints({"con": 0.5})
 
     def test_a_violated_constraint_evaluates_to_false(self):
         priors = simple_priors()
         priors["con"] = Constraint(0, 1, "con")
         likelihood = base.NMMALikelihood(StubSubModel(), priors)
-        self.assertFalse(likelihood.evaluate_constraints({"con": 5.0}))
+        assert not likelihood.evaluate_constraints({"con": 5.0})
 
     def test_no_constraints_evaluate_to_true(self):
         likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
-        self.assertTrue(likelihood.evaluate_constraints({"x": 0.5}))
+        assert likelihood.evaluate_constraints({"x": 0.5})
 
     def test_a_violated_constraint_short_circuits_the_log_likelihood(self):
         priors = simple_priors()
@@ -283,33 +277,31 @@ class TestNMMALikelihoodConstraints(unittest.TestCase):
         sub_model = StubSubModel()
         likelihood = base.NMMALikelihood(sub_model, priors)
         value = likelihood.log_likelihood({"x": 0.5, "con": 5.0})
-        self.assertEqual(value, np.nan_to_num(-np.inf))
-        self.assertIsNone(sub_model.seen_parameters)
+        assert value == np.nan_to_num(-np.inf)
+        assert sub_model.seen_parameters is None
 
     def test_a_failed_sanity_check_short_circuits_the_log_likelihood(self):
         sub_model = StubSubModel()
         likelihood = base.NMMALikelihood(sub_model, simple_priors())
         likelihood.sanity_checks = lambda: False
-        self.assertEqual(
-            likelihood.log_likelihood({"x": 0.5}), np.nan_to_num(-np.inf)
-        )
-        self.assertIsNone(sub_model.seen_parameters)
+        assert likelihood.log_likelihood({"x": 0.5}) == np.nan_to_num(-np.inf)
+        assert sub_model.seen_parameters is None
 
 
-class TestCheckParameterEquivalencies(unittest.TestCase):
-    def setUp(self):
+class TestCheckParameterEquivalencies:
+    def setup_method(self):
         self.likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
 
     def test_a_single_inclination_parameter_is_accepted(self):
         self.likelihood.check_parameter_equivalencies(["theta_jn", "chirp_mass"])
 
     def test_two_equivalent_inclination_parameters_are_rejected(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.likelihood.check_parameter_equivalencies(["theta_jn", "KNtheta"])
 
     def test_all_inclination_spellings_are_covered(self):
         for name in ["inclination_EM", "KNtheta", "cos_theta_jn", "thetaObs"]:
-            with self.assertRaises(ValueError, msg=name):
+            with pytest.raises(ValueError):
                 self.likelihood.check_parameter_equivalencies(["theta_jn", name])
 
     def test_two_distance_parameters_are_allowed(self):
@@ -319,7 +311,7 @@ class TestCheckParameterEquivalencies(unittest.TestCase):
         )
 
     def test_three_distance_parameters_are_rejected(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.likelihood.check_parameter_equivalencies(
                 ["redshift", "luminosity_distance", "Hubble_constant"]
             )
@@ -328,7 +320,7 @@ class TestCheckParameterEquivalencies(unittest.TestCase):
         self.likelihood.check_parameter_equivalencies(["chirp_mass", "mass_ratio"])
 
     def test_three_mass_parameters_are_rejected(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.likelihood.check_parameter_equivalencies(
                 ["chirp_mass", "mass_ratio", "mass_1"]
             )
@@ -337,19 +329,19 @@ class TestCheckParameterEquivalencies(unittest.TestCase):
         priors = PriorDict()
         priors["theta_jn"] = Uniform(0, np.pi, "theta_jn")
         priors["KNtheta"] = Uniform(0, 90, "KNtheta")
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             base.NMMALikelihood(StubSubModel(), priors)
 
 
-class TestNMMADummyPrior(unittest.TestCase):
+class TestNMMADummyPrior:
     def test_the_setup_properties_are_stored(self):
         prior = base.NMMADummyPrior({"file": "eos.h5"})
-        self.assertEqual(prior.setup_props, {"file": "eos.h5"})
-        self.assertEqual(prior.name, "NMMADummyPrior")
+        assert prior.setup_props == {"file": "eos.h5"}
+        assert prior.name == "NMMADummyPrior"
 
     def test_from_repr_parses_a_literal(self):
         prior = base.NMMADummyPrior.from_repr("{'file': 'eos.h5'}")
-        self.assertEqual(prior.setup_props, {"file": "eos.h5"})
+        assert prior.setup_props == {"file": "eos.h5"}
 
     def test_it_can_be_read_back_out_of_a_prior_file(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -362,16 +354,16 @@ class TestNMMADummyPrior(unittest.TestCase):
                 bilby.core.prior.__dict__, {"NMMADummyPrior": base.NMMADummyPrior}
             ):
                 priors = PriorDict(str(prior_file))
-        self.assertIsInstance(priors["eos_h5"], base.NMMADummyPrior)
+        assert isinstance(priors["eos_h5"], base.NMMADummyPrior)
 
 
-class TestAdjustHubblePrior(unittest.TestCase):
-    def setUp(self):
+class TestAdjustHubblePrior:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.hubble_values = np.linspace(50.0, 100.0, 51)
         self.weights = np.exp(-((self.hubble_values - 70.0) ** 2) / 50.0)
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def write_weight_file(self, with_header):
@@ -388,22 +380,22 @@ class TestAdjustHubblePrior(unittest.TestCase):
         priors = adjusted = base.adjust_hubble_prior(
             PriorDict(), Namespace(Hubble_weight=self.write_weight_file(True))
         )
-        self.assertIsInstance(adjusted["Hubble_constant"], Interped)
-        self.assertAlmostEqual(priors["Hubble_constant"].minimum, 50.0)
-        self.assertAlmostEqual(priors["Hubble_constant"].maximum, 100.0)
+        assert isinstance(adjusted["Hubble_constant"], Interped)
+        assert priors["Hubble_constant"].minimum == pytest.approx(50.0)
+        assert priors["Hubble_constant"].maximum == pytest.approx(100.0)
 
     def test_a_bare_two_column_weight_file_is_also_accepted(self):
         adjusted = base.adjust_hubble_prior(
             PriorDict(), Namespace(Hubble_weight=self.write_weight_file(False))
         )
-        self.assertIsInstance(adjusted["Hubble_constant"], Interped)
+        assert isinstance(adjusted["Hubble_constant"], Interped)
 
     def test_the_interpolated_prior_peaks_where_the_weights_do(self):
         adjusted = base.adjust_hubble_prior(
             PriorDict(), Namespace(Hubble_weight=self.write_weight_file(True))
         )
         prior = adjusted["Hubble_constant"]
-        self.assertGreater(prior.prob(70.0), prior.prob(50.0))
+        assert prior.prob(70.0) > prior.prob(50.0)
 
     def test_an_existing_hubble_prior_is_overwritten(self):
         priors = PriorDict()
@@ -411,13 +403,11 @@ class TestAdjustHubblePrior(unittest.TestCase):
         adjusted = base.adjust_hubble_prior(
             priors, Namespace(Hubble_weight=self.write_weight_file(True))
         )
-        self.assertIsInstance(adjusted["Hubble_constant"], Interped)
+        assert isinstance(adjusted["Hubble_constant"], Interped)
 
     def test_no_weight_file_leaves_the_priors_untouched(self):
         priors = PriorDict()
-        self.assertEqual(
-            base.adjust_hubble_prior(priors, Namespace(Hubble_weight=None)), priors
-        )
+        assert base.adjust_hubble_prior(priors, Namespace(Hubble_weight=None)) == priors
 
     def test_the_cosmology_is_set_when_hubble_sampling_is_requested(self):
         with patch.object(base, "set_cosmology") as mock_set:
@@ -434,8 +424,8 @@ class TestAdjustHubblePrior(unittest.TestCase):
         mock_set.assert_called_once()
 
 
-class TestH5ToMultivarPrior(unittest.TestCase):
-    def setUp(self):
+class TestH5ToMultivarPrior:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.h5_path = self.tmp_dir / "eos.h5"
         rng = np.random.default_rng(0)
@@ -443,30 +433,30 @@ class TestH5ToMultivarPrior(unittest.TestCase):
             f.create_dataset("TOV_mass", data=rng.normal(2.1, 0.1, 500))
             f.create_dataset("R_14", data=rng.normal(12.0, 0.5, 500))
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_every_dataset_becomes_a_multivariate_gaussian_prior(self):
         priors = base.h5_to_multivar_prior(str(self.h5_path))
-        self.assertEqual(set(priors), {"TOV_mass", "R_14"})
+        assert set(priors) == {"TOV_mass", "R_14"}
         for prior in priors.values():
-            self.assertIsInstance(prior, MultivariateGaussian)
+            assert isinstance(prior, MultivariateGaussian)
 
     def test_the_result_is_at_least_a_conditional_prior_dict(self):
         priors = base.h5_to_multivar_prior(str(self.h5_path))
-        self.assertIsInstance(priors, ConditionalPriorDict)
+        assert isinstance(priors, ConditionalPriorDict)
 
     def test_an_existing_conditional_prior_dict_is_not_downgraded(self):
         priors = ConditionalPriorDict()
         priors["x"] = Uniform(0, 1, "x")
         result = base.h5_to_multivar_prior(str(self.h5_path), priors)
-        self.assertIsInstance(result, ConditionalPriorDict)
-        self.assertIn("x", result)
+        assert isinstance(result, ConditionalPriorDict)
+        assert "x" in result
 
     def test_existing_priors_are_preserved(self):
         priors = {"x": Uniform(0, 1, "x")}
         result = base.h5_to_multivar_prior(str(self.h5_path), priors)
-        self.assertIn("x", result)
+        assert "x" in result
 
     def test_the_fitted_distribution_recovers_the_sample_mean(self):
         priors = base.h5_to_multivar_prior(str(self.h5_path))
@@ -474,32 +464,32 @@ class TestH5ToMultivarPrior(unittest.TestCase):
             expected = np.mean(f["TOV_mass"][:])
         distribution = priors["TOV_mass"].dist
         index = distribution.names.index("TOV_mass")
-        self.assertAlmostEqual(distribution.mus[0][index], expected, places=6)
+        assert distribution.mus[0][index] == pytest.approx(expected, abs=1.5 * 10**(-6))
 
     def test_a_namespace_path_is_accepted(self):
         priors = base.h5_to_multivar_prior(
             Namespace(**{"h5 file path": str(self.h5_path)})
         )
-        self.assertEqual(set(priors), {"TOV_mass", "R_14"})
+        assert set(priors) == {"TOV_mass", "R_14"}
 
 
-class TestAdjustPriorsForNmma(unittest.TestCase):
-    def setUp(self):
+class TestAdjustPriorsForNmma:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_priors_without_dummies_are_returned_unchanged(self):
         priors = simple_priors()
-        self.assertEqual(base.adjust_priors_for_nmma(priors), priors)
+        assert base.adjust_priors_for_nmma(priors) == priors
 
     def test_a_prior_file_path_is_read(self):
         prior_file = self.tmp_dir / "test.prior"
         prior_file.write_text("x = Uniform(minimum=0, maximum=1, name='x')\n")
         priors = base.adjust_priors_for_nmma(str(prior_file))
-        self.assertIsInstance(priors, PriorDict)
-        self.assertIn("x", priors)
+        assert isinstance(priors, PriorDict)
+        assert "x" in priors
 
     def test_an_h5_dummy_prior_is_replaced_by_multivariate_gaussians(self):
         h5_path = self.tmp_dir / "eos.h5"
@@ -510,8 +500,8 @@ class TestAdjustPriorsForNmma(unittest.TestCase):
         priors = PriorDict()
         priors["eos_h5"] = base.NMMADummyPrior(str(h5_path))
         adjusted = base.adjust_priors_for_nmma(priors)
-        self.assertNotIn("eos_h5", adjusted)
-        self.assertIn("TOV_mass", adjusted)
+        assert "eos_h5" not in adjusted
+        assert "TOV_mass" in adjusted
 
     def test_a_hubble_dummy_prior_is_replaced_by_an_interped_prior(self):
         weight_file = self.tmp_dir / "hubble.dat"
@@ -522,8 +512,8 @@ class TestAdjustPriorsForNmma(unittest.TestCase):
             Namespace(Hubble_weight=str(weight_file), Hubble=False)
         )
         adjusted = base.adjust_priors_for_nmma(priors)
-        self.assertNotIn("hubble_weighting", adjusted)
-        self.assertIsInstance(adjusted["Hubble_constant"], Interped)
+        assert "hubble_weighting" not in adjusted
+        assert isinstance(adjusted["Hubble_constant"], Interped)
 
     def test_the_replacement_is_logged_when_a_logger_is_given(self):
         weight_file = self.tmp_dir / "hubble.dat"
@@ -535,30 +525,30 @@ class TestAdjustPriorsForNmma(unittest.TestCase):
         )
         logger = MagicMock()
         base.adjust_priors_for_nmma(priors, logger=logger)
-        self.assertTrue(logger.info.called)
+        assert logger.info.called
 
 
-class TestCheckPriorsAndLikelihoodForNmma(unittest.TestCase):
+class TestCheckPriorsAndLikelihoodForNmma:
     def test_constraints_left_in_the_priors_are_moved_to_the_likelihood(self):
         priors = simple_priors()
         likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
         priors["con"] = Constraint(0, 1, "con")
         priors, likelihood = base.check_priors_and_likelihood_for_nmma(priors, likelihood)
-        self.assertNotIn("con", priors)
-        self.assertIn("con", likelihood.constraints)
+        assert "con" not in priors
+        assert "con" in likelihood.constraints
 
     def test_the_sampling_priors_survive(self):
         priors = simple_priors()
         likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
         priors, _ = base.check_priors_and_likelihood_for_nmma(priors, likelihood)
-        self.assertIn("x", priors)
+        assert "x" in priors
 
     def test_the_final_parameter_conversion_is_set_up(self):
         priors = simple_priors()
         priors["Hubble_constant"] = Uniform(50, 100, "Hubble_constant")
         likelihood = base.NMMALikelihood(StubSubModel(), priors)
         _, likelihood = base.check_priors_and_likelihood_for_nmma(priors, likelihood)
-        self.assertIn(base.cosmology_to_distance, likelihood.conv_functions)
+        assert base.cosmology_to_distance in likelihood.conv_functions
 
     def test_the_duplicate_key_branch_is_unreachable(self):
         # The guard compares len(set(keys)) against len(keys) for the same
@@ -570,17 +560,17 @@ class TestCheckPriorsAndLikelihoodForNmma(unittest.TestCase):
         likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
         original_conversion = priors.conversion_function
         _, likelihood = base.check_priors_and_likelihood_for_nmma(priors, likelihood)
-        self.assertIs(priors.conversion_function, original_conversion)
-        self.assertEqual(likelihood.conv_functions, [])
+        assert priors.conversion_function is original_conversion
+        assert likelihood.conv_functions == []
 
 
-class TestBilbySampling(unittest.TestCase):
-    def setUp(self):
+class TestBilbySampling:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
         self.priors = simple_priors()
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def make_args(self, **overrides):
@@ -609,17 +599,17 @@ class TestBilbySampling(unittest.TestCase):
         with patch.object(base, "run_sampler", return_value=self.make_result()) as mock:
             base.bilby_sampling(self.likelihood, self.priors, self.make_args())
         kwargs = mock.call_args.kwargs
-        self.assertEqual(kwargs["sampler"], "dynesty")
-        self.assertEqual(kwargs["nlive"], 32)
-        self.assertEqual(kwargs["seed"], 42)
-        self.assertEqual(kwargs["label"], "test")
-        self.assertFalse(kwargs["save"])
+        assert kwargs["sampler"] == "dynesty"
+        assert kwargs["nlive"] == 32
+        assert kwargs["seed"] == 42
+        assert kwargs["label"] == "test"
+        assert not kwargs["save"]
 
     def test_extra_sampler_kwargs_are_forwarded(self):
         args = self.make_args(sampler_kwargs={"walks": 50})
         with patch.object(base, "run_sampler", return_value=self.make_result()) as mock:
             base.bilby_sampling(self.likelihood, self.priors, args)
-        self.assertEqual(mock.call_args.kwargs["walks"], 50)
+        assert mock.call_args.kwargs["walks"] == 50
 
     def test_a_dictionary_of_arguments_is_filled_in_from_the_defaults(self):
         settings = {"sampler": "dynesty", "outdir": str(self.tmp_dir), "label": "test"}
@@ -630,7 +620,7 @@ class TestBilbySampling(unittest.TestCase):
             patch.object(base, "run_sampler", return_value=self.make_result()) as mock,
         ):
             base.bilby_sampling(self.likelihood, self.priors, settings)
-        self.assertEqual(mock.call_args.kwargs["nlive"], 2048)
+        assert mock.call_args.kwargs["nlive"] == 2048
 
     def test_the_dictionary_path_inherits_the_surrounding_command_line(self):
         # The defaults come from parsing sys.argv, so any unrelated command
@@ -642,19 +632,19 @@ class TestBilbySampling(unittest.TestCase):
             patch.object(sys, "argv", ["nmma", "--not-an-nmma-argument"]),
             patch.object(base, "run_sampler", return_value=self.make_result()),
         ):
-            with self.assertRaises(SystemExit):
+            with pytest.raises(SystemExit):
                 base.bilby_sampling(self.likelihood, self.priors, settings)
 
     def test_reactive_sampling_drops_the_live_point_count(self):
         args = self.make_args(sampler="ultranest", reactive_sampling=True)
         with patch.object(base, "run_sampler", return_value=self.make_result()) as mock:
             base.bilby_sampling(self.likelihood, self.priors, args)
-        self.assertIsNone(mock.call_args.kwargs["nlive"])
+        assert mock.call_args.kwargs["nlive"] is None
 
     def test_reactive_sampling_is_rejected_for_other_samplers(self):
         args = self.make_args(sampler="dynesty", reactive_sampling=True)
         with patch.object(base, "run_sampler", return_value=self.make_result()):
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 base.bilby_sampling(self.likelihood, self.priors, args)
 
     def test_skip_sampling_caps_the_iterations_per_sampler(self):
@@ -668,7 +658,7 @@ class TestBilbySampling(unittest.TestCase):
                 base, "run_sampler", return_value=self.make_result()
             ) as mock:
                 base.bilby_sampling(self.likelihood, self.priors, args)
-            self.assertEqual(mock.call_args.kwargs[key], 1, msg=sampler)
+            assert mock.call_args.kwargs[key] == 1, sampler
 
     def test_non_zero_mpi_ranks_do_no_post_processing(self):
         result = self.make_result()
@@ -676,14 +666,14 @@ class TestBilbySampling(unittest.TestCase):
             returned = base.bilby_sampling(
                 self.likelihood, self.priors, self.make_args(), rank=1
             )
-        self.assertIsNone(returned)
+        assert returned is None
         result.save_to_file.assert_not_called()
 
     def test_rank_zero_saves_and_plots_the_result(self):
         result = self.make_result()
         with patch.object(base, "run_sampler", return_value=result):
             returned = base.bilby_sampling(self.likelihood, self.priors, self.make_args())
-        self.assertIs(returned, result)
+        assert returned is result
         result.save_to_file.assert_called_once()
         result.save_posterior_samples.assert_called_once()
         result.plot_corner.assert_called_once()
@@ -698,7 +688,7 @@ class TestBilbySampling(unittest.TestCase):
                 injection_parameters={"x": 0.5, "fixed": 1.0, "absent": 2.0},
             )
         plotted = result.plot_corner.call_args[0][0]
-        self.assertEqual(plotted, {"x": 0.5})
+        assert plotted == {"x": 0.5}
 
     def test_the_best_fit_post_processing_runs_when_requested(self):
         result = self.make_result()
@@ -714,12 +704,12 @@ class TestBilbySampling(unittest.TestCase):
         result.plot_corner.side_effect = [RuntimeError("bad label"), None]
         with patch.object(base, "run_sampler", return_value=result):
             base.bilby_sampling(self.likelihood, self.priors, self.make_args())
-        self.assertEqual(result.plot_corner.call_count, 2)
-        self.assertIsNone(result.parameter_labels_with_unit)
+        assert result.plot_corner.call_count == 2
+        assert result.parameter_labels_with_unit is None
 
 
-class TestMultiAnalysisLoop(unittest.TestCase):
-    def setUp(self):
+class TestMultiAnalysisLoop:
+    def setup_method(self):
         self.likelihood = base.NMMALikelihood(StubSubModel(), simple_priors())
         self.priors = simple_priors()
         self.seen_args = []
@@ -749,33 +739,31 @@ class TestMultiAnalysisLoop(unittest.TestCase):
 
     def test_a_plain_run_calls_the_sampler_once(self):
         out, mock_sampling = self.run_loop(self.make_args())
-        self.assertEqual(out, "result")
-        self.assertEqual(mock_sampling.call_count, 1)
-        self.assertEqual(len(self.seen_args), 1)
+        assert out == "result"
+        assert mock_sampling.call_count == 1
+        assert len(self.seen_args) == 1
 
     def test_a_single_key_multi_sweeps_over_the_values(self):
         args = self.make_args(multi={"nlive": [16, 32, 64]})
         _, mock_sampling = self.run_loop(args)
-        self.assertEqual(mock_sampling.call_count, 3)
-        self.assertEqual([a.nlive for a in self.seen_args], [16, 32, 64])
-        self.assertEqual(
-            [a.label for a in self.seen_args], ["run_0", "run_1", "run_2"]
-        )
+        assert mock_sampling.call_count == 3
+        assert [a.nlive for a in self.seen_args] == [16, 32, 64]
+        assert [a.label for a in self.seen_args] == ["run_0", "run_1", "run_2"]
 
     def test_a_named_multi_applies_each_set_of_changes(self):
         args = self.make_args(
             multi={"low": {"nlive": 16}, "high": {"nlive": 64, "sampler": "dynesty"}}
         )
         _, mock_sampling = self.run_loop(args)
-        self.assertEqual(mock_sampling.call_count, 2)
-        self.assertEqual([a.label for a in self.seen_args], ["run_low", "run_high"])
-        self.assertEqual(self.seen_args[1].sampler, "dynesty")
+        assert mock_sampling.call_count == 2
+        assert [a.label for a in self.seen_args] == ["run_low", "run_high"]
+        assert self.seen_args[1].sampler == "dynesty"
 
     def test_an_unknown_key_in_a_named_multi_is_rejected(self):
         args = self.make_args(
             multi={"bad": {"not_an_argument": 1}, "good": {"nlive": 16}}
         )
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.run_loop(args)
 
     def test_a_named_multi_with_a_single_run_is_read_as_a_value_sweep(self):
@@ -787,33 +775,35 @@ class TestMultiAnalysisLoop(unittest.TestCase):
         # documents that known gap rather than asserting it is correct.
         args = self.make_args(multi={"label": {"nlive": 16}})
         _, mock_sampling = self.run_loop(args)
-        self.assertEqual(mock_sampling.call_count, 1)
-        self.assertEqual(self.seen_args[0].label, "run_0")
-        self.assertEqual(self.seen_args[0].nlive, 32)
+        assert mock_sampling.call_count == 1
+        assert self.seen_args[0].label == "run_0"
+        assert self.seen_args[0].nlive == 32
 
     def test_the_original_arguments_are_not_modified_by_a_sweep(self):
         args = self.make_args(multi={"nlive": [16, 32]})
         self.run_loop(args)
-        self.assertEqual(args.nlive, 32)
-        self.assertEqual(args.label, "run")
+        assert args.nlive == 32
+        assert args.label == "run"
 
     def test_a_matrix_runs_the_cross_product(self):
         args = self.make_args(matrix={"nlive": [16, 32], "sampler": ["dynesty", "ultranest"]})
         _, mock_sampling = self.run_loop(args)
-        self.assertEqual(mock_sampling.call_count, 4)
-        self.assertEqual(
-            [(a.nlive, a.sampler) for a in self.seen_args],
-            [(16, "dynesty"), (16, "ultranest"), (32, "dynesty"), (32, "ultranest")],
-        )
+        assert mock_sampling.call_count == 4
+        assert [(a.nlive, a.sampler) for a in self.seen_args] == [
+            (16, "dynesty"),
+            (16, "ultranest"),
+            (32, "dynesty"),
+            (32, "ultranest"),
+        ]
 
     def test_matrix_labels_carry_every_varied_value(self):
         args = self.make_args(matrix={"nlive": [16, 32]})
         self.run_loop(args)
-        self.assertEqual([a.label for a in self.seen_args], ["run_16", "run_32"])
+        assert [a.label for a in self.seen_args] == ["run_16", "run_32"]
 
     def test_an_unknown_key_in_a_matrix_is_rejected(self):
         args = self.make_args(matrix={"not_an_argument": [1, 2]})
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.run_loop(args)
 
     def test_a_long_matrix_value_currently_breaks_the_label_shortening(self):
@@ -822,15 +812,12 @@ class TestMultiAnalysisLoop(unittest.TestCase):
         # directly and those dictionary views are not subscriptable. This
         # test documents that known gap rather than asserting it is correct.
         args = self.make_args(matrix={"outdir": ["a" * 40, "b" * 40]})
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.run_loop(args)
 
     def test_multi_takes_precedence_over_matrix(self):
         args = self.make_args(multi={"nlive": [16]}, matrix={"nlive": [32, 64]})
         _, mock_sampling = self.run_loop(args)
-        self.assertEqual(mock_sampling.call_count, 1)
-        self.assertEqual(self.seen_args[0].nlive, 16)
+        assert mock_sampling.call_count == 1
+        assert self.seen_args[0].nlive == 16
 
-
-if __name__ == "__main__":
-    unittest.main()

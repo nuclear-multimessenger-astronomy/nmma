@@ -1,7 +1,7 @@
-import unittest
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 
 from nmma.post_processing import marginalisation
 
@@ -24,34 +24,34 @@ def template_row(with_spins=True, with_angles=True):
     return data
 
 
-class TestGetAllGWQuantitiesFromMasses(unittest.TestCase):
+class TestGetAllGWQuantitiesFromMasses:
     """A search template gives component masses, and the derived mass
     quantities the light curve model needs are filled in from them."""
 
     def test_the_mass_quantities_are_derived_from_the_components(self):
         data = marginalisation.get_all_gw_quantities(template_row())
         for key in ["mchirp", "eta", "q"]:
-            self.assertIn(key, data, msg=key)
+            assert key in data, key
 
     def test_the_chirp_mass_sits_below_both_components(self):
         # For comparable masses the chirp mass is about 0.87 of the mean, so
         # it falls under the lighter star rather than between the two.
         data = marginalisation.get_all_gw_quantities(template_row())
-        self.assertTrue(np.all(data["mchirp"] < data["m2"]))
-        self.assertTrue(np.all(data["mchirp"] > 0.8 * data["m2"]))
+        assert np.all(data["mchirp"] < data["m2"])
+        assert np.all(data["mchirp"] > 0.8 * data["m2"])
 
     def test_the_symmetric_mass_ratio_stays_below_a_quarter(self):
         data = marginalisation.get_all_gw_quantities(template_row())
-        self.assertTrue(np.all(data["eta"] <= 0.25))
+        assert np.all(data["eta"] <= 0.25)
 
     def test_every_template_is_weighted_equally(self):
         data = marginalisation.get_all_gw_quantities(template_row())
-        self.assertAlmostEqual(float(np.atleast_1d(data["weight"])[0]), 0.5)
+        assert float(np.atleast_1d(data["weight"])[0]) == pytest.approx(0.5)
 
     def test_the_effective_spin_is_the_mass_weighted_average(self):
         data = marginalisation.get_all_gw_quantities(template_row())
         expected = (1.6 * 0.02 + 1.4 * 0.01) / (1.6 + 1.4)
-        self.assertAlmostEqual(data["chi_eff"][0], expected)
+        assert data["chi_eff"][0] == pytest.approx(expected)
 
     def test_the_aligned_spin_columns_are_preferred_when_present(self):
         data = template_row()
@@ -63,10 +63,10 @@ class TestGetAllGWQuantitiesFromMasses(unittest.TestCase):
     def test_missing_orientation_angles_default_to_zero(self):
         data = marginalisation.get_all_gw_quantities(template_row(with_angles=False))
         for key in ["theta_jn", "tilt1", "tilt2"]:
-            self.assertEqual(data[key], 0.0, msg=key)
+            assert data[key] == 0.0, key
 
 
-class TestGetAllGWQuantitiesWithoutSpins(unittest.TestCase):
+class TestGetAllGWQuantitiesWithoutSpins:
     """A template file written without spin columns is one of the two formats
     the script explicitly reads."""
 
@@ -75,14 +75,14 @@ class TestGetAllGWQuantitiesWithoutSpins(unittest.TestCase):
         # the loop that defaults them to zero, so the spinless format the
         # reader falls back to is rejected here. Moving the defaulting loop
         # above the effective-spin calculation is the fix.
-        with self.assertRaises(KeyError) as caught:
+        with pytest.raises(KeyError) as caught:
             marginalisation.get_all_gw_quantities(template_row(with_spins=False))
-        self.assertIn("a1", str(caught.exception))
+        assert "a1" in str(caught.value)
 
     def test_the_defaulting_loop_does_cover_the_spins(self):
         # The intent is clearly there; it just runs too late.
         source = __import__("pathlib").Path(marginalisation.__file__).read_text()
-        self.assertIn('for key in ["a1", "a2", "theta_jn", "tilt1", "tilt2"]', source)
+        assert 'for key in ["a1", "a2", "theta_jn", "tilt1", "tilt2"]' in source
 
     def test_supplying_the_spins_explicitly_works_around_it(self):
         data = template_row(with_spins=False)
@@ -92,7 +92,7 @@ class TestGetAllGWQuantitiesWithoutSpins(unittest.TestCase):
         np.testing.assert_allclose(result["chi_eff"], [0.0, 0.0])
 
 
-class TestGetAllGWQuantitiesFromChirpMass(unittest.TestCase):
+class TestGetAllGWQuantitiesFromChirpMass:
     """A posterior file gives a chirp mass and mass ratio instead, and the
     component masses are reconstructed from them."""
 
@@ -110,12 +110,12 @@ class TestGetAllGWQuantitiesFromChirpMass(unittest.TestCase):
 
     def test_the_component_masses_are_reconstructed(self):
         result = marginalisation.get_all_gw_quantities(self.data())
-        self.assertIn("m1", result)
-        self.assertIn("m2", result)
+        assert "m1" in result
+        assert "m2" in result
 
     def test_the_primary_is_the_heavier_component(self):
         result = marginalisation.get_all_gw_quantities(self.data())
-        self.assertTrue(np.all(result["m1"] >= result["m2"]))
+        assert np.all(result["m1"] >= result["m2"])
 
     def test_the_chirp_mass_is_carried_over_under_its_full_name(self):
         result = marginalisation.get_all_gw_quantities(self.data())
@@ -124,7 +124,7 @@ class TestGetAllGWQuantitiesFromChirpMass(unittest.TestCase):
     def test_the_symmetric_mass_ratio_is_derived_from_the_mass_ratio(self):
         result = marginalisation.get_all_gw_quantities(self.data())
         expected = 0.9 / (1 + 0.9) ** 2
-        self.assertAlmostEqual(result["eta"][0], expected)
+        assert result["eta"][0] == pytest.approx(expected)
 
     def test_the_reconstructed_masses_reproduce_the_chirp_mass(self):
         result = marginalisation.get_all_gw_quantities(self.data())
@@ -133,7 +133,7 @@ class TestGetAllGWQuantitiesFromChirpMass(unittest.TestCase):
         np.testing.assert_allclose(reconstructed, result["mchirp"], rtol=1e-6)
 
 
-class TestMarginalisedLightcurveExpectation(unittest.TestCase):
+class TestMarginalisedLightcurveExpectation:
     """The routine that draws equation-of-state and template pairs and builds
     one light curve per draw. Only its guard rails are reachable without a
     full set of surrogate weights and sky localisation inputs."""
@@ -147,11 +147,11 @@ class TestMarginalisedLightcurveExpectation(unittest.TestCase):
         from nmma.em import em_parsing
         from nmma.post_processing import parser as pp_parser
 
-        self.assertFalse(hasattr(em_parsing, "lc_marginalisation_parser"))
-        self.assertTrue(hasattr(pp_parser, "lc_marginalisation_parser"))
-        with self.assertRaises(AttributeError) as caught:
+        assert not hasattr(em_parsing, "lc_marginalisation_parser")
+        assert hasattr(pp_parser, "lc_marginalisation_parser")
+        with pytest.raises(AttributeError) as caught:
             marginalisation.marginalised_lightcurve_expectation_from_gw_samples()
-        self.assertIn("lc_marginalisation_parser", str(caught.exception))
+        assert "lc_marginalisation_parser" in str(caught.value)
 
     def test_no_input_format_at_all_would_exit_once_the_parser_is_found(self):
         args = MagicMock()
@@ -182,7 +182,7 @@ class TestMarginalisedLightcurveExpectation(unittest.TestCase):
                                     "load_tabulated_macro_eos_set_to_dict",
                                     return_value=({}, np.ones(2) / 2, 2),
                                 ):
-                                    with self.assertRaises(SystemExit):
+                                    with pytest.raises(SystemExit):
                                         marginalisation.marginalised_lightcurve_expectation_from_gw_samples()
 
     def test_the_secondary_spin_is_filled_from_the_secondary_mass(self):
@@ -191,8 +191,8 @@ class TestMarginalisedLightcurveExpectation(unittest.TestCase):
         # with a spin equal to a neutron-star mass. That is far outside any
         # physical spin range.
         source = __import__("pathlib").Path(marginalisation.__file__).read_text()
-        self.assertIn('"a_2": data_out["m2"][idy]', source)
-        self.assertIn('"a_1": data_out["a1"][idy]', source)
+        assert '"a_2": data_out["m2"][idy]' in source
+        assert '"a_1": data_out["a1"][idy]' in source
 
     def test_a_binary_with_both_components_above_the_maximum_mass_is_unhandled(self):
         # The ejecta nuisance parameter is only assigned in two of the four
@@ -200,20 +200,16 @@ class TestMarginalisedLightcurveExpectation(unittest.TestCase):
         # a search template can easily produce, neither branch runs and the
         # parameter is referenced before assignment.
         source = __import__("pathlib").Path(marginalisation.__file__).read_text()
-        self.assertIn("if (m1 < mMax) and (m2 < mMax):", source)
-        self.assertIn("elif (m1 > mMax) and (m2 < mMax):", source)
-        self.assertNotIn("else:\n            alpha", source)
+        assert "if (m1 < mMax) and (m2 < mMax):" in source
+        assert "elif (m1 > mMax) and (m2 < mMax):" in source
+        assert "else:\n            alpha" not in source
 
     def test_the_error_scale_is_zeroed_so_the_curves_are_noise_free(self):
         # The spread being measured is the one from the binary parameters and
         # the equation of state, not from photometric noise.
         source = __import__("pathlib").Path(marginalisation.__file__).read_text()
-        self.assertIn("args.mag_error_scale = 0", source)
+        assert "args.mag_error_scale = 0" in source
 
     def test_the_default_filter_set_is_used_when_none_are_requested(self):
         source = __import__("pathlib").Path(marginalisation.__file__).read_text()
-        self.assertIn('filters = "u,g,r,i,z,y,J,H,K"', source)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert 'filters = "u,g,r,i,z,y,J,H,K"' in source

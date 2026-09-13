@@ -1,7 +1,6 @@
 import argparse
 import shutil
 import tempfile
-import unittest
 from argparse import Namespace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -9,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import matplotlib
 import numpy as np
 import pandas as pd
+import pytest
 
 matplotlib.use("Agg")
 
@@ -38,18 +38,16 @@ class FigureMixin:
     which needs an installation a developer machine may not have. Each test
     renders with mathtext and restores the global settings."""
 
-    def setUp(self):
+    def setup_method(self):
         self.original_rc = matplotlib.rcParams.copy()
         matplotlib.rcParams["text.usetex"] = False
-        super().setUp()
 
-    def tearDown(self):
+    def teardown_method(self):
         plt.close("all")
         matplotlib.rcParams.update(self.original_rc)
-        super().tearDown()
 
 
-class TestSetupPlotQuantities(FigureMixin, unittest.TestCase):
+class TestSetupPlotQuantities(FigureMixin):
     """Collects everything a corner or histogram plot needs from a posterior
     table: the samples, the axis labels, the titles and the ranges."""
 
@@ -63,62 +61,62 @@ class TestSetupPlotQuantities(FigureMixin, unittest.TestCase):
     def test_every_piece_the_plotters_need_is_returned(self):
         quantities = self.build()
         for key in ["best_fit", "labels", "titles", "samples", "limits", "keys"]:
-            self.assertIn(key, quantities, msg=key)
+            assert key in quantities, key
 
     def test_all_columns_are_plotted_when_no_keys_are_given(self):
         quantities = self.build()
-        self.assertIn("log10_mej_dyn", quantities["keys"])
-        self.assertIn("luminosity_distance", quantities["keys"])
+        assert "log10_mej_dyn" in quantities["keys"]
+        assert "luminosity_distance" in quantities["keys"]
 
     def test_the_likelihood_columns_are_left_out_of_the_plot(self):
         # They are bookkeeping rather than inferred parameters.
         quantities = self.build()
-        self.assertNotIn("log_likelihood", quantities["keys"])
-        self.assertNotIn("log_prior", quantities["keys"])
+        assert "log_likelihood" not in quantities["keys"]
+        assert "log_prior" not in quantities["keys"]
 
     def test_only_the_requested_keys_are_plotted(self):
         quantities = self.build(plot_keys=["log10_mej_dyn"])
-        self.assertEqual(quantities["keys"], ["log10_mej_dyn"])
-        self.assertEqual(quantities["samples"].shape[1], 1)
+        assert quantities["keys"] == ["log10_mej_dyn"]
+        assert quantities["samples"].shape[1] == 1
 
     def test_the_samples_are_stacked_one_column_per_parameter(self):
         quantities = self.build(plot_keys=["log10_mej_dyn", "log10_mej_wind"])
-        self.assertEqual(quantities["samples"].shape, (300, 2))
+        assert quantities["samples"].shape == (300, 2)
 
     def test_the_best_fit_sample_is_the_most_likely_one(self):
         samples = posterior_frame()
         quantities = self.build(samples)
         expected = samples.iloc[samples["log_likelihood"].idxmax()]
-        self.assertAlmostEqual(
-            quantities["best_fit"]["log10_mej_dyn"], expected["log10_mej_dyn"]
+        assert quantities["best_fit"]["log10_mej_dyn"] == pytest.approx(
+            expected["log10_mej_dyn"]
         )
 
     def test_without_a_likelihood_column_there_is_no_best_fit(self):
         quantities = self.build(posterior_frame(with_likelihood=False))
-        self.assertIsNone(quantities["best_fit"]["log10_mej_dyn"])
+        assert quantities["best_fit"]["log10_mej_dyn"] is None
 
     def test_the_limits_are_widened_to_hold_the_samples(self):
         samples = posterior_frame()
         quantities = self.build(samples, plot_keys=["log10_mej_dyn"])
         low, high = quantities["limits"][0]
-        self.assertLessEqual(low, samples["log10_mej_dyn"].min())
-        self.assertGreaterEqual(high, samples["log10_mej_dyn"].max())
+        assert low <= samples["log10_mej_dyn"].min()
+        assert high >= samples["log10_mej_dyn"].max()
 
     def test_supplied_limits_are_only_ever_widened(self):
         quantities = self.build(plot_keys=["log10_mej_dyn"], limits=[(-10.0, 10.0)])
         low, high = quantities["limits"][0]
-        self.assertAlmostEqual(low, -10.0)
-        self.assertAlmostEqual(high, 10.0)
+        assert low == pytest.approx(-10.0)
+        assert high == pytest.approx(10.0)
 
     def test_a_known_parameter_gets_its_published_label(self):
         quantities = self.build(plot_keys=["luminosity_distance"])
-        self.assertIn("d_L", quantities["labels"][0])
+        assert "d_L" in quantities["labels"][0]
 
     def test_an_unknown_parameter_falls_back_to_its_own_name(self):
         samples = posterior_frame()
         samples["my_parameter"] = np.linspace(0.0, 1.0, len(samples))
         quantities = self.build(samples, plot_keys=["my_parameter"])
-        self.assertEqual(quantities["labels"][0], "my_parameter")
+        assert quantities["labels"][0] == "my_parameter"
 
     def test_a_parameter_with_no_spread_cannot_be_titled(self):
         # The title is built from the significant figures of the credible
@@ -126,7 +124,7 @@ class TestSetupPlotQuantities(FigureMixin, unittest.TestCase):
         # A posterior holding a delta-function parameter cannot be plotted.
         samples = posterior_frame()
         samples["fixed"] = 1.0
-        with self.assertRaises(OverflowError):
+        with pytest.raises(OverflowError):
             self.build(samples, plot_keys=["fixed"])
 
     def test_a_supplied_label_beats_the_parameter_name(self):
@@ -137,90 +135,92 @@ class TestSetupPlotQuantities(FigureMixin, unittest.TestCase):
             plot_keys=["my_parameter"],
             default_labels={"my_parameter": "$x$"},
         )
-        self.assertEqual(quantities["labels"][0], "$x$")
+        assert quantities["labels"][0] == "$x$"
 
     def test_a_missing_parameter_gets_a_blank_off_screen_placeholder(self):
         # Several posteriors are overlaid on one figure, so a parameter only
         # present in some of them still needs a column in the grid.
         quantities = self.build(plot_keys=["log10_mej_dyn", "absent"])
-        self.assertEqual(quantities["labels"][1], "")
-        self.assertEqual(quantities["titles"][1], "")
-        self.assertEqual(quantities["samples"].shape[1], 2)
+        assert quantities["labels"][1] == ""
+        assert quantities["titles"][1] == ""
+        assert quantities["samples"].shape[1] == 2
 
     def test_a_title_is_produced_for_each_present_parameter(self):
         quantities = self.build(plot_keys=["log10_mej_dyn"])
-        self.assertTrue(quantities["titles"][0])
+        assert quantities["titles"][0]
 
     def test_no_injection_means_no_truth_markers(self):
-        self.assertIsNone(self.build()["truths"])
+        assert self.build()["truths"] is None
 
     def test_an_injection_dictionary_becomes_the_truth_markers(self):
         quantities = self.build(
             plot_keys=["log10_mej_dyn"], injection={"log10_mej_dyn": -2.4}
         )
-        self.assertAlmostEqual(quantities["truths"][0], -2.4)
+        assert quantities["truths"][0] == pytest.approx(-2.4)
 
     def test_an_injection_table_is_reduced_to_its_first_row(self):
         injection = pd.DataFrame({"log10_mej_dyn": [-2.4, -9.9]})
         quantities = self.build(plot_keys=["log10_mej_dyn"], injection=injection)
-        self.assertAlmostEqual(quantities["truths"][0], -2.4)
+        assert quantities["truths"][0] == pytest.approx(-2.4)
 
     def test_a_parameter_absent_from_the_injection_gets_no_marker(self):
         quantities = self.build(
             plot_keys=["log10_mej_dyn", "luminosity_distance"],
             injection={"log10_mej_dyn": -2.4},
         )
-        self.assertIsNone(quantities["truths"][1])
+        assert quantities["truths"][1] is None
 
 
-class TestCornerPlot(FigureMixin, unittest.TestCase):
+class TestCornerPlot(FigureMixin):
     """Draws the corner figure itself, over a set of NMMA defaults that the
     caller can override."""
 
-    def setUp(self):
-        super().setUp()
+    def setup_method(self):
+        super().setup_method()
         self.samples = np.random.default_rng(0).normal(size=(400, 2))
         self.labels = ["$a$", "$b$"]
         self.limits = [(-4.0, 4.0), (-4.0, 4.0)]
 
     def test_a_figure_is_returned(self):
         figure = pr.corner_plot(self.samples, self.labels, self.limits)
-        self.assertIsInstance(figure, plt.Figure)
+        assert isinstance(figure, plt.Figure)
 
     def test_one_panel_is_drawn_per_parameter_pair(self):
         figure = pr.corner_plot(self.samples, self.labels, self.limits)
-        self.assertEqual(len(figure.axes), 4)
+        assert len(figure.axes) == 4
 
     def test_the_defaults_can_be_overridden(self):
         figure = pr.corner_plot(
             self.samples, self.labels, self.limits, bins=10, color="C3"
         )
-        self.assertIsInstance(figure, plt.Figure)
+        assert isinstance(figure, plt.Figure)
 
     def test_an_existing_figure_is_drawn_onto_so_posteriors_can_overlay(self):
         first = pr.corner_plot(self.samples, self.labels, self.limits)
         second = pr.corner_plot(self.samples, self.labels, self.limits, fig=first)
-        self.assertIs(second, first)
+        assert second is first
 
     def test_the_figure_can_be_saved(self):
         directory = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, directory)
-        target = directory / "corner.pdf"
-        pr.corner_plot(self.samples, self.labels, self.limits, save=str(target))
-        self.assertTrue(target.is_file())
+        try:
+            target = directory / "corner.pdf"
+            pr.corner_plot(self.samples, self.labels, self.limits, save=str(target))
+            assert target.is_file()
+        finally:
+            shutil.rmtree(directory)
 
     def test_the_quantiles_default_to_the_one_sigma_band_and_median(self):
         with patch.object(pr.corner, "corner") as corner:
             pr.corner_plot(self.samples, self.labels, self.limits)
-        self.assertEqual(corner.call_args.kwargs["quantiles"], [0.16, 0.5, 0.84])
+        assert corner.call_args.kwargs["quantiles"] == [0.16, 0.5, 0.84]
 
     def test_the_ranges_are_passed_to_corner_as_its_range_argument(self):
         with patch.object(pr.corner, "corner") as corner:
             pr.corner_plot(self.samples, self.labels, self.limits)
-        self.assertEqual(corner.call_args.kwargs["range"], self.limits)
+        assert corner.call_args.kwargs["range"] == self.limits
 
 
-class TestSetupCornerPlot(FigureMixin, unittest.TestCase):
+class TestSetupCornerPlot(FigureMixin):
     """Joins the quantity collection to the drawing, which is the path the
     corner-plot script takes for each posterior file."""
 
@@ -228,8 +228,8 @@ class TestSetupCornerPlot(FigureMixin, unittest.TestCase):
         figure, limits = pr.setup_corner_plot(
             posterior_frame(), plot_keys=["log10_mej_dyn", "log10_mej_wind"]
         )
-        self.assertIsInstance(figure, plt.Figure)
-        self.assertEqual(len(limits), 2)
+        assert isinstance(figure, plt.Figure)
+        assert len(limits) == 2
 
     def test_the_truth_markers_reach_the_drawing(self):
         # The routine post-processes the real figure afterwards, so the
@@ -248,25 +248,25 @@ class TestSetupCornerPlot(FigureMixin, unittest.TestCase):
                 plot_keys=["log10_mej_dyn", "log10_mej_wind"],
                 injection={"log10_mej_dyn": -2.4, "log10_mej_wind": -1.9},
             )
-        self.assertAlmostEqual(recorded["truths"][0], -2.4)
-        self.assertAlmostEqual(recorded["truths"][1], -1.9)
+        assert recorded["truths"][0] == pytest.approx(-2.4)
+        assert recorded["truths"][1] == pytest.approx(-1.9)
 
     def test_an_existing_figure_is_reused_for_overlays(self):
         first, _ = pr.setup_corner_plot(posterior_frame(), plot_keys=["log10_mej_dyn"])
         second, _ = pr.setup_corner_plot(
             posterior_frame(seed=12), plot_keys=["log10_mej_dyn"], fig=first
         )
-        self.assertIs(second, first)
+        assert second is first
 
     def test_the_limits_come_back_widened_so_overlays_share_a_scale(self):
         # Each posterior is drawn onto the same figure, so the caller feeds
         # the returned limits into the next call.
         _, limits = pr.setup_corner_plot(posterior_frame(), plot_keys=["log10_mej_dyn"])
         low, high = limits[0]
-        self.assertLess(low, high)
+        assert low < high
 
 
-class TestPlotHistogramsOnly(FigureMixin, unittest.TestCase):
+class TestPlotHistogramsOnly(FigureMixin):
     """A cheaper one-dimensional summary, used when the full corner grid
     would be unreadable."""
 
@@ -274,14 +274,14 @@ class TestPlotHistogramsOnly(FigureMixin, unittest.TestCase):
         figure, limits = pr.plot_histograms_only(
             posterior_frame(), plot_keys=["log10_mej_dyn", "log10_mej_wind"]
         )
-        self.assertIsInstance(figure, plt.Figure)
-        self.assertEqual(len(limits), 2)
+        assert isinstance(figure, plt.Figure)
+        assert len(limits) == 2
 
     def test_one_panel_is_drawn_per_parameter(self):
         figure, _ = pr.plot_histograms_only(
             posterior_frame(), plot_keys=["log10_mej_dyn", "log10_mej_wind"]
         )
-        self.assertGreaterEqual(len(figure.axes), 2)
+        assert len(figure.axes) >= 2
 
     def test_the_column_count_can_be_chosen(self):
         figure, _ = pr.plot_histograms_only(
@@ -289,21 +289,24 @@ class TestPlotHistogramsOnly(FigureMixin, unittest.TestCase):
             plot_keys=["log10_mej_dyn", "log10_mej_wind", "luminosity_distance"],
             ncols=1,
         )
-        self.assertIsInstance(figure, plt.Figure)
+        assert isinstance(figure, plt.Figure)
 
 
-class TestPlotR14Trend(FigureMixin, unittest.TestCase):
+class TestPlotR14Trend(FigureMixin):
     """The figure the combine-EOS script ends with: the recovered radius as
     events accumulate, with and without the electromagnetic counterpart."""
 
-    def setUp(self):
-        super().setUp()
+    def setup_method(self):
+        super().setup_method()
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.gw_dir = self.tmp_dir / "gw"
         self.gw_dir.mkdir()
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
         self.write_trend(self.tmp_dir / "GW_EM_R14trend_run.dat")
         self.write_trend(self.gw_dir / "GW_R14trend.dat", spread=0.6)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmp_dir)
+        super().teardown_method()
 
     def write_trend(self, path, events=5, spread=0.3):
         pd.DataFrame(
@@ -324,37 +327,37 @@ class TestPlotR14Trend(FigureMixin, unittest.TestCase):
 
     def test_the_figure_is_written(self):
         pr.plot_R14_trend(self.args())
-        self.assertTrue((self.tmp_dir / "R14_trend_GW_EM_run.pdf").is_file())
+        assert (self.tmp_dir / "R14_trend_GW_EM_run.pdf").is_file()
 
     def test_both_trends_are_drawn(self):
         pr.plot_R14_trend(self.args())
         figure = plt.gcf()
-        self.assertEqual(len(figure.axes), 2)
+        assert len(figure.axes) == 2
 
     def test_the_injected_value_is_marked(self):
         pr.plot_R14_trend(self.args())
         upper_axis = plt.gcf().axes[0]
-        self.assertTrue(
-            any(np.allclose(line.get_ydata(), 11.55) for line in upper_axis.get_lines())
+        assert any(
+            np.allclose(line.get_ydata(), 11.55) for line in upper_axis.get_lines()
         )
 
     def test_the_relative_error_panel_is_logarithmic(self):
         pr.plot_R14_trend(self.args())
-        self.assertEqual(plt.gcf().axes[1].get_yscale(), "log")
+        assert plt.gcf().axes[1].get_yscale() == "log"
 
     def test_a_missing_trend_file_is_reported(self):
         (self.tmp_dir / "GW_EM_R14trend_run.dat").unlink()
-        with self.assertRaises(FileNotFoundError):
+        with pytest.raises(FileNotFoundError):
             pr.plot_R14_trend(self.args())
 
     def test_the_file_names_match_what_the_trend_script_writes(self):
         # The script writes GW_EM_R14trend_<label>.dat under its output
         # directory, and this reader has to look for exactly that.
         source = Path(pr.__file__).read_text()
-        self.assertIn("GW_EM_R14trend_{args.label}.dat", source)
+        assert "GW_EM_R14trend_{args.label}.dat" in source
 
 
-class TestPlotMultiCorner(FigureMixin, unittest.TestCase):
+class TestPlotMultiCorner(FigureMixin):
     """The entry point behind the corner-plot console script. Four attribute
     names do not match the parser it is fed by, so it cannot run."""
 
@@ -367,23 +370,23 @@ class TestPlotMultiCorner(FigureMixin, unittest.TestCase):
         # The parser defines --prior-filename, giving args.prior_filename,
         # but the routine reads args.prior.
         args = self.args()
-        self.assertTrue(hasattr(args, "prior_filename"))
-        self.assertFalse(hasattr(args, "prior"))
-        with self.assertRaises(AttributeError) as caught:
+        assert hasattr(args, "prior_filename")
+        assert not hasattr(args, "prior")
+        with pytest.raises(AttributeError) as caught:
             pr.plot_multi_corner(args)
-        self.assertIn("prior", str(caught.exception))
+        assert "prior" in str(caught.value)
 
     def test_the_best_fit_file_is_also_read_under_the_wrong_name(self):
         # The parser defines --bestfit-params; the routine reads
         # args.bestfit_json when deciding what to draw as truth.
         args = self.args()
-        self.assertFalse(hasattr(args, "bestfit_json"))
+        assert not hasattr(args, "bestfit_json")
         source = Path(pr.__file__).read_text()
-        self.assertIn("args.bestfit_json", source)
+        assert "args.bestfit_json" in source
 
     def test_the_verbose_flag_is_not_provided_by_the_parser(self):
-        self.assertFalse(hasattr(self.args(), "verbose"))
-        self.assertIn("args.verbose", Path(pr.__file__).read_text())
+        assert not hasattr(self.args(), "verbose")
+        assert "args.verbose" in Path(pr.__file__).read_text()
 
     def test_the_plot_keys_and_labels_cannot_be_unpacked_from_one_mapping(self):
         # The routine writes "plot_keys, plot_labels = mapping.items()",
@@ -398,9 +401,9 @@ class TestPlotMultiCorner(FigureMixin, unittest.TestCase):
             "plotting_parameters_from_priors",
             return_value={"a": "$a$", "b": "$b$", "c": "$c$"},
         ):
-            with self.assertRaises(ValueError) as caught:
+            with pytest.raises(ValueError) as caught:
                 pr.plot_multi_corner(args)
-        self.assertIn("unpack", str(caught.exception))
+        assert "unpack" in str(caught.value)
 
     def test_a_two_parameter_prior_slips_through_the_unpacking(self):
         # With exactly two parameters the unpacking succeeds but binds the
@@ -416,16 +419,16 @@ class TestPlotMultiCorner(FigureMixin, unittest.TestCase):
         ):
             with patch.object(pr, "setup_corner_plot") as setup:
                 pr.plot_multi_corner(args)
-        self.assertEqual(setup.call_args.kwargs["plot_keys"], ("a", "$a$"))
+        assert setup.call_args.kwargs["plot_keys"] == ("a", "$a$")
 
     def test_the_legend_falls_back_to_the_file_names(self):
         args = self.args()
-        self.assertIsNone(args.label_name)
+        assert args.label_name is None
         source = Path(pr.__file__).read_text()
-        self.assertIn("for f in args.posterior_files", source)
+        assert "for f in args.posterior_files" in source
 
 
-class TestResamplingCornerPlot(FigureMixin, unittest.TestCase):
+class TestResamplingCornerPlot(FigureMixin):
     """The figure the resampling script ends with, drawn from the sampler
     solution rather than from a file."""
 
@@ -462,34 +465,38 @@ class TestResamplingCornerPlot(FigureMixin, unittest.TestCase):
         # positionally, so corner treats it as an existing figure and the
         # plot is never written. Passing save=<path> is the fix.
         directory = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, directory)
-        with self.assertRaises(AttributeError) as caught:
-            pr.resampling_corner_plot(
-                self.samples(withNSBH=True), self.solution(), str(directory), True
-            )
-        self.assertIn("axes", str(caught.exception))
-        self.assertEqual(list(directory.iterdir()), [])
+        try:
+            with pytest.raises(AttributeError) as caught:
+                pr.resampling_corner_plot(
+                    self.samples(withNSBH=True), self.solution(), str(directory), True
+                )
+            assert "axes" in str(caught.value)
+            assert list(directory.iterdir()) == []
+        finally:
+            shutil.rmtree(directory)
 
     def test_the_same_mistake_affects_the_binary_neutron_star_branch(self):
         directory = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, directory)
-        with self.assertRaises(AttributeError):
-            pr.resampling_corner_plot(
-                self.samples(), self.solution(), str(directory), False
-            )
+        try:
+            with pytest.raises(AttributeError):
+                pr.resampling_corner_plot(
+                    self.samples(), self.solution(), str(directory), False
+                )
+        finally:
+            shutil.rmtree(directory)
 
     def test_the_mixed_binary_branch_plots_four_parameters(self):
         with patch.object(pr, "corner_plot") as draw:
             pr.resampling_corner_plot(
                 self.samples(withNSBH=True), self.solution(), "out", True
             )
-        self.assertEqual(draw.call_args.args[0].shape[1], 4)
+        assert draw.call_args.args[0].shape[1] == 4
 
     def test_the_binary_neutron_star_branch_adds_tidal_and_maximum_mass(self):
         with patch.object(pr, "corner_plot") as draw:
             pr.resampling_corner_plot(self.samples(), self.solution(), "out", False)
-        self.assertEqual(draw.call_args.args[0].shape[1], 6)
-        self.assertIn(r"$\tilde{\Lambda}$", draw.call_args.args[1])
+        assert draw.call_args.args[0].shape[1] == 6
+        assert r"$\tilde{\Lambda}$" in draw.call_args.args[1]
 
     def test_the_mass_ratio_is_reported_as_the_larger_than_one_convention(self):
         with patch.object(pr, "corner_plot") as draw:
@@ -497,8 +504,4 @@ class TestResamplingCornerPlot(FigureMixin, unittest.TestCase):
                 self.samples(withNSBH=True), self.solution(), "out", True
             )
         mass_ratio = draw.call_args.args[0][:, 1]
-        self.assertTrue(np.all(mass_ratio >= 1.0))
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert np.all(mass_ratio >= 1.0)

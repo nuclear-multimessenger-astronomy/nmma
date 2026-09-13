@@ -1,9 +1,9 @@
-import unittest
 from argparse import Namespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+import pytest
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Constraint, DeltaFunction, PriorDict, Uniform
 
@@ -107,98 +107,98 @@ class LikelihoodMixin:
         return MultiMessengerLikelihood(self.stubs, priors, instructions)
 
 
-class TestInitialisation(LikelihoodMixin, unittest.TestCase):
+class TestInitialisation(LikelihoodMixin):
     def test_every_messenger_likelihood_is_kept(self):
         likelihood = self.build(("A", "B", "C"))
-        self.assertEqual(len(likelihood.likelihoods), 3)
+        assert len(likelihood.likelihoods) == 3
 
     def test_the_noise_evidence_is_summed_once_at_construction(self):
         likelihood = self.build(("A", "B"), noise_logl=-5.0)
-        self.assertEqual(likelihood._noise_logl, -10.0)
+        assert likelihood._noise_logl == -10.0
 
     def test_the_noise_evidence_is_cached_rather_than_recomputed(self):
         # Each sub-likelihood's noise evidence is fixed for the run, so it
         # is summed once instead of on every sampler call.
         likelihood = self.build(("A",), noise_logl=-3.0)
         likelihood.likelihoods[0].noise_logl = -99.0
-        self.assertEqual(likelihood._noise_logl, -3.0)
+        assert likelihood._noise_logl == -3.0
 
     def test_the_priors_are_stored(self):
         priors = simple_priors()
         likelihood = self.build(priors=priors)
-        self.assertIs(likelihood.priors, priors)
+        assert likelihood.priors is priors
 
     def test_constraint_priors_are_split_out_by_the_mixin(self):
         likelihood = self.build(priors=simple_priors(with_constraint=True))
-        self.assertEqual(list(likelihood.constraints), ["mass_ratio_constraint"])
+        assert list(likelihood.constraints) == ["mass_ratio_constraint"]
 
     def test_without_constraints_the_constraint_set_is_empty(self):
-        self.assertEqual(self.build().constraints, {})
+        assert self.build().constraints == {}
 
     def test_the_conversion_instructions_are_stored(self):
         likelihood = self.build(instructions={"ejecta": True})
-        self.assertEqual(likelihood.conversion_instructions, {"ejecta": True})
+        assert likelihood.conversion_instructions == {"ejecta": True}
 
     def test_the_default_instructions_are_an_empty_dictionary(self):
         stubs = [StubMessengerLikelihood("A"), StubMessengerLikelihood("B")]
         likelihood = MultiMessengerLikelihood(stubs, simple_priors())
-        self.assertEqual(likelihood.conversion_instructions, {})
+        assert likelihood.conversion_instructions == {}
 
     def test_a_non_likelihood_messenger_is_refused(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             MultiMessengerLikelihood(["not a likelihood"], simple_priors())
 
 
-class TestRepresentation(LikelihoodMixin, unittest.TestCase):
+class TestRepresentation(LikelihoodMixin):
     """The representation is logged to say which messengers a run combines."""
 
     def test_a_single_messenger_is_named_directly(self):
         likelihood = self.build(("Solo",))
-        self.assertEqual(repr(likelihood), "MultiMessengerLikelihood with Solo")
+        assert repr(likelihood) == "MultiMessengerLikelihood with Solo"
 
     def test_two_messengers_are_joined_with_and(self):
         likelihood = self.build(("A", "B"))
-        self.assertEqual(repr(likelihood), "MultiMessengerLikelihood with A and B")
+        assert repr(likelihood) == "MultiMessengerLikelihood with A and B"
 
     def test_three_messengers_are_comma_separated_before_the_last(self):
         likelihood = self.build(("A", "B", "C"))
-        self.assertEqual(repr(likelihood), "MultiMessengerLikelihood with A, B and C")
+        assert repr(likelihood) == "MultiMessengerLikelihood with A, B and C"
 
 
-class TestSetupParameterConversion(LikelihoodMixin, unittest.TestCase):
+class TestSetupParameterConversion(LikelihoodMixin):
     """The conversion instructions decide which chain of conversions turns
     sampled parameters into the quantities each messenger needs."""
 
     def test_instructions_build_a_multimessenger_conversion(self):
         likelihood = self.build(instructions={"ejecta": True})
-        self.assertIsNotNone(likelihood.multi_conversion)
-        self.assertEqual(len(likelihood.multi_conversion._conversions), 1)
+        assert likelihood.multi_conversion is not None
+        assert len(likelihood.multi_conversion._conversions) == 1
 
     def test_no_instructions_still_builds_an_empty_conversion_chain(self):
         likelihood = self.build(instructions={})
-        self.assertEqual(likelihood.multi_conversion._conversions, ())
+        assert likelihood.multi_conversion._conversions == ()
 
     def test_instructions_of_none_fall_back_to_chaining_the_sub_likelihoods(self):
         likelihood = self.build(instructions=None)
-        self.assertEqual(
-            likelihood.parameter_conversion.__func__,
-            MultiMessengerLikelihood.basic_parameter_conversion,
+        assert (
+            likelihood.parameter_conversion.__func__
+            == MultiMessengerLikelihood.basic_parameter_conversion
         )
-        self.assertEqual(
-            likelihood.posterior_conversion.__func__,
-            MultiMessengerLikelihood.basic_posterior_conversion,
+        assert (
+            likelihood.posterior_conversion.__func__
+            == MultiMessengerLikelihood.basic_posterior_conversion
         )
 
     def test_instructions_of_none_build_no_conversion_object(self):
         likelihood = self.build(instructions=None)
-        self.assertFalse(hasattr(likelihood, "multi_conversion"))
+        assert not hasattr(likelihood, "multi_conversion")
 
     def test_an_em_likelihood_contributes_its_own_conversion(self):
         with patch.object(joint_likelihood, "EMTransientLikelihood", StubEMLikelihood):
             stubs = [StubEMLikelihood(name="EM"), StubMessengerLikelihood("Other")]
             likelihood = MultiMessengerLikelihood(stubs, simple_priors(), {})
-        self.assertIn("em", likelihood.conversion_instructions)
-        self.assertEqual(likelihood.conversion_instructions["em"].__self__.name, "EM")
+        assert "em" in likelihood.conversion_instructions
+        assert likelihood.conversion_instructions["em"].__self__.name == "EM"
 
     def test_a_gw_likelihood_contributes_its_own_conversion(self):
         with patch.object(
@@ -206,7 +206,7 @@ class TestSetupParameterConversion(LikelihoodMixin, unittest.TestCase):
         ):
             stubs = [StubGWLikelihood(name="GW"), StubMessengerLikelihood("Other")]
             likelihood = MultiMessengerLikelihood(stubs, simple_priors(), {})
-        self.assertIn("gw", likelihood.conversion_instructions)
+        assert "gw" in likelihood.conversion_instructions
 
     def test_an_eos_likelihood_contributes_its_own_conversion(self):
         with patch.object(
@@ -214,7 +214,7 @@ class TestSetupParameterConversion(LikelihoodMixin, unittest.TestCase):
         ):
             stubs = [StubEoSLikelihood(name="EoS"), StubMessengerLikelihood("Other")]
             likelihood = MultiMessengerLikelihood(stubs, simple_priors(), {})
-        self.assertIn("eos", likelihood.conversion_instructions)
+        assert "eos" in likelihood.conversion_instructions
 
     def test_a_placeholder_instruction_is_replaced_by_the_real_conversion(self):
         # setup_from_args marks a messenger's conversion with True before the
@@ -222,63 +222,63 @@ class TestSetupParameterConversion(LikelihoodMixin, unittest.TestCase):
         with patch.object(joint_likelihood, "EMTransientLikelihood", StubEMLikelihood):
             stubs = [StubEMLikelihood(name="EM")]
             likelihood = MultiMessengerLikelihood(stubs, simple_priors(), {"em": True})
-        self.assertNotEqual(likelihood.conversion_instructions["em"], True)
-        self.assertTrue(callable(likelihood.conversion_instructions["em"]))
+        assert likelihood.conversion_instructions["em"] != True  # noqa: E712
+        assert callable(likelihood.conversion_instructions["em"])
 
 
-class TestSanityChecks(LikelihoodMixin, unittest.TestCase):
+class TestSanityChecks(LikelihoodMixin):
     def test_all_messengers_sane_passes(self):
-        self.assertTrue(self.build(("A", "B"), sane=True).sanity_checks())
+        assert self.build(("A", "B"), sane=True).sanity_checks()
 
     def test_one_insane_messenger_fails_the_whole_check(self):
         likelihood = self.build(("A", "B"))
         likelihood.likelihoods[0].sane = False
-        self.assertFalse(likelihood.sanity_checks())
+        assert not likelihood.sanity_checks()
 
     def test_the_check_is_a_product_so_it_fails_on_any_messenger(self):
         likelihood = self.build(("A", "B", "C"))
         likelihood.likelihoods[2].sane = False
-        self.assertFalse(likelihood.sanity_checks())
+        assert not likelihood.sanity_checks()
 
 
-class TestSubLogLikelihood(LikelihoodMixin, unittest.TestCase):
+class TestSubLogLikelihood(LikelihoodMixin):
     def test_the_messenger_log_likelihoods_are_added(self):
         likelihood = self.build(("A", "B"), logl=-2.5)
-        self.assertEqual(likelihood.sub_log_likelihood({"x": 0.5}), -5.0)
+        assert likelihood.sub_log_likelihood({"x": 0.5}) == -5.0
 
     def test_every_messenger_sees_the_same_parameters(self):
         likelihood = self.build(("A", "B"))
         parameters = {"x": 0.5}
         likelihood.sub_log_likelihood(parameters)
         for sub in likelihood.likelihoods:
-            self.assertEqual(sub.seen_parameters, parameters)
+            assert sub.seen_parameters == parameters
 
     def test_a_minus_infinite_total_is_replaced_by_a_finite_floor(self):
         # Samplers reject the sample either way, but a literal -inf breaks
         # evidence bookkeeping, so it is clipped to the lowest float.
         likelihood = self.build(("A",), logl=-np.inf)
         value = likelihood.sub_log_likelihood({})
-        self.assertTrue(np.isfinite(value))
-        self.assertLess(value, -1e300)
+        assert np.isfinite(value)
+        assert value < -1e300
 
     def test_a_not_a_number_total_is_also_floored(self):
         likelihood = self.build(("A",), logl=np.nan)
         value = likelihood.sub_log_likelihood({})
-        self.assertTrue(np.isfinite(value))
-        self.assertLess(value, -1e300)
+        assert np.isfinite(value)
+        assert value < -1e300
 
     def test_one_infinite_messenger_drags_the_total_down(self):
         likelihood = self.build(("A", "B"))
         likelihood.likelihoods[0].logl = -np.inf
-        self.assertTrue(np.isfinite(likelihood.sub_log_likelihood({})))
+        assert np.isfinite(likelihood.sub_log_likelihood({}))
 
 
-class TestLogLikelihood(LikelihoodMixin, unittest.TestCase):
+class TestLogLikelihood(LikelihoodMixin):
     """The mixin's log_likelihood converts, checks constraints, then sums."""
 
     def test_the_summed_messenger_likelihood_is_returned(self):
         likelihood = self.build(("A", "B"), instructions=None, logl=-2.0)
-        self.assertEqual(likelihood.log_likelihood({"x": 0.5}), -4.0)
+        assert likelihood.log_likelihood({"x": 0.5}) == -4.0
 
     def test_a_violated_constraint_floors_the_likelihood(self):
         priors = PriorDict()
@@ -286,29 +286,29 @@ class TestLogLikelihood(LikelihoodMixin, unittest.TestCase):
         priors["forbidden"] = Constraint(0, 1, "forbidden")
         likelihood = self.build(("A",), priors=priors, instructions=None)
         value = likelihood.log_likelihood({"x": 0.5, "forbidden": 5.0})
-        self.assertLess(value, -1e300)
+        assert value < -1e300
 
     def test_a_satisfied_constraint_leaves_the_likelihood_alone(self):
         priors = PriorDict()
         priors["x"] = Uniform(0, 1, "x")
         priors["allowed"] = Constraint(0, 1, "allowed")
         likelihood = self.build(("A",), priors=priors, instructions=None, logl=-2.0)
-        self.assertEqual(likelihood.log_likelihood({"x": 0.5, "allowed": 0.5}), -2.0)
+        assert likelihood.log_likelihood({"x": 0.5, "allowed": 0.5}) == -2.0
 
     def test_an_insane_setup_floors_the_likelihood(self):
         likelihood = self.build(("A",), instructions=None)
         likelihood.likelihoods[0].sane = False
-        self.assertLess(likelihood.log_likelihood({"x": 0.5}), -1e300)
+        assert likelihood.log_likelihood({"x": 0.5}) < -1e300
 
 
-class TestParameterConversion(LikelihoodMixin, unittest.TestCase):
+class TestParameterConversion(LikelihoodMixin):
     def test_the_conversion_is_delegated_to_the_multimessenger_object(self):
         likelihood = self.build()
         likelihood.multi_conversion = MagicMock()
         likelihood.multi_conversion.convert_to_multimessenger_parameters.return_value = {
             "converted": True
         }
-        self.assertEqual(likelihood.parameter_conversion({"x": 1}), {"converted": True})
+        assert likelihood.parameter_conversion({"x": 1}) == {"converted": True}
         likelihood.multi_conversion.convert_to_multimessenger_parameters.assert_called_once_with(
             {"x": 1}
         )
@@ -316,15 +316,15 @@ class TestParameterConversion(LikelihoodMixin, unittest.TestCase):
     def test_the_basic_conversion_chains_every_messenger_in_order(self):
         likelihood = self.build(("A", "B"))
         converted = likelihood.basic_parameter_conversion({"x": 0.5})
-        self.assertEqual(converted["A_added"], 1.0)
-        self.assertEqual(converted["B_added"], 1.0)
+        assert converted["A_added"] == 1.0
+        assert converted["B_added"] == 1.0
 
     def test_the_basic_conversion_keeps_the_sampled_parameters(self):
         likelihood = self.build(("A",))
-        self.assertEqual(likelihood.basic_parameter_conversion({"x": 0.5})["x"], 0.5)
+        assert likelihood.basic_parameter_conversion({"x": 0.5})["x"] == 0.5
 
 
-class TestPosteriorConversion(LikelihoodMixin, unittest.TestCase):
+class TestPosteriorConversion(LikelihoodMixin):
     """Posterior conversion runs over a whole table of samples, and only
     numeric columns survive because the result writer cannot store objects."""
 
@@ -338,34 +338,34 @@ class TestPosteriorConversion(LikelihoodMixin, unittest.TestCase):
             core=1.0
         )
         converted = likelihood.posterior_conversion(self.samples())
-        self.assertIn("core", converted.columns)
-        self.assertIn("A_added", converted.columns)
+        assert "core" in converted.columns
+        assert "A_added" in converted.columns
 
     def test_non_numeric_columns_are_dropped(self):
         likelihood = self.build(("A",))
         converted = likelihood.basic_posterior_conversion(self.samples())
-        self.assertNotIn("label", converted.columns)
-        self.assertIn("x", converted.columns)
+        assert "label" not in converted.columns
+        assert "x" in converted.columns
 
     def test_every_messenger_adds_its_own_columns(self):
         likelihood = self.build(("A", "B"))
         converted = likelihood.basic_posterior_conversion(self.samples())
-        self.assertIn("A_added", converted.columns)
-        self.assertIn("B_added", converted.columns)
+        assert "A_added" in converted.columns
+        assert "B_added" in converted.columns
 
     def test_the_sample_rows_are_preserved(self):
         likelihood = self.build(("A",))
         converted = likelihood.basic_posterior_conversion(self.samples())
-        self.assertEqual(len(converted), 2)
+        assert len(converted) == 2
 
 
-class TestFinalDiagnostics(LikelihoodMixin, unittest.TestCase):
+class TestFinalDiagnostics(LikelihoodMixin):
     def test_one_diagnostic_is_returned_per_messenger(self):
         likelihood = self.build(("A", "B"))
-        self.assertEqual(
-            likelihood.final_diagnostics({"x": 0.5}, Namespace()),
-            ["A_diagnostics", "B_diagnostics"],
-        )
+        assert likelihood.final_diagnostics({"x": 0.5}, Namespace()) == [
+            "A_diagnostics",
+            "B_diagnostics",
+        ]
 
     def test_the_result_object_is_passed_through(self):
         likelihood = self.build(("A",))
@@ -381,7 +381,7 @@ class SetupFromArgsMixin:
     likelihood, so each messenger's setup helper is replaced by a stub and
     only the wiring decisions are exercised."""
 
-    def setUp(self):
+    def setup_method(self):
         self.logger = MagicMock()
         self.priors = PriorDict()
         self.priors["x"] = Uniform(0, 1, "x")
@@ -419,7 +419,10 @@ class SetupFromArgsMixin:
         ]
         for patcher in self.patches:
             patcher.start()
-        self.addCleanup(lambda: [patcher.stop() for patcher in self.patches])
+
+    def teardown_method(self):
+        for patcher in self.patches:
+            patcher.stop()
 
     def data_dump(self, messengers=(), modifiers=()):
         return {
@@ -443,44 +446,40 @@ class SetupFromArgsMixin:
         )
 
 
-class TestSetupFromArgsMessengerSelection(SetupFromArgsMixin, unittest.TestCase):
+class TestSetupFromArgsMessengerSelection(SetupFromArgsMixin):
     def test_no_messengers_at_all_is_an_error(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.setup()
 
     def test_a_single_messenger_is_returned_on_its_own(self):
         # A joint likelihood over one messenger would only add overhead.
         likelihood = self.setup(messengers=["em"])
-        self.assertIsInstance(likelihood, StubEMLikelihood)
-        self.assertNotIsInstance(likelihood, MultiMessengerLikelihood)
+        assert isinstance(likelihood, StubEMLikelihood)
+        assert not isinstance(likelihood, MultiMessengerLikelihood)
 
     def test_a_single_messenger_has_its_conversion_set_up(self):
         likelihood = self.setup(messengers=["em"])
-        self.assertTrue(likelihood.conversion_was_set_up)
+        assert likelihood.conversion_was_set_up
 
     def test_two_messengers_are_combined_into_a_joint_likelihood(self):
         likelihood = self.setup(messengers=["gw", "em"])
-        self.assertIsInstance(likelihood, MultiMessengerLikelihood)
-        self.assertEqual(len(likelihood.likelihoods), 2)
+        assert isinstance(likelihood, MultiMessengerLikelihood)
+        assert len(likelihood.likelihoods) == 2
 
     def test_the_gw_likelihood_is_built_from_its_own_helper(self):
         likelihood = self.setup(messengers=["gw", "em"])
-        self.assertTrue(
-            any(isinstance(sub, StubGWLikelihood) for sub in likelihood.likelihoods)
-        )
+        assert any(isinstance(sub, StubGWLikelihood) for sub in likelihood.likelihoods)
 
     def test_the_em_likelihood_is_built_from_its_own_helper(self):
         likelihood = self.setup(messengers=["gw", "em"])
-        self.assertTrue(
-            any(isinstance(sub, StubEMLikelihood) for sub in likelihood.likelihoods)
-        )
+        assert any(isinstance(sub, StubEMLikelihood) for sub in likelihood.likelihoods)
 
     def test_the_helpers_receive_the_dump_the_args_and_the_logger(self):
         self.setup(messengers=["gw", "em"])
         joint_likelihood.setup_gw_kwargs.assert_called_once()
         joint_likelihood.setup_em_kwargs.assert_called_once()
         # The EM helper also needs the priors, to add systematics parameters.
-        self.assertIs(joint_likelihood.setup_em_kwargs.call_args.args[0], self.priors)
+        assert joint_likelihood.setup_em_kwargs.call_args.args[0] is self.priors
 
     def test_a_gw_run_pins_fixed_parameters_as_delta_functions(self):
         # Marginalisation setup needs every fixed value to be a prior.
@@ -488,7 +487,7 @@ class TestSetupFromArgsMessengerSelection(SetupFromArgsMixin, unittest.TestCase)
         priors["x"] = Uniform(0, 1, "x")
         priors["fixed"] = 2.0
         self.setup(messengers=["gw", "em"], priors=priors)
-        self.assertIsInstance(priors["fixed"], DeltaFunction)
+        assert isinstance(priors["fixed"], DeltaFunction)
 
     def test_a_population_messenger_is_wrapped_in_a_plain_nmma_likelihood(self):
         with patch.object(
@@ -501,18 +500,16 @@ class TestSetupFromArgsMessengerSelection(SetupFromArgsMixin, unittest.TestCase)
             ):
                 likelihood = self.setup(messengers=["em", "pop"])
         population.assert_called_once_with("uniform")
-        self.assertEqual(len(likelihood.likelihoods), 2)
+        assert len(likelihood.likelihoods) == 2
 
 
-class TestSetupFromArgsEoSHandling(SetupFromArgsMixin, unittest.TestCase):
+class TestSetupFromArgsEoSHandling(SetupFromArgsMixin):
     """How the EOS enters the run depends on whether it is sampled, read
     from a table, or replaced by universal relations."""
 
     def test_a_constrained_eos_becomes_its_own_likelihood(self):
         likelihood = self.setup(messengers=["gw", "em", "eos"])
-        self.assertTrue(
-            any(isinstance(sub, StubEoSLikelihood) for sub in likelihood.likelihoods)
-        )
+        assert any(isinstance(sub, StubEoSLikelihood) for sub in likelihood.likelihoods)
 
     def test_a_constrained_eos_without_gravitational_waves_fails_to_set_up(self):
         # A constrained sampled EOS records its conversion as the placeholder
@@ -520,7 +517,7 @@ class TestSetupFromArgsEoSHandling(SetupFromArgsMixin, unittest.TestCase):
         # EoSConverter. An EM-plus-EOS run therefore cannot be set up at all.
         # Once the placeholder is resolved before that branch, this should
         # build a two-messenger likelihood instead of raising.
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             self.setup(messengers=["em", "eos"])
 
     def test_an_unconstrained_eos_is_only_a_conversion(self):
@@ -532,38 +529,38 @@ class TestSetupFromArgsEoSHandling(SetupFromArgsMixin, unittest.TestCase):
             "eos_converter": self.eos_converter,
         }
         likelihood = self.setup(messengers=["gw", "em", "eos"])
-        self.assertFalse(
-            any(isinstance(sub, StubEoSLikelihood) for sub in likelihood.likelihoods)
+        assert not any(
+            isinstance(sub, StubEoSLikelihood) for sub in likelihood.likelihoods
         )
-        self.assertIn("eos", likelihood.conversion_instructions)
+        assert "eos" in likelihood.conversion_instructions
 
     def test_a_tabulated_eos_is_taken_from_the_analysis_modifiers(self):
         likelihood = self.setup(messengers=["gw", "em"], modifiers=["tabulated_eos"])
         joint_likelihood.EoSConverter.assert_called_once()
-        self.assertEqual(joint_likelihood.EoSConverter.call_args.args[1], "tabulated")
-        self.assertIn("eos", likelihood.conversion_instructions)
+        assert joint_likelihood.EoSConverter.call_args.args[1] == "tabulated"
+        assert "eos" in likelihood.conversion_instructions
 
     def test_sampled_tidal_deformabilities_use_universal_relations(self):
         priors = PriorDict()
         priors["lambda_1"] = Uniform(0, 1000, "lambda_1")
         priors["lambda_2"] = Uniform(0, 1000, "lambda_2")
         self.setup(messengers=["gw", "em"], priors=priors)
-        self.assertEqual(joint_likelihood.EoSConverter.call_args.args[1], "qur")
+        assert joint_likelihood.EoSConverter.call_args.args[1] == "qur"
 
     def test_an_eos_without_gravitational_waves_only_computes_macro_parameters(self):
         # Without a GW likelihood there are no component masses to map onto
         # the EOS, so only the bulk neutron-star properties are computed.
         self.setup(messengers=["em"], modifiers=["tabulated_eos"])
-        self.assertIs(
-            self.eos_converter.parameter_conversion,
-            self.eos_converter.compute_macro_parameters,
+        assert (
+            self.eos_converter.parameter_conversion
+            is self.eos_converter.compute_macro_parameters
         )
 
     def test_an_eos_alongside_gravitational_waves_keeps_the_full_conversion(self):
         self.setup(messengers=["gw", "em"], modifiers=["tabulated_eos"])
-        self.assertNotEqual(
-            self.eos_converter.parameter_conversion,
-            self.eos_converter.compute_macro_parameters,
+        assert (
+            self.eos_converter.parameter_conversion
+            != self.eos_converter.compute_macro_parameters
         )
 
     def test_a_sampled_eos_takes_precedence_over_a_tabulated_one(self):
@@ -571,45 +568,41 @@ class TestSetupFromArgsEoSHandling(SetupFromArgsMixin, unittest.TestCase):
         joint_likelihood.EoSConverter.assert_not_called()
 
 
-class TestSetupFromArgsConversionInstructions(SetupFromArgsMixin, unittest.TestCase):
+class TestSetupFromArgsConversionInstructions(SetupFromArgsMixin):
     def test_a_hubble_run_records_the_cosmology(self):
         likelihood = self.setup(
             messengers=["gw", "em"], modifiers=["Hubble"], cosmology="Planck15"
         )
-        self.assertEqual(likelihood.conversion_instructions["cosmo"], "Planck15")
+        assert likelihood.conversion_instructions["cosmo"] == "Planck15"
 
     def test_without_the_hubble_modifier_no_cosmology_is_recorded(self):
         likelihood = self.setup(messengers=["gw", "em"])
-        self.assertNotIn("cosmo", likelihood.conversion_instructions)
+        assert "cosmo" not in likelihood.conversion_instructions
 
     def test_sampled_wind_ejecta_switch_on_the_ejecta_conversion(self):
         priors = PriorDict()
         priors["log10_mej_wind"] = Uniform(-3, -1, "log10_mej_wind")
         likelihood = self.setup(messengers=["gw", "em"], priors=priors)
-        self.assertTrue(likelihood.conversion_instructions["ejecta"])
+        assert likelihood.conversion_instructions["ejecta"]
 
     def test_sampled_dynamical_ejecta_switch_on_the_ejecta_conversion(self):
         priors = PriorDict()
         priors["log10_mej_dyn"] = Uniform(-3, -1, "log10_mej_dyn")
         likelihood = self.setup(messengers=["gw", "em"], priors=priors)
-        self.assertTrue(likelihood.conversion_instructions["ejecta"])
+        assert likelihood.conversion_instructions["ejecta"]
 
     def test_the_ejecta_conversion_can_be_requested_explicitly(self):
         likelihood = self.setup(messengers=["gw", "em"], ejecta_conversion=True)
-        self.assertTrue(likelihood.conversion_instructions["ejecta"])
+        assert likelihood.conversion_instructions["ejecta"]
 
     def test_without_ejecta_parameters_no_ejecta_conversion_is_added(self):
         likelihood = self.setup(messengers=["gw", "em"])
-        self.assertNotIn("ejecta", likelihood.conversion_instructions)
+        assert "ejecta" not in likelihood.conversion_instructions
 
     def test_a_single_messenger_still_gains_the_eos_conversion(self):
         likelihood = self.setup(messengers=["em"], modifiers=["tabulated_eos"])
-        self.assertIn(self.eos_converter, likelihood.conv_functions)
+        assert self.eos_converter in likelihood.conv_functions
 
     def test_the_setup_is_logged(self):
         self.setup(messengers=["gw", "em"])
-        self.assertTrue(self.logger.info.called)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert self.logger.info.called

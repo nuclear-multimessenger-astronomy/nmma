@@ -1,12 +1,12 @@
 import shutil
 import tempfile
-import unittest
 from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 import scipy.stats
 from bilby.core.prior import Uniform
 from bilby.gw.prior import PriorDict
@@ -36,46 +36,45 @@ def write_micro_eos(path, num=200):
     )
 
 
-class TestBaryonicKeplerMass(unittest.TestCase):
+class TestBaryonicKeplerMass:
     """The Kepler limit is the largest mass a uniformly rotating remnant can
     hold, reached through a quasi-universal relation rather than a solve."""
 
     def test_the_limit_exceeds_the_non_rotating_maximum_mass(self):
-        self.assertGreater(mmc.baryonic_Kepler_mass(2.0, 12.0, 1.2, 0.0), 2.0)
+        assert mmc.baryonic_Kepler_mass(2.0, 12.0, 1.2, 0.0) > 2.0
 
     def test_a_larger_rotation_ratio_raises_the_limit(self):
         low = mmc.baryonic_Kepler_mass(2.0, 12.0, 1.1, 0.0)
         high = mmc.baryonic_Kepler_mass(2.0, 12.0, 1.3, 0.0)
-        self.assertGreater(high, low)
+        assert high > low
 
     def test_the_correction_term_scales_the_whole_result(self):
         base = mmc.baryonic_Kepler_mass(2.0, 12.0, 1.2, 0.0)
         corrected = mmc.baryonic_Kepler_mass(2.0, 12.0, 1.2, 0.1)
-        self.assertAlmostEqual(corrected, base * 1.1)
+        assert corrected == pytest.approx(base * 1.1)
 
     def test_the_baryonic_correction_follows_the_known_relation(self):
         # The baryonic mass exceeds the gravitational one by a term that
         # grows with compactness, so a smaller radius binds more tightly.
         compact = mmc.baryonic_Kepler_mass(2.0, 10.0, 1.0, 0.0)
         extended = mmc.baryonic_Kepler_mass(2.0, 14.0, 1.0, 0.0)
-        self.assertGreater(compact, extended)
+        assert compact > extended
 
     def test_the_formula_is_evaluated_exactly_as_published(self):
         m_max = 1.2 * 2.0
         expected = (m_max + 0.78 / 12.0 * m_max**2) * 1.05
-        self.assertAlmostEqual(mmc.baryonic_Kepler_mass(2.0, 12.0, 1.2, 0.05), expected)
+        assert mmc.baryonic_Kepler_mass(2.0, 12.0, 1.2, 0.05) == pytest.approx(expected)
 
     def test_it_works_elementwise_over_arrays(self):
         result = mmc.baryonic_Kepler_mass(
             np.array([1.9, 2.1]), np.array([12.0, 12.0]), 1.2, 0.0
         )
-        self.assertEqual(result.shape, (2,))
-        self.assertGreater(result[1], result[0])
+        assert result.shape == (2,)
+        assert result[1] > result[0]
 
     def test_a_heavier_non_rotating_maximum_gives_a_heavier_limit(self):
-        self.assertGreater(
-            mmc.baryonic_Kepler_mass(2.3, 12.0, 1.2, 0.0),
-            mmc.baryonic_Kepler_mass(1.9, 12.0, 1.2, 0.0),
+        assert mmc.baryonic_Kepler_mass(2.3, 12.0, 1.2, 0.0) > mmc.baryonic_Kepler_mass(
+            1.9, 12.0, 1.2, 0.0
         )
 
 
@@ -92,7 +91,7 @@ class PostmergerMixin:
     n_eos = 3
     n_samples = 300
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.macro_dir = self.tmp_dir / "macro"
         self.micro_dir = self.tmp_dir / "micro"
@@ -101,7 +100,9 @@ class PostmergerMixin:
         for index in range(1, self.n_eos + 1):
             write_macro_eos(self.macro_dir / f"{index}.dat", 2.0 + 0.1 * index)
             write_micro_eos(self.micro_dir / f"{index}.dat")
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmp_dir)
 
     def prior(self, with_kepler=False):
         priors = {
@@ -138,37 +139,40 @@ class PostmergerMixin:
         )
 
 
-class TestPostmergerSetup(PostmergerMixin, unittest.TestCase):
+class TestPostmergerSetup(PostmergerMixin):
     def test_the_sampled_parameters_are_the_five_joint_ones(self):
         inference = self.build()
-        self.assertEqual(
-            list(inference._search_parameter_keys),
-            ["chirp_mass", "eta_star", "EOS", "log10_mdisk", "log10_mej_dyn"],
-        )
+        assert list(inference._search_parameter_keys) == [
+            "chirp_mass",
+            "eta_star",
+            "EOS",
+            "log10_mdisk",
+            "log10_mej_dyn",
+        ]
 
     def test_the_kepler_limit_adds_the_two_relation_parameters(self):
         inference = self.build(use_M_max=True)
-        self.assertIn("ratio_R", inference._search_parameter_keys)
-        self.assertIn("delta", inference._search_parameter_keys)
+        assert "ratio_R" in inference._search_parameter_keys
+        assert "delta" in inference._search_parameter_keys
 
     def test_the_equation_of_state_index_spans_the_table_count(self):
         # Unlike the ejecta resampler, this prior stops at the count rather
         # than one past it.
-        self.assertEqual(self.build().priors["EOS"].maximum, self.n_eos)
+        assert self.build().priors["EOS"].maximum == self.n_eos
 
     def test_the_joint_posterior_becomes_a_five_dimensional_density(self):
         inference = self.build()
-        self.assertIsInstance(inference.KDE, scipy.stats.gaussian_kde)
-        self.assertEqual(inference.KDE.d, 5)
+        assert isinstance(inference.KDE, scipy.stats.gaussian_kde)
+        assert inference.KDE.d == 5
 
     def test_both_table_directories_are_kept_as_paths(self):
         inference = self.build()
-        self.assertIsInstance(inference.eos_path_macro, Path)
-        self.assertIsInstance(inference.eos_path_micro, Path)
+        assert isinstance(inference.eos_path_macro, Path)
+        assert isinstance(inference.eos_path_micro, Path)
 
     def test_a_posterior_missing_a_required_column_is_reported(self):
         posterior = self.posterior().drop(columns=["log10_mdisk"])
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             StandalonePostmergerInference(
                 self.prior(),
                 posterior,
@@ -181,7 +185,7 @@ class TestPostmergerSetup(PostmergerMixin, unittest.TestCase):
     def test_a_prior_missing_a_required_key_is_reported(self):
         prior = self.prior()
         del prior["eta_star"]
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             StandalonePostmergerInference(
                 prior,
                 self.posterior(),
@@ -192,54 +196,52 @@ class TestPostmergerSetup(PostmergerMixin, unittest.TestCase):
             )
 
 
-class TestPostmergerPrior(PostmergerMixin, unittest.TestCase):
+class TestPostmergerPrior(PostmergerMixin):
     def test_the_unit_cube_is_rescaled_onto_the_priors(self):
-        self.assertEqual(len(self.build().Prior(np.full(5, 0.5))), 5)
+        assert len(self.build().Prior(np.full(5, 0.5))) == 5
 
     def test_the_cube_edges_map_to_the_prior_edges(self):
         inference = self.build()
-        self.assertAlmostEqual(inference.Prior(np.full(5, 0.0))[0], 1.0)
-        self.assertAlmostEqual(inference.Prior(np.full(5, 1.0))[0], 1.5)
+        assert inference.Prior(np.full(5, 0.0))[0] == pytest.approx(1.0)
+        assert inference.Prior(np.full(5, 1.0))[0] == pytest.approx(1.5)
 
     def test_the_kepler_run_rescales_seven_values(self):
-        self.assertEqual(len(self.build(use_M_max=True).Prior(np.full(7, 0.5))), 7)
+        assert len(self.build(use_M_max=True).Prior(np.full(7, 0.5))) == 7
 
 
-class TestBaryonicMass(PostmergerMixin, unittest.TestCase):
+class TestBaryonicMass(PostmergerMixin):
     """Integrates the stellar structure equations outward to turn a
     gravitational mass into a baryonic one."""
 
     def test_a_baryonic_mass_is_returned(self):
         inference = self.build()
         mass = inference.baryonic_mass(1.4, 1)
-        self.assertTrue(np.isfinite(mass))
-        self.assertGreater(mass, 0.0)
+        assert np.isfinite(mass)
+        assert mass > 0.0
 
     def test_a_heavier_star_has_a_larger_baryonic_mass(self):
         inference = self.build()
-        self.assertGreater(
-            inference.baryonic_mass(1.8, 1), inference.baryonic_mass(1.2, 1)
-        )
+        assert inference.baryonic_mass(1.8, 1) > inference.baryonic_mass(1.2, 1)
 
     def test_each_equation_of_state_gives_its_own_answer(self):
         inference = self.build()
-        self.assertNotAlmostEqual(
-            inference.baryonic_mass(1.4, 1), inference.baryonic_mass(1.4, 3)
+        assert inference.baryonic_mass(1.4, 1) != pytest.approx(
+            inference.baryonic_mass(1.4, 3)
         )
 
     def test_a_failed_integration_is_warned_about_rather_than_hidden(self):
         inference = self.build()
         with patch.object(mmc.scipy.integrate, "simpson", return_value=np.nan):
-            with self.assertWarns(UserWarning):
+            with pytest.warns(UserWarning):
                 inference.baryonic_mass(1.4, 1)
 
     def test_a_missing_table_is_reported(self):
         inference = self.build()
-        with self.assertRaises(OSError):
+        with pytest.raises(OSError):
             inference.baryonic_mass(1.4, 99)
 
 
-class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
+class TestPostmergerLogLikelihood(PostmergerMixin):
     """Accepts only those samples where the remnant was heavy enough to
     collapse, using the joint posterior as the prior."""
 
@@ -257,7 +259,7 @@ class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
         inference = self.build()
         with patch.object(inference, "baryonic_mass", side_effect=[2.0, 1.8, 1.0]):
             value = inference.LogLikelihood(self.point())
-        self.assertTrue(np.isfinite(value))
+        assert np.isfinite(value)
 
     def test_a_surviving_remnant_is_excluded(self):
         # If the threshold mass exceeds the remnant, the remnant would not
@@ -265,7 +267,7 @@ class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
         inference = self.build()
         with patch.object(inference, "baryonic_mass", side_effect=[1.0, 0.9, 5.0]):
             value = inference.LogLikelihood(self.point())
-        self.assertLess(value, -1e300)
+        assert value < -1e300
 
     def test_the_joint_posterior_is_used_as_the_prior(self):
         inference = self.build()
@@ -275,7 +277,7 @@ class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
             with patch.object(inference, "baryonic_mass", side_effect=[2.0, 1.8, 1.0]):
                 value = inference.LogLikelihood(self.point())
         logpdf.assert_called_once()
-        self.assertAlmostEqual(value, -3.0)
+        assert value == pytest.approx(-3.0)
 
     def test_the_threshold_is_the_baryonic_tov_mass_by_default(self):
         inference = self.build()
@@ -283,7 +285,7 @@ class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
             inference, "baryonic_mass", side_effect=[2.0, 1.8, 1.0]
         ) as baryonic:
             inference.LogLikelihood(self.point())
-        self.assertEqual(baryonic.call_count, 3)
+        assert baryonic.call_count == 3
 
     def test_the_kepler_limit_replaces_the_third_structure_solve(self):
         # The quasi-universal relation is cheaper than integrating the
@@ -294,7 +296,7 @@ class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
         ) as baryonic:
             with patch.object(mmc, "baryonic_Kepler_mass", return_value=1.0) as kepler:
                 inference.LogLikelihood(self.point() + [1.2, 0.05])
-        self.assertEqual(baryonic.call_count, 2)
+        assert baryonic.call_count == 2
         kepler.assert_called_once()
 
     def test_the_ejecta_and_disk_are_removed_from_the_remnant(self):
@@ -309,8 +311,8 @@ class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
             heavy_threshold = inference.LogLikelihood(
                 self.point(log10_mdisk=-3.0, log10_mej_dyn=-3.0)
             )
-        self.assertTrue(np.isfinite(light_ejecta))
-        self.assertLess(heavy_threshold, -1e300)
+        assert np.isfinite(light_ejecta)
+        assert heavy_threshold < -1e300
 
     def test_the_equation_of_state_index_is_floored_then_shifted(self):
         inference = self.build()
@@ -318,7 +320,7 @@ class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
             inference, "baryonic_mass", side_effect=[2.0, 1.8, 1.0]
         ) as baryonic:
             inference.LogLikelihood(self.point(eos=0.7))
-        self.assertEqual(baryonic.call_args.args[1], 1)
+        assert baryonic.call_args.args[1] == 1
 
     def test_the_symmetric_mass_ratio_comes_from_the_logarithmic_parameter(self):
         # Sampling the logarithm keeps the mass ratio away from the equal
@@ -331,14 +333,14 @@ class TestPostmergerLogLikelihood(PostmergerMixin, unittest.TestCase):
                 return_value=0.9,
             ) as conversion:
                 inference.LogLikelihood(self.point(eta_star=-4.0))
-        self.assertAlmostEqual(conversion.call_args.args[0], 0.25 - np.exp(-4.0))
+        assert conversion.call_args.args[0] == pytest.approx(0.25 - np.exp(-4.0))
 
 
-class TestMaximumMassResampling(unittest.TestCase):
+class TestMaximumMassResampling:
     """The script validates the prior against the chosen threshold before it
     starts sampling, and counts the tables from the directory."""
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.macro_dir = self.tmp_dir / "macro"
         self.micro_dir = self.tmp_dir / "micro"
@@ -364,7 +366,9 @@ class TestMaximumMassResampling(unittest.TestCase):
                 "log10_mej_dyn": [-2.5, -2.6],
             }
         ).to_csv(self.posterior_file, sep=" ", index=False)
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmp_dir)
 
     def args(self, **kwargs):
         defaults = dict(
@@ -381,9 +385,9 @@ class TestMaximumMassResampling(unittest.TestCase):
 
     def test_a_kepler_run_without_the_relation_priors_is_refused(self):
         # The prior file has four keys, but the Kepler threshold needs six.
-        with self.assertRaises(Exception) as caught:
+        with pytest.raises(Exception) as caught:
             mmc.maximum_mass_resampling(self.args(use_M_Kepler=True))
-        self.assertIn("ratio_R", str(caught.exception))
+        assert "ratio_R" in str(caught.value)
 
     def test_the_sampler_output_directory_is_created(self):
         # The directory is made before the sampler is imported, so it exists
@@ -393,15 +397,15 @@ class TestMaximumMassResampling(unittest.TestCase):
             mmc.maximum_mass_resampling(self.args())
         except BaseException:
             pass
-        self.assertTrue((self.tmp_dir / "pm").is_dir())
+        assert (self.tmp_dir / "pm").is_dir()
 
     def test_multinest_is_only_imported_when_the_script_runs(self):
-        self.assertFalse(hasattr(mmc, "Solver"))
+        assert not hasattr(mmc, "Solver")
 
     def test_the_table_count_is_taken_from_the_macroscopic_directory(self):
         # It counts every entry, so a stray file in that directory would be
         # counted as an equation of state.
-        self.assertEqual(len(list(self.macro_dir.iterdir())), 3)
+        assert len(list(self.macro_dir.iterdir())) == 3
 
     def test_the_entry_point_parses_its_own_arguments_when_none_are_given(self):
         with patch.object(
@@ -418,7 +422,3 @@ class TestMaximumMassResampling(unittest.TestCase):
                 mmc.main(args)
         parsing.assert_not_called()
         resampling.assert_called_once_with(args)
-
-
-if __name__ == "__main__":
-    unittest.main()

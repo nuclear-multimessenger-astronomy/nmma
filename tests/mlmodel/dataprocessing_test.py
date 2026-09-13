@@ -1,11 +1,11 @@
 import json
 import shutil
 import tempfile
-import unittest
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 try:
     import torch
@@ -16,8 +16,8 @@ try:
 except ImportError:  # pragma: no cover - torch is the optional neuralnet extra
     TORCH_AVAILABLE = False
 
-needs_torch = unittest.skipUnless(
-    TORCH_AVAILABLE, "torch is not installed; install the neuralnet extra"
+needs_torch = pytest.mark.skipif(
+    not TORCH_AVAILABLE, reason="torch is not installed; install the neuralnet extra"
 )
 
 
@@ -32,88 +32,87 @@ def lightcurve_json(num_points=20, start=0.0, step=0.25, magnitude=20.0):
 
 
 @needs_torch
-class TestModuleConstants(unittest.TestCase):
+class TestModuleConstants:
     """The pipeline is pinned to three ZTF bands on a fixed time grid,
     because the released weights were trained that way."""
 
     def test_three_bands_give_three_channels(self):
-        self.assertEqual(dataprocessing.bands, ["ztfg", "ztfr", "ztfi"])
-        self.assertEqual(dataprocessing.num_channels, 3)
+        assert dataprocessing.bands == ["ztfg", "ztfr", "ztfi"]
+        assert dataprocessing.num_channels == 3
 
     def test_the_grid_length_follows_the_span_and_the_step(self):
         # Every light curve is padded to this many points, so the number has
         # to agree with the time span the padding walks.
-        self.assertEqual(dataprocessing.num_points, 121)
-        self.assertEqual(dataprocessing.days, 30)
-        self.assertEqual(dataprocessing.time_step, 0.25)
+        assert dataprocessing.num_points == 121
+        assert dataprocessing.days == 30
+        assert dataprocessing.time_step == 0.25
 
     def test_the_detection_limit_doubles_as_the_padding_value(self):
-        self.assertEqual(dataprocessing.detection_limit, 22.0)
+        assert dataprocessing.detection_limit == 22.0
 
     def test_the_reference_times_are_ordered(self):
-        self.assertLess(dataprocessing.t_min, dataprocessing.t_zero)
-        self.assertLess(dataprocessing.t_zero, dataprocessing.t_max)
+        assert dataprocessing.t_min < dataprocessing.t_zero
+        assert dataprocessing.t_zero < dataprocessing.t_max
 
 
 @needs_torch
-class TestOpenJson(unittest.TestCase):
-    def setUp(self):
+class TestOpenJson:
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_the_contents_are_returned_as_a_dictionary(self):
         (self.tmp_dir / "lc.json").write_text(json.dumps({"ztfg": [[0.0, 20.0]]}))
         data = dataprocessing.open_json("lc.json", str(self.tmp_dir) + "/")
-        self.assertEqual(data, {"ztfg": [[0.0, 20.0]]})
+        assert data == {"ztfg": [[0.0, 20.0]]}
 
     def test_the_directory_and_the_name_are_joined_by_plain_concatenation(self):
         # There is no separator handling, so the directory argument has to
         # end in one.
         (self.tmp_dir / "lc.json").write_text("{}")
-        with self.assertRaises(FileNotFoundError):
+        with pytest.raises(FileNotFoundError):
             dataprocessing.open_json("lc.json", str(self.tmp_dir))
 
     def test_a_missing_file_is_reported(self):
-        with self.assertRaises(FileNotFoundError):
+        with pytest.raises(FileNotFoundError):
             dataprocessing.open_json("absent.json", str(self.tmp_dir) + "/")
 
 
 @needs_torch
-class TestFileNameBuilders(unittest.TestCase):
+class TestFileNameBuilders:
     """Two naming schemes exist for the generated light curve batches, one
     for the training sets and one for the test sets."""
 
     def test_the_training_names_nest_a_batch_directory(self):
         names = dataprocessing.get_names("/data", "kn", 2, 3)
-        self.assertEqual(names[0], "/data/kn_batch_2/kn_2_0.json")
-        self.assertEqual(names[2], "/data/kn_batch_2/kn_2_2.json")
+        assert names[0] == "/data/kn_batch_2/kn_2_0.json"
+        assert names[2] == "/data/kn_batch_2/kn_2_2.json"
 
     def test_one_name_is_built_per_file(self):
-        self.assertEqual(len(dataprocessing.get_names("/data", "kn", 0, 5)), 5)
+        assert len(dataprocessing.get_names("/data", "kn", 0, 5)) == 5
 
     def test_asking_for_no_files_gives_no_names(self):
-        self.assertEqual(dataprocessing.get_names("/data", "kn", 0, 0), [])
+        assert dataprocessing.get_names("/data", "kn", 0, 0) == []
 
     def test_the_test_names_are_flat(self):
         names = dataprocessing.get_test_names("/data", "kn", 1, 2)
-        self.assertEqual(names[0], "/data/kn1_0.json")
-        self.assertEqual(names[1], "/data/kn1_1.json")
+        assert names[0] == "/data/kn1_0.json"
+        assert names[1] == "/data/kn1_1.json"
 
     def test_the_two_schemes_differ(self):
-        self.assertNotEqual(
-            dataprocessing.get_names("/d", "kn", 1, 1),
-            dataprocessing.get_test_names("/d", "kn", 1, 1),
+        assert dataprocessing.get_names("/d", "kn", 1, 1) != dataprocessing.get_test_names(
+            "/d", "kn", 1, 1
         )
 
 
 @needs_torch
-class TestJsonToDataframe(unittest.TestCase):
+class TestJsonToDataframe:
     """Each generated light curve json is flattened into one table with a
     column per band, plus a detection count and a simulation number."""
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.paths = []
         for index in range(2):
@@ -121,36 +120,36 @@ class TestJsonToDataframe(unittest.TestCase):
             path.write_text(json.dumps(lightcurve_json()))
             self.paths.append(str(path))
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def test_one_table_is_returned_per_file(self):
         frames = dataprocessing.json_to_df(self.paths, 2)
-        self.assertEqual(len(frames), 2)
+        assert len(frames) == 2
 
     def test_each_band_becomes_a_column(self):
         frame = dataprocessing.json_to_df(self.paths, 1)[0]
         for band in ["ztfg", "ztfr", "ztfi"]:
-            self.assertIn(band, frame.columns, msg=band)
+            assert band in frame.columns, band
 
     def test_the_time_column_is_kept(self):
         frame = dataprocessing.json_to_df(self.paths, 1)[0]
-        self.assertIn("t", frame.columns)
-        self.assertEqual(len(frame), 20)
+        assert "t" in frame.columns
+        assert len(frame) == 20
 
     def test_the_uncertainty_column_is_dropped(self):
         frame = dataprocessing.json_to_df(self.paths, 1)[0]
-        self.assertNotIn("x", frame.columns)
+        assert "x" not in frame.columns
 
     def test_every_point_below_the_limit_counts_as_a_detection(self):
         frame = dataprocessing.json_to_df(self.paths, 1)[0]
-        self.assertEqual(frame["num_detections"].iloc[0], 3 * 20)
+        assert frame["num_detections"].iloc[0] == 3 * 20
 
     def test_points_at_the_limit_are_not_detections(self):
         path = self.tmp_dir / "faint.json"
         path.write_text(json.dumps(lightcurve_json(magnitude=22.0)))
         frame = dataprocessing.json_to_df([str(path)], 1)[0]
-        self.assertEqual(frame["num_detections"].iloc[0], 0)
+        assert frame["num_detections"].iloc[0] == 0
 
     def test_the_detection_count_is_summed_over_every_band(self):
         data = lightcurve_json(num_points=4, magnitude=22.0)
@@ -158,26 +157,26 @@ class TestJsonToDataframe(unittest.TestCase):
         path = self.tmp_dir / "mixed.json"
         path.write_text(json.dumps(data))
         frame = dataprocessing.json_to_df([str(path)], 1)[0]
-        self.assertEqual(frame["num_detections"].iloc[0], 4)
+        assert frame["num_detections"].iloc[0] == 4
 
     def test_the_detection_count_is_repeated_on_every_row(self):
         frame = dataprocessing.json_to_df(self.paths, 1)[0]
-        self.assertEqual(frame["num_detections"].nunique(), 1)
+        assert frame["num_detections"].nunique() == 1
 
     def test_each_file_gets_its_own_simulation_number(self):
         frames = dataprocessing.json_to_df(self.paths, 2)
-        self.assertEqual(frames[0]["sim_id"].iloc[0], 0)
-        self.assertEqual(frames[1]["sim_id"].iloc[0], 1)
+        assert frames[0]["sim_id"].iloc[0] == 0
+        assert frames[1]["sim_id"].iloc[0] == 1
 
     def test_a_custom_detection_limit_is_honoured(self):
         path = self.tmp_dir / "custom.json"
         path.write_text(json.dumps(lightcurve_json(magnitude=21.0)))
         frame = dataprocessing.json_to_df([str(path)], 1, detection_limit=21.0)[0]
-        self.assertEqual(frame["num_detections"].iloc[0], 0)
+        assert frame["num_detections"].iloc[0] == 0
 
 
 @needs_torch
-class TestFillerGeneration(unittest.TestCase):
+class TestFillerGeneration:
     """Padding rows carry the detection limit in every band, so a light
     curve that does not span the grid reads as a non-detection there."""
 
@@ -189,39 +188,39 @@ class TestFillerGeneration(unittest.TestCase):
 
     def test_the_leading_filler_stops_before_the_end_of_the_window(self):
         filler = dataprocessing.gen_prepend_filler(self.columns, 22.0, 0.0, 1.0, 0.25)
-        self.assertLess(filler["t"].max(), 1.0)
+        assert filler["t"].max() < 1.0
 
     def test_every_band_is_filled_with_the_limit(self):
         filler = dataprocessing.gen_prepend_filler(self.columns, 22.0, 0.0, 1.0, 0.25)
         for band in ["ztfg", "ztfr"]:
-            self.assertTrue((filler[band] == 22.0).all(), msg=band)
+            assert (filler[band] == 22.0).all(), band
 
     def test_the_column_order_is_preserved(self):
         filler = dataprocessing.gen_prepend_filler(self.columns, 22.0, 0.0, 1.0)
-        self.assertEqual(filler.columns.tolist(), self.columns)
+        assert filler.columns.tolist() == self.columns
 
     def test_an_empty_window_gives_no_filler(self):
         filler = dataprocessing.gen_prepend_filler(self.columns, 22.0, 1.0, 1.0, 0.25)
-        self.assertEqual(len(filler), 0)
+        assert len(filler) == 0
 
     def test_the_trailing_filler_is_built_from_a_count_not_a_window(self):
         # The trailing pad has to land on exactly the number of rows still
         # missing from the grid.
         filler = dataprocessing.gen_append_filler(self.columns, 22.0, 5.0, 4, 0.25)
-        self.assertEqual(len(filler), 4)
+        assert len(filler) == 4
         np.testing.assert_allclose(filler["t"], [5.0, 5.25, 5.5, 5.75])
 
     def test_the_trailing_filler_also_carries_the_limit(self):
         filler = dataprocessing.gen_append_filler(self.columns, 22.0, 5.0, 3)
-        self.assertTrue((filler["ztfg"] == 22.0).all())
+        assert (filler["ztfg"] == 22.0).all()
 
     def test_asking_for_no_trailing_rows_gives_none(self):
         filler = dataprocessing.gen_append_filler(self.columns, 22.0, 5.0, 0)
-        self.assertEqual(len(filler), 0)
+        assert len(filler) == 0
 
 
 @needs_torch
-class TestPadTheData(unittest.TestCase):
+class TestPadTheData:
     """The network needs every light curve on the same fixed-length grid, so
     observations are shifted to start at zero and padded on both ends."""
 
@@ -240,37 +239,36 @@ class TestPadTheData(unittest.TestCase):
 
     def test_the_grid_length_is_reached(self):
         padded = dataprocessing.pad_the_data(self.frame(), self.columns)
-        self.assertEqual(len(padded), dataprocessing.num_points)
+        assert len(padded) == dataprocessing.num_points
 
     def test_the_times_are_shifted_to_start_from_the_reference_time(self):
         padded = dataprocessing.pad_the_data(self.frame(), self.columns)
-        self.assertAlmostEqual(padded["t"].min(), 0.0)
+        assert padded["t"].min() == pytest.approx(0.0)
 
     def test_a_shorter_grid_can_be_requested(self):
         padded = dataprocessing.pad_the_data(
             self.frame(), self.columns, desired_count=40
         )
-        self.assertEqual(len(padded), 40)
+        assert len(padded) == 40
 
     def test_the_observations_are_kept(self):
         padded = dataprocessing.pad_the_data(self.frame(), self.columns)
-        self.assertEqual(int((padded["ztfg"] == 20.0).sum()), 20)
+        assert int((padded["ztfg"] == 20.0).sum()) == 20
 
     def test_the_padding_is_the_detection_limit(self):
         padded = dataprocessing.pad_the_data(self.frame(), self.columns)
-        self.assertEqual(
-            int((padded["ztfg"] == dataprocessing.detection_limit).sum()),
-            dataprocessing.num_points - 20,
+        assert int((padded["ztfg"] == dataprocessing.detection_limit).sum()) == (
+            dataprocessing.num_points - 20
         )
 
     def test_a_late_first_observation_is_padded_at_the_front(self):
         padded = dataprocessing.pad_the_data(self.frame(start=5.0), self.columns)
-        self.assertAlmostEqual(padded["t"].min(), 0.0)
-        self.assertEqual(padded["ztfg"].iloc[0], dataprocessing.detection_limit)
+        assert padded["t"].min() == pytest.approx(0.0)
+        assert padded["ztfg"].iloc[0] == dataprocessing.detection_limit
 
     def test_an_observation_starting_at_the_reference_time_is_not_front_padded(self):
         padded = dataprocessing.pad_the_data(self.frame(start=0.0), self.columns)
-        self.assertEqual(padded["ztfg"].iloc[0], 20.0)
+        assert padded["ztfg"].iloc[0] == 20.0
 
     def test_the_trailing_padding_continues_the_time_grid_evenly(self):
         padded = dataprocessing.pad_the_data(self.frame(start=0.0), self.columns)
@@ -286,25 +284,25 @@ class TestPadTheData(unittest.TestCase):
         padded = dataprocessing.pad_the_data(self.frame(start=5.0), self.columns)
         spacing = np.diff(padded["t"].to_numpy())
         oversized = np.flatnonzero(np.abs(spacing - 0.25) > 1e-9)
-        self.assertEqual(len(oversized), 1)
-        self.assertAlmostEqual(spacing[oversized[0]], 0.5)
+        assert len(oversized) == 1
+        assert spacing[oversized[0]] == pytest.approx(0.5)
 
     def test_a_custom_filler_value_is_used(self):
         padded = dataprocessing.pad_the_data(
             self.frame(), self.columns, filler_data=99.0
         )
-        self.assertIn(99.0, padded["ztfg"].tolist())
+        assert 99.0 in padded["ztfg"].tolist()
 
     def test_a_light_curve_already_longer_than_the_grid_is_refused(self):
         # The function asserts the final length, so it cannot trim.
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             dataprocessing.pad_the_data(
                 self.frame(num_points=200), self.columns, desired_count=121
             )
 
 
 @needs_torch
-class TestPadAllDataframes(unittest.TestCase):
+class TestPadAllDataframes:
     def test_padding_a_list_of_light_curves_fails(self):
         # pad_all_dfs calls pad_the_data(df) but that function requires a
         # column list as its second argument, so the helper raises for any
@@ -317,11 +315,11 @@ class TestPadAllDataframes(unittest.TestCase):
                 "sim_id": np.zeros(20, dtype=int),
             }
         )
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             dataprocessing.pad_all_dfs([frame])
 
     def test_an_empty_list_is_handled_because_nothing_is_padded(self):
-        self.assertEqual(dataprocessing.pad_all_dfs([]), [])
+        assert dataprocessing.pad_all_dfs([]) == []
 
 
 @needs_torch
@@ -332,11 +330,11 @@ class CsvFixtureMixin:
     num_points = 4
     num_repeats = 2
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.data_dir = str(self.tmp_dir) + "/"
 
-    def tearDown(self):
+    def teardown_method(self):
         shutil.rmtree(self.tmp_dir)
 
     def write_csv(self, name, index, num_sims=4, offset=0.0):
@@ -362,14 +360,14 @@ class CsvFixtureMixin:
 
 
 @needs_torch
-class TestLoadInData(CsvFixtureMixin, unittest.TestCase):
+class TestLoadInData(CsvFixtureMixin):
     def test_several_files_are_concatenated(self):
         self.write_csv("lc", 0)
         self.write_csv("lc", 1)
         frame = dataprocessing.load_in_data(
             self.data_dir, "lc", 2, self.num_points, self.num_repeats
         )
-        self.assertEqual(len(frame), 2 * 4 * self.num_points)
+        assert len(frame) == 2 * 4 * self.num_points
 
     def test_every_light_curve_is_renumbered_across_the_files(self):
         self.write_csv("lc", 0)
@@ -377,15 +375,15 @@ class TestLoadInData(CsvFixtureMixin, unittest.TestCase):
         frame = dataprocessing.load_in_data(
             self.data_dir, "lc", 2, self.num_points, self.num_repeats
         )
-        self.assertEqual(frame["sim_id"].nunique(), 8)
-        self.assertEqual(frame["sim_id"].tolist()[: self.num_points], [0] * 4)
+        assert frame["sim_id"].nunique() == 8
+        assert frame["sim_id"].tolist()[: self.num_points] == [0] * 4
 
     def test_light_curves_are_grouped_into_batches_of_repeats(self):
         self.write_csv("lc", 0)
         frame = dataprocessing.load_in_data(
             self.data_dir, "lc", 1, self.num_points, self.num_repeats
         )
-        self.assertEqual(frame["batch_id"].nunique(), 2)
+        assert frame["batch_id"].nunique() == 2
 
     def test_each_batch_holds_one_set_of_repeats(self):
         self.write_csv("lc", 0)
@@ -393,7 +391,7 @@ class TestLoadInData(CsvFixtureMixin, unittest.TestCase):
             self.data_dir, "lc", 1, self.num_points, self.num_repeats
         )
         counts = frame.groupby("batch_id").size().unique().tolist()
-        self.assertEqual(counts, [self.num_points * self.num_repeats])
+        assert counts == [self.num_points * self.num_repeats]
 
     def test_light_curves_beyond_a_whole_batch_are_dropped(self):
         # A partial batch cannot be reshaped into the repeat axis, so the
@@ -402,11 +400,11 @@ class TestLoadInData(CsvFixtureMixin, unittest.TestCase):
         frame = dataprocessing.load_in_data(
             self.data_dir, "lc", 1, self.num_points, self.num_repeats
         )
-        self.assertEqual(len(frame), 4 * self.num_points)
+        assert len(frame) == 4 * self.num_points
 
 
 @needs_torch
-class TestMatchFixToVar(CsvFixtureMixin, unittest.TestCase):
+class TestMatchFixToVar(CsvFixtureMixin):
     """The contrastive training needs each time-shifted light curve paired
     with its unshifted counterpart, matched on the simulation number."""
 
@@ -419,28 +417,28 @@ class TestMatchFixToVar(CsvFixtureMixin, unittest.TestCase):
 
     def test_both_halves_are_returned(self):
         fixed, varied = self.match()
-        self.assertEqual(len(fixed), len(varied))
+        assert len(fixed) == len(varied)
 
     def test_the_pairs_are_aligned_row_by_row(self):
         fixed, varied = self.match()
-        self.assertEqual(fixed["sim_id"].tolist(), varied["sim_id"].tolist())
+        assert fixed["sim_id"].tolist() == varied["sim_id"].tolist()
 
     def test_both_halves_are_numbered_and_batched_identically(self):
         fixed, varied = self.match()
-        self.assertEqual(fixed["batch_id"].tolist(), varied["batch_id"].tolist())
+        assert fixed["batch_id"].tolist() == varied["batch_id"].tolist()
 
     def test_the_merge_suffixes_are_stripped_from_the_column_names(self):
         fixed, varied = self.match()
-        self.assertIn("sim_id", fixed.columns)
-        self.assertIn("sim_id", varied.columns)
+        assert "sim_id" in fixed.columns
+        assert "sim_id" in varied.columns
 
     def test_the_suffix_stripping_also_eats_trailing_band_letters(self):
         # The columns are cleaned with rstrip("_y"), which removes any
         # trailing underscore or y rather than the two-character suffix, so
         # a column whose own name ends in y loses that letter too.
-        self.assertEqual(
-            pd.Index(["ztfy_y", "key_y", "ztfg_y"]).str.rstrip("_y").tolist(),
-            ["ztf", "ke", "ztfg"],
+        assert (
+            pd.Index(["ztfy_y", "key_y", "ztfg_y"]).str.rstrip("_y").tolist()
+            == ["ztf", "ke", "ztfg"]
         )
 
     def test_a_partial_batch_is_dropped_from_both_halves(self):
@@ -449,30 +447,30 @@ class TestMatchFixToVar(CsvFixtureMixin, unittest.TestCase):
         fixed, varied = dataprocessing.match_fix_to_var(
             self.data_dir, "var", "fix", 0, 1, self.num_points, self.num_repeats
         )
-        self.assertEqual(len(fixed), 4 * self.num_points)
-        self.assertEqual(len(varied), 4 * self.num_points)
+        assert len(fixed) == 4 * self.num_points
+        assert len(varied) == 4 * self.num_points
 
 
 @needs_torch
-class TestMatched(CsvFixtureMixin, unittest.TestCase):
+class TestMatched(CsvFixtureMixin):
     def test_the_two_halves_stay_in_one_table(self):
         self.write_csv("var", 0)
         self.write_csv("fix", 0, offset=0.5)
         frame = dataprocessing.matched(self.data_dir, "var", "fix", 0, 1)
-        self.assertEqual(len(frame), 4 * self.num_points)
-        self.assertTrue(any(column.endswith("_x") for column in frame.columns))
-        self.assertTrue(any(column.endswith("_y") for column in frame.columns))
+        assert len(frame) == 4 * self.num_points
+        assert any(column.endswith("_x") for column in frame.columns)
+        assert any(column.endswith("_y") for column in frame.columns)
 
     def test_several_files_are_concatenated(self):
         for index in range(2):
             self.write_csv("var", index)
             self.write_csv("fix", index, offset=0.5)
         frame = dataprocessing.matched(self.data_dir, "var", "fix", 0, 2)
-        self.assertEqual(len(frame), 2 * 4 * self.num_points)
+        assert len(frame) == 2 * 4 * self.num_points
 
 
 @needs_torch
-class TestAddBatchSimNumbers(unittest.TestCase):
+class TestAddBatchSimNumbers:
     """Numbering is rewritten in place after a table has been split or
     recombined, so the batch axis still lines up with the repeats."""
 
@@ -481,32 +479,31 @@ class TestAddBatchSimNumbers(unittest.TestCase):
 
     def test_the_numbers_are_added_in_place(self):
         frame = self.frame()
-        self.assertIsNone(
+        assert (
             dataprocessing.add_batch_sim_nums_all(frame, num_points=4, num_repeats=2)
+            is None
         )
-        self.assertIn("sim_id", frame.columns)
-        self.assertIn("batch_id", frame.columns)
+        assert "sim_id" in frame.columns
+        assert "batch_id" in frame.columns
 
     def test_one_simulation_number_is_given_per_block_of_points(self):
         frame = self.frame()
         dataprocessing.add_batch_sim_nums_all(frame, num_points=4, num_repeats=2)
-        self.assertEqual(
-            frame["sim_id"].tolist(), [0] * 4 + [1] * 4 + [2] * 4 + [3] * 4
-        )
+        assert frame["sim_id"].tolist() == [0] * 4 + [1] * 4 + [2] * 4 + [3] * 4
 
     def test_one_batch_number_is_given_per_set_of_repeats(self):
         frame = self.frame()
         dataprocessing.add_batch_sim_nums_all(frame, num_points=4, num_repeats=2)
-        self.assertEqual(frame["batch_id"].tolist(), [0] * 8 + [1] * 8)
+        assert frame["batch_id"].tolist() == [0] * 8 + [1] * 8
 
     def test_a_table_that_is_not_a_whole_number_of_batches_is_refused(self):
         frame = self.frame(num_sims=3)
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             dataprocessing.add_batch_sim_nums_all(frame, num_points=4, num_repeats=2)
 
 
 @needs_torch
-class TestRepeatedDataframeToTensor(unittest.TestCase):
+class TestRepeatedDataframeToTensor:
     """The final step before training: each batch becomes a tensor with the
     repeat axis first and the bands as channels."""
 
@@ -514,14 +511,13 @@ class TestRepeatedDataframeToTensor(unittest.TestCase):
     num_repeats = 2
     num_batches = 2
 
-    def setUp(self):
+    def setup_method(self):
         self.original_points = dataprocessing.num_points
         self.original_repeats = dataprocessing.num_repeats
         dataprocessing.num_points = self.num_points
         dataprocessing.num_repeats = self.num_repeats
-        self.addCleanup(self.restore)
 
-    def restore(self):
+    def teardown_method(self):
         dataprocessing.num_points = self.original_points
         dataprocessing.num_repeats = self.original_repeats
 
@@ -547,27 +543,25 @@ class TestRepeatedDataframeToTensor(unittest.TestCase):
         )
 
     def test_four_lists_are_returned(self):
-        self.assertEqual(len(self.convert()), 4)
+        assert len(self.convert()) == 4
 
     def test_one_tensor_is_produced_per_batch(self):
         for entry in self.convert():
-            self.assertEqual(len(entry), self.num_batches)
+            assert len(entry) == self.num_batches
 
     def test_the_light_curves_carry_the_bands_as_channels(self):
         shifted, unshifted, _, _ = self.convert()
         for tensor in [shifted[0], unshifted[0]]:
-            self.assertEqual(
-                tuple(tensor.shape), (self.num_repeats, 3, self.num_points)
-            )
+            assert tuple(tensor.shape) == (self.num_repeats, 3, self.num_points)
 
     def test_the_parameters_carry_one_row_per_repeat(self):
         _, _, shifted_parameters, unshifted_parameters = self.convert()
         for tensor in [shifted_parameters[0], unshifted_parameters[0]]:
-            self.assertEqual(tuple(tensor.shape), (self.num_repeats, 1, 5))
+            assert tuple(tensor.shape) == (self.num_repeats, 1, 5)
 
     def test_the_tensors_are_single_precision_floats(self):
         for entry in self.convert():
-            self.assertEqual(entry[0].dtype, torch.float32)
+            assert entry[0].dtype == torch.float32
 
     def test_the_band_values_survive_the_reshape(self):
         shifted, _, _, _ = self.convert()
@@ -581,11 +575,11 @@ class TestRepeatedDataframeToTensor(unittest.TestCase):
         # The shifted table carries one extra leading column, so the
         # parameter block sits one position further along.
         _, _, shifted_parameters, unshifted_parameters = self.convert()
-        self.assertFalse(torch.equal(shifted_parameters[0], unshifted_parameters[0]))
+        assert not torch.equal(shifted_parameters[0], unshifted_parameters[0])
 
 
 @needs_torch
-class TestPaperDataset(unittest.TestCase):
+class TestPaperDataset:
     """The dataset the training loops iterate over. It yields parameters and
     light curves for both the shifted and unshifted halves."""
 
@@ -601,10 +595,10 @@ class TestPaperDataset(unittest.TestCase):
         )
 
     def test_the_length_is_the_number_of_batches(self):
-        self.assertEqual(len(self.build(num_batches=3)), 3)
+        assert len(self.build(num_batches=3)) == 3
 
     def test_an_item_is_a_four_tuple(self):
-        self.assertEqual(len(self.build()[0]), 4)
+        assert len(self.build()[0]) == 4
 
     def test_the_parameters_come_before_the_light_curves(self):
         # The training loops unpack in this order, so it is part of the
@@ -621,16 +615,12 @@ class TestPaperDataset(unittest.TestCase):
     def test_every_batch_can_be_reached(self):
         dataset = self.build(num_batches=3)
         for index in range(len(dataset)):
-            self.assertEqual(len(dataset[index]), 4)
+            assert len(dataset[index]) == 4
 
     def test_it_works_as_a_torch_dataset(self):
         from torch.utils.data import DataLoader
 
         loader = DataLoader(self.build(num_batches=2), batch_size=1)
         batches = list(loader)
-        self.assertEqual(len(batches), 2)
-        self.assertEqual(tuple(batches[0][2].shape), (1, 2, 3, 4))
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert len(batches) == 2
+        assert tuple(batches[0][2].shape) == (1, 2, 3, 4)

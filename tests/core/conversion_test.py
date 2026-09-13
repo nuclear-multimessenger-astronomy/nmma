@@ -1,7 +1,6 @@
-import unittest
-
 import numpy as np
 import pandas as pd
+import pytest
 from astropy import cosmology as astropy_cosmology
 
 from nmma.core import constants
@@ -9,14 +8,14 @@ from nmma.core import conversion
 from nmma.core.constants import geom_msun_km, msun_s
 
 
-class TestValToScalar(unittest.TestCase):
+class TestValToScalar:
     def test_a_scalar_is_passed_through(self):
-        self.assertEqual(conversion.val_to_scalar(3.0), 3.0)
+        assert conversion.val_to_scalar(3.0) == 3.0
 
     def test_a_single_element_array_becomes_a_python_scalar(self):
         value = conversion.val_to_scalar(np.array([3.0]))
-        self.assertEqual(value, 3.0)
-        self.assertIsInstance(value, float)
+        assert value == 3.0
+        assert isinstance(value, float)
 
     def test_a_multi_element_array_is_left_as_an_array(self):
         np.testing.assert_allclose(
@@ -24,37 +23,33 @@ class TestValToScalar(unittest.TestCase):
         )
 
     def test_a_list_of_one_becomes_a_scalar(self):
-        self.assertEqual(conversion.val_to_scalar([2.5]), 2.5)
+        assert conversion.val_to_scalar([2.5]) == 2.5
 
 
-class TestDistanceConversions(unittest.TestCase):
-    def setUp(self):
+class TestDistanceConversions:
+    def setup_method(self):
         self.original_cosmology = constants.get_cosmology()
 
-    def tearDown(self):
+    def teardown_method(self):
         constants.set_cosmology(self.original_cosmology)
 
     def test_distance_modulus_matches_its_definition(self):
         # mag_app - mag_abs = 5 log10(d / 10 pc), with d in Mpc
-        self.assertAlmostEqual(
-            conversion.distance_modulus_nmma(40.0), 5.0 * np.log10(40e6 / 10.0)
-        )
+        assert conversion.distance_modulus_nmma(40.0) == pytest.approx(5.0 * np.log10(40e6 / 10.0))
 
     def test_distance_modulus_at_ten_parsec_is_zero(self):
-        self.assertAlmostEqual(conversion.distance_modulus_nmma(1e-5), 0.0)
+        assert conversion.distance_modulus_nmma(1e-5) == pytest.approx(0.0)
 
     def test_luminosity_distance_to_redshift_inverts_the_cosmology(self):
         cosmology = constants.get_cosmology()
         distance = cosmology.luminosity_distance(0.05).value
-        self.assertAlmostEqual(
-            conversion.luminosity_distance_to_redshift(distance), 0.05, places=6
-        )
+        assert conversion.luminosity_distance_to_redshift(distance) == pytest.approx(0.05, abs=1.5 * 10**(-6))
 
     def test_luminosity_distance_to_redshift_accepts_a_pandas_series(self):
         distances = pd.Series([40.0, 100.0])
         redshifts = conversion.luminosity_distance_to_redshift(distances)
-        self.assertEqual(len(redshifts), 2)
-        self.assertLess(redshifts[0], redshifts[1])
+        assert len(redshifts) == 2
+        assert redshifts[0] < redshifts[1]
 
     def test_many_distances_go_through_the_interpolated_grid(self):
         # more than 50 entries switches to the interpolation branch; it has
@@ -69,46 +64,43 @@ class TestDistanceConversions(unittest.TestCase):
     def test_get_cosmo_grids_spans_the_requested_range(self):
         cosmology = constants.get_cosmology()
         dist_grid, z_grid = conversion.get_cosmo_grids(40.0, 400.0, cosmology)
-        self.assertEqual(len(dist_grid), 50)
-        self.assertAlmostEqual(dist_grid[0], 40.0, places=3)
-        self.assertAlmostEqual(dist_grid[-1], 400.0, places=3)
-        self.assertTrue(np.all(np.diff(z_grid) > 0))
+        assert len(dist_grid) == 50
+        assert dist_grid[0] == pytest.approx(40.0, abs=1.5 * 10**(-3))
+        assert dist_grid[-1] == pytest.approx(400.0, abs=1.5 * 10**(-3))
+        assert np.all(np.diff(z_grid) > 0)
 
     def test_get_redshift_prefers_an_explicit_redshift(self):
-        self.assertEqual(
-            conversion.get_redshift({"redshift": 0.1, "luminosity_distance": 40.0}), 0.1
-        )
+        assert conversion.get_redshift({"redshift": 0.1, "luminosity_distance": 40.0}) == 0.1
 
     def test_get_redshift_falls_back_to_the_luminosity_distance(self):
-        self.assertAlmostEqual(
-            conversion.get_redshift({"luminosity_distance": 40.0}),
-            conversion.luminosity_distance_to_redshift(40.0),
-        )
+        assert conversion.get_redshift(
+            {"luminosity_distance": 40.0}
+        ) == pytest.approx(conversion.luminosity_distance_to_redshift(40.0))
 
     def test_get_redshift_without_distance_information_is_zero(self):
         redshift = conversion.get_redshift({"mass_1": np.array([1.4, 1.3])})
         np.testing.assert_allclose(redshift, [0.0, 0.0])
 
 
-class TestCosmologyToDistance(unittest.TestCase):
-    def setUp(self):
+class TestCosmologyToDistance:
+    def setup_method(self):
         self.original_cosmology = constants.get_cosmology()
 
-    def tearDown(self):
+    def teardown_method(self):
         constants.set_cosmology(self.original_cosmology)
 
     def test_redshift_is_derived_from_the_distance(self):
         parameters = conversion.cosmology_to_distance(
             {"Hubble_constant": 70.0, "luminosity_distance": 40.0}
         )
-        self.assertIn("redshift", parameters)
-        self.assertGreater(parameters["redshift"], 0.0)
+        assert "redshift" in parameters
+        assert parameters["redshift"] > 0.0
 
     def test_distance_is_derived_from_the_redshift(self):
         parameters = conversion.cosmology_to_distance(
             {"Hubble_constant": 70.0, "redshift": 0.01}
         )
-        self.assertAlmostEqual(parameters["luminosity_distance"], 43.1546, places=3)
+        assert parameters["luminosity_distance"] == pytest.approx(43.1546, abs=1.5 * 10**(-3))
 
     def test_a_larger_hubble_constant_gives_a_smaller_distance(self):
         low = conversion.cosmology_to_distance(
@@ -117,7 +109,7 @@ class TestCosmologyToDistance(unittest.TestCase):
         high = conversion.cosmology_to_distance(
             {"Hubble_constant": 80.0, "redshift": 0.01}
         )["luminosity_distance"]
-        self.assertGreater(low, high)
+        assert low > high
 
     def test_omega_matter_is_honoured(self):
         first = conversion.cosmology_to_distance(
@@ -126,10 +118,10 @@ class TestCosmologyToDistance(unittest.TestCase):
         second = conversion.cosmology_to_distance(
             {"Hubble_constant": 70.0, "Omega_matter": 0.4, "redshift": 0.5}
         )["luminosity_distance"]
-        self.assertNotAlmostEqual(first, second)
+        assert first != pytest.approx(second)
 
     def test_neither_redshift_nor_distance_raises(self):
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             conversion.cosmology_to_distance({"Hubble_constant": 70.0})
 
     def test_array_valued_hubble_constant_takes_the_per_sample_branch(self):
@@ -142,8 +134,8 @@ class TestCosmologyToDistance(unittest.TestCase):
             }
         )
         distances = parameters["luminosity_distance"]
-        self.assertEqual(len(distances), 2)
-        self.assertGreater(distances[0], distances[1])
+        assert len(distances) == 2
+        assert distances[0] > distances[1]
 
     def test_array_valued_hubble_constant_with_distances_gives_redshifts(self):
         parameters = conversion.cosmology_to_distance(
@@ -153,79 +145,79 @@ class TestCosmologyToDistance(unittest.TestCase):
             }
         )
         redshifts = parameters["redshift"]
-        self.assertEqual(len(redshifts), 2)
-        self.assertLess(redshifts[0], redshifts[1])
+        assert len(redshifts) == 2
+        assert redshifts[0] < redshifts[1]
 
 
-class TestSourceFrameMasses(unittest.TestCase):
+class TestSourceFrameMasses:
     def test_source_masses_are_redshifted_detector_masses(self):
         parameters = conversion.source_frame_masses(
             {"mass_1": 1.5, "mass_2": 1.3, "redshift": 0.1}
         )
-        self.assertAlmostEqual(float(parameters["mass_1_source"]), 1.5 / 1.1)
-        self.assertAlmostEqual(float(parameters["mass_2_source"]), 1.3 / 1.1)
+        assert float(parameters["mass_1_source"]) == pytest.approx(1.5 / 1.1)
+        assert float(parameters["mass_2_source"]) == pytest.approx(1.3 / 1.1)
 
     def test_redshift_is_computed_from_the_distance_when_absent(self):
         parameters = conversion.source_frame_masses(
             {"mass_1": 1.5, "mass_2": 1.3, "luminosity_distance": 100.0}
         )
-        self.assertIn("redshift", parameters)
-        self.assertLess(float(parameters["mass_1_source"]), 1.5)
+        assert "redshift" in parameters
+        assert float(parameters["mass_1_source"]) < 1.5
 
     def test_existing_source_masses_are_not_overwritten(self):
         parameters = conversion.source_frame_masses(
             {"mass_1": 1.5, "mass_2": 1.3, "redshift": 0.1, "mass_1_source": 99.0}
         )
-        self.assertEqual(parameters["mass_1_source"], 99.0)
+        assert parameters["mass_1_source"] == 99.0
 
     def test_derived_mass_parameters_are_added(self):
         parameters = conversion.source_frame_masses(
             {"mass_1": 1.5, "mass_2": 1.3, "redshift": 0.0}
         )
         for key in ["chirp_mass", "total_mass", "mass_ratio", "symmetric_mass_ratio"]:
-            self.assertIn(key, parameters)
+            assert key in parameters
 
 
-class TestObservationAngleConversion(unittest.TestCase):
+class TestObservationAngleConversion:
     def test_theta_jn_is_converted_to_degrees(self):
         parameters = conversion.observation_angle_conversion({"theta_jn": np.pi / 4})
-        self.assertAlmostEqual(parameters["KNtheta"], 45.0)
-        self.assertAlmostEqual(parameters["inclination_EM"], np.pi / 4)
+        assert parameters["KNtheta"] == pytest.approx(45.0)
+        assert parameters["inclination_EM"] == pytest.approx(np.pi / 4)
 
     def test_angles_above_ninety_degrees_are_folded_back(self):
         # the kilonova is symmetric about the orbital plane, so theta and
         # pi - theta are the same viewing geometry
         parameters = conversion.observation_angle_conversion({"theta_jn": 0.75 * np.pi})
-        self.assertAlmostEqual(parameters["KNtheta"], 45.0)
+        assert parameters["KNtheta"] == pytest.approx(45.0)
 
     def test_cos_theta_jn_is_accepted(self):
         parameters = conversion.observation_angle_conversion({"cos_theta_jn": 0.0})
-        self.assertAlmostEqual(parameters["KNtheta"], 90.0)
+        assert parameters["KNtheta"] == pytest.approx(90.0)
 
     def test_inclination_em_takes_precedence(self):
         parameters = conversion.observation_angle_conversion(
             {"theta_jn": np.pi / 4, "inclination_EM": np.pi / 6}
         )
-        self.assertAlmostEqual(parameters["KNtheta"], 30.0)
+        assert parameters["KNtheta"] == pytest.approx(30.0)
 
     def test_kntheta_is_converted_back_to_radians(self):
         parameters = conversion.observation_angle_conversion({"KNtheta": 60.0})
-        self.assertAlmostEqual(parameters["inclination_EM"], np.pi / 3)
+        assert parameters["inclination_EM"] == pytest.approx(np.pi / 3)
 
     def test_no_angle_information_gives_an_on_axis_view(self):
         parameters = conversion.observation_angle_conversion({"mass_1": 1.4})
-        self.assertAlmostEqual(parameters["KNtheta"], 0.0)
-        self.assertAlmostEqual(parameters["inclination_EM"], 0.0)
+        assert parameters["KNtheta"] == pytest.approx(0.0)
+        assert parameters["inclination_EM"] == pytest.approx(0.0)
 
 
-class TestMassConversions(unittest.TestCase):
+class TestMassConversions:
     def test_source_frame_helpers_add_component_masses(self):
         for func in [conversion.bbh_source_frame, conversion.bns_source_frame]:
             parameters = func(
                 {"chirp_mass": 1.2, "mass_ratio": 0.9, "luminosity_distance": 40.0}
             )
-            self.assertIn("mass_1_source", parameters, msg=func.__name__)
-            self.assertIn("mass_2_source", parameters, msg=func.__name__)
+            assert "mass_1_source" in parameters, func.__name__
+            assert "mass_2_source" in parameters, func.__name__
 
     def test_bns_source_frame_keeps_tidal_parameters(self):
         parameters = conversion.bns_source_frame(
@@ -237,29 +229,29 @@ class TestMassConversions(unittest.TestCase):
                 "lambda_2": 600.0,
             }
         )
-        self.assertIn("lambda_1", parameters)
+        assert "lambda_1" in parameters
 
     def test_mass_ratio_to_eta_peaks_at_equal_masses(self):
-        self.assertAlmostEqual(conversion.mass_ratio_to_eta(1.0), 0.25)
-        self.assertLess(conversion.mass_ratio_to_eta(0.5), 0.25)
+        assert conversion.mass_ratio_to_eta(1.0) == pytest.approx(0.25)
+        assert conversion.mass_ratio_to_eta(0.5) < 0.25
 
     def test_component_masses_to_mass_quantities(self):
         chirp_mass, eta, mass_ratio = conversion.component_masses_to_mass_quantities(
             2.0, 2.0
         )
-        self.assertAlmostEqual(eta, 0.25)
-        self.assertAlmostEqual(mass_ratio, 1.0)
-        self.assertAlmostEqual(chirp_mass, 4.0 * 0.25**0.6)
+        assert eta == pytest.approx(0.25)
+        assert mass_ratio == pytest.approx(1.0)
+        assert chirp_mass == pytest.approx(4.0 * 0.25**0.6)
 
     def test_chirp_mass_and_eta_round_trip_through_component_masses(self):
         mass_1, mass_2 = conversion.chirp_mass_and_eta_to_component_masses(1.2, 0.24)
         chirp_mass, eta, _ = conversion.component_masses_to_mass_quantities(mass_1, mass_2)
-        self.assertAlmostEqual(chirp_mass, 1.2)
-        self.assertAlmostEqual(eta, 0.24)
+        assert chirp_mass == pytest.approx(1.2)
+        assert eta == pytest.approx(0.24)
 
     def test_chirp_mass_and_eta_to_component_masses_orders_the_masses(self):
         mass_1, mass_2 = conversion.chirp_mass_and_eta_to_component_masses(1.2, 0.24)
-        self.assertGreaterEqual(mass_1, mass_2)
+        assert mass_1 >= mass_2
 
     def test_effective_tidal_deformabilities_for_equal_masses(self):
         # for lambda_1 == lambda_2 and q == 1, lambda_tilde reduces to lambda
@@ -269,8 +261,8 @@ class TestMassConversions(unittest.TestCase):
                 500.0, 500.0, 1.0
             )
         )
-        self.assertAlmostEqual(lambda_tilde, 500.0)
-        self.assertAlmostEqual(dlambda_tilde, 0.0)
+        assert lambda_tilde == pytest.approx(500.0)
+        assert dlambda_tilde == pytest.approx(0.0)
 
     def test_effective_tidal_deformability_grows_with_the_deformabilities(self):
         small, _ = (
@@ -283,7 +275,7 @@ class TestMassConversions(unittest.TestCase):
                 800.0, 800.0, 0.9
             )
         )
-        self.assertGreater(large, small)
+        assert large > small
 
     def test_reweight_to_flat_mass_prior_thins_the_dataframe(self):
         rng = np.random.default_rng(0)
@@ -294,74 +286,59 @@ class TestMassConversions(unittest.TestCase):
             }
         )
         reweighted = conversion.reweight_to_flat_mass_prior(df)
-        self.assertEqual(len(reweighted), 300)
-        self.assertTrue(set(reweighted.columns) == set(df.columns))
+        assert len(reweighted) == 300
+        assert set(reweighted.columns) == set(df.columns)
 
     def test_convert_mtot_mni_fills_linear_masses(self):
         parameters = conversion.convert_mtot_mni(
             {"log10_mni": -1.0, "log10_mtot": 0.0, "log10_mrp": -2.0, "xmix": 0.5}
         )
-        self.assertAlmostEqual(parameters["mni"], 0.1)
-        self.assertAlmostEqual(parameters["mtot"], 1.0)
-        self.assertAlmostEqual(parameters["mrp"], 0.01)
-        self.assertAlmostEqual(parameters["mni_c"], 0.1)
-        self.assertAlmostEqual(parameters["mrp_c"], 0.5 * (1.0 - 0.1) - 0.01)
+        assert parameters["mni"] == pytest.approx(0.1)
+        assert parameters["mtot"] == pytest.approx(1.0)
+        assert parameters["mrp"] == pytest.approx(0.01)
+        assert parameters["mni_c"] == pytest.approx(0.1)
+        assert parameters["mrp_c"] == pytest.approx(0.5 * (1.0 - 0.1) - 0.01)
 
     def test_convert_mtot_mni_keeps_explicit_linear_masses(self):
         parameters = conversion.convert_mtot_mni(
             {"mni": 0.2, "mtot": 1.0, "mrp": 0.01, "xmix": 0.5}
         )
-        self.assertAlmostEqual(parameters["mni_c"], 0.2)
+        assert parameters["mni_c"] == pytest.approx(0.2)
 
 
-class TestPulsarTimingConversions(unittest.TestCase):
+class TestPulsarTimingConversions:
     def test_binary_mass_function_definition(self):
-        self.assertAlmostEqual(
-            conversion.binary_mass_function(1.4, 1.1, 0.9),
-            (1.1 * 0.9) ** 3 / (1.4 + 1.1) ** 2,
-        )
+        assert conversion.binary_mass_function(1.4, 1.1, 0.9) == pytest.approx((1.1 * 0.9) ** 3 / (1.4 + 1.1) ** 2)
 
     def test_mass_function_inverts_back_to_sin_i(self):
         mass_function = conversion.binary_mass_function(1.4, 1.1, 0.9)
-        self.assertAlmostEqual(
-            conversion.mass_parameters_to_sini(1.4 + 1.1, mass_function, 1.1), 0.9
-        )
+        assert conversion.mass_parameters_to_sini(1.4 + 1.1, mass_function, 1.1) == pytest.approx(0.9)
 
     def test_shapiro_delay_is_edge_on_maximal(self):
         edge_on = conversion.shapiro_delay(1.1, 1.0)
         inclined = conversion.shapiro_delay(1.1, 0.5)
-        self.assertGreater(edge_on, inclined)
+        assert edge_on > inclined
 
     def test_shapiro_delay_scales_with_the_companion_mass(self):
-        self.assertAlmostEqual(
-            conversion.shapiro_delay(2.0, 1.0) / conversion.shapiro_delay(1.0, 1.0), 2.0
-        )
+        assert conversion.shapiro_delay(2.0, 1.0) / conversion.shapiro_delay(1.0, 1.0) == pytest.approx(2.0)
 
     def test_shapiro_delay_units_are_microseconds(self):
         # range = msun_s * m_comp, expressed in microseconds
-        self.assertAlmostEqual(conversion.shapiro_delay(1.0, 1.0), msun_s * 1e6)
+        assert conversion.shapiro_delay(1.0, 1.0) == pytest.approx(msun_s * 1e6)
 
     def test_einstein_delay_orbital_factor_vanishes_for_a_circular_orbit(self):
-        self.assertAlmostEqual(
-            conversion.einstein_delay_orbital_factor(1e5, 0.0), 0.0
-        )
+        assert conversion.einstein_delay_orbital_factor(1e5, 0.0) == pytest.approx(0.0)
 
     def test_einstein_delay_grows_with_eccentricity(self):
-        self.assertGreater(
-            conversion.einstein_delay(1.4, 1.1, 1e5, 0.5),
-            conversion.einstein_delay(1.4, 1.1, 1e5, 0.1),
-        )
+        assert conversion.einstein_delay(1.4, 1.1, 1e5, 0.5) > conversion.einstein_delay(1.4, 1.1, 1e5, 0.1)
 
     def test_einstein_delay_composes_its_two_factors(self):
         factor = conversion.einstein_delay_orbital_factor(1e5, 0.3)
-        self.assertAlmostEqual(
-            conversion.einstein_delay(1.4, 1.1, 1e5, 0.3),
-            conversion.simplified_einstein_delay(1.4, 1.1, factor),
-        )
+        assert conversion.einstein_delay(1.4, 1.1, 1e5, 0.3) == pytest.approx(conversion.simplified_einstein_delay(1.4, 1.1, factor))
 
 
-class TestEOSConversions(unittest.TestCase):
-    def setUp(self):
+class TestEOSConversions:
+    def setup_method(self):
         # a monotonic stand-in mass-radius-lambda sequence; the TOV point is
         # the maximum of the mass column
         self.masses = np.array([1.0, 1.4, 1.6, 2.0, 1.9])
@@ -372,15 +349,15 @@ class TestEOSConversions(unittest.TestCase):
         tov_mass, tov_radius, r14, r16 = conversion.EOS_to_ns_parameters(
             self.radii, self.masses, self.lambdas
         )
-        self.assertAlmostEqual(tov_mass, 2.0)
-        self.assertAlmostEqual(tov_radius, 12.0)
+        assert tov_mass == pytest.approx(2.0)
+        assert tov_radius == pytest.approx(12.0)
 
     def test_canonical_radii_are_interpolated_at_1_4_and_1_6(self):
         _, _, r14, r16 = conversion.EOS_to_ns_parameters(
             self.radii, self.masses, self.lambdas
         )
-        self.assertAlmostEqual(r14, 12.4)
-        self.assertAlmostEqual(r16, 12.5)
+        assert r14 == pytest.approx(12.4)
+        assert r16 == pytest.approx(12.5)
 
     def test_system_parameters_are_interpolated_for_both_components(self):
         masses = np.array([1.0, 1.4, 1.6, 2.0])
@@ -389,10 +366,10 @@ class TestEOSConversions(unittest.TestCase):
         lambda_1, lambda_2, radius_1, radius_2 = conversion.EOS_to_system_parameters(
             radii, masses, lambdas, 1.6, 1.4
         )
-        self.assertAlmostEqual(lambda_1, 300.0)
-        self.assertAlmostEqual(lambda_2, 500.0)
-        self.assertAlmostEqual(radius_1, 12.5)
-        self.assertAlmostEqual(radius_2, 12.4)
+        assert lambda_1 == pytest.approx(300.0)
+        assert lambda_2 == pytest.approx(500.0)
+        assert radius_1 == pytest.approx(12.5)
+        assert radius_2 == pytest.approx(12.4)
 
     def test_a_mass_outside_the_tabulated_range_gives_zero_radius(self):
         # the 0 radius is the sentinel the ejecta fitting uses to decide a
@@ -403,32 +380,29 @@ class TestEOSConversions(unittest.TestCase):
         lambda_1, _, radius_1, _ = conversion.EOS_to_system_parameters(
             radii, masses, lambdas, 2.5, 1.4
         )
-        self.assertEqual(radius_1, 0.0)
-        self.assertEqual(lambda_1, 0.0)
+        assert radius_1 == 0.0
+        assert lambda_1 == 0.0
 
     def test_lambda_to_compactness_decreases_with_deformability(self):
-        self.assertGreater(
-            conversion.lambda_to_compactness(100.0),
-            conversion.lambda_to_compactness(1000.0),
-        )
+        assert conversion.lambda_to_compactness(100.0) > conversion.lambda_to_compactness(1000.0)
 
     def test_lambda_to_compactness_is_in_a_physical_range(self):
         compactness = conversion.lambda_to_compactness(400.0)
-        self.assertTrue(0.1 < compactness < 0.25)
+        assert 0.1 < compactness < 0.25
 
     def test_mass_and_compactness_to_radius_inverts_the_compactness(self):
         radius = conversion.mass_and_compactness_to_radius(1.4, 0.16)
-        self.assertAlmostEqual(radius, 1.4 / 0.16 * geom_msun_km)
+        assert radius == pytest.approx(1.4 / 0.16 * geom_msun_km)
 
     def test_a_black_hole_compactness_gives_zero_radius(self):
-        self.assertEqual(conversion.mass_and_compactness_to_radius(1.4, 0.6), 0.0)
+        assert conversion.mass_and_compactness_to_radius(1.4, 0.6) == 0.0
 
     def test_mass_and_compactness_to_radius_is_vectorised(self):
         radii = conversion.mass_and_compactness_to_radius(
             np.array([1.4, 1.4]), np.array([0.16, 0.6])
         )
-        self.assertGreater(radii[0], 0.0)
-        self.assertEqual(radii[1], 0.0)
+        assert radii[0] > 0.0
+        assert radii[1] == 0.0
 
     def test_radii_from_qur_adds_radii_and_the_canonical_radius(self):
         parameters = conversion.radii_from_qur(
@@ -439,9 +413,9 @@ class TestEOSConversions(unittest.TestCase):
                 "lambda_2": 600.0,
             }
         )
-        self.assertGreater(parameters["radius_1"], 8.0)
-        self.assertLess(parameters["radius_1"], 20.0)
-        self.assertGreater(parameters["R_16"], 0.0)
+        assert parameters["radius_1"] > 8.0
+        assert parameters["radius_1"] < 20.0
+        assert parameters["R_16"] > 0.0
 
     def test_radii_from_qur_gives_the_softer_star_the_smaller_radius(self):
         parameters = conversion.radii_from_qur(
@@ -452,15 +426,15 @@ class TestEOSConversions(unittest.TestCase):
                 "lambda_2": 800.0,
             }
         )
-        self.assertLess(parameters["radius_1"], parameters["radius_2"])
+        assert parameters["radius_1"] < parameters["radius_2"]
 
 
-class TestGRBJetConversions(unittest.TestCase):
+class TestGRBJetConversions:
     def test_gaussian_jet_isotropic_equivalent_exceeds_the_true_energy(self):
         e_iso = conversion.gaussian_jet_energy_to_central_isotropic_energy_equivalent(
             1e50, 0.1, 4.0
         )
-        self.assertGreater(e_iso, 1e50)
+        assert e_iso > 1e50
 
     def test_gaussian_jet_energy_scales_linearly(self):
         first = conversion.gaussian_jet_energy_to_central_isotropic_energy_equivalent(
@@ -469,7 +443,7 @@ class TestGRBJetConversions(unittest.TestCase):
         second = conversion.gaussian_jet_energy_to_central_isotropic_energy_equivalent(
             2e50, 0.1, 4.0
         )
-        self.assertAlmostEqual(second / first, 2.0)
+        assert second / first == pytest.approx(2.0)
 
     def test_gaussian_jet_result_is_real(self):
         # the expression is evaluated with complex error functions whose
@@ -477,8 +451,8 @@ class TestGRBJetConversions(unittest.TestCase):
         e_iso = conversion.gaussian_jet_energy_to_central_isotropic_energy_equivalent(
             1e50, 0.1, 4.0
         )
-        self.assertIsInstance(float(e_iso), float)
-        self.assertTrue(np.isfinite(e_iso))
+        assert isinstance(float(e_iso), float)
+        assert np.isfinite(e_iso)
 
     def test_a_narrower_core_concentrates_more_energy_on_axis(self):
         narrow = conversion.gaussian_jet_energy_to_central_isotropic_energy_equivalent(
@@ -487,13 +461,13 @@ class TestGRBJetConversions(unittest.TestCase):
         wide = conversion.gaussian_jet_energy_to_central_isotropic_energy_equivalent(
             1e50, 0.2, 4.0
         )
-        self.assertGreater(narrow, wide)
+        assert narrow > wide
 
     def test_powerlaw_jet_isotropic_equivalent_exceeds_the_true_energy(self):
         e_iso = conversion.powerlaw_jet_energy_to_central_isotropic_energy_equivalent(
             1e50, 0.1, 4.0, 2.0
         )
-        self.assertGreater(e_iso, 1e50)
+        assert e_iso > 1e50
 
     def test_powerlaw_jet_energy_scales_linearly(self):
         first = conversion.powerlaw_jet_energy_to_central_isotropic_energy_equivalent(
@@ -502,7 +476,7 @@ class TestGRBJetConversions(unittest.TestCase):
         second = conversion.powerlaw_jet_energy_to_central_isotropic_energy_equivalent(
             3e50, 0.1, 4.0, 2.0
         )
-        self.assertAlmostEqual(second / first, 3.0)
+        assert second / first == pytest.approx(3.0)
 
     def test_a_steeper_powerlaw_tail_concentrates_more_energy_on_axis(self):
         steep = conversion.powerlaw_jet_energy_to_central_isotropic_energy_equivalent(
@@ -511,66 +485,57 @@ class TestGRBJetConversions(unittest.TestCase):
         shallow = conversion.powerlaw_jet_energy_to_central_isotropic_energy_equivalent(
             1e50, 0.1, 4.0, 1.0
         )
-        self.assertGreater(steep, shallow)
+        assert steep > shallow
 
 
-class TestEjectaFittingBase(unittest.TestCase):
+class TestEjectaFittingBase:
     def test_the_base_class_produces_no_ejecta(self):
         parameters = conversion.EjectaFitting()({"mass_1": 1.4})
         for key in conversion.EjectaFitting.mass_fitting_keys:
-            self.assertEqual(parameters[key], -np.inf)
+            assert parameters[key] == -np.inf
 
     def test_explicitly_sampled_ejecta_parameters_are_preferred(self):
         parameters = conversion.EjectaFitting()({"mass_1": 1.4, "log10_mej": -2.0})
-        self.assertEqual(parameters["log10_mej"], -2.0)
-        self.assertEqual(parameters["log10_mej_dyn"], -np.inf)
+        assert parameters["log10_mej"] == -2.0
+        assert parameters["log10_mej_dyn"] == -np.inf
 
     def test_the_input_dictionary_is_updated_in_place(self):
         parameters = {"mass_1": 1.4}
         returned = conversion.EjectaFitting()(parameters)
-        self.assertIs(returned, parameters)
+        assert returned is parameters
 
 
-class TestNSBHEjectaFitting(unittest.TestCase):
-    def setUp(self):
+class TestNSBHEjectaFitting:
+    def setup_method(self):
         self.fitter = conversion.NSBHEjectaFitting()
 
     def test_isco_of_a_non_spinning_black_hole_is_six_masses(self):
-        self.assertAlmostEqual(self.fitter.chibh2risco(0.0), 6.0)
+        assert self.fitter.chibh2risco(0.0) == pytest.approx(6.0)
 
     def test_isco_shrinks_for_prograde_spin(self):
-        self.assertLess(self.fitter.chibh2risco(0.9), self.fitter.chibh2risco(0.0))
+        assert self.fitter.chibh2risco(0.9) < self.fitter.chibh2risco(0.0)
 
     def test_isco_grows_for_retrograde_spin(self):
-        self.assertGreater(self.fitter.chibh2risco(-0.9), self.fitter.chibh2risco(0.0))
+        assert self.fitter.chibh2risco(-0.9) > self.fitter.chibh2risco(0.0)
 
     def test_extremal_spin_gives_the_expected_isco_limits(self):
-        self.assertAlmostEqual(self.fitter.chibh2risco(1.0), 1.0, places=6)
-        self.assertAlmostEqual(self.fitter.chibh2risco(-1.0), 9.0, places=6)
+        assert self.fitter.chibh2risco(1.0) == pytest.approx(1.0, abs=1.5 * 10**(-6))
+        assert self.fitter.chibh2risco(-1.0) == pytest.approx(9.0, abs=1.5 * 10**(-6))
 
     def test_baryon_mass_exceeds_the_gravitational_mass(self):
-        self.assertGreater(self.fitter.baryon_mass_NS(1.4, 0.16), 1.4)
+        assert self.fitter.baryon_mass_NS(1.4, 0.16) > 1.4
 
     def test_baryon_mass_correction_grows_with_compactness(self):
-        self.assertGreater(
-            self.fitter.baryon_mass_NS(1.4, 0.20), self.fitter.baryon_mass_NS(1.4, 0.10)
-        )
+        assert self.fitter.baryon_mass_NS(1.4, 0.20) > self.fitter.baryon_mass_NS(1.4, 0.10)
 
     def test_remnant_disk_and_dynamic_masses_are_non_negative(self):
         for chi_bh in [-0.5, 0.0, 0.9]:
-            self.assertGreaterEqual(
-                self.fitter.remnant_disk_mass_fitting(6.0, 1.4, 0.16, chi_bh), 0.0
-            )
-            self.assertGreaterEqual(
-                self.fitter.dynamic_mass_fitting(6.0, 1.4, 0.16, chi_bh), 0.0
-            )
+            assert self.fitter.remnant_disk_mass_fitting(6.0, 1.4, 0.16, chi_bh) >= 0.0
+            assert self.fitter.dynamic_mass_fitting(6.0, 1.4, 0.16, chi_bh) >= 0.0
 
     def test_a_rapidly_spinning_black_hole_disrupts_the_star_more(self):
         # a smaller ISCO lets more material stay outside the horizon
-        self.assertGreater(
-            self.fitter.remnant_disk_mass_fitting(6.0, 1.4, 0.16, 0.9),
-            self.fitter.remnant_disk_mass_fitting(6.0, 1.4, 0.16, 0.0),
-        )
+        assert self.fitter.remnant_disk_mass_fitting(6.0, 1.4, 0.16, 0.9) > self.fitter.remnant_disk_mass_fitting(6.0, 1.4, 0.16, 0.0)
 
     def test_nsbh_conversion_returns_four_ejecta_quantities(self):
         parameters = dict(
@@ -582,7 +547,7 @@ class TestNSBHEjectaFitting(unittest.TestCase):
             ratio_zeta=np.array([0.5]),
         )
         result = self.fitter.nsbh_parameter_conversion(parameters)
-        self.assertEqual(result.shape, (4, 1))
+        assert result.shape == (4, 1)
 
     def test_nsbh_conversion_never_produces_a_grb_energy(self):
         # the fourth slot, log10_E0, is left at -inf for NSBH systems
@@ -594,7 +559,7 @@ class TestNSBHEjectaFitting(unittest.TestCase):
             alpha=np.array([0.0]),
             ratio_zeta=np.array([0.5]),
         )
-        self.assertEqual(self.fitter.nsbh_parameter_conversion(parameters)[3][0], -np.inf)
+        assert self.fitter.nsbh_parameter_conversion(parameters)[3][0] == -np.inf
 
     def test_spin_is_built_from_the_tilt_when_chi_1_is_absent(self):
         base = dict(
@@ -644,7 +609,7 @@ class TestNSBHEjectaFitting(unittest.TestCase):
             a_1=np.array([0.9]),
             cos_tilt_1=np.array([1.0]),
         )
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.fitter.nsbh_parameter_conversion(parameters)
 
     def test_a_non_disrupting_system_gives_no_ejecta(self):
@@ -658,11 +623,11 @@ class TestNSBHEjectaFitting(unittest.TestCase):
             ratio_zeta=np.array([0.5]),
         )
         result = self.fitter.nsbh_parameter_conversion(parameters)
-        self.assertEqual(result[1][0], -np.inf)
+        assert result[1][0] == -np.inf
 
 
-class TestBNSEjectaFitting(unittest.TestCase):
-    def setUp(self):
+class TestBNSEjectaFitting:
+    def setup_method(self):
         self.fitter = conversion.BNSEjectaFitting()
         self.parameters = dict(
             mass_1_source=np.array([1.4]),
@@ -678,72 +643,65 @@ class TestBNSEjectaFitting(unittest.TestCase):
     def test_disk_mass_is_floored_at_ten_to_the_minus_three(self):
         # a total mass far above the threshold mass gives prompt collapse
         log10_mdisk = self.fitter.log10_disk_mass_fitting(10.0, 1.0, 2.0, 12.0)
-        self.assertAlmostEqual(log10_mdisk, -3.0)
+        assert log10_mdisk == pytest.approx(-3.0)
 
     def test_a_lighter_binary_leaves_a_more_massive_disk(self):
         light = self.fitter.log10_disk_mass_fitting(2.6, 0.9, 2.0, 12.0)
         heavy = self.fitter.log10_disk_mass_fitting(3.2, 0.9, 2.0, 12.0)
-        self.assertGreater(light, heavy)
+        assert light > heavy
 
     def test_dynamic_mass_fittings_are_non_negative(self):
-        self.assertGreaterEqual(
-            self.fitter.dynamic_mass_fitting_KrFo(1.4, 1.3, 0.16, 0.15), 0.0
-        )
-        self.assertGreaterEqual(
-            self.fitter.dynamic_mass_fitting_KrFo(1.9, 1.0, 0.25, 0.10), 0.0
-        )
+        assert self.fitter.dynamic_mass_fitting_KrFo(1.4, 1.3, 0.16, 0.15) >= 0.0
+        assert self.fitter.dynamic_mass_fitting_KrFo(1.9, 1.0, 0.25, 0.10) >= 0.0
 
     def test_dynamic_mass_fittings_agree_within_an_order_of_magnitude(self):
         krfo = self.fitter.dynamic_mass_fitting_KrFo(1.4, 1.3, 0.16, 0.15)
         codimame = 10 ** self.fitter.log10_dynamic_mass_fitting_CoDiMaMe(
             1.4, 1.3, 0.16, 0.15
         )
-        self.assertLess(abs(np.log10(krfo / codimame)), 1.0)
+        assert abs(np.log10(krfo / codimame)) < 1.0
 
     def test_dynamic_ejecta_velocity_is_a_sensible_fraction_of_light_speed(self):
         velocity = self.fitter.dynamic_vel_fitting_Radice2018(1.4, 1.3, 0.16, 0.15)
-        self.assertTrue(0.05 < velocity < 0.5)
+        assert 0.05 < velocity < 0.5
 
     def test_prompt_collapse_dynamic_mass_is_positive(self):
         mdyn = self.fitter.dynamic_mass_fitting_prompt_collapse(1.4, 1.3, 400.0, 600.0)
-        self.assertGreater(mdyn, 0.0)
+        assert mdyn > 0.0
 
     def test_prompt_collapse_dynamic_mass_grows_with_deformability(self):
-        self.assertGreater(
-            self.fitter.dynamic_mass_fitting_prompt_collapse(1.4, 1.3, 800.0, 1000.0),
-            self.fitter.dynamic_mass_fitting_prompt_collapse(1.4, 1.3, 200.0, 300.0),
-        )
+        assert self.fitter.dynamic_mass_fitting_prompt_collapse(
+            1.4, 1.3, 800.0, 1000.0
+        ) > self.fitter.dynamic_mass_fitting_prompt_collapse(1.4, 1.3, 200.0, 300.0)
 
     def test_prompt_collapse_velocity_is_a_sensible_fraction_of_light_speed(self):
         velocity = self.fitter.dynamic_vel_fitting_prompt_collapse(1.4, 1.3, 0.16, 0.15)
-        self.assertTrue(0.05 < velocity < 0.5)
+        assert 0.05 < velocity < 0.5
 
     def test_prompt_collapse_disk_mass_is_capped(self):
         log10_mdisk = self.fitter.log10_disk_mass_fitting_prompt_collapse(
             1.4, 1.3, 2000.0, 2000.0
         )
-        self.assertLessEqual(log10_mdisk, -1.0)
+        assert log10_mdisk <= -1.0
 
     def test_black_hole_spin_fitting_is_a_physical_spin(self):
         chi_bh = self.fitter.chiBH_fitting(1.4, 1.3, 400.0, 600.0)
-        self.assertTrue(0.0 < chi_bh < 1.0)
+        assert 0.0 < chi_bh < 1.0
 
     def test_ejecta_conversion_returns_finite_masses_for_a_plausible_binary(self):
         log10_mej_dyn, log10_mej_wind, log10_mej_total, log10_mdisk = (
             self.fitter.bns_ejecta_conversion(self.parameters)
         )
-        self.assertTrue(np.isfinite(log10_mej_dyn[0]))
-        self.assertTrue(np.isfinite(log10_mej_wind[0]))
-        self.assertTrue(np.isfinite(log10_mej_total[0]))
-        self.assertTrue(np.isfinite(log10_mdisk))
+        assert np.isfinite(log10_mej_dyn[0])
+        assert np.isfinite(log10_mej_wind[0])
+        assert np.isfinite(log10_mej_total[0])
+        assert np.isfinite(log10_mdisk)
 
     def test_the_total_ejecta_mass_is_the_sum_of_its_components(self):
         log10_mej_dyn, log10_mej_wind, log10_mej_total, _ = (
             self.fitter.bns_ejecta_conversion(self.parameters)
         )
-        self.assertAlmostEqual(
-            log10_mej_total[0], np.log10(10**log10_mej_dyn[0] + 10**log10_mej_wind[0])
-        )
+        assert log10_mej_total[0] == pytest.approx(np.log10(10**log10_mej_dyn[0] + 10**log10_mej_wind[0]))
 
     def test_the_wind_ejecta_scale_with_the_disk_conversion_efficiency(self):
         low = self.fitter.bns_ejecta_conversion(
@@ -752,7 +710,7 @@ class TestBNSEjectaFitting(unittest.TestCase):
         high = self.fitter.bns_ejecta_conversion(
             dict(self.parameters, ratio_zeta=np.array([0.5]))
         )[1][0]
-        self.assertAlmostEqual(high - low, np.log10(0.5 / 0.1))
+        assert high - low == pytest.approx(np.log10(0.5 / 0.1))
 
     def test_bns_ejecta_conversion_rejects_non_ns_component(self):
         """Regression test carried over from the retired
@@ -782,26 +740,20 @@ class TestBNSEjectaFitting(unittest.TestCase):
         log10_mej_dyn, log10_mej_wind, log10_mej_total, _ = (
             self.fitter.bns_ejecta_conversion(parameters)
         )
-        self.assertFalse(
-            np.isfinite(log10_mej_dyn[0]),
-            "log10_mej_dyn should be -inf when mass_1 isn't a real NS under this EOS",
-        )
-        self.assertFalse(
-            np.isfinite(log10_mej_wind[0]),
-            "log10_mej_wind should be -inf when mass_1 isn't a real NS under this EOS",
-        )
-        self.assertFalse(np.isfinite(log10_mej_total[0]))
+        assert not np.isfinite(log10_mej_dyn[0])
+        assert not np.isfinite(log10_mej_wind[0])
+        assert not np.isfinite(log10_mej_total[0])
 
     def test_grb_energy_defaults_to_a_top_hat_jet(self):
         log10_e_iso = self.fitter.grb_energy_conversion(
             self.parameters, np.array([-1.0])
         )
-        self.assertTrue(np.all(np.isfinite(log10_e_iso)))
+        assert np.all(np.isfinite(log10_e_iso))
 
     def test_grb_energy_uses_the_gaussian_jet_when_a_wing_is_given(self):
         parameters = dict(self.parameters, thetaCore=0.1, thetaWing=0.4)
         log10_e_iso = self.fitter.grb_energy_conversion(parameters, np.array([-1.0]))
-        self.assertTrue(np.isfinite(log10_e_iso))
+        assert np.isfinite(log10_e_iso)
 
     def test_grb_energy_uses_the_powerlaw_jet_when_b_is_given(self):
         gaussian = self.fitter.grb_energy_conversion(
@@ -810,7 +762,7 @@ class TestBNSEjectaFitting(unittest.TestCase):
         powerlaw = self.fitter.grb_energy_conversion(
             dict(self.parameters, thetaCore=0.1, alphaWing=4.0, b=2.0), np.array([-1.0])
         )
-        self.assertNotAlmostEqual(float(gaussian), float(powerlaw))
+        assert float(gaussian) != pytest.approx(float(powerlaw))
 
     def test_grb_energy_scales_with_the_disk_mass(self):
         low = self.fitter.grb_energy_conversion(self.parameters, np.array([-2.0]))
@@ -824,12 +776,12 @@ class TestBNSEjectaFitting(unittest.TestCase):
         high_zeta = self.fitter.grb_energy_conversion(
             dict(self.parameters, ratio_zeta=np.array([0.9])), np.array([-1.0])
         )
-        self.assertGreater(low_zeta, high_zeta)
+        assert low_zeta > high_zeta
 
     def test_an_explicit_jet_energy_is_not_overwritten(self):
         parameters = dict(self.parameters, log10_E0=np.array([50.0]))
         result = self.fitter.bns_parameter_conversion(parameters)
-        self.assertAlmostEqual(float(result[3][0]), 50.0)
+        assert float(result[3][0]) == pytest.approx(50.0)
 
     def test_non_finite_results_are_normalised_to_minus_infinity(self):
         parameters = dict(
@@ -838,17 +790,17 @@ class TestBNSEjectaFitting(unittest.TestCase):
             radius_2=np.array([0.0]),
         )
         result = self.fitter.bns_parameter_conversion(parameters)
-        self.assertTrue(np.all(result[:3] == -np.inf))
+        assert np.all(result[:3] == -np.inf)
 
     def test_the_fitter_is_callable_and_fills_the_parameter_dictionary(self):
         parameters = {k: v for k, v in self.parameters.items()}
         returned = self.fitter(parameters)
         for key in conversion.EjectaFitting.mass_fitting_keys:
-            self.assertIn(key, returned)
+            assert key in returned
 
 
-class TestKilonovaEjectaFitting(unittest.TestCase):
-    def setUp(self):
+class TestKilonovaEjectaFitting:
+    def setup_method(self):
         self.fitter = conversion.KilonovaEjectaFitting()
 
     def test_a_scalar_bns_is_routed_to_the_bns_fitting(self):
@@ -928,19 +880,10 @@ class TestKilonovaEjectaFitting(unittest.TestCase):
         log10_mej_dyn, log10_mej_wind, log10_mej_total, _ = (
             self.fitter.ejecta_parameter_conversion(parameters)
         )
-        self.assertFalse(
-            np.isfinite(log10_mej_dyn[0]), "invalid secondary should give -inf"
-        )
-        self.assertFalse(
-            np.isfinite(log10_mej_wind[0]), "invalid secondary should give -inf"
-        )
-        self.assertFalse(
-            np.isfinite(log10_mej_total[0]), "invalid secondary should give -inf"
-        )
-        self.assertTrue(
-            np.isfinite(log10_mej_dyn[1]),
-            "a genuine BNS row should not be affected by the fix",
-        )
+        assert not np.isfinite(log10_mej_dyn[0])
+        assert not np.isfinite(log10_mej_wind[0])
+        assert not np.isfinite(log10_mej_total[0])
+        assert np.isfinite(log10_mej_dyn[1])
 
     def test_a_vectorised_binary_black_hole_row_produces_no_ejecta(self):
         parameters = dict(
@@ -955,15 +898,15 @@ class TestKilonovaEjectaFitting(unittest.TestCase):
             chi_1=np.array([0.0, 0.0]),
         )
         result = self.fitter.ejecta_parameter_conversion(parameters)
-        self.assertTrue(np.all(result[:, 0] == -np.inf))
-        self.assertTrue(np.isfinite(result[0, 1]))
+        assert np.all(result[:, 0] == -np.inf)
+        assert np.isfinite(result[0, 1])
 
 
-class TestMultimessengerConversion(unittest.TestCase):
-    def setUp(self):
+class TestMultimessengerConversion:
+    def setup_method(self):
         self.original_cosmology = constants.get_cosmology()
 
-    def tearDown(self):
+    def teardown_method(self):
         constants.set_cosmology(self.original_cosmology)
 
     def test_conversions_are_applied_in_order(self):
@@ -981,26 +924,23 @@ class TestMultimessengerConversion(unittest.TestCase):
 
         converter = conversion.MultimessengerConversion(first, second)
         result = converter.core_conversion({})
-        self.assertEqual(calls, ["first", "second"])
-        self.assertEqual(result["b"], 2)
+        assert calls == ["first", "second"]
+        assert result["b"] == 2
 
     def test_no_conversions_leaves_the_parameters_untouched(self):
         converter = conversion.MultimessengerConversion()
-        self.assertEqual(converter.core_conversion({"a": 1}), {"a": 1})
+        assert converter.core_conversion({"a": 1}) == {"a": 1}
 
     def test_identity_conversion_returns_its_input(self):
         parameters = {"a": 1}
-        self.assertIs(
-            conversion.MultimessengerConversion().identity_conversion(parameters),
-            parameters,
-        )
+        assert conversion.MultimessengerConversion().identity_conversion(parameters) is parameters
 
     def test_single_element_arrays_are_flattened_to_scalars(self):
         converter = conversion.MultimessengerConversion()
         result = converter.convert_to_multimessenger_parameters(
             {"mass_1": np.array([1.4])}
         )
-        self.assertIsInstance(result["mass_1"], float)
+        assert isinstance(result["mass_1"], float)
 
     def test_added_keys_are_reported_when_requested(self):
         converter = conversion.MultimessengerConversion(conversion.bbh_source_frame)
@@ -1008,30 +948,26 @@ class TestMultimessengerConversion(unittest.TestCase):
             {"chirp_mass": 1.2, "mass_ratio": 0.9, "luminosity_distance": 40.0},
             add_new_keys=True,
         )
-        self.assertIn("mass_1_source", added_keys)
-        self.assertNotIn("chirp_mass", added_keys)
-        self.assertIn("mass_1_source", result)
+        assert "mass_1_source" in added_keys
+        assert "chirp_mass" not in added_keys
+        assert "mass_1_source" in result
 
     def test_from_args_is_not_implemented_yet(self):
-        with self.assertRaises(NotImplementedError):
+        with pytest.raises(NotImplementedError):
             conversion.MultimessengerConversion.from_args(None)
 
     def test_from_dict_builds_only_the_requested_conversions(self):
         converter = conversion.MultimessengerConversion.from_dict({"ejecta": True})
-        self.assertEqual(len(converter._conversions), 1)
-        self.assertIsInstance(
-            converter._conversions[0], conversion.KilonovaEjectaFitting
-        )
+        assert len(converter._conversions) == 1
+        assert isinstance(converter._conversions[0], conversion.KilonovaEjectaFitting)
 
     def test_from_dict_is_empty_for_an_empty_instruction(self):
-        self.assertEqual(
-            len(conversion.MultimessengerConversion.from_dict({})._conversions), 0
-        )
+        assert len(conversion.MultimessengerConversion.from_dict({})._conversions) == 0
 
     def test_from_dict_sets_the_cosmology_and_adds_the_distance_conversion(self):
         converter = conversion.MultimessengerConversion.from_dict({"cosmo": "Planck15"})
-        self.assertEqual(constants.get_cosmology().name, "Planck15")
-        self.assertIs(converter._conversions[0], conversion.cosmology_to_distance)
+        assert constants.get_cosmology().name == "Planck15"
+        assert converter._conversions[0] is conversion.cosmology_to_distance
 
     def test_from_dict_orders_cosmology_gw_eos_ejecta_em_and_custom(self):
         gw, eos, em, custom = (lambda p: p for _ in range(4))
@@ -1046,12 +982,12 @@ class TestMultimessengerConversion(unittest.TestCase):
             }
         )
         conversions = converter._conversions
-        self.assertIs(conversions[0], conversion.cosmology_to_distance)
-        self.assertIs(conversions[1], gw)
-        self.assertIs(conversions[2], eos)
-        self.assertIsInstance(conversions[3], conversion.KilonovaEjectaFitting)
-        self.assertIs(conversions[4], em)
-        self.assertIs(conversions[5], custom)
+        assert conversions[0] is conversion.cosmology_to_distance
+        assert conversions[1] is gw
+        assert conversions[2] is eos
+        assert isinstance(conversions[3], conversion.KilonovaEjectaFitting)
+        assert conversions[4] is em
+        assert conversions[5] is custom
 
     def test_basic_cbc_wires_up_the_standard_chain(self):
         eos_conversion, em_conversion = (lambda p: p for _ in range(2))
@@ -1059,10 +995,10 @@ class TestMultimessengerConversion(unittest.TestCase):
             eos_conversion, em_conversion
         )
         conversions = converter._conversions
-        self.assertIs(conversions[0], conversion.bbh_source_frame)
-        self.assertIs(conversions[1], eos_conversion)
-        self.assertIsInstance(conversions[2], conversion.KilonovaEjectaFitting)
-        self.assertIs(conversions[3], em_conversion)
+        assert conversions[0] is conversion.bbh_source_frame
+        assert conversions[1] is eos_conversion
+        assert isinstance(conversions[2], conversion.KilonovaEjectaFitting)
+        assert conversions[3] is em_conversion
 
     def test_a_full_chain_turns_binary_parameters_into_ejecta_parameters(self):
         # the point of the conversion layer: an EM model in a joint run sees
@@ -1083,20 +1019,20 @@ class TestMultimessengerConversion(unittest.TestCase):
                 "TOV_mass": 2.0854,
             }
         )
-        self.assertIn("log10_mej", result)
-        self.assertIn("KNtheta", result)
-        self.assertTrue(np.isfinite(result["log10_mej"]))
+        assert "log10_mej" in result
+        assert "KNtheta" in result
+        assert np.isfinite(result["log10_mej"])
 
 
-class TestLabelMapping(unittest.TestCase):
+class TestLabelMapping:
     def test_every_label_is_latex(self):
         for key, label in conversion.label_mapping.items():
-            self.assertTrue(label.startswith("$"), msg=key)
-            self.assertTrue(label.endswith("$"), msg=key)
+            assert label.startswith("$"), key
+            assert label.endswith("$"), key
 
     def test_the_ejecta_parameters_produced_by_the_fitting_all_have_labels(self):
         for key in conversion.EjectaFitting.mass_fitting_keys:
-            self.assertIn(key, conversion.label_mapping)
+            assert key in conversion.label_mapping
 
     def test_core_sampling_parameters_have_labels(self):
         for key in [
@@ -1107,8 +1043,5 @@ class TestLabelMapping(unittest.TestCase):
             "Hubble_constant",
             "KNtheta",
         ]:
-            self.assertIn(key, conversion.label_mapping)
+            assert key in conversion.label_mapping
 
-
-if __name__ == "__main__":
-    unittest.main()

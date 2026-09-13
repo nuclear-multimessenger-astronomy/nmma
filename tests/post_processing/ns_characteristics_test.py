@@ -1,32 +1,32 @@
 import shutil
 import tempfile
-import unittest
 from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from nmma.post_processing import ns_characteristics
 
 
-class TestGenerateEOSCumprods(unittest.TestCase):
+class TestGenerateEOSCumprods:
     """Accumulates one event's equation-of-state posterior at a time, each
     time dividing the common prior back out so it is only counted once."""
 
-    def setUp(self):
+    def setup_method(self):
         self.prior = np.array([0.25, 0.25, 0.25, 0.25])
 
     def test_one_weighting_is_produced_per_event(self):
         probs = [np.array([0.4, 0.3, 0.2, 0.1])] * 3
         result = ns_characteristics.generate_EOS_cumprods(probs, self.prior)
-        self.assertEqual(len(result), 3)
+        assert len(result) == 3
 
     def test_each_weighting_is_normalised(self):
         probs = [np.array([0.4, 0.3, 0.2, 0.1]), np.array([0.1, 0.2, 0.3, 0.4])]
         for weighting in ns_characteristics.generate_EOS_cumprods(probs, self.prior):
-            self.assertAlmostEqual(weighting.sum(), 1.0)
+            assert weighting.sum() == pytest.approx(1.0)
 
     def test_the_first_weighting_is_the_first_posterior(self):
         # With the prior divided out, one event leaves its own posterior.
@@ -46,17 +46,17 @@ class TestGenerateEOSCumprods(unittest.TestCase):
         # mutating in place, so the intermediate steps are preserved.
         probs = [np.array([0.7, 0.1, 0.1, 0.1]), np.array([0.1, 0.7, 0.1, 0.1])]
         result = ns_characteristics.generate_EOS_cumprods(probs, self.prior)
-        self.assertFalse(np.allclose(result[0], result[1]))
+        assert not np.allclose(result[0], result[1])
 
     def test_agreeing_events_sharpen_the_weighting(self):
         probs = [np.array([0.7, 0.1, 0.1, 0.1])] * 3
         result = ns_characteristics.generate_EOS_cumprods(probs, self.prior)
-        self.assertGreater(result[-1][0], result[0][0])
+        assert result[-1][0] > result[0][0]
 
     def test_an_equation_of_state_excluded_by_one_event_stays_excluded(self):
         probs = [np.array([0.0, 0.4, 0.3, 0.3]), np.array([0.7, 0.1, 0.1, 0.1])]
         result = ns_characteristics.generate_EOS_cumprods(probs, self.prior)
-        self.assertAlmostEqual(result[-1][0], 0.0)
+        assert result[-1][0] == pytest.approx(0.0)
 
     def test_a_non_uniform_prior_is_respected(self):
         prior = np.array([0.7, 0.1, 0.1, 0.1])
@@ -65,21 +65,23 @@ class TestGenerateEOSCumprods(unittest.TestCase):
         np.testing.assert_allclose(result[0], [0.25, 0.25, 0.25, 0.25])
 
     def test_no_events_gives_no_weightings(self):
-        self.assertEqual(ns_characteristics.generate_EOS_cumprods([], self.prior), [])
+        assert ns_characteristics.generate_EOS_cumprods([], self.prior) == []
 
 
 class LoadPosteriorsMixin:
     n_eos = 4
     n_samples = 400
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.samples_dir = self.tmp_dir / "samples"
         self.samples_dir.mkdir()
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
         generator = np.random.default_rng(6)
         for event in range(3):
             self.write_event(event, generator)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmp_dir)
 
     def write_event(self, event, generator, eos_values=None):
         directory = self.samples_dir / str(event)
@@ -103,21 +105,21 @@ class LoadPosteriorsMixin:
         return Namespace(**defaults)
 
 
-class TestLoadInPosteriors(LoadPosteriorsMixin, unittest.TestCase):
+class TestLoadInPosteriors(LoadPosteriorsMixin):
     """Each event's posterior over equation-of-state index is turned into a
     discrete probability by counting the samples in each bin."""
 
     def test_one_probability_vector_is_returned_per_event(self):
         probs = ns_characteristics.load_in_posteriors([0, 1, 2], self.args())
-        self.assertEqual(len(probs), 3)
+        assert len(probs) == 3
 
     def test_each_vector_has_one_entry_per_equation_of_state(self):
         probs = ns_characteristics.load_in_posteriors([0], self.args())
-        self.assertEqual(len(probs[0]), self.n_eos)
+        assert len(probs[0]) == self.n_eos
 
     def test_each_vector_is_normalised(self):
         for prob in ns_characteristics.load_in_posteriors([0, 1], self.args()):
-            self.assertAlmostEqual(prob.sum(), 1.0)
+            assert prob.sum() == pytest.approx(1.0)
 
     def unweighted(self):
         """Reweighting to a flat mass prior resamples the table, so it is
@@ -147,7 +149,7 @@ class TestLoadInPosteriors(LoadPosteriorsMixin, unittest.TestCase):
     def test_a_missing_event_directory_is_skipped(self):
         # The routine is meant to run against a partially finished set.
         probs = ns_characteristics.load_in_posteriors([0, 42, 2], self.args())
-        self.assertEqual(len(probs), 2)
+        assert len(probs) == 2
 
     def test_the_samples_are_reweighted_to_a_flat_mass_prior_first(self):
         with patch.object(
@@ -160,14 +162,14 @@ class TestLoadInPosteriors(LoadPosteriorsMixin, unittest.TestCase):
 
     def test_asking_for_more_equations_of_state_pads_with_zeros(self):
         probs = ns_characteristics.load_in_posteriors([0], self.args(Neos=10))
-        self.assertEqual(len(probs[0]), 10)
-        self.assertAlmostEqual(probs[0][-1], 0.0)
+        assert len(probs[0]) == 10
+        assert probs[0][-1] == pytest.approx(0.0)
 
 
-class TestEstimateObservableTrend(unittest.TestCase):
+class TestEstimateObservableTrend:
     """Averages the radius trend over many random event orderings."""
 
-    def setUp(self):
+    def setup_method(self):
         self.prior = np.linspace(10.0, 14.0, 50)
         self.probs = [np.full(4, 0.25), np.array([0.4, 0.3, 0.2, 0.1])]
         self.prior_prob = np.full(4, 0.25)
@@ -189,12 +191,12 @@ class TestEstimateObservableTrend(unittest.TestCase):
 
     def test_a_median_and_two_bounds_are_returned(self):
         result, _ = self.run_trend()
-        self.assertEqual(len(result), 3)
+        assert len(result) == 3
 
     def test_each_estimate_has_one_entry_per_event(self):
         result, _ = self.run_trend()
         for estimate in result:
-            self.assertEqual(len(estimate), 2)
+            assert len(estimate) == 2
 
     def test_the_median_over_the_orderings_is_reported(self):
         result, _ = self.run_trend()
@@ -202,20 +204,20 @@ class TestEstimateObservableTrend(unittest.TestCase):
 
     def test_one_spread_is_computed_per_ordering(self):
         _, spread = self.run_trend()
-        self.assertEqual(spread.call_count, 3)
+        assert spread.call_count == 3
 
     def test_the_estimates_are_ordered_median_upper_lower(self):
         result, _ = self.run_trend()
         median, upper, lower = result
-        self.assertTrue(np.all(upper > median))
-        self.assertTrue(np.all(lower < median))
+        assert np.all(upper > median)
+        assert np.all(lower < median)
 
     def test_the_resampling_draws_from_the_radius_prior(self):
         _, spread = self.run_trend()
         method = spread.call_args.args[0]
         drawn = method(self.prior, np.full(len(self.prior), 1 / len(self.prior)), 20)
-        self.assertEqual(len(drawn), 20)
-        self.assertTrue(np.all(np.isin(drawn, self.prior)))
+        assert len(drawn) == 20
+        assert np.all(np.isin(drawn, self.prior))
 
     def test_the_seed_makes_the_resampling_reproducible(self):
         first, _ = self.run_trend()
@@ -234,16 +236,15 @@ class TestEstimateObservableTrend(unittest.TestCase):
                 ns_characteristics.estimate_observable_trend(
                     self.prior, self.probs, self.prior_prob, self.args
                 )
-        self.assertEqual(shuffle.call_count, 3)
+        assert shuffle.call_count == 3
 
 
-class TestMain(unittest.TestCase):
+class TestMain:
     """The combine-EOS console script. Two naming mistakes stop it before it
     reaches any of the science."""
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
         self.detections = self.tmp_dir / "detections.dat"
         np.savetxt(self.detections, np.array([[0], [1]]))
         self.eos_prior = self.tmp_dir / "eos.prior"
@@ -253,6 +254,9 @@ class TestMain(unittest.TestCase):
             self.pdet,
             np.column_stack([np.linspace(1.9, 2.5, 10), np.linspace(0.2, 0.9, 10)]),
         )
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmp_dir)
 
     def args(self, **kwargs):
         defaults = dict(
@@ -278,9 +282,9 @@ class TestMain(unittest.TestCase):
         # posterior is loaded. One of the two spellings has to change.
         args = self.args()
         with patch.object(ns_characteristics, "nmma_base_parsing", return_value=args):
-            with self.assertRaises(AttributeError) as caught:
+            with pytest.raises(AttributeError) as caught:
                 ns_characteristics.main()
-        self.assertIn("EOSPath", str(caught.exception))
+        assert "EOSPath" in str(caught.value)
 
     def test_the_trend_file_cannot_be_written_with_a_regular_expression_separator(self):
         # Past the attribute error, the output is written with a separator of
@@ -304,7 +308,7 @@ class TestMain(unittest.TestCase):
                         return_value=trend,
                     ):
                         with patch.object(ns_characteristics, "plot_R14_trend"):
-                            with self.assertRaises(TypeError):
+                            with pytest.raises(TypeError):
                                 ns_characteristics.main()
 
     def test_the_source_still_carries_the_invalid_escape_sequences(self):
@@ -312,8 +316,4 @@ class TestMain(unittest.TestCase):
         # python reports as an invalid escape sequence at import time. Raw
         # strings would silence that.
         source = Path(ns_characteristics.__file__).read_text()
-        self.assertIn('sep="\\s+"', source)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert 'sep="\\s+"' in source

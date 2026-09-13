@@ -1,7 +1,6 @@
-import unittest
-
 import lal
 import numpy as np
+import pytest
 import scipy.constants
 
 from nmma.eos import tov
@@ -44,28 +43,28 @@ class AnalyticEoS:
         return self.e_index / self.p_index
 
 
-class TestUnitConversions(unittest.TestCase):
+class TestUnitConversions:
     """The module converts from particle-physics units (MeV fm^-3) to
     geometric units, which is the only place those factors are defined."""
 
     def test_particle_to_si(self):
-        self.assertEqual(tov.particle_to_SI, scipy.constants.e * 1e51)
+        assert tov.particle_to_SI == scipy.constants.e * 1e51
 
     def test_si_to_geometric(self):
         expected = scipy.constants.G / np.power(scipy.constants.c, 4.0)
-        self.assertEqual(tov.SI_to_geometric, expected)
+        assert tov.SI_to_geometric == expected
 
     def test_particle_to_geometric_is_the_composition_of_the_two(self):
-        self.assertEqual(
-            tov.particle_to_geometric, tov.particle_to_SI * tov.SI_to_geometric
+        assert (
+            tov.particle_to_geometric == tov.particle_to_SI * tov.SI_to_geometric
         )
 
     def test_geometric_conversion_has_the_expected_order_of_magnitude(self):
         # 1 MeV fm^-3 is about 1.3e-12 m^-2 in geometric units.
-        self.assertAlmostEqual(np.log10(tov.particle_to_geometric), -11.88, places=2)
+        assert np.log10(tov.particle_to_geometric) == pytest.approx(-11.88, abs=1.5 * 10**-2)
 
 
-class TestCalcK2(unittest.TestCase):
+class TestCalcK2:
     """calc_k2 turns the metric perturbation at the surface into the
     dimensionless tidal Love number, so it may only depend on the
     compactness M/R and on y = R b / H."""
@@ -73,52 +72,50 @@ class TestCalcK2(unittest.TestCase):
     def test_depends_only_on_y_and_not_on_the_scale_of_h_and_b(self):
         reference = tov.calc_k2(1.0, 0.2, 1.0, 2.0)
         for factor in [0.5, 3.0, 100.0]:
-            self.assertAlmostEqual(
-                tov.calc_k2(1.0, 0.2, factor * 1.0, factor * 2.0), reference
-            )
+            assert tov.calc_k2(1.0, 0.2, factor * 1.0, factor * 2.0) == pytest.approx(reference)
 
     def test_depends_only_on_the_compactness_and_not_on_the_radius(self):
         reference = tov.calc_k2(1.0, 0.2, 1.0, 2.0)
         # R and M doubled keeps C, and b/H is rescaled to keep y
-        self.assertAlmostEqual(tov.calc_k2(2.0, 0.4, 4.0, 4.0), reference)
+        assert tov.calc_k2(2.0, 0.4, 4.0, 4.0) == pytest.approx(reference)
 
     def test_is_positive_over_the_neutron_star_range_of_compactness(self):
         for compactness in [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]:
             k2 = tov.calc_k2(1.0, compactness, 1.0, 2.0)
-            self.assertGreater(k2, 0.0, msg=f"C={compactness}")
-            self.assertLess(k2, 1.0, msg=f"C={compactness}")
+            assert k2 > 0.0, f"C={compactness}"
+            assert k2 < 1.0, f"C={compactness}"
 
     def test_accepts_array_input(self):
         compactness = np.array([0.1, 0.2, 0.3])
         k2 = tov.calc_k2(1.0, compactness, 1.0, 2.0)
-        self.assertEqual(k2.shape, compactness.shape)
-        self.assertTrue(np.all(np.isfinite(k2)))
+        assert k2.shape == compactness.shape
+        assert np.all(np.isfinite(k2))
 
     def test_matches_the_scalar_result_elementwise(self):
         compactness = np.array([0.1, 0.25])
         k2 = tov.calc_k2(1.0, compactness, 1.0, 2.0)
-        self.assertAlmostEqual(k2[0], tov.calc_k2(1.0, 0.1, 1.0, 2.0))
-        self.assertAlmostEqual(k2[1], tov.calc_k2(1.0, 0.25, 1.0, 2.0))
+        assert k2[0] == pytest.approx(tov.calc_k2(1.0, 0.1, 1.0, 2.0))
+        assert k2[1] == pytest.approx(tov.calc_k2(1.0, 0.25, 1.0, 2.0))
 
 
-class TestTovOde(unittest.TestCase):
+class TestTovOde:
     """The ODE is integrated inwards in pseudo enthalpy, so the radius,
     the enclosed mass and the perturbation all decrease as h grows."""
 
-    def setUp(self):
+    def setup_method(self):
         self.eos = AnalyticEoS()
         self.h = 0.2
         self.state = [8.0e3, 1.5e3, 6.4e7, 1.6e4]
 
     def test_returns_four_derivatives(self):
         dydt = tov.tov_ode(self.h, self.state, self.eos)
-        self.assertEqual(len(dydt), 4)
-        self.assertTrue(np.all(np.isfinite(dydt)))
+        assert len(dydt) == 4
+        assert np.all(np.isfinite(dydt))
 
     def test_radius_and_mass_decrease_with_increasing_pseudo_enthalpy(self):
         drdh, dmdh, _, _ = tov.tov_ode(self.h, self.state, self.eos)
-        self.assertLess(drdh, 0.0)
-        self.assertLess(dmdh, 0.0)
+        assert drdh < 0.0
+        assert dmdh < 0.0
 
     def test_mass_derivative_follows_the_continuity_equation(self):
         r = self.state[0]
@@ -127,30 +124,28 @@ class TestTovOde(unittest.TestCase):
             self.eos.energy_density_from_pseudo_enthalpy(self.h)
             * tov.particle_to_geometric
         )
-        self.assertAlmostEqual(
-            dmdh / (4.0 * np.pi * r * r * energy_density * drdh), 1.0
-        )
+        assert dmdh / (4.0 * np.pi * r * r * energy_density * drdh) == pytest.approx(1.0)
 
     def test_metric_perturbation_derivative_is_b_times_drdh(self):
         b = self.state[3]
         drdh, _, dHdh, _ = tov.tov_ode(self.h, self.state, self.eos)
-        self.assertAlmostEqual(dHdh, b * drdh)
+        assert dHdh == pytest.approx(b * drdh)
 
     def test_a_real_eos_object_can_be_integrated_at_its_centre(self):
         eos = EOS_with_CSE(polytropic_low_density_eos(), n_lim=1.0, N_seg=3)
         hc = eos.pseudo_enthalpy_from_pressure(30.0)
         state = [1.0e3, 1.0e2, 1.0e6, 2.0e3]
         dydt = tov.tov_ode(hc, state, eos)
-        self.assertTrue(np.all(np.isfinite(dydt)))
+        assert np.all(np.isfinite(dydt))
 
 
-class TestTOVSolver(unittest.TestCase):
+class TestTOVSolver:
     """End-to-end solve of one stellar model on a synthetic but physically
     reasonable EOS. Masses come back in geometric metres, so lal.MRSUN_SI
     and 1e3 convert to solar masses and kilometres."""
 
     @classmethod
-    def setUpClass(cls):
+    def setup_class(cls):
         cls.eos = EOS_with_CSE(
             polytropic_low_density_eos(), n_connect=0.16, n_lim=1.0, N_seg=3, seed=42
         )
@@ -161,10 +156,10 @@ class TestTOVSolver(unittest.TestCase):
 
     def test_returns_a_neutron_star_of_plausible_mass_and_radius(self):
         mass, radius, k2, compactness = self.solve(30.0)
-        self.assertTrue(1.0 < mass < 2.0, msg=f"mass {mass}")
-        self.assertTrue(8.0 < radius < 16.0, msg=f"radius {radius}")
-        self.assertTrue(0.0 < k2 < 0.5, msg=f"k2 {k2}")
-        self.assertLess(compactness, 0.5)
+        assert 1.0 < mass < 2.0, f"mass {mass}"
+        assert 8.0 < radius < 16.0, f"radius {radius}"
+        assert 0.0 < k2 < 0.5, f"k2 {k2}"
+        assert compactness < 0.5
 
     def test_mass_and_radius_grow_along_the_stable_branch(self):
         masses, radii = [], []
@@ -172,23 +167,19 @@ class TestTOVSolver(unittest.TestCase):
             mass, radius, _, _ = self.solve(central_pressure)
             masses.append(mass)
             radii.append(radius)
-        self.assertTrue(np.all(np.diff(masses) > 0.0), msg=str(masses))
-        self.assertTrue(np.all(np.diff(radii) > 0.0), msg=str(radii))
+        assert np.all(np.diff(masses) > 0.0), str(masses)
+        assert np.all(np.diff(radii) > 0.0), str(radii)
 
     def test_love_number_decreases_as_the_star_becomes_more_compact(self):
         k2s = [self.solve(p)[2] for p in [10.0, 30.0, 50.0, 80.0]]
-        self.assertTrue(np.all(np.diff(k2s) < 0.0), msg=str(k2s))
+        assert np.all(np.diff(k2s) < 0.0), str(k2s)
 
     def test_tidal_deformability_is_in_the_range_probed_by_gw170817(self):
         _, _, k2, compactness = self.solve(50.0)
         lambda_tidal = 2.0 / 3.0 * k2 * np.power(compactness, -5.0)
-        self.assertTrue(10.0 < lambda_tidal < 5000.0, msg=f"lambda {lambda_tidal}")
+        assert 10.0 < lambda_tidal < 5000.0, f"lambda {lambda_tidal}"
 
     def test_the_solution_is_deterministic(self):
         first = tov.TOVSolver(self.eos, 30.0)
         second = tov.TOVSolver(self.eos, 30.0)
         np.testing.assert_allclose(first, second)
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -1,10 +1,11 @@
 import pickle
 import shutil
 import tempfile
-import unittest
 from argparse import Namespace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from nmma.joint import main
 
@@ -25,7 +26,7 @@ class AnalysisRunnerMixin:
     from it and hands both to a sampler, so the sampler and the likelihood
     setup are replaced and only that wiring is checked."""
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.likelihood = MagicMock(name="likelihood")
         self.priors = MagicMock(name="priors")
@@ -43,8 +44,10 @@ class AnalysisRunnerMixin:
         self.bilby = patch.object(
             main, "bilby_sampling", return_value="bilby_result"
         ).start()
-        self.addCleanup(patch.stopall)
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmp_dir)
+        patch.stopall()
 
     def write_dump(self, name="run_data_dump.pickle", in_data_dir=False, **extra):
         args = Namespace(
@@ -74,7 +77,7 @@ class AnalysisRunnerMixin:
         return call
 
 
-class TestAnalysisRunnerDataDumpLocation(AnalysisRunnerMixin, unittest.TestCase):
+class TestAnalysisRunnerDataDumpLocation(AnalysisRunnerMixin):
     def test_a_dump_file_is_loaded_directly(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
@@ -89,52 +92,52 @@ class TestAnalysisRunnerDataDumpLocation(AnalysisRunnerMixin, unittest.TestCase)
 
     def test_a_directory_without_a_dump_is_an_error(self):
         (self.tmp_dir / "data").mkdir()
-        with self.assertRaises(StopIteration):
+        with pytest.raises(StopIteration):
             main.analysis_runner(str(self.tmp_dir))
 
     def test_a_missing_run_directory_is_an_error(self):
-        with self.assertRaises((FileNotFoundError, StopIteration)):
+        with pytest.raises((FileNotFoundError, StopIteration)):
             main.analysis_runner(str(self.tmp_dir / "absent"))
 
 
-class TestAnalysisRunnerArgumentOverrides(AnalysisRunnerMixin, unittest.TestCase):
+class TestAnalysisRunnerArgumentOverrides(AnalysisRunnerMixin):
     """The dump carries the arguments of the original run, and a handful of
     them can be overridden when the analysis is repeated."""
 
     def test_the_output_directory_is_overridden_when_given(self):
         path = self.write_dump()
         main.analysis_runner(str(path), outdir="new_outdir")
-        self.assertEqual(self.setup_from_args.call_args.args[2].outdir, "new_outdir")
+        assert self.setup_from_args.call_args.args[2].outdir == "new_outdir"
 
     def test_the_output_directory_is_kept_when_not_given(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
-        self.assertEqual(
-            self.setup_from_args.call_args.args[2].outdir, "original_outdir"
+        assert (
+            self.setup_from_args.call_args.args[2].outdir == "original_outdir"
         )
 
     def test_the_label_is_overridden_when_given(self):
         path = self.write_dump()
         main.analysis_runner(str(path), label="new_label")
-        self.assertEqual(self.setup_from_args.call_args.args[2].label, "new_label")
+        assert self.setup_from_args.call_args.args[2].label == "new_label"
 
     def test_the_label_is_kept_when_not_given(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
-        self.assertEqual(self.setup_from_args.call_args.args[2].label, "original_label")
+        assert self.setup_from_args.call_args.args[2].label == "original_label"
 
     def test_plotting_is_always_taken_from_the_call_not_the_dump(self):
         path = self.write_dump()
         main.analysis_runner(str(path), plot=True)
-        self.assertTrue(self.setup_from_args.call_args.args[2].plot)
+        assert self.setup_from_args.call_args.args[2].plot
 
     def test_plotting_defaults_to_off(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
-        self.assertFalse(self.setup_from_args.call_args.args[2].plot)
+        assert not self.setup_from_args.call_args.args[2].plot
 
 
-class TestAnalysisRunnerLikelihoodSetup(AnalysisRunnerMixin, unittest.TestCase):
+class TestAnalysisRunnerLikelihoodSetup(AnalysisRunnerMixin):
     def test_the_priors_are_read_from_the_file_named_in_the_dump(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
@@ -146,16 +149,16 @@ class TestAnalysisRunnerLikelihoodSetup(AnalysisRunnerMixin, unittest.TestCase):
         path = self.write_dump()
         main.analysis_runner(str(path))
         dump, priors, _args, _logger = self.setup_from_args.call_args.args
-        self.assertEqual(dump["messengers"], ["em"])
-        self.assertIs(priors, self.priors)
+        assert dump["messengers"] == ["em"]
+        assert priors is self.priors
 
     def test_the_shared_logger_is_passed_so_every_stage_logs_together(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
-        self.assertIs(self.setup_from_args.call_args.args[3], main.logger)
+        assert self.setup_from_args.call_args.args[3] is main.logger
 
 
-class TestAnalysisRunnerMetaData(AnalysisRunnerMixin, unittest.TestCase):
+class TestAnalysisRunnerMetaData(AnalysisRunnerMixin):
     """The dump holds live objects that cannot be serialised into a result
     file, so the metadata copy keeps only their representations."""
 
@@ -163,29 +166,29 @@ class TestAnalysisRunnerMetaData(AnalysisRunnerMixin, unittest.TestCase):
         path = self.write_dump(waveform_generator=StubRepr("a waveform generator"))
         main.analysis_runner(str(path))
         meta_data = self.pbilby.call_args.kwargs["meta_data"]
-        self.assertEqual(meta_data["waveform_generator"], "a waveform generator")
+        assert meta_data["waveform_generator"] == "a waveform generator"
 
     def test_each_interferometer_is_reduced_to_its_representation(self):
         path = self.write_dump(ifo_list=[StubRepr("H1"), StubRepr("L1")])
         main.analysis_runner(str(path))
         meta_data = self.pbilby.call_args.kwargs["meta_data"]
-        self.assertEqual(meta_data["ifo_list"], ["H1", "L1"])
+        assert meta_data["ifo_list"] == ["H1", "L1"]
 
     def test_an_em_only_dump_has_neither_key(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
         meta_data = self.pbilby.call_args.kwargs["meta_data"]
-        self.assertNotIn("waveform_generator", meta_data)
-        self.assertNotIn("ifo_list", meta_data)
+        assert "waveform_generator" not in meta_data
+        assert "ifo_list" not in meta_data
 
     def test_the_rest_of_the_dump_is_carried_into_the_metadata(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
         meta_data = self.pbilby.call_args.kwargs["meta_data"]
-        self.assertEqual(meta_data["messengers"], ["em"])
+        assert meta_data["messengers"] == ["em"]
 
 
-class TestAnalysisRunnerSamplerChoice(AnalysisRunnerMixin, unittest.TestCase):
+class TestAnalysisRunnerSamplerChoice(AnalysisRunnerMixin):
     """Only dynesty is run through the parallel bilby path; every other
     sampler goes through the plain bilby wrapper."""
 
@@ -194,43 +197,43 @@ class TestAnalysisRunnerSamplerChoice(AnalysisRunnerMixin, unittest.TestCase):
         result = main.analysis_runner(str(path))
         self.pbilby.assert_called_once()
         self.bilby.assert_not_called()
-        self.assertEqual(result, "pbilby_result")
+        assert result == "pbilby_result"
 
     def test_another_sampler_uses_the_plain_bilby_path(self):
         path = self.write_dump(sampler="pymultinest")
         result = main.analysis_runner(str(path))
         self.bilby.assert_called_once()
         self.pbilby.assert_not_called()
-        self.assertEqual(result, "bilby_result")
+        assert result == "bilby_result"
 
     def test_the_injection_parameters_are_forwarded_when_present(self):
         path = self.write_dump(injection_parameters={"mass_1": 1.4})
         main.analysis_runner(str(path))
-        self.assertEqual(self.pbilby.call_args.args[3], {"mass_1": 1.4})
+        assert self.pbilby.call_args.args[3] == {"mass_1": 1.4}
 
     def test_a_run_on_real_data_forwards_no_injection_parameters(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
-        self.assertIsNone(self.pbilby.call_args.args[3])
+        assert self.pbilby.call_args.args[3] is None
 
     def test_the_mpi_rank_is_forwarded_so_only_one_rank_writes_output(self):
         path = self.write_dump()
         main.analysis_runner(str(path))
-        self.assertEqual(self.pbilby.call_args.args[4], main.rank)
+        assert self.pbilby.call_args.args[4] == main.rank
 
     def test_extra_keyword_arguments_reach_the_parallel_sampler(self):
         path = self.write_dump()
         main.analysis_runner(str(path), nlive=500)
-        self.assertEqual(self.pbilby.call_args.kwargs["nlive"], 500)
+        assert self.pbilby.call_args.kwargs["nlive"] == 500
 
     def test_the_plain_sampler_is_called_with_the_positional_arguments_only(self):
         path = self.write_dump(sampler="pymultinest")
         main.analysis_runner(str(path))
-        self.assertEqual(len(self.bilby.call_args.args), 5)
-        self.assertEqual(self.bilby.call_args.kwargs, {})
+        assert len(self.bilby.call_args.args) == 5
+        assert self.bilby.call_args.kwargs == {}
 
 
-class TestNMMAAnalysisEntryPoint(unittest.TestCase):
+class TestNMMAAnalysisEntryPoint:
     """The console script only builds the parser and forwards the parsed
     arguments as keywords."""
 
@@ -265,18 +268,14 @@ class TestNMMAAnalysisEntryPoint(unittest.TestCase):
         parse.assert_called_once_with("the_parser")
 
 
-class TestModuleSetup(unittest.TestCase):
+class TestModuleSetup:
     """Importing the analysis module pins the thread count, because each MPI
     rank runs its own process and must not oversubscribe the node."""
 
     def test_the_thread_count_is_pinned_to_one(self):
         import os
 
-        self.assertEqual(os.environ["OMP_NUM_THREADS"], "1")
+        assert os.environ["OMP_NUM_THREADS"] == "1"
 
     def test_a_rank_is_always_defined_even_without_mpi(self):
-        self.assertIsInstance(main.rank, int)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert isinstance(main.rank, int)

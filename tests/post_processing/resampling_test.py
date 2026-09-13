@@ -1,11 +1,11 @@
 import shutil
 import tempfile
-import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 import scipy.stats
 from bilby.core.prior import Uniform
 from bilby.gw.prior import PriorDict
@@ -54,11 +54,11 @@ def em_samples(size=200, seed=5, combined=False):
     )
 
 
-class TestFindSpreadFromResampling(unittest.TestCase):
+class TestFindSpreadFromResampling:
     """Turns a sequence of accumulated weightings into a median and credible
     interval for each step, which is what the trend plots show."""
 
-    def setUp(self):
+    def setup_method(self):
         self.prior = np.linspace(10.0, 14.0, 500)
         self.weights = [np.ones(500) / 500, np.ones(500) / 500]
 
@@ -72,11 +72,11 @@ class TestFindSpreadFromResampling(unittest.TestCase):
         # Every caller of this function therefore raises, which takes out
         # both the gwem-Hubble-estimate and combine-EOS console scripts.
         # Renaming the keyword to prob is the whole fix.
-        with self.assertRaises(TypeError) as caught:
+        with pytest.raises(TypeError) as caught:
             resampling.find_spread_from_resampling(
                 self.method, self.weights, self.prior, 200, 0.95
             )
-        self.assertIn("hdi_prob", str(caught.exception))
+        assert "hdi_prob" in str(caught.value)
 
     def test_the_resampling_method_is_called_twice_per_weighting(self):
         # The call is written out twice with a comment between, and the first
@@ -91,7 +91,7 @@ class TestFindSpreadFromResampling(unittest.TestCase):
             resampling.find_spread_from_resampling(
                 counting_method, self.weights[:1], self.prior, 200, 0.95
             )
-        self.assertEqual(len(calls), 2)
+        assert len(calls) == 2
 
     def test_one_estimate_is_produced_per_weighting(self):
         with patch.object(resampling, "hdi", return_value=(11.0, 13.0)):
@@ -99,7 +99,7 @@ class TestFindSpreadFromResampling(unittest.TestCase):
                 self.method, self.weights, self.prior, 200, 0.95
             )
         for estimate in [median, upper, lower]:
-            self.assertEqual(estimate.shape, (2,))
+            assert estimate.shape == (2,)
 
     def test_the_median_of_the_resampled_draws_is_reported(self):
         with patch.object(resampling, "hdi", return_value=(11.0, 13.0)):
@@ -107,15 +107,15 @@ class TestFindSpreadFromResampling(unittest.TestCase):
                 self.method, self.weights[:1], self.prior, 200, 0.95
             )
         expected = np.median(np.random.default_rng(1).normal(12.0, 0.5, 200))
-        self.assertAlmostEqual(median[0], expected)
+        assert median[0] == pytest.approx(expected)
 
     def test_the_interval_bounds_are_returned_lower_then_upper(self):
         with patch.object(resampling, "hdi", return_value=(11.0, 13.0)):
             _, upper, lower = resampling.find_spread_from_resampling(
                 self.method, self.weights[:1], self.prior, 200, 0.95
             )
-        self.assertAlmostEqual(upper[0], 13.0)
-        self.assertAlmostEqual(lower[0], 11.0)
+        assert upper[0] == pytest.approx(13.0)
+        assert lower[0] == pytest.approx(11.0)
 
     def test_the_prior_and_sample_size_are_passed_through(self):
         with patch.object(resampling, "hdi", return_value=(11.0, 13.0)):
@@ -123,25 +123,25 @@ class TestFindSpreadFromResampling(unittest.TestCase):
                 self.method, self.weights[:1], self.prior, 321, 0.95
             )
         prior, _, size = self.seen
-        self.assertIs(prior, self.prior)
-        self.assertEqual(size, 321)
+        assert prior is self.prior
+        assert size == 321
 
     def test_no_weightings_gives_empty_estimates(self):
         median, upper, lower = resampling.find_spread_from_resampling(
             self.method, [], self.prior, 200, 0.95
         )
         for estimate in [median, upper, lower]:
-            self.assertEqual(len(estimate), 0)
+            assert len(estimate) == 0
 
 
-class TestConstructEMKDE(unittest.TestCase):
+class TestConstructEMKDE:
     """The electromagnetic posterior enters the resampling as a density over
     ejecta mass, built from whichever ejecta columns are present."""
 
     def test_a_single_total_ejecta_column_is_used_when_present(self):
         kde = resampling.construct_EM_KDE(em_samples(combined=True), False)
-        self.assertIsInstance(kde, scipy.stats.gaussian_kde)
-        self.assertEqual(kde.d, 1)
+        assert isinstance(kde, scipy.stats.gaussian_kde)
+        assert kde.d == 1
 
     def test_the_total_column_is_converted_out_of_the_logarithm(self):
         samples = pd.DataFrame({"log10_mej": np.full(200, -2.0)})
@@ -150,11 +150,11 @@ class TestConstructEMKDE(unittest.TestCase):
 
     def test_the_two_ejecta_give_a_two_dimensional_density(self):
         kde = resampling.construct_EM_KDE(em_samples(), False)
-        self.assertEqual(kde.d, 2)
+        assert kde.d == 2
 
     def test_the_two_ejecta_can_be_summed_into_one_dimension(self):
         kde = resampling.construct_EM_KDE(em_samples(), True)
-        self.assertEqual(kde.d, 1)
+        assert kde.d == 1
 
     def test_summing_adds_the_two_masses_not_their_logarithms(self):
         samples = pd.DataFrame(
@@ -166,14 +166,14 @@ class TestConstructEMKDE(unittest.TestCase):
     def test_the_single_total_column_wins_over_the_split_columns(self):
         samples = em_samples()
         samples["log10_mej"] = -2.0
-        self.assertEqual(resampling.construct_EM_KDE(samples, False).d, 1)
+        assert resampling.construct_EM_KDE(samples, False).d == 1
 
     def test_samples_without_any_ejecta_column_are_refused(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             resampling.construct_EM_KDE(pd.DataFrame({"mass_1": [1.4]}), False)
 
     def test_only_one_of_the_two_split_columns_is_not_enough(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             resampling.construct_EM_KDE(
                 pd.DataFrame({"log10_mej_dyn": np.full(10, -2.0)}), False
             )
@@ -190,11 +190,13 @@ class StandaloneResampler(resampling.EjectaResamplerMixIn):
 
 
 class ResamplerMixin:
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
         self.eos_dir = self.tmp_dir / "eos"
         write_eos_set(self.eos_dir, count=3)
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmp_dir)
 
     def priors(self, with_spins=False):
         gw = PriorDict(
@@ -225,70 +227,71 @@ class ResamplerMixin:
         )
 
 
-class TestEjectaResamplerSetup(ResamplerMixin, unittest.TestCase):
+class TestEjectaResamplerSetup(ResamplerMixin):
     """Setting up the resampler turns both posteriors into densities and
     loads the tabulated equations of state into memory."""
 
     def test_the_sampled_parameters_are_the_five_binary_neutron_star_ones(self):
         resampler = self.build()
-        self.assertEqual(
-            list(resampler._search_parameter_keys),
-            ["chirp_mass", "mass_ratio", "EOS", "alpha", "zeta"],
-        )
+        assert list(resampler._search_parameter_keys) == [
+            "chirp_mass",
+            "mass_ratio",
+            "EOS",
+            "alpha",
+            "zeta",
+        ]
 
     def test_a_neutron_star_black_hole_run_adds_the_two_spins(self):
         resampler = self.build(withNSBH=True)
-        self.assertIn("chi_1", resampler._search_parameter_keys)
-        self.assertIn("chi_2", resampler._search_parameter_keys)
+        assert "chi_1" in resampler._search_parameter_keys
+        assert "chi_2" in resampler._search_parameter_keys
 
     def test_the_equation_of_state_index_spans_one_past_the_count(self):
         # The index is sampled as a continuous value and floored later, so
         # the upper edge is one above the number of tables.
         resampler = self.build()
-        self.assertEqual(resampler.priors["EOS"].maximum, 4)
+        assert resampler.priors["EOS"].maximum == 4
 
     def test_every_equation_of_state_table_is_loaded(self):
         resampler = self.build()
-        self.assertEqual(sorted(resampler.EOS_masses_dict), [1, 2, 3])
-        self.assertEqual(sorted(resampler.EOS_radius_dict), [1, 2, 3])
-        self.assertEqual(sorted(resampler.EOS_lambda_dict), [1, 2, 3])
+        assert sorted(resampler.EOS_masses_dict) == [1, 2, 3]
+        assert sorted(resampler.EOS_radius_dict) == [1, 2, 3]
+        assert sorted(resampler.EOS_lambda_dict) == [1, 2, 3]
 
     def test_the_tables_are_indexed_from_one_to_match_the_file_names(self):
         resampler = self.build()
-        self.assertNotIn(0, resampler.EOS_masses_dict)
+        assert 0 not in resampler.EOS_masses_dict
 
     def test_the_posterior_equation_of_state_index_is_shifted_to_match(self):
         # The samples hold a zero-based continuous index, the tables are
         # named from one.
         resampler = self.build()
-        self.assertEqual(resampler.EOSsamples.min(), 1)
-        self.assertTrue(np.issubdtype(resampler.EOSsamples.dtype, np.integer))
+        assert resampler.EOSsamples.min() == 1
+        assert np.issubdtype(resampler.EOSsamples.dtype, np.integer)
 
     def test_the_chirp_mass_density_is_built_in_the_source_frame(self):
         # The samples are in the detector frame, so they are divided by one
         # plus the redshift before the density is built.
         resampler = self.build()
         samples = gw_samples()
-        self.assertLess(
-            resampler.mcKDE.dataset.mean(), samples.chirp_mass.to_numpy().mean()
-        )
+        assert resampler.mcKDE.dataset.mean() < samples.chirp_mass.to_numpy().mean()
 
     def test_the_inverse_mass_ratio_density_is_built(self):
         resampler = self.build()
-        self.assertGreater(resampler.invqKDE.dataset.mean(), 1.0)
+        assert resampler.invqKDE.dataset.mean() > 1.0
 
     def test_the_spin_densities_are_only_built_for_a_mixed_binary(self):
-        self.assertFalse(hasattr(self.build(), "chi_1KDE"))
-        self.assertTrue(hasattr(self.build(withNSBH=True), "chi_1KDE"))
+        assert not hasattr(self.build(), "chi_1KDE")
+        assert hasattr(self.build(withNSBH=True), "chi_1KDE")
 
     def test_both_ejecta_fitting_formulae_are_prepared(self):
         resampler = self.build()
-        self.assertIsNotNone(resampler.BNSEjectaFitting)
-        self.assertIsNotNone(resampler.NSBHEjectaFitting)
+        assert resampler.BNSEjectaFitting is not None
+        assert resampler.NSBHEjectaFitting is not None
 
     def test_a_missing_equation_of_state_table_is_reported(self):
         gw_prior, em_prior = self.priors()
-        with self.assertRaises(OSError):
+        with pytest.raises(OSError):
             StandaloneResampler(
                 gw_samples(),
                 em_samples(),
@@ -300,31 +303,31 @@ class TestEjectaResamplerSetup(ResamplerMixin, unittest.TestCase):
             )
 
 
-class TestEjectaResamplerPrior(ResamplerMixin, unittest.TestCase):
+class TestEjectaResamplerPrior(ResamplerMixin):
     def test_the_unit_cube_is_rescaled_onto_the_priors(self):
         resampler = self.build()
         values = resampler.Prior(np.full(5, 0.5))
-        self.assertEqual(len(values), 5)
+        assert len(values) == 5
 
     def test_the_chirp_mass_lands_inside_its_prior_range(self):
         resampler = self.build()
         chirp_mass = resampler.Prior(np.full(5, 0.5))[0]
-        self.assertGreaterEqual(chirp_mass, 1.0)
-        self.assertLessEqual(chirp_mass, 1.5)
+        assert chirp_mass >= 1.0
+        assert chirp_mass <= 1.5
 
     def test_the_cube_edges_map_to_the_prior_edges(self):
         resampler = self.build()
         low = resampler.Prior(np.full(5, 0.0))
         high = resampler.Prior(np.full(5, 1.0))
-        self.assertAlmostEqual(low[0], 1.0)
-        self.assertAlmostEqual(high[0], 1.5)
+        assert low[0] == pytest.approx(1.0)
+        assert high[0] == pytest.approx(1.5)
 
     def test_a_mixed_binary_rescales_seven_values(self):
         resampler = self.build(withNSBH=True)
-        self.assertEqual(len(resampler.Prior(np.full(7, 0.5))), 7)
+        assert len(resampler.Prior(np.full(7, 0.5))) == 7
 
 
-class TestEjectaResamplerLogLikelihood(ResamplerMixin, unittest.TestCase):
+class TestEjectaResamplerLogLikelihood(ResamplerMixin):
     """The likelihood maps binary parameters through an equation of state and
     an ejecta formula, then scores the result against the electromagnetic
     density."""
@@ -335,17 +338,17 @@ class TestEjectaResamplerLogLikelihood(ResamplerMixin, unittest.TestCase):
     def test_a_plausible_binary_gets_a_finite_value(self):
         resampler = self.build()
         value = resampler.LogLikelihood(self.point())
-        self.assertTrue(np.isfinite(value))
+        assert np.isfinite(value)
 
     def test_the_value_is_a_plain_float_not_an_array(self):
         resampler = self.build()
-        self.assertIsInstance(resampler.LogLikelihood(self.point()), float)
+        assert isinstance(resampler.LogLikelihood(self.point()), float)
 
     def test_an_equation_of_state_absent_from_the_posterior_is_excluded(self):
         resampler = self.build()
         resampler.EOSsamples = np.full_like(resampler.EOSsamples, 1)
         value = resampler.LogLikelihood(self.point(eos=2.0))
-        self.assertLess(value, -1e300)
+        assert value < -1e300
 
     def test_a_negative_dynamical_ejecta_mass_is_excluded(self):
         resampler = self.build()
@@ -353,7 +356,7 @@ class TestEjectaResamplerLogLikelihood(ResamplerMixin, unittest.TestCase):
             resampler.BNSEjectaFitting, "dynamic_mass_fitting_KrFo", return_value=-1.0
         ):
             value = resampler.LogLikelihood(self.point(alpha=0.0))
-        self.assertLess(value, -1e300)
+        assert value < -1e300
 
     def test_the_combined_ejecta_mode_scores_a_single_total(self):
         resampler = self.build(combine_ejecta_mass=True)
@@ -361,7 +364,7 @@ class TestEjectaResamplerLogLikelihood(ResamplerMixin, unittest.TestCase):
             resampler.EMKDE, "logpdf", return_value=np.array([-1.0])
         ) as logpdf:
             resampler.LogLikelihood(self.point())
-        self.assertTrue(np.isscalar(logpdf.call_args.args[0]))
+        assert np.isscalar(logpdf.call_args.args[0])
 
     def test_the_separate_ejecta_mode_scores_both_masses(self):
         resampler = self.build(combine_ejecta_mass=False)
@@ -369,7 +372,7 @@ class TestEjectaResamplerLogLikelihood(ResamplerMixin, unittest.TestCase):
             resampler.EMKDE, "logpdf", return_value=np.array([-1.0])
         ) as logpdf:
             resampler.LogLikelihood(self.point())
-        self.assertEqual(len(logpdf.call_args.args[0]), 2)
+        assert len(logpdf.call_args.args[0]) == 2
 
     def test_a_mixed_binary_uses_the_neutron_star_black_hole_formula(self):
         resampler = self.build(withNSBH=True)
@@ -400,28 +403,30 @@ class TestEjectaResamplerLogLikelihood(ResamplerMixin, unittest.TestCase):
         heavy = self.point(chirp_mass=1.49, mass_ratio=0.99)
         with np.errstate(divide="ignore", invalid="ignore"):
             value = resampler.LogLikelihood(heavy)
-        self.assertIsInstance(value, float)
+        assert isinstance(value, float)
 
     def test_the_equation_of_state_index_is_floored_then_shifted(self):
         resampler = self.build()
         first = resampler.LogLikelihood(self.point(eos=0.2))
         second = resampler.LogLikelihood(self.point(eos=0.8))
-        self.assertAlmostEqual(first, second)
+        assert first == pytest.approx(second)
 
     def test_a_different_equation_of_state_changes_the_value(self):
         resampler = self.build()
         first = resampler.LogLikelihood(self.point(eos=0.0))
         second = resampler.LogLikelihood(self.point(eos=1.0))
-        self.assertNotAlmostEqual(first, second)
+        assert first != pytest.approx(second)
 
 
-class TestMainResampling(unittest.TestCase):
+class TestMainResampling:
     """The console script reads both posteriors, builds the sampler and
     writes the combined samples out."""
 
-    def setUp(self):
+    def setup_method(self):
         self.tmp_dir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmp_dir)
 
     def test_multinest_is_only_imported_when_the_script_runs(self):
         # The library needs a separately built shared object, so importing
@@ -429,15 +434,11 @@ class TestMainResampling(unittest.TestCase):
         import importlib
 
         module = importlib.import_module("nmma.post_processing.resampling")
-        self.assertFalse(hasattr(module, "Solver"))
+        assert not hasattr(module, "Solver")
 
     def test_the_sampler_dimension_follows_the_source_type(self):
         # Five parameters for a binary neutron star, seven once the two
         # spins are added for a mixed binary.
         source = Path(resampling.__file__).read_text()
-        self.assertIn("n_dims=5", source)
-        self.assertIn('pymulti_kwargs["n_dims"] = 7', source)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert "n_dims=5" in source
+        assert 'pymulti_kwargs["n_dims"] = 7' in source
