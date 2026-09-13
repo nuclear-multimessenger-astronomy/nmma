@@ -11,25 +11,25 @@ from nmma.population.pop_likelihood import (
     build_population_model,
 )
 
-### TODO: remove this
-# def binary(mass_1=1.5, mass_2=1.4, mass_ratio=None):
-#     """The three parameters the population likelihood reads. The masses are
-#     source-frame, because a population is defined in the source frame."""
-#     if mass_ratio is None:
-#         mass_ratio = mass_2 / mass_1
-#     return {
-#         "mass_1_source": mass_1,
-#         "mass_2_source": mass_2,
-#         "mass_ratio": mass_ratio,
-#     }
-
-
+# The three parameters the population likelihood reads. The masses are
+# source-frame, because a population is defined in the source frame. The
+# mass ratio is always mass_2_source / mass_1_source, so that these
+# dictionaries describe physically consistent binaries.
 TEST_MASS_1_SOURCE = 1.7
 TEST_MASS_2_SOURCE = 1.3
-TEST_VAR_UNEQUAL_MASS_PARAMS = {"mass_1_source": TEST_MASS_1_SOURCE,
-                                "mass_2_source": TEST_MASS_2_SOURCE,
-                                "mass_ratio": TEST_MASS_2_SOURCE / TEST_MASS_1_SOURCE,
-                                }
+TEST_VAR_UNEQUAL_MASS_PARAMS = {
+    "mass_1_source": TEST_MASS_1_SOURCE,
+    "mass_2_source": TEST_MASS_2_SOURCE,
+    "mass_ratio": TEST_MASS_2_SOURCE / TEST_MASS_1_SOURCE,
+}
+
+TEST_EQUAL_MASS_SOURCE = 1.5
+TEST_VAR_EQUAL_MASS_PARAMS = {
+    "mass_1_source": TEST_EQUAL_MASS_SOURCE,
+    "mass_2_source": TEST_EQUAL_MASS_SOURCE,
+    "mass_ratio": 1.0,
+}
+
 
 class TestNeutronStarPopulation:
     """The base class is the uniform (flat) neutron-star mass distribution
@@ -65,7 +65,7 @@ class TestNeutronStarPopulation:
         assert NeutronStarPopulation(beta=custom_beta).beta == custom_beta
 
     def test_no_pairing_preference_leaves_the_likelihood_to_the_masses_alone(self):
-        parameters = binary(mass_ratio=self.unequal_mass_ratio)
+        parameters = TEST_VAR_UNEQUAL_MASS_PARAMS
         expected = self.model.distribution.logpdf(
             parameters["mass_1_source"]
         ) + self.model.distribution.logpdf(parameters["mass_2_source"])
@@ -75,8 +75,12 @@ class TestNeutronStarPopulation:
         self,
     ):
         low_mass_ratio, high_mass_ratio = 0.2, 0.9
-        first = self.model.log_likelihood(binary(mass_ratio=low_mass_ratio))
-        second = self.model.log_likelihood(binary(mass_ratio=high_mass_ratio))
+        first = self.model.log_likelihood(
+            {**TEST_VAR_UNEQUAL_MASS_PARAMS, "mass_ratio": low_mass_ratio}
+        )
+        second = self.model.log_likelihood(
+            {**TEST_VAR_UNEQUAL_MASS_PARAMS, "mass_ratio": high_mass_ratio}
+        )
         assert first == pytest.approx(second)
 
     def test_a_positive_exponent_favours_equal_mass_binaries(self):
@@ -84,8 +88,12 @@ class TestNeutronStarPopulation:
         model = NeutronStarPopulation(
             m_min=self.m_min, m_max=self.m_max, beta=positive_beta
         )
-        unequal = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
-        equal = model.log_likelihood(binary(mass_ratio=self.equal_mass_ratio))
+        unequal = model.log_likelihood(
+            {**TEST_VAR_UNEQUAL_MASS_PARAMS, "mass_ratio": self.unequal_mass_ratio}
+        )
+        equal = model.log_likelihood(
+            {**TEST_VAR_UNEQUAL_MASS_PARAMS, "mass_ratio": self.equal_mass_ratio}
+        )
         assert equal > unequal
 
     def test_a_negative_exponent_favours_unequal_mass_binaries(self):
@@ -93,8 +101,12 @@ class TestNeutronStarPopulation:
         model = NeutronStarPopulation(
             m_min=self.m_min, m_max=self.m_max, beta=negative_beta
         )
-        unequal = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
-        equal = model.log_likelihood(binary(mass_ratio=self.equal_mass_ratio))
+        unequal = model.log_likelihood(
+            {**TEST_VAR_UNEQUAL_MASS_PARAMS, "mass_ratio": self.unequal_mass_ratio}
+        )
+        equal = model.log_likelihood(
+            {**TEST_VAR_UNEQUAL_MASS_PARAMS, "mass_ratio": self.equal_mass_ratio}
+        )
         assert unequal > equal
 
     def test_the_mass_ratio_term_is_the_exponent_times_its_logarithm(self):
@@ -104,15 +116,16 @@ class TestNeutronStarPopulation:
         without = NeutronStarPopulation(
             m_min=self.m_min, m_max=self.m_max, beta=0.0
         )
-        difference = model.log_likelihood(
-            binary(mass_ratio=mass_ratio)
-        ) - without.log_likelihood(binary(mass_ratio=mass_ratio))
+        parameters = {**TEST_VAR_UNEQUAL_MASS_PARAMS, "mass_ratio": mass_ratio}
+        difference = model.log_likelihood(parameters) - without.log_likelihood(
+            parameters
+        )
         assert difference == pytest.approx(beta * np.log(mass_ratio))
 
     def test_an_equal_mass_binary_gets_no_pairing_contribution(self):
         beta = 5.0
         model = NeutronStarPopulation(m_min=self.m_min, m_max=self.m_max, beta=beta)
-        parameters = binary(mass_ratio=self.equal_mass_ratio)
+        parameters = TEST_VAR_EQUAL_MASS_PARAMS
         assert model.log_likelihood(parameters) == pytest.approx(
             self.model.log_likelihood(parameters)
         )
@@ -126,8 +139,9 @@ class TestNeutronStarPopulation:
         model = NeutronStarPopulation(
             m_min=self.m_min, m_max=self.m_max, beta=huge_beta
         )
+        parameters = {**TEST_VAR_UNEQUAL_MASS_PARAMS, "mass_ratio": self.unequal_mass_ratio}
         with np.errstate(divide="ignore"):
-            value = model.log_likelihood(binary(mass_ratio=self.unequal_mass_ratio))
+            value = model.log_likelihood(parameters)
         assert value == -np.inf
         assert np.isfinite(huge_beta * np.log(self.unequal_mass_ratio))
 
@@ -181,15 +195,20 @@ class TestPeakNeutronStarPopulation:
         assert peak == pytest.approx(self.loc, abs=grid_spacing / 2)
 
     def test_a_binary_at_the_peak_is_the_most_likely(self):
-        equal_mass_ratio = 1.0
         peak_mass = self.loc
         off_peak_mass_1, off_peak_mass_2 = 2.0, 1.2
-        at_peak = self.model.log_likelihood(
-            binary(peak_mass, peak_mass, mass_ratio=equal_mass_ratio)
-        )
-        off_peak = self.model.log_likelihood(
-            binary(off_peak_mass_1, off_peak_mass_2, mass_ratio=equal_mass_ratio)
-        )
+        at_peak_params = {
+            "mass_1_source": peak_mass,
+            "mass_2_source": peak_mass,
+            "mass_ratio": 1.0,
+        }
+        off_peak_params = {
+            "mass_1_source": off_peak_mass_1,
+            "mass_2_source": off_peak_mass_2,
+            "mass_ratio": off_peak_mass_2 / off_peak_mass_1,
+        }
+        at_peak = self.model.log_likelihood(at_peak_params)
+        off_peak = self.model.log_likelihood(off_peak_params)
         assert at_peak > off_peak
 
 
@@ -231,45 +250,67 @@ class TestLogLikelihood:
     def setup_method(self):
         self.m_min = 1.1
         self.m_max = 2.1
-        self.equal_mass_ratio = 1.0
         self.model = NeutronStarPopulation(m_min=self.m_min, m_max=self.m_max)
 
     def test_both_components_contribute(self):
-        mass_1, mass_2 = 1.6, 1.3
+        parameters = TEST_VAR_UNEQUAL_MASS_PARAMS
         expected = self.model.distribution.logpdf(
-            mass_1
-        ) + self.model.distribution.logpdf(mass_2)
-        assert self.model.log_likelihood(
-            binary(mass_1, mass_2, mass_ratio=self.equal_mass_ratio)
-        ) == pytest.approx(expected)
+            parameters["mass_1_source"]
+        ) + self.model.distribution.logpdf(parameters["mass_2_source"])
+        assert self.model.log_likelihood(parameters) == pytest.approx(expected)
 
     def test_the_components_are_interchangeable(self):
-        mass_1, mass_2 = 1.7, 1.3
-        first = self.model.log_likelihood(
-            binary(mass_1, mass_2, mass_ratio=self.equal_mass_ratio)
-        )
-        second = self.model.log_likelihood(
-            binary(mass_2, mass_1, mass_ratio=self.equal_mass_ratio)
-        )
+        swapped_parameters = {
+            "mass_1_source": TEST_MASS_2_SOURCE,
+            "mass_2_source": TEST_MASS_1_SOURCE,
+            "mass_ratio": TEST_MASS_1_SOURCE / TEST_MASS_2_SOURCE,
+        }
+        first = self.model.log_likelihood(TEST_VAR_UNEQUAL_MASS_PARAMS)
+        second = self.model.log_likelihood(swapped_parameters)
         assert first == pytest.approx(second)
+
+    def test_the_components_are_not_interchangeable_with_a_pairing_preference(self):
+        # Swapping mass_1 and mass_2 leaves the mass densities unchanged
+        # (their sum is symmetric) but inverts the mass ratio, so once beta
+        # is non-zero the pairing term breaks the symmetry.
+        beta = 2.0
+        model = NeutronStarPopulation(m_min=self.m_min, m_max=self.m_max, beta=beta)
+        swapped_parameters = {
+            "mass_1_source": TEST_MASS_2_SOURCE,
+            "mass_2_source": TEST_MASS_1_SOURCE,
+            "mass_ratio": TEST_MASS_1_SOURCE / TEST_MASS_2_SOURCE,
+        }
+        first = model.log_likelihood(TEST_VAR_UNEQUAL_MASS_PARAMS)
+        second = model.log_likelihood(swapped_parameters)
+        assert first != pytest.approx(second)
 
     def test_a_component_outside_the_population_is_excluded(self):
         mass_outside_support = 2.5
-        assert self.model.log_likelihood(
-            binary(mass_outside_support, 1.4, mass_ratio=self.equal_mass_ratio)
-        ) == -np.inf
+        mass_inside_support = 1.4
+        parameters = {
+            "mass_1_source": mass_outside_support,
+            "mass_2_source": mass_inside_support,
+            "mass_ratio": mass_inside_support / mass_outside_support,
+        }
+        assert self.model.log_likelihood(parameters) == -np.inf
 
     def test_either_component_being_outside_excludes_the_binary(self):
+        mass_inside_support = 1.5
         mass_outside_support = 0.9
-        assert self.model.log_likelihood(
-            binary(1.5, mass_outside_support, mass_ratio=self.equal_mass_ratio)
-        ) == -np.inf
+        parameters = {
+            "mass_1_source": mass_inside_support,
+            "mass_2_source": mass_outside_support,
+            "mass_ratio": mass_outside_support / mass_inside_support,
+        }
+        assert self.model.log_likelihood(parameters) == -np.inf
 
     def test_a_table_of_binaries_is_evaluated_elementwise(self):
+        mass_1_source = np.array([1.5, 1.6])
+        mass_2_source = np.array([1.4, 1.3])
         parameters = {
-            "mass_1_source": np.array([1.5, 1.6]),
-            "mass_2_source": np.array([1.4, 1.3]),
-            "mass_ratio": np.array([0.93, 0.81]),
+            "mass_1_source": mass_1_source,
+            "mass_2_source": mass_2_source,
+            "mass_ratio": mass_2_source / mass_1_source,
         }
         values = self.model.log_likelihood(parameters)
         assert values.shape == (2,)
@@ -277,38 +318,53 @@ class TestLogLikelihood:
 
     def test_one_excluded_row_does_not_exclude_the_others(self):
         mass_outside_support = 3.0
+        mass_1_source = np.array([1.5, mass_outside_support])
+        mass_2_source = np.array([1.4, 1.3])
         parameters = {
-            "mass_1_source": np.array([1.5, mass_outside_support]),
-            "mass_2_source": np.array([1.4, 1.3]),
-            "mass_ratio": np.array([0.93, 0.43]),
+            "mass_1_source": mass_1_source,
+            "mass_2_source": mass_2_source,
+            "mass_ratio": mass_2_source / mass_1_source,
         }
         values = self.model.log_likelihood(parameters)
         assert np.isfinite(values[0])
         assert values[1] == -np.inf
 
     def test_the_source_frame_masses_are_required(self):
+        # We don't care about the values, just the keys missing _source
+        mass_1, mass_2 = 1.5, 1.4
         with pytest.raises(KeyError):
-            self.model.log_likelihood({"mass_1": 1.5, "mass_2": 1.4, "mass_ratio": 0.9})
+            self.model.log_likelihood(
+                {"mass_1": mass_1, "mass_2": mass_2, "mass_ratio": mass_2 / mass_1}
+            )
 
     def test_the_mass_ratio_is_required(self):
         with pytest.raises(KeyError):
             self.model.log_likelihood({"mass_1_source": 1.5, "mass_2_source": 1.4})
 
     def test_extra_parameters_are_ignored(self):
-        parameters = binary(mass_ratio=self.equal_mass_ratio)
-        parameters["luminosity_distance"] = 40.0
+        parameters = {**TEST_VAR_UNEQUAL_MASS_PARAMS, "luminosity_distance": 40.0}
         assert self.model.log_likelihood(parameters) == pytest.approx(
-            self.model.log_likelihood(binary(mass_ratio=self.equal_mass_ratio))
+            self.model.log_likelihood(TEST_VAR_UNEQUAL_MASS_PARAMS)
         )
 
     def test_the_flat_model_gives_the_same_value_for_any_allowed_pair(self):
         flat_m_min, flat_m_max = 1.1, 2.0
         flat = NeutronStarPopulation(m_min=flat_m_min, m_max=flat_m_max)
+        mass_1, mass_2 = 1.3, 1.2
         first = flat.log_likelihood(
-            binary(1.3, 1.2, mass_ratio=self.equal_mass_ratio)
+            {
+                "mass_1_source": mass_1,
+                "mass_2_source": mass_2,
+                "mass_ratio": mass_2 / mass_1,
+            }
         )
+        other_mass_1, other_mass_2 = flat_m_max, flat_m_max - 0.1
         second = flat.log_likelihood(
-            binary(flat_m_max, flat_m_max - 0.1, mass_ratio=self.equal_mass_ratio)
+            {
+                "mass_1_source": other_mass_1,
+                "mass_2_source": other_mass_2,
+                "mass_ratio": other_mass_2 / other_mass_1,
+            }
         )
         assert first == pytest.approx(second)
 
@@ -320,7 +376,6 @@ class TestUseAsAMessengerLikelihood:
     def setup_method(self):
         self.prior_m_min = 1.1
         self.prior_m_max = 2.0
-        self.equal_mass_ratio = 1.0
         self.priors = PriorDict()
         self.priors["mass_1_source"] = Uniform(
             self.prior_m_min, self.prior_m_max, "mass_1_source"
@@ -332,10 +387,9 @@ class TestUseAsAMessengerLikelihood:
         assert self.likelihood.sub_model is self.model
 
     def test_the_wrapped_likelihood_reports_the_population_value(self):
-        parameters = binary(mass_ratio=self.equal_mass_ratio)
-        assert self.likelihood.sub_log_likelihood(parameters) == pytest.approx(
-            self.model.log_likelihood(parameters)
-        )
+        assert self.likelihood.sub_log_likelihood(
+            TEST_VAR_UNEQUAL_MASS_PARAMS
+        ) == pytest.approx(self.model.log_likelihood(TEST_VAR_UNEQUAL_MASS_PARAMS))
 
     def test_a_population_has_no_noise_evidence(self):
         # There is no data and so no noise hypothesis; the wrapper falls
@@ -344,16 +398,21 @@ class TestUseAsAMessengerLikelihood:
 
     def test_an_excluded_binary_is_floored_rather_than_left_infinite(self):
         mass_outside_support = 2.5
-        value = self.likelihood.sub_log_likelihood(
-            binary(mass_outside_support, 1.4, mass_ratio=self.equal_mass_ratio)
-        )
+        mass_inside_support = 1.4
+        parameters = {
+            "mass_1_source": mass_outside_support,
+            "mass_2_source": mass_inside_support,
+            "mass_ratio": mass_inside_support / mass_outside_support,
+        }
+        value = self.likelihood.sub_log_likelihood(parameters)
         assert np.isfinite(value)
         assert value < -1e300
 
     def test_the_full_likelihood_runs_through_the_conversion_and_constraints(self):
-        parameters = binary(mass_ratio=self.equal_mass_ratio)
-        value = self.likelihood.log_likelihood(parameters)
-        assert value == pytest.approx(self.model.log_likelihood(parameters))
+        value = self.likelihood.log_likelihood(TEST_VAR_UNEQUAL_MASS_PARAMS)
+        assert value == pytest.approx(
+            self.model.log_likelihood(TEST_VAR_UNEQUAL_MASS_PARAMS)
+        )
 
     def test_a_violated_constraint_floors_the_likelihood(self):
         priors = PriorDict()
@@ -362,8 +421,7 @@ class TestUseAsAMessengerLikelihood:
         )
         priors["forbidden"] = Constraint(0, 1, "forbidden")
         likelihood = NMMALikelihood(PeakNeutronStarPopulation(), priors)
-        parameters = binary(mass_ratio=self.equal_mass_ratio)
-        parameters["forbidden"] = 5.0
+        parameters = {**TEST_VAR_UNEQUAL_MASS_PARAMS, "forbidden": 5.0}
         assert likelihood.log_likelihood(parameters) < -1e300
 
     def test_the_representation_names_the_population_model(self):
