@@ -6,7 +6,7 @@ from ..core.conversion import MultimessengerConversion
 from ..gw.gw_likelihood import GravitationalWaveTransientLikelihood, setup_gw_kwargs
 from ..eos.eos_likelihood import EquationofStateLikelihood, setup_eos_kwargs, EoSConverter
 from ..em.em_likelihood import EMTransientLikelihood, setup_em_kwargs
-from ..population.pop_likelihood import NeutronStarPopulation
+from ..population.pop_likelihood import build_population_model
 
 
 class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
@@ -154,7 +154,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin,JointLikelihood):
             conversion_instructions['em'] = True  # placeholder
 
         if "pop" in messengers:
-            pop_model = NeutronStarPopulation(args.population_model)
+            pop_model = build_population_model(args.population_model)
             messenger_lhoods.append(NMMALikelihood(pop_model, priors))
             # conversion_instructions['pop'] = 'model'
         

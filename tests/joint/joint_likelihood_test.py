@@ -491,7 +491,7 @@ class TestSetupFromArgsMessengerSelection(SetupFromArgsMixin):
 
     def test_a_population_messenger_is_wrapped_in_a_plain_nmma_likelihood(self):
         with patch.object(
-            joint_likelihood, "NeutronStarPopulation", return_value=MagicMock()
+            joint_likelihood, "build_population_model", return_value=MagicMock()
         ) as population:
             with patch.object(
                 joint_likelihood,
