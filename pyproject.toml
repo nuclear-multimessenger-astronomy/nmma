@@ -84,11 +84,6 @@ grb = [
     "afterglowpy>=0.7.3",
     "wrapt_timeout_decorator",
 ]
-neuralnet = [
-    "torch",
-    "nflows",
-    "torchvision",
-]
 production = [
     "nestcheck",
     "mpi4py",

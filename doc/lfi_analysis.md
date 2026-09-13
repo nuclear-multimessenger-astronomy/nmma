@@ -1,3 +1,7 @@
+:::{important}
+Likelihood-free inference is no longer supported in NMMA versions after [v1.0.2](https://github.com/nuclear-multimessenger-astronomy/nmma/releases/tag/v1.0.2). The legacy code can be found at <https://github.com/nuclear-multimessenger-astronomy/sim_based_inference>.
+:::
+
 # Perform Parameter Estimation Using Liklihood Free Inference (LFI)
 
 NMMA is adding machine learning functionality to its currently offered analysis methods. In this initial incorporation, a neural network approach will perform parameter estimation on light curves from BNS events. We will address the limitations first, and then provide an example run. 
