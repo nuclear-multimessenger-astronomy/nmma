@@ -33,7 +33,7 @@ dependencies = [
     "bilby_pipe>=1.7.0",
     "fiestaEM>=0.2.1",
     "huggingface_hub",
-    "schwimmbad",
+    "richpool",
     "colorcet",
     "numpy>=2.0",
     "matplotlib>=3.8",

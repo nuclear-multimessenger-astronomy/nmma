@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from pandas import DataFrame
 from numpy.random import Generator, PCG64, SeedSequence
-from schwimmbad import MPIPool, MultiPool
+from richpool import MPIPool, MultiPool
 
 from bilby.core.sampler import base_sampler as bs, dynesty3_utils  as dy_utils
 from bilby.core.sampler.dynesty import dynesty_stats_plot
@@ -259,7 +259,7 @@ class Dynesty(Worker):
 
         Parameters
         ----------
-        pool: a Schwimmbad-pool object
+        pool: a richpool-pool object
 
         Returns
         -------
@@ -316,8 +316,8 @@ class Dynesty(Worker):
 
         Parameters
         ----------
-        pool: schwimmbad.MPIPool
-            Schwimmbad pool for MPI parallelisation
+        pool: richpool.MultiPool
+            Richpool pool for parallelisation
 
         Returns
         -------
