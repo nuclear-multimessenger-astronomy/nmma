@@ -6,20 +6,51 @@ from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_n
 from ..core.conversion import (bbh_source_frame, bns_source_frame, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion)
 
 def setup_gw_kwargs(data_dump, args, logger, **kwargs):
-    """
-    Set up the gravitational-wave likelihood.
-    We read some required args for the chosen gw-likelihood in this process.
-    For multibanding, this includes:
-        reference_chirp_mass: float, optional          
-            A reference chirp mass for determining the frequency banding. This is set to prior minimum of chirp mass if not specified. Hence a CBCPriorDict object needs to be passed to priors when this parameter is not specified.
-    For relative-binning, this includes:
-        fiducial_parameters: dictionary
-            fiducial parameters for relative binning reference waveform
+    """Assemble the keyword arguments for `GravitationalWaveTransientLikelihood`.
+
+    Starts from the defaults inferred from `GravitationalWaveTransientLikelihood`'s
+    signature via `args` (prefixed `gw_`), then reads any extra args required by
+    the chosen `args.likelihood_type`:
+
+    - ROQGravitationalWaveTransient: drops `time_marginalization`/`jitter_time`
+      (unsupported for ROQ) and adds the ROQ kwargs from `roq_likelihood_kwargs`.
+    - RelativeBinningGravitationalWaveTransient:
+        fiducial_parameters: dict
+            Fiducial parameters for the relative-binning reference waveform.
         update_fiducial_parameters: bool
-            if True, tries to optimize fiducial parameters with the maximum likelihood. Defaults to False
+            If True, tries to optimize fiducial parameters with the maximum
+            likelihood. Defaults to False.
         epsilon: float
-            sets the precision of the binning for relative binning
+            Sets the precision of the binning for relative binning.
+    - MBGravitationalWaveTransient: drops `time_marginalization`/`jitter_time`,
+      strips bilby_pipe's default `minimum_frequency`/`maximum_frequency` from
+      the waveform generator, and adds:
+        reference_chirp_mass: float, optional
+            A reference chirp mass for determining the frequency banding. This
+            is set to the prior minimum of chirp mass if not specified. Hence a
+            CBCPriorDict object needs to be passed to priors when this
+            parameter is not specified.
+
+    Parameters
+    ----------
+    data_dump : dict
+        The generation-stage data dump; used for `ifo_list`, `waveform_generator`,
+        and (for ROQ) `meta_data["weight_file"]`.
+    args : argparse.Namespace
+        Parsed analysis config, including `likelihood_type` and the `gw_`-prefixed
+        likelihood options.
+    logger : logging.Logger
+        Logger used when loading ROQ weights.
+    **kwargs
+        Overrides merged into the returned kwargs last, taking precedence over
+        everything computed above.
+
+    Returns
+    -------
+    dict
+        Keyword arguments ready to pass to `GravitationalWaveTransientLikelihood`.
     """
+
     default_gw_kwargs = initialisation_args_from_signature_and_namespace(
         GravitationalWaveTransientLikelihood, args, prefixes=['gw_'])
     gw_kwargs = default_gw_kwargs | dict(
@@ -103,8 +134,9 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
     Parameters
     ----------
     priors: dict
-        To be used in the distance and phase marginalization and
-        having the corresponding eos prior appened to it
+        The joint prior dict for the run (may already include EOS-derived
+        priors merged in upstream by `MultiMessengerLikelihood`); used
+        directly for distance and phase marginalization.
     interferometers: list, bilby.gw.detector.InterferometerList
         A list of `bilby.detector.Interferometer` instances - contains the
         detector data and power spectral densities
@@ -159,6 +191,19 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
     kwargs:
         Additional keyword arguments passed to the likelihood class. These might be required by the chosen gw_likelihood_type!
 
+    Notes
+    -----
+    When `gw_likelihood_type='ROQGravitationalWaveTransient'`, `kwargs` must
+    additionally supply:
+        roq_params: str, array_like
+            Parameters describing the domain of validity of the ROQ basis.
+        roq_params_check: bool
+            If true, run tests using the roq_params to check the prior and
+            data are valid for the ROQ.
+        roq_scale_factor: float
+            The ROQ scale factor used.
+    (`setup_gw_kwargs`/`roq_likelihood_kwargs` populate these automatically
+    when building this likelihood via the normal pipeline.)
     """
 
     def __init__(self,priors, interferometers,  
@@ -186,14 +231,6 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
             gw_transient = GravitationalWaveTransient(**gw_likelihood_kwargs)
 
         elif gw_likelihood_type == 'ROQGravitationalWaveTransient':
-            """Additional params:
-            roq_params: str, array_like
-                Parameters describing the domain of validity of the ROQ basis.
-            roq_params_check: bool
-                If true, run tests using the roq_params to check the prior and data are
-                valid for the ROQ
-            roq_scale_factor: float
-                The ROQ scale factor used."""
             gw_transient = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         elif gw_likelihood_type == 'RelativeBinningGravitationalWaveTransient':
@@ -202,6 +239,7 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
         elif gw_likelihood_type == 'MBGravitationalWaveTransient':
             gw_transient = MBGravitationalWaveTransient(**gw_likelihood_kwargs)
         else:
+            ### FIXME: Not an f-string and no .format() call, so {} is never substituted.
             raise ValueError("Unknown GW Likelihood class {}")
 
         super().__init__(gw_transient, priors)
@@ -212,8 +250,27 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
             self.parameter_conversion = bbh_source_frame
     
     def posterior_conversion(self, posterior_samples):
+        """Add derived spin/tidal summary parameters to posterior samples, in place.
+
+        If not already present, computes `chi_eff` from `mass_ratio` and
+        `chi_1`/`chi_2` (or `spin_1z`/`spin_2z`), and `lambda_tilde`/
+        `delta_lambda_t` from `lambda_1`, `lambda_2`, `mass_ratio`. Silently
+        skips a derived quantity if its required inputs are missing.
+
+        Parameters
+        ----------
+        posterior_samples : dict or pandas.DataFrame
+            Posterior samples, keyed by parameter name.
+
+        Returns
+        -------
+        dict or pandas.DataFrame
+            The same object, with derived keys added where possible.
+        """
+
         if "chi_eff" not in posterior_samples:
             try:
+                ### FIXME: Python evaluates dict.get's default argument eagerly, before checking whether the key exists. So posterior_samples['spin_1z'] is evaluated unconditionally — if spin_1z/spin_2z aren't in the samples (the normal case when a run uses chi_1/chi_2 instead), this raises KeyError, which gets caught by the surrounding except KeyError: pass and chi_eff is silently never added — even though chi_1/chi_2 were present. I confirmed this directly: a sample dict with chi_1/chi_2 (no spin_1z/spin_2z) produced no chi_eff key at all, while a dict with only spin_1z/spin_2z worked correctly. In practice, only the spin_1z/spin_2z path in the docstring actually works.
                 q = posterior_samples['mass_ratio']
                 chi_1 = posterior_samples.get('chi_1', posterior_samples['spin_1z'])
                 chi_2 = posterior_samples.get('chi_2', posterior_samples['spin_2z'])
@@ -234,13 +291,25 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
         
         return posterior_samples
 
+    ### CHECKME: Check all functions below if they are needed or if they can be removed.
+
     def sanity_checks(self):
+        """Validate the sub-likelihood configuration.
+
+        Returns
+        -------
+        bool
+            Always True currently; relative-binning-specific checks are not
+            yet implemented (see inline TODO).
+        """
+        
         #TODO: add additional checks RelativeBinning!
         return True
     
     def final_diagnostics(self, bestfit_params, args, result=None):
         # TODO add some nice plotting for final waveform
         pass
+    
     def noise_log_likelihood(self):
         return self.sub_model.noise_log_likelihood()
 

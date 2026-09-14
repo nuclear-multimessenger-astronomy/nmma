@@ -15,11 +15,47 @@ from ..core.utils import read_trigger_time
 
 
 def marginalised_lightcurve_expectation_from_gw_samples(args=None):
-    """Routine to generate a marginalized set of light curves from a set of GW samples. These need to be parsed as template-files, h5-file or coincidence files."""
+    """Generate a Monte-Carlo-marginalized set of kilonova light curves from GW posterior samples.
+
+    Draws `args.Nmarg` (EOS, GW-sample) pairs -- EOS drawn from a
+    tabulated macro-EOS set weighted by `args.eos_weights`, GW samples
+    drawn from a template/hdf5/coinc file weighted by their own
+    'weight' column -- converts each combination through
+    `MultimessengerConversion` to full kilonova parameters (including
+    an alpha/zeta ejecta-model parameter drawn depending on whether
+    the component masses are below the EOS's maximum mass), computes
+    a light curve for each draw via `create_light_curve_model_from_args`
+    and `create_light_curve_data`, and optionally plots the ejecta-mass
+    distribution and the light-curve envelope across draws.
+
+    Note: this currently cannot run -- `emp.lc_marginalisation_parser`
+    doesn't exist (`lc_marginalisation_parser` is defined in
+    `post_processing.parser`, not `em.em_parsing`); see review notes.
+
+    Parameters
+    ----------
+    args : list of str or argparse.Namespace, optional
+        CLI-style arguments (or None to parse from sys.argv), handled
+        via `emp.lc_marginalisation_parser` -- needs exactly one of
+        `--template-file` (ascii table with SNRdiff/erf/weight/m1/m2/
+        [a1/a2/]dist columns), `--hdf5-file` (LALInference posterior),
+        or `--coinc-file` (+ `--skymap`, ligolw sngl_inspiral table);
+        plus `eos_data`/`eos_weights`, `Nmarg`, `outdir`, and the usual
+        light-curve-model/sample-time arguments.
+
+    Returns
+    -------
+    None
+        Writes one 'lc.dat'/'matter.dat' pair per draw under
+        `args.outdir/<i>/`, and (if `args.plot`) 'matter.pdf'/'lc.pdf'
+        summary plots.
+    """
+
     # gwpy is nasty in overwriting matplotlib, so we should only load it if truly needed
     from gwpy.table import Table
 
     args = emp.parsing_and_logging(emp.lc_marginalisation_parser, args)
+    ### FIXME: lc_marginalisation_parser is defined in nmma/post_processing/parser.py, not nmma/em/em_parsing.py. Since emp is bound to the em_parsing module, emp.lc_marginalisation_parser doesn't exist.
 
     rng = np.random.default_rng(args.generation_seed)
     args.mag_error_scale = 0
@@ -196,6 +232,33 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
 
 
 def get_all_gw_quantities(data_out):
+    """Derive standard mass/spin combinations on a GW sample table, in place.
+
+    Adds mchirp/eta/q (from m1/m2, or vice versa from mc/q if m1/m2
+    are absent), a uniform 'weight' column, and chi_eff -- falling
+    back from a1/a2 to spin1z/spin2z if the table doesn't already
+    have a1/a2 (defaulting missing a1/a2/theta_jn/tilt1/tilt2 to 0.0).
+
+    Note: as currently ordered, chi_eff is computed *before* the
+    a1/a2 defaults and the spin1z/spin2z fallback run, so a table
+    with spin1z/spin2z but no a1/a2 raises KeyError instead of using
+    the fallback (see review notes) -- only tables that already have
+    a1/a2 columns work correctly today.
+
+    Parameters
+    ----------
+    data_out : astropy.table.Table or gwpy.table.Table
+        GW sample table, mutated in place. Must have m1/m2 (or mc/q)
+        and, for a correct chi_eff, a1/a2 already present.
+
+    Returns
+    -------
+    astropy.table.Table or gwpy.table.Table
+        The same table, with mchirp/eta/q/weight/chi_eff columns
+        added and a1/a2/theta_jn/tilt1/tilt2 present (a1/a2 possibly
+        wrong/missing depending on the ordering issue above).
+    """
+    
     try:
         data_out["mchirp"], data_out["eta"], data_out["q"] = (
             conv.component_masses_to_mass_quantities(data_out["m1"], data_out["m2"])
@@ -209,6 +272,7 @@ def get_all_gw_quantities(data_out):
 
     data_out["weight"] = 1.0 / len(data_out["m1"])
 
+    ### FIXME: get_all_gw_quantities computes chi_eff before its own fallback logic can supply the values it needs. The chi_eff line requires a1/a2 to already exist, but the two mechanisms that would supply them — the 0.0-default loop and the spin1z/spin2z fallback — both run after it. 
     data_out["chi_eff"] = (
         data_out["m1"] * data_out["a1"] + data_out["m2"] * data_out["a2"]
     ) / (data_out["m1"] + data_out["m2"])
