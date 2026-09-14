@@ -23,4 +23,5 @@ slurm.sub
 nmma/eos/data
 min_install.zip
 _build/
+_templates
 doc/api/
