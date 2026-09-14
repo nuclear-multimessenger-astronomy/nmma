@@ -30,10 +30,6 @@
 .. py:module:: {{ pkgname }}
 {% endif %}
 
-{%- if modulefirst and not is_namespace %}
-{{ automodule(pkgname, automodule_options) }}
-{% endif %}
-
 {%- if subpackages %}
 Subpackages
 -----------
@@ -61,9 +57,12 @@ Submodules
 {%- endif %}
 {%- endif %}
 
-{%- if not modulefirst and not is_namespace %}
-Module contents
----------------
+{%- if not is_namespace %}
+.. No "Module contents" heading here: __init__.py files in this repo
+   have no docstring/members of their own, so it would always render
+   empty. This automodule call just registers {{ pkgname }} as a
+   cross-reference target for the autosummary tables above (and on
+   the parent package's own page) to link into.
 
 {{ automodule(pkgname, automodule_options) }}
 {% endif %}
