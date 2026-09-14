@@ -5,7 +5,21 @@ sys.path.insert(0, os.path.abspath(".."))
 
 import nmma
 
-extensions = ["myst_parser", "sphinx_copybutton","sphinx_github_changelog"]
+extensions = [
+    "myst_parser",
+    "sphinx_copybutton",
+    "sphinx_github_changelog",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
+    "numpydoc",
+]
+
+# Show member functions/attributes in source order rather than alphabetically.
+autodoc_member_order = "bysource"
+# numpydoc adds its own (redundant) autosummary-style member listing on top
+# of autodoc's; this keeps it to just rendering the numpydoc-style sections
+# (Parameters/Returns/...) within each already-listed member's docstring.
+numpydoc_show_class_members = False
 myst_enable_extensions = [
     "amsmath",
     "colon_fence",

@@ -469,6 +469,15 @@ User Guide
    changelog
 
 
+API Reference
+--------------
+
+.. toctree::
+   :maxdepth: 2
+
+   api/nmma
+
+
 .. Indices and tables
 .. ==================
 
