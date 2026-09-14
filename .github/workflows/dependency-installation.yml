@@ -4,7 +4,7 @@ on:
     branches: [main]
     paths: ["*_requirements.txt", "pyproject.toml"]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
     paths: ["*_requirements.txt", "pyproject.toml"]
   workflow_dispatch:
 
