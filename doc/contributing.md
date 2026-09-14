@@ -60,6 +60,19 @@ either. Therefore, we use code formatters: black for Python.
 Code is an art, and opinions differ of what
 looks good: we choose to spend our time writing correct, elegant code.
 
+### Pre-commit hooks
+
+Install the development dependencies and enable the repository's Git hooks
+after cloning:
+
+```bash
+python -m pip install -e ".[dev]"
+pre-commit install
+```
+
+The hooks run automatically before each commit. To run them against the
+entire repository, use `pre-commit run --all-files`.
+
 ### Testing
 
 All functionality should be accompanied by tests.  We use pytest and
