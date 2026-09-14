@@ -25,7 +25,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Operating System :: POSIX",
     "Operating System :: Unix",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 ]
 dynamic = ["version"]
 dependencies = [
