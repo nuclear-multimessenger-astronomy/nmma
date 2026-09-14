@@ -19,8 +19,8 @@ def test_lightcurve_HoNa_basic():
         *setup_HoNa_params(t, param_dict), param_dict["n"]
     )
 
-    assert (
-        inv_temp.shape == r.shape == t.shape
-    ), "Output shapes must match input time array"
+    assert inv_temp.shape == r.shape == t.shape, (
+        "Output shapes must match input time array"
+    )
     assert np.all(inv_temp > 0), "Temperature must be positive"
     assert np.all(r > 0), "Radius must be positive"

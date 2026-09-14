@@ -1,19 +1,21 @@
 import sys
 from pathlib import Path
-from scipy.interpolate import PchipInterpolator
-from scipy.stats import norm
+
 import healpy as hp
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from bilby.core.prior import (
-    Prior,
+    ConditionalPriorDict,
+    ConditionalTruncatedGaussian,
     DeltaFunction,
     Interped,
-    ConditionalTruncatedGaussian,
-    ConditionalPriorDict,
+    Prior,
     PriorDict,
 )
-from ligo.skymap import io as skymap_io, moc
+from ligo.skymap import io as skymap_io
+from ligo.skymap import moc
+from scipy.interpolate import PchipInterpolator
+from scipy.stats import norm
 
 from ..core.base import adjust_hubble_prior
 from .utils import get_skymap_idx
@@ -196,8 +198,8 @@ def extinction_prior(priors, args):
     print("Fetching value of Ebv from dustmap, overwriting any previous prior on Ebv")
     try:
         import dustmaps.sfd
-        from dustmaps.config import config
         from astropy import coordinates
+        from dustmaps.config import config
     except ImportError:
         print("Package dustmap is needed")
         sys.exit(1)

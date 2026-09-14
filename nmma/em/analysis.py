@@ -1,17 +1,17 @@
 import numpy as np
 import pandas as pd
 
-from .lightcurve_handling import create_light_curve_data, adjust_injection_parameters
-from .em_likelihood import EMTransientLikelihood
-from .prior import create_prior_from_args
-from . import io, model, utils, systematics
-from .em_parsing import (
-    parsing_and_logging,
-    multi_wavelength_analysis_parser,
-    bolometric_parser,
-)
 from ..core.base import multi_analysis_loop
-from ..core.utils import injection_from_args, set_filename, read_trigger_time
+from ..core.utils import injection_from_args, read_trigger_time, set_filename
+from . import io, model, systematics, utils
+from .em_likelihood import EMTransientLikelihood
+from .em_parsing import (
+    bolometric_parser,
+    multi_wavelength_analysis_parser,
+    parsing_and_logging,
+)
+from .lightcurve_handling import adjust_injection_parameters, create_light_curve_data
+from .prior import create_prior_from_args
 
 
 def data_from_injection(args, filters):

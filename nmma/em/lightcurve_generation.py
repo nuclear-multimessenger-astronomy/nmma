@@ -1,17 +1,16 @@
 import copy
-from joblib import load
+from importlib import resources
 
 import numpy as np
 import pandas as pd
-from importlib import resources
-
 import scipy
+from joblib import load
 from scipy.integrate import quad, solve_ivp
-from scipy.special import erfc
 from scipy.interpolate import CubicSpline
+from scipy.special import erfc
 
-from . import utils
 from ..core.utils import read_trigger_time
+from . import utils
 
 try:
     import afterglowpy
@@ -32,7 +31,7 @@ except ImportError:
 
 
 ### some frequently used constants:
-from ..core.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D
+from ..core.constants import D, arad, c_cgs, h, kb, msun_cgs, sigSB
 
 seconds_a_day = 86400.0
 abs_mag_dist_factor = D**2
@@ -218,7 +217,7 @@ def eval_svd_model(svd_model, ass_ncoeff, param_list):
         cAproj = np.zeros((n_coeff,))
         gps = svd_model["gps"]
         if gps is None:
-            raise ValueError(f"Gaussian process model unavailable.")
+            raise ValueError("Gaussian process model unavailable.")
         for i in range(n_coeff):
             gp = gps[i]
             y_pred, sigma2_pred = gp.predict(
@@ -544,7 +543,7 @@ def metzger_lc(sample_times, param_dict, nu_host, filters):
         ] / 4000.0 ** (5.5)
         kappa_correction[:] = 1
 
-        tdiff[:-1, j] = 0.08 * kappa[:-1, j] * m[:-1] * msun_cgs 
+        tdiff[:-1, j] = 0.08 * kappa[:-1, j] * m[:-1] * msun_cgs
         tdiff[:-1, j] *= 3 * kappa_correction / (vm[:-1] * c_cgs * t[j] * beta)
         tau[:-1, j] = (
             m[:-1] * msun_cgs * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
@@ -643,7 +642,7 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
 
     for j in range(tprec - 1):
         tdiff = 0.08 * kappa[:-1, j] * m[:-1] * msun_cgs * 3
-        tdiff /= (vm[:-1] * c_cgs * t[j] * beta)
+        tdiff /= vm[:-1] * c_cgs * t[j] * beta
         tau = m[:-1] * msun_cgs * kappa[:-1, j] / (4 * np.pi * (t[j] * vm[:-1]) ** 2)
         lum_j = ene / (tdiff + t[j] * (vm[:-1] / c_cgs))
         lum[:, j] = lum_j * dm * msun_cgs
@@ -897,7 +896,6 @@ def create_light_curve_data(
 
     if not keep_infinite_data:
         for filt, val_dict in observed_data.items():
-
             keep_idx = np.isfinite(val_dict["mag"]) & np.isfinite(val_dict["mag_error"])
             observed_data[filt] = {key: val[keep_idx] for key, val in val_dict.items()}
 
@@ -1170,10 +1168,12 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
                     )  # estimate_mag_err maps filter numbers
 
                     df["mag_err"] = df.apply(
-                        lambda x: (ztfuncer["band"] == x["passband"])
-                        & (
-                            pd.arrays.IntervalArray(ztfuncer["interval"]).contains(
-                                x["mag"]
+                        lambda x: (
+                            (ztfuncer["band"] == x["passband"])
+                            & (
+                                pd.arrays.IntervalArray(ztfuncer["interval"]).contains(
+                                    x["mag"]
+                                )
                             )
                         ),
                         axis=1,
@@ -1188,7 +1188,7 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
                         for value in df["mag"].values:
                             if ztfuncer.iloc[argmin_slice]["interval"].left > value:
                                 print(
-                                    f'WARNING: {value} is outside of the measured uncertainty region with a lower limit of {ztfuncer.iloc[argmin_slice]["interval"].left}'
+                                    f"WARNING: {value} is outside of the measured uncertainty region with a lower limit of {ztfuncer.iloc[argmin_slice]['interval'].left}"
                                 )
 
                     sim.loc[row.name, "mag_error"] = float(df["mag_error"])

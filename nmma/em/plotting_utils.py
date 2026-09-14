@@ -1,10 +1,11 @@
-import matplotlib.pyplot as plt
+from itertools import cycle
+from pathlib import Path
+
 import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.ticker import NullFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from itertools import cycle
-import numpy as np
-from pathlib import Path
 
 from nmma.core.plotting_utils import fig_setup
 
@@ -57,7 +58,6 @@ def basic_em_analysis_plot(
 
     ### prepare figure
     if not shared_data or not fig:
-
         if not fig:
             fig = init_em_analysis_plot(plot_filters, ncols)
 
@@ -347,7 +347,7 @@ def plot_benchmark_percentiles(model, model_benchmarks, outdir):
     ax.set_xlabel("Filter")
     ax.set_ylabel(r"Reduced $\chi^{2}$")
     ax.legend(
-        title=f"Percentile\n (max $\chi^{2}$ = {np.round(np.max(pctls_100),1)})",  # noqa
+        title=f"Percentile\n (max $\chi^{2}$ = {np.round(np.max(pctls_100), 1)})",  # noqa
         loc=2,
     )
     ax.set_title(f"{model} benchmark percentiles")

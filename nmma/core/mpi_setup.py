@@ -1,28 +1,29 @@
 import os
-from pathlib import Path
-import sys
-import traceback
-from io import BufferedWriter
-from copy import deepcopy
 import pickle
 import signal
-from functools import wraps
-from time import time
+import sys
+import traceback
+from copy import deepcopy
 from datetime import timedelta
-from matplotlib import pyplot as plt
+from functools import wraps
+from io import BufferedWriter
+from pathlib import Path
+from time import time
+
+import dynesty
 import numpy as np
+from bilby.core.sampler import base_sampler as bs
+from bilby.core.sampler import dynesty3_utils as dy_utils
+from bilby.core.sampler.dynesty import dynesty_stats_plot
+from dynesty.plotting import runplot, traceplot
+from matplotlib import pyplot as plt
+from numpy.random import PCG64, Generator, SeedSequence
 from pandas import DataFrame
-from numpy.random import Generator, PCG64, SeedSequence
 from schwimmbad import MPIPool, MultiPool
 
-from bilby.core.sampler import base_sampler as bs, dynesty3_utils  as dy_utils
-from bilby.core.sampler.dynesty import dynesty_stats_plot
-import dynesty
-from dynesty.plotting import traceplot, runplot 
-
 from .conversion import label_mapping
-from .utils import  rejection_sample, read_bestfit_from_posterior, logger
 from .parsing import process_sampler_kwargs
+from .utils import logger, read_bestfit_from_posterior, rejection_sample
 
 
 def time_storage(func):
@@ -30,11 +31,12 @@ def time_storage(func):
     def wrapper(*args, **kwargs):
         start = time()
         result = func(*args, **kwargs)
-        duration = timedelta(seconds=time()-start)
+        duration = timedelta(seconds=time() - start)
         logger.info(f"{func.__name__} took {duration} ")
         return result
 
     return wrapper
+
 
 class Worker(bs.NestedSampler):
     """
@@ -55,12 +57,17 @@ class Worker(bs.NestedSampler):
     skip_import_verification : bool, optional
         Skip import verification during initialization.
     """
+
     def __init__(
-        self, args, prior, likelihood,
-        injection_parameters,  plot = False,  
-        skip_import_verification = True,
-        ):
-        
+        self,
+        args,
+        prior,
+        likelihood,
+        injection_parameters,
+        plot=False,
+        skip_import_verification=True,
+    ):
+
         args.plot = plot
         self.args = args
         self.outdir = args.outdir
@@ -68,16 +75,17 @@ class Worker(bs.NestedSampler):
         Path(self.outdir).mkdir(parents=True, exist_ok=True)
 
         super().__init__(
-            likelihood, prior, self.outdir, self.label,
-            injection_parameters = injection_parameters,
-            skip_import_verification = skip_import_verification,
-            plot= plot,
+            likelihood,
+            prior,
+            self.outdir,
+            self.label,
+            injection_parameters=injection_parameters,
+            skip_import_verification=skip_import_verification,
+            plot=plot,
             soft_init=True,
-            use_ratio = True,
-            
+            use_ratio=True,
         )
 
-    
     def log_likelihood(self, theta):
         """
 
@@ -99,7 +107,6 @@ class Worker(bs.NestedSampler):
         # we add the noise log-likelihood later to retrieve the full log-likelihood
         return self.likelihood.log_likelihood_ratio(params)
 
-
     def get_initial_point_from_prior(self, rstate):
         """
         Draw initial points from the prior subject to constraints applied both to
@@ -110,8 +117,13 @@ class Worker(bs.NestedSampler):
         The `log_likelihood` often converts infinite values to large
         finite values so we catch those.
         """
-        bad_values = [ np.inf, np.nan_to_num(np.inf),
-                      -np.inf, np.nan_to_num(- np.inf), np.nan]
+        bad_values = [
+            np.inf,
+            np.nan_to_num(np.inf),
+            -np.inf,
+            np.nan_to_num(-np.inf),
+            np.nan,
+        ]
         while True:
             unit = rstate.random(self.ndim)
             theta = self.prior_transform(unit)
@@ -123,7 +135,7 @@ class Worker(bs.NestedSampler):
                 continue
 
             return unit, theta, logl
-                
+
     def checkpointing(self, checkpoint_plot=False, message=None):
         """
         Checkpointing function to be called periodically during sampling.
@@ -138,46 +150,52 @@ class Worker(bs.NestedSampler):
         os.wait()
         pass  # only to be executed in main process
 
+
 class Dynesty(Worker):
-   
     def __init__(
         self,
-        args, prior, likelihood,
-        injection_parameters = None,
+        args,
+        prior,
+        likelihood,
+        injection_parameters=None,
         maxmcmc=5000,
         naccept=60,
         nact=2,
         sampling_seed=42,
         sampler_kwargs={},
         sampler_init_kwargs={},
-        plot= False,
-        meta_data = {},
-    ):  
-        super().__init__(args, prior, likelihood, injection_parameters, 
-                        plot, skip_import_verification = False)
-        
+        plot=False,
+        meta_data={},
+    ):
+        super().__init__(
+            args,
+            prior,
+            likelihood,
+            injection_parameters,
+            plot,
+            skip_import_verification=False,
+        )
+
         self.resume_file = Path(self.outdir) / f"{self.label}_checkpoint_resume.pickle"
-        self.samples_file= Path(self.outdir) / f"{self.label}_samples.parquet"
+        self.samples_file = Path(self.outdir) / f"{self.label}_samples.parquet"
 
         # Create a random generator, which is saved across restarts
         # This ensures that runs are fully deterministic, which is important
         # for reproducibility
         self.rstate = Generator(PCG64(sampling_seed))
         logger.debug(f"Setting random state = {self.rstate} (seed={sampling_seed})")
-        
+
         # dynesty3 sampler kwargs
-        self.dlogz = sampler_kwargs['dlogz']
+        self.dlogz = sampler_kwargs["dlogz"]
         self.sampler_kwargs = sampler_kwargs
         self._init_sampler_kwargs(sampler_init_kwargs, nact, naccept, maxmcmc)
-        self.nlive = sampler_init_kwargs['nlive']
+        self.nlive = sampler_init_kwargs["nlive"]
         self.meta_data = meta_data
 
-    
     def _init_sampler_kwargs(self, kwargs, nact, naccept, maxmcmc):
         """
         Mostly stolen from bilby.core.sampler.dynesty to set up the internal sampler kwargs
         """
-        
 
         periodic = []
         reflective = []
@@ -193,17 +211,18 @@ class Dynesty(Worker):
             periodic = None
         if len(reflective) == 0:
             reflective = None
-        kwargs |= dict(   
+        kwargs |= dict(
             ndim=len(self._search_parameter_keys),
             periodic=periodic,
-            reflective=reflective)
-        
+            reflective=reflective,
+        )
+
         internal_kwargs = dict(
-            ndim=kwargs['ndim'],
+            ndim=kwargs["ndim"],
             nonbounded=None,
-            periodic = kwargs["periodic"],
-            reflective = kwargs["reflective"],
-            maxmcmc = maxmcmc
+            periodic=kwargs["periodic"],
+            reflective=kwargs["reflective"],
+            maxmcmc=maxmcmc,
         )
         if kwargs["sample"] == "act-walk":
             internal_kwargs["nact"] = nact
@@ -248,7 +267,7 @@ class Dynesty(Worker):
             kwargs["bound"] = "multi"
 
         self.init_sampler_kwargs = kwargs
-    
+
     @time_storage
     def start_sampler(self, pool, log_likelihood, prior_transform, find_live):
         """
@@ -264,7 +283,7 @@ class Dynesty(Worker):
         Returns
         -------
         sampler: dynesty.NestedSampler
-            If a resume file exists and was successfully read, the nested sampler 
+            If a resume file exists and was successfully read, the nested sampler
             instance updated with the values stored to disk. If unavailable, create the initial state from scratch.
         sampling_time: float
             The current sampling time
@@ -277,7 +296,7 @@ class Dynesty(Worker):
                 if sampler.added_live:
                     sampler._remove_live_points()
 
-                #reset pool
+                # reset pool
                 sampler.nqueue = -1
                 sampler.pool = pool
                 sampler.queue_size = pool.size
@@ -285,30 +304,35 @@ class Dynesty(Worker):
 
             sampler.prior_transform = prior_transform
             sampler.loglikelihood = dynesty.utils.LogLikelihood(
-                log_likelihood, sampler.ndim)
-            
+                log_likelihood, sampler.ndim
+            )
+
             self.sampling_time = sampler.sampling_time
             self.sampler = sampler
         else:
-            logger.info(f"Resume file {self.resume_file} does not exist. "
-            f"Initializing sampling points with pool size={pool.size}")
+            logger.info(
+                f"Resume file {self.resume_file} does not exist. "
+                f"Initializing sampling points with pool size={pool.size}"
+            )
             live_points = self.get_initial_points_from_prior(pool, find_live)
-            logger.info( f"Initialize NestedSampler with {self.init_sampler_kwargs}")
-            self.sampler = dynesty.NestedSampler(log_likelihood, prior_transform,
-                                            pool=pool,
-                                            live_points=live_points,
-                                            rstate=self.rstate,
-                                            **self.init_sampler_kwargs,
-                                        )
+            logger.info(f"Initialize NestedSampler with {self.init_sampler_kwargs}")
+            self.sampler = dynesty.NestedSampler(
+                log_likelihood,
+                prior_transform,
+                pool=pool,
+                live_points=live_points,
+                rstate=self.rstate,
+                **self.init_sampler_kwargs,
+            )
             self.sampling_time = 0.0
 
-
-        self.init_sampler_kwargs.pop('sample')
+        self.init_sampler_kwargs.pop("sample")
         logger.info(f"Run criteria: {self.sampler_kwargs}")
 
-        logger.info(f"Starting sampling for job {self.label}, with pool size={pool.size}")
+        logger.info(
+            f"Starting sampling for job {self.label}, with pool size={pool.size}"
+        )
 
-    
     @time_storage
     def get_initial_points_from_prior(self, pool, find_live):
         """
@@ -362,59 +386,70 @@ class Dynesty(Worker):
             Formatted log string for the current sampling step.
         """
         niter, _, mid_str, _ = dynesty.utils.get_print_fn_args(
-            dlogz = self.dlogz, ncall=self.sampler.ncall,**kwargs)
+            dlogz=self.dlogz, ncall=self.sampler.ncall, **kwargs
+        )
         custom_str = [f"#: {niter:d}"] + mid_str
         custom_str = "|".join(custom_str).replace(" ", "")
         return custom_str
-    
 
-    def run_sampler(self, check_point_delta_t=1800, n_check_point=1000, max_its=1e10, max_run_time=1e10, checkpoint_plot=False):
-        logger.info(f"Beginning sampling with checkpoints every {check_point_delta_t} seconds or {n_check_point} iterations \n "
-                    f" until max {max_its} iterations or max run time {timedelta(seconds=max_run_time)}.")
-        run_time = 0.
+    def run_sampler(
+        self,
+        check_point_delta_t=1800,
+        n_check_point=1000,
+        max_its=1e10,
+        max_run_time=1e10,
+        checkpoint_plot=False,
+    ):
+        logger.info(
+            f"Beginning sampling with checkpoints every {check_point_delta_t} seconds or {n_check_point} iterations \n "
+            f" until max {max_its} iterations or max run time {timedelta(seconds=max_run_time)}."
+        )
+        run_time = 0.0
         t_start = time()
-        last_checkpoint_time= t_start
+        last_checkpoint_time = t_start
         last_checkpoint_it = 0
-        
-        for it, res in enumerate(self.sampler.sample(**self.sampler_kwargs)):
 
+        for it, res in enumerate(self.sampler.sample(**self.sampler_kwargs)):
             self.stdout_sampling_log(itresult=res, niter=it)
             run_time = time() - t_start
-            checkpoint_interval = time()- last_checkpoint_time
+            checkpoint_interval = time() - last_checkpoint_time
 
             if it >= max_its or run_time > max_run_time:
-                self.sampling_time +=  checkpoint_interval  
-                self.checkpointing(checkpoint_plot,
-                    f"{it} of max {max_its} iterations completed after {timedelta(seconds=run_time)} " 
-                    f" sampling time of max {timedelta(seconds=max_run_time)}. Stopping." )
-                return 
-            
+                self.sampling_time += checkpoint_interval
+                self.checkpointing(
+                    checkpoint_plot,
+                    f"{it} of max {max_its} iterations completed after {timedelta(seconds=run_time)} "
+                    f" sampling time of max {timedelta(seconds=max_run_time)}. Stopping.",
+                )
+                return
+
             elif (
                 # checkpoint criteria
                 checkpoint_interval >= check_point_delta_t
-                or (it - last_checkpoint_it >= n_check_point) 
+                or (it - last_checkpoint_it >= n_check_point)
             ):
-                self.sampling_time +=  checkpoint_interval
-                last_checkpoint_time = time() 
+                self.sampling_time += checkpoint_interval
+                last_checkpoint_time = time()
                 last_checkpoint_it = it
-                self.checkpointing(checkpoint_plot, 
-                    self.get_step_info_str(itresult=res, niter=it))
+                self.checkpointing(
+                    checkpoint_plot, self.get_step_info_str(itresult=res, niter=it)
+                )
 
         # Adding the final set of live points.
         for it_final, res in enumerate(self.sampler.add_live_points()):
             pass
 
         # Create a final checkpoint in case anything happens during the formatting
-        self.sampling_time +=  time() - last_checkpoint_time
+        self.sampling_time += time() - last_checkpoint_time
         self.write_current_state()
         self.plot_current_state()
         return self.sampler.results
-    
+
     def stdout_sampling_log(self, **kwargs):
         sys.stdout.write(f"\033[K {self.get_step_info_str(**kwargs)}\r")
         sys.stdout.flush()
 
-    def checkpointing(self, checkpoint_plot=False, message= None):
+    def checkpointing(self, checkpoint_plot=False, message=None):
         self.write_current_state()
         self.write_sample_dump(self.sampler.saved_run.D)
         if checkpoint_plot:
@@ -424,7 +459,7 @@ class Dynesty(Worker):
 
     @time_storage
     def write_sample_dump(self, data):
-        """Writes a checkpoint file """
+        """Writes a checkpoint file"""
         weights = np.exp(data["logwt"] - data["logz"][-1])
         samples, keep = rejection_sample(data["v"], weights, self.rstate)
 
@@ -447,7 +482,7 @@ class Dynesty(Worker):
         cp_time = self.sampling_time
         if self.resume_file.is_file():
             cp_time = time() - self.resume_file.stat().st_mtime
-        logger.info(f"Write new checkpoint after {timedelta(seconds = cp_time)}")
+        logger.info(f"Write new checkpoint after {timedelta(seconds=cp_time)}")
 
         # avoid expensive pickling of easily rebuilt objects
         pool = self.sampler.pool
@@ -479,12 +514,12 @@ class Dynesty(Worker):
     @time_storage
     def plot_current_state(self):
         # labels = [label.replace("_", " ") for label in search_parameter_keys]
-        for name, func, obj in zip (
+        for name, func, obj in zip(
             ["trace", "run", "stats"],
             [traceplot, runplot, dynesty_stats_plot],
-            [self.sampler.results, self.sampler.results, self.sampler]):
-
-            try: 
+            [self.sampler.results, self.sampler.results, self.sampler],
+        ):
+            try:
                 fig, _ = func(obj)
                 fig.tight_layout()
                 fig.savefig(f"{self.outdir}/{self.label}_checkpoint_{name}.png")
@@ -497,13 +532,15 @@ class Dynesty(Worker):
 
     def storable_metadata(self):
         meta_data = self.meta_data
-        meta_data["args"] = vars(self.args).copy() # convert Namespace to dict for storing
+        meta_data["args"] = vars(
+            self.args
+        ).copy()  # convert Namespace to dict for storing
         meta_data["likelihood"] = self.likelihood.meta_data
         meta_data["sampler_kwargs"] = self.init_sampler_kwargs
         meta_data["run_sampler_kwargs"] = self.sampler_kwargs
         meta_data = self.floatify_dict(meta_data)
         return meta_data
-    
+
     def floatify_dict(self, d):
         for k, v in d.items():
             if isinstance(v, dict):
@@ -532,39 +569,46 @@ class Dynesty(Worker):
             nested samples or resampling with replacement
         """
 
-        nested_samples = DataFrame(sampler_result.samples, columns=self._search_parameter_keys)
+        nested_samples = DataFrame(
+            sampler_result.samples, columns=self._search_parameter_keys
+        )
         nested_samples["log_likelihood"] = sampler_result.logl
-        log_noise_evidence= self.likelihood.noise_log_likelihood()
+        log_noise_evidence = self.likelihood.noise_log_likelihood()
         log_bayes = sampler_result.logz[-1]
-        
+
         result = self.result
 
-        result.nested_samples = nested_samples 
-        result.sampling_time=timedelta(seconds=self.sampling_time)
+        result.nested_samples = nested_samples
+        result.sampling_time = timedelta(seconds=self.sampling_time)
         logger.info(f"Sampling time = {result.sampling_time}")
-        result.meta_data=self.storable_metadata()
-        result.num_likelihood_evaluations=np.sum(sampler_result.ncall)
+        result.meta_data = self.storable_metadata()
+        result.num_likelihood_evaluations = np.sum(sampler_result.ncall)
         logger.info(f"Number of lnl calls = {result.num_likelihood_evaluations}")
-        result.log_noise_evidence=log_noise_evidence
-        result.log_bayes_factor=log_bayes
-        result.log_evidence_err=sampler_result.logzerr[-1]
-        result.log_evidence=log_noise_evidence + log_bayes
-    
+        result.log_noise_evidence = log_noise_evidence
+        result.log_bayes_factor = log_bayes
+        result.log_evidence_err = sampler_result.logzerr[-1]
+        result.log_evidence = log_noise_evidence + log_bayes
+
         weights = np.exp(sampler_result["logwt"] - log_bayes)
         if rejection_sample_posterior:
-            result.samples, keep = rejection_sample(sampler_result.samples, weights, self.rstate)
+            result.samples, keep = rejection_sample(
+                sampler_result.samples, weights, self.rstate
+            )
             result.log_likelihood_evaluations = sampler_result.logl[keep]
-            logger.info(f"Rejection sampling nested samples to obtain {sum(keep)} posterior samples")
+            logger.info(
+                f"Rejection sampling nested samples to obtain {sum(keep)} posterior samples"
+            )
 
         else:
-            result.samples = dynesty.utils.resample_equal(sampler_result.samples, weights, self.rstate)
+            result.samples = dynesty.utils.resample_equal(
+                sampler_result.samples, weights, self.rstate
+            )
             result.log_likelihood_evaluations = self.reorder_loglikelihoods(
                 unsorted_loglikelihoods=sampler_result.logl,
                 unsorted_samples=sampler_result.samples,
                 sorted_samples=result.samples,
             )
             logger.info("Resampling nested samples to posterior samples in place.")
-
 
         result.samples_to_posterior(priors=result.priors)
         result.posterior = self.likelihood.posterior_conversion(result.posterior)
@@ -579,40 +623,56 @@ class Dynesty(Worker):
         if self.samples_file.is_file():
             self.samples_file.unlink()  # remove temp file after succesful run
 
-        logger.info(f"Saving result to {self.outdir}/{self.label}_result.{result_format}")
+        logger.info(
+            f"Saving result to {self.outdir}/{self.label}_result.{result_format}"
+        )
         result.save_to_file(extension=result_format)
 
         if self.plot:
             logger.info("Creating corner plot of posterior samples.")
             try:
-                injection_parameters = {
-                    k: v for k, v in self.injection_parameters.items()
-                    if k in self._search_parameter_keys} if self.injection_parameters else None
-                result.plot_corner(parameters = injection_parameters, priors=True, dpi = 200)
+                injection_parameters = (
+                    {
+                        k: v
+                        for k, v in self.injection_parameters.items()
+                        if k in self._search_parameter_keys
+                    }
+                    if self.injection_parameters
+                    else None
+                )
+                result.plot_corner(
+                    parameters=injection_parameters, priors=True, dpi=200
+                )
             except Exception as e:
-                logger.warning(f"Failed to create corner plot: {e}")    
+                logger.warning(f"Failed to create corner plot: {e}")
             try:
                 logger.info("Creating diagnostic plots.")
-                bestfit_params = read_bestfit_from_posterior(result.posterior, 'max_posterior')
+                bestfit_params = read_bestfit_from_posterior(
+                    result.posterior, "max_posterior"
+                )
                 self.likelihood.final_diagnostics(bestfit_params, self.args, result)
             except Exception as e:
-                logger.warning(f"Failed to create diagnostic plots: {e} \n{traceback.format_exc()}")
+                logger.warning(
+                    f"Failed to create diagnostic plots: {e} \n{traceback.format_exc()}"
+                )
         logger.info("Finished formatting result.")
         return result
 
 
-
 def pbilby_sampling(
-    likelihood, prior, args, 
-    injection_parameters, rank,
-    pool_type = 'mpi',
-    meta_data = {},
-    **kwargs
+    likelihood,
+    prior,
+    args,
+    injection_parameters,
+    rank,
+    pool_type="mpi",
+    meta_data={},
+    **kwargs,
 ):
-    # kwargs > args in priority, so that command line arguments can override the config      
+    # kwargs > args in priority, so that command line arguments can override the config
     args.__dict__.update(kwargs)
 
-    # Initialise a worker. this needs a global scope to allow 
+    # Initialise a worker. this needs a global scope to allow
     # persistence of states beyond the pool's scope.
     # Otherwise emulators retrace on each evaluation.
     global worker
@@ -620,56 +680,60 @@ def pbilby_sampling(
         sampler_init_kwargs, run_kwargs = process_sampler_kwargs(args)
 
         worker = Dynesty(
-            args, prior, likelihood,
+            args,
+            prior,
+            likelihood,
             injection_parameters,
             maxmcmc=args.maxmcmc,
             nact=args.nact,
             naccept=args.naccept,
             sampling_seed=args.sampling_seed,
-            sampler_kwargs = run_kwargs,
+            sampler_kwargs=run_kwargs,
             sampler_init_kwargs=sampler_init_kwargs,
             plot=args.plot,
             meta_data=meta_data,
         )
 
     else:
-        worker = Worker(args, prior, likelihood,
-            injection_parameters,  plot = args.plot)
+        worker = Worker(args, prior, likelihood, injection_parameters, plot=args.plot)
 
     ## graceful handling of preemptive shutdowns
     def handle_sigterm(signum, frame):
         try:
-            worker.checkpointing(False,
-                'Received termination signal. Checkpointing and exiting gracefully.')
+            worker.checkpointing(
+                False,
+                "Received termination signal. Checkpointing and exiting gracefully.",
+            )
             sys.exit()
         except Exception:
             pass
 
     signal.signal(signal.SIGTERM, handle_sigterm)
-    signal.signal(signal.SIGINT , handle_sigterm)
-    signal.signal(signal.SIGUSR1, handle_sigterm) 
+    signal.signal(signal.SIGINT, handle_sigterm)
+    signal.signal(signal.SIGUSR1, handle_sigterm)
 
-    POOL = MPIPool if pool_type == 'mpi' else MultiPool
+    POOL = MPIPool if pool_type == "mpi" else MultiPool
     with POOL() as pool:
         result = None
-        if pool.is_master():           
+        if pool.is_master():
             worker.start_sampler(
                 pool,
-                pooled_log_likelihood, 
+                pooled_log_likelihood,
                 pooled_prior_transform,
-                pooled_initial_point_from_prior)
+                pooled_initial_point_from_prior,
+            )
 
             results = worker.run_sampler(
                 check_point_delta_t=args.check_point_delta_t,
                 n_check_point=args.n_check_point,
                 max_its=args.max_its,
                 max_run_time=args.max_run_time,
-                checkpoint_plot=args.checkpoint_plot
+                checkpoint_plot=args.checkpoint_plot,
             )
             result = worker.format_result(
-            results, args.result_format,
-            args.rejection_sample_posterior)
-    
+                results, args.result_format, args.rejection_sample_posterior
+            )
+
     return result
 
 
@@ -677,8 +741,10 @@ def pbilby_sampling(
 def pooled_initial_point_from_prior(args):
     return worker.get_initial_point_from_prior(args)
 
+
 def pooled_log_likelihood(v_array):
     return worker.log_likelihood(v_array)
+
 
 def pooled_prior_transform(u_array):
     return worker.prior_transform(u_array)

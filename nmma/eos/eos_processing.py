@@ -1,14 +1,16 @@
-import numpy as np
-import shutil
-from pathlib import Path
 import json
-import joblib
+import shutil
 from ast import literal_eval
+from pathlib import Path
+
+import joblib
 import keras as k
+import numpy as np
+
 from ..core.conversion import (
-    radii_from_qur,
     EOS_to_ns_parameters,
     EOS_to_system_parameters,
+    radii_from_qur,
 )
 
 
@@ -125,9 +127,9 @@ class NEPEoSGenerator(EoSGenerator):
 
         emulator_path = metadata["emulator_path"]
         if metadata.get("backend", False):
-            assert (
-                k.backend.backend() == metadata["backend"]
-            ), f"Keras Backend mismatch: {k.backend.backend()} vs {metadata['backend']}. please set the environment variable KERAS_BACKEND to {metadata['backend']}"
+            assert k.backend.backend() == metadata["backend"], (
+                f"Keras Backend mismatch: {k.backend.backend()} vs {metadata['backend']}. please set the environment variable KERAS_BACKEND to {metadata['backend']}"
+            )
         super().__init__(emulator_path, metadata.get("eos_parameters", None))
 
         n_mass_samples = metadata.get("n_mass_samples", 40)
@@ -294,13 +296,13 @@ class EoSConverter:
                 if getattr(args, "Neos", None) is None:
                     eos_files = list(eos_path.iterdir())
                 else:
-                    eos_files = [eos_path / f"{j+1}.dat" for j in range(args.Neos)]
+                    eos_files = [eos_path / f"{j + 1}.dat" for j in range(args.Neos)]
             else:
                 eos_files = list(Path().glob(args.eos_data))
                 if getattr(args, "Neos", None):
-                    assert args.Neos == len(
-                        eos_files
-                    ), "Number of EOS files found does not match Neos"
+                    assert args.Neos == len(eos_files), (
+                        "Number of EOS files found does not match Neos"
+                    )
 
             self.Neos = len(eos_files)
             # Case 3a: precomputed eos data is loaded to ram
@@ -312,8 +314,8 @@ class EoSConverter:
             else:
                 eos_dir = eos_files[0].parent
                 for i, f in enumerate(eos_files):
-                    if not f.samefile(eos_dir / f"{i+1}.dat"):
-                        shutil.copy(f, eos_dir / f"{i+1}.dat")
+                    if not f.samefile(eos_dir / f"{i + 1}.dat"):
+                        shutil.copy(f, eos_dir / f"{i + 1}.dat")
                 self.eos_data = eos_dir
                 self.macro_conversion = self.eos_direct_load
 
@@ -329,7 +331,8 @@ class EoSConverter:
     def eos_direct_load(self, converted_parameters):
         EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
         return [
-            np.loadtxt(self.eos_data / f"{j+1}.dat", usecols=[0, 1, 2]).T for j in EOSID
+            np.loadtxt(self.eos_data / f"{j + 1}.dat", usecols=[0, 1, 2]).T
+            for j in EOSID
         ]
 
     def eos_from_ram(self, converted_parameters):

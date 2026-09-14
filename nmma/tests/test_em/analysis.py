@@ -1,11 +1,12 @@
-from pathlib import Path
-import os
-import pytest
-import shutil
 import copy
+import os
+import shutil
 from argparse import Namespace
+from pathlib import Path
 
-from nmma.em import analysis, em_parsing, cluster_handling
+import pytest
+
+from nmma.em import analysis, cluster_handling, em_parsing
 
 test_dir = Path(__file__).resolve().parent.parent
 DATA_DIR = test_dir / "data"

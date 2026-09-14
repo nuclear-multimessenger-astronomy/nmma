@@ -1,8 +1,8 @@
-from pathlib import Path
 import shutil
-import toml
-import pytest
+from pathlib import Path
 
+import pytest
+import toml
 
 from nmma.em import analysis, em_parsing
 
