@@ -10,9 +10,15 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_github_changelog",
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "numpydoc",
 ]
+
+# Package landing pages (Subpackages/Submodules) list their contents as
+# autosummary tables; don't also auto-generate separate stub pages for
+# them -- sphinx-apidoc already generates the real per-module pages.
+autosummary_generate = False
 
 # Show member functions/attributes in source order rather than alphabetically.
 autodoc_member_order = "bysource"
