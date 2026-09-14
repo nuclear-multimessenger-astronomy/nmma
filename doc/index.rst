@@ -475,7 +475,7 @@ API Reference
 .. toctree::
    :maxdepth: 2
 
-   api/nmma
+   API Reference <api/nmma>
 
 
 .. Indices and tables
