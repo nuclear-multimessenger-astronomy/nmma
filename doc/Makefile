@@ -225,5 +225,10 @@ pseudoxml:
 .PHONY: apidoc
 apidoc:
 	sphinx-apidoc -o api/ ../nmma --no-toc --separate --force
+	# sphinx-apidoc titles each page "<dotted.path> module"/"<dotted.path>
+	# package"; drop that suffix so titles/nav/breadcrumbs just show the
+	# dotted path itself. The underline ends up longer than the
+	# (now-shorter) title, which RST allows.
+	sed -i '1s/ \(package\|module\)$$//' api/*.rst
 	@echo
 	@echo "APIdoc run is complete."
