@@ -16,5 +16,8 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
+      - id: ruff
+        name: ruff check (unfixable errors)
+        args: [--no-fix]
       - id: ruff-format
         exclude: nb|.ipynb_checkpoints|data|dev|letsencrypt|logs|dask-worker-space|__init__.py
