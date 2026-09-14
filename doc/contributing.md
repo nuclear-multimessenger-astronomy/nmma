@@ -23,7 +23,11 @@ guide](https://guides.github.com/activities/forking/)):
 
 1. Make a fork of the [NMMA repository](https://github.com/nuclear-multimessenger-astronomy/nmma)
 2. Clone your fork and add `upstream`
-   (`git@github.com:nuclear-multimessenger-astronomy/nmma`) as a remote
+   (`git@github.com:nuclear-multimessenger-astronomy/nmma`) as a remote. 
+   When first cloning, set up the pre-commit hooks by running 
+   `python -m pip install -e ".[dev]" && pre-commit install`.  
+   This will ensure that your code is formatted correctly and passes the tests 
+   before you submit a pull request.
 3. Create a new branch based on the latest `dev` branch and make your changes.
    Please follow the [code style](#code-style) and [testing](#testing)
    guidelines below.
@@ -43,7 +47,9 @@ guide](https://guides.github.com/activities/forking/)):
 The other developers will provide feedback, and you may push updates
 into the same branch (which will also update your pull request), until
 the Continuous Integration tests pass and reviewers agree that it
-should be merged (see "Process Guidelines: Reviews" below). We generally require at least one approval from a maintainer before merging, and we may request changes to your code before it is merged.
+should be merged (see "Process Guidelines: Reviews" below). We generally require at 
+least one approval from a maintainer before merging, and we may request changes to 
+your code before it is merged.
 
 When merging, maintainers should use the "Squash and merge" option to keep the commit history clean.
 
