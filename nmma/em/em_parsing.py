@@ -1,17 +1,18 @@
 import argparse
 
 import numpy as np
-from .utils import DEFAULT_FILTERS
+
 from ..core.gitlab import DEFAULT_MODELS_HOME
 
 # unused imports kept for forward compatibility
 from ..core.parsing import (
-    parsing_and_logging, # noqa: F401,
-    nmma_base_parsing, # noqa: F401
-    single_messenger_analysis_parsing,
     base_injection_parsing,
+    nmma_base_parsing,  # noqa: F401
+    parsing_and_logging,  # noqa: F401,
+    single_messenger_analysis_parsing,
     yaml_parse,
 )
+from .utils import DEFAULT_FILTERS
 
 
 def em_time_parsing(parser):

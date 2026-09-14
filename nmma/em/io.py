@@ -1,13 +1,14 @@
+import argparse
 import json
 from pathlib import Path
-import argparse
-from astropy.table import Table
-from astropy.time import Time
+
 import h5py
 import numpy as np
 import pandas as pd
-from bilby.core.utils import decode_bilby_json
 import scipy.signal
+from astropy.table import Table
+from astropy.time import Time
+from bilby.core.utils import decode_bilby_json
 
 from ..core.utils import NumpyEncoder
 
@@ -349,7 +350,7 @@ def read_spectroscopy_files(
             if ii == 0:
                 lambda_d = group["wavelength"].to_numpy()
                 jj = np.where(
-                    (lambda_d >= wavelength_min) & ((lambda_d <= wavelength_max))
+                    (lambda_d >= wavelength_min) & (lambda_d <= wavelength_max)
                 )[0]
                 lambda_d = lambda_d[jj]
             spec = group["fnu"].to_numpy()[jj]

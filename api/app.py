@@ -1,28 +1,26 @@
 # Credits to Michael W. Coughlin
 
-import os
-import functools
-import tempfile
 import base64
-import traceback
+import functools
 import json
+import os
+import tempfile
+import traceback
 
-import joblib
-import numpy as np
-import matplotlib
 import arviz as az
-import requests
-
-from tornado.ioloop import IOLoop
-import tornado.web
-import tornado.escape
-
-from astropy.time import Time
-from astropy.table import Table
 import bilby
-from nmma.em.analysis import get_parser, main
-
+import joblib
+import matplotlib
+import numpy as np
+import requests
+import tornado.escape
+import tornado.web
+from astropy.table import Table
+from astropy.time import Time
 from log import make_log
+from tornado.ioloop import IOLoop
+
+from nmma.em.analysis import get_parser, main
 
 # we need to set the backend here to insure we
 # can render the plot headlessly
@@ -217,7 +215,6 @@ def run_nmma_model(data_dict):
         json_file = os.path.join(plotdir, f"{cand_name}_{source}_result.json")
 
         if os.path.isfile(posterior_file):
-
             tab = Table.read(posterior_file, format="csv", delimiter=" ")
             inference = az.convert_to_inference_data(
                 tab.to_pandas().to_dict(orient="list")
