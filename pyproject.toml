@@ -13,18 +13,18 @@ requires-python = ">=3.12,<3.14"
 license = {text = "GPLv3"}
 classifiers = [
     "Programming Language :: Python :: 3",
-    'Programming Language :: Python :: 3.12',
-    'Programming Language :: Python :: 3.13',
-    'Intended Audience :: Science/Research',
-    'Intended Audience :: End Users/Desktop',
-    'Intended Audience :: Developers',
-    'Natural Language :: English',
-    'Topic :: Scientific/Engineering',
-    'Topic :: Scientific/Engineering :: Astronomy',
-    'Topic :: Scientific/Engineering :: Physics',
-    'Operating System :: POSIX',
-    'Operating System :: Unix',
-    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 ]
 dynamic = ["version"]
 dependencies = [
@@ -58,7 +58,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-aiohttp",
-    "flake8",
+    "ruff",
     "sqlparse",
     "freezegun",
     "PyJWT",
@@ -101,8 +101,6 @@ sampler = [
 ]
 
 [tool.setuptools_scm]
-# Version is derived from the latest git tag (e.g. v1.2.3 -> 1.2.3).
-# Untagged commits get a .devN+<hash> suffix. Nothing is stored in the tree.
 
 [project.scripts]
 nmma-generation = "nmma.joint.generation:nmma_generation"
@@ -165,13 +163,28 @@ exclude_lines = [
     "err =",
     "logger.error",
     "raise"
-    ]
+]
 ignore_errors = true
-
-[tool.isort]
-profile = "black"
 
 [tool.pytest.ini_options]
 addopts = "--verbose -r s"
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
