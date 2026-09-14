@@ -1,0 +1,21 @@
+NMMA Logo Licence
+
+Copyright holder: Peter Tsun Ho Pang
+Logo creator: Alice L. Y. Chan
+
+Alice L. Y. Chan assigned copyright in the logo to Peter Tsun Ho Pang in
+writing.
+
+The NMMA logo files identified with this licence are not licensed under the
+GNU General Public License or the GPL-3.0-only licence that applies to NMMA
+source code.
+
+Permission is granted to reproduce an unmodified logo only as part of an
+unmodified copy of an official NMMA source distribution or official NMMA
+documentation. Any other use, reproduction, distribution, modification, or
+creation of derivative works requires prior written permission from Peter
+Tsun Ho Pang, except to the extent permitted by applicable law.
+
+Use of the logo as branding is also subject to TRADEMARKS.md. Independent
+services, forks, and modified distributions must use distinct branding but
+may truthfully state that they use or are based on NMMA.
