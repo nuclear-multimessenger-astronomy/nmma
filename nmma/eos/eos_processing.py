@@ -625,31 +625,33 @@ def load_weights(weights):
 def load_macro_characteristics_from_tabulated_eos_set(
     eos_data, Neos, masses_for_char_radii=None, masses_for_char_lambdas=None
 ):
-    """utility to get MTOV and other characteristic properties for a set of tabulated EOS
-    -----------
-    Parameters:
+    """Get the TOV mass, and optionally characteristic radii/tidal
+    deformabilities at given masses, for a set of tabulated EOS.
 
-    eos_data: str or list of strings
-        if string: path to directory with eos_files, else list of eos_files to be read
+    Parameters
+    ----------
+    eos_data: str | list of str
+        If a string, path to a directory of EOS files; otherwise an
+        already-resolved list of EOS files.
     Neos: int
-        Number of equations of state to consider
-    masses_for_char_radii: int or tuple-like, default: None
-        mass(es) at which characteristic radii should be evaluated
-    masses_for_char_lambdas: int or tuple-like, default: None
-        mass(es) at which characteristic tidal deformabilities should be evaluated
+        Number of equations of state to consider.
+    masses_for_char_radii: float | array-like, optional
+        Mass(es) at which characteristic radii should be evaluated.
+    masses_for_char_lambdas: float | array-like, optional
+        Mass(es) at which characteristic tidal deformabilities should
+        be evaluated.
 
-    --------
-    Returns:
-        output: list
-            A list containing a 1d-array with the TOV-masses and optionally arrays
-            with the characteristic radii and tidal deformabilities.
-
-    FIX ME: currently broken -- crashes immediately (see below) even before
-    reaching the missing `return output` at the end of the function, which
-    would make it return None regardless. This backs the `combine-EOS`
-    console script (nmma.post_processing.ns_characteristics.main), which
-    is therefore also broken; no test currently covers it.
+    Returns
+    -------
+    list of np.ndarray
+        The TOV masses, plus (if requested) the characteristic radii
+        and/or tidal deformabilities, one array each.
     """
+    # FIX ME: currently broken -- crashes immediately (see below) even before
+    # reaching the missing `return output` at the end of the function, which
+    # would make it return None regardless. This backs the `combine-EOS`
+    # console script (nmma.post_processing.ns_characteristics.main), which
+    # is therefore also broken; no test currently covers it.
     ####SETUP
     do_rads = False
     do_lams = False

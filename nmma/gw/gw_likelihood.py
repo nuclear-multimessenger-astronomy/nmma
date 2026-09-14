@@ -15,6 +15,7 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     - ROQGravitationalWaveTransient: drops `time_marginalization`/`jitter_time`
       (unsupported for ROQ) and adds the ROQ kwargs from `roq_likelihood_kwargs`.
     - RelativeBinningGravitationalWaveTransient:
+
         fiducial_parameters: dict
             Fiducial parameters for the relative-binning reference waveform.
         update_fiducial_parameters: bool
@@ -25,6 +26,7 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     - MBGravitationalWaveTransient: drops `time_marginalization`/`jitter_time`,
       strips bilby_pipe's default `minimum_frequency`/`maximum_frequency` from
       the waveform generator, and adds:
+
         reference_chirp_mass: float, optional
             A reference chirp mass for determining the frequency banding. This
             is set to the prior minimum of chirp mass if not specified. Hence a
@@ -178,6 +180,7 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
         Using this parameter is strongly encouraged.
     reference_frame: (str, bilby.gw.detector.InterferometerList, list), optional
         Definition of the reference frame for the sky location.
+
         - "sky": sample in RA/dec, this is the default
         - e.g., "H1L1", ["H1", "L1"], InterferometerList(["H1", "L1"]):
           sample in azimuth and zenith, `azimuth` and `zenith` defined in the
@@ -185,6 +188,7 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
           and L1.
     time_reference: str, optional
         Name of the reference for the sampled time parameter.
+
         - "geocent"/"geocenter": sample in the time at the Earth's center,
           this is the default
         - e.g., "H1": sample in the time of arrival at H1    
@@ -195,6 +199,7 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
     -----
     When `gw_likelihood_type='ROQGravitationalWaveTransient'`, `kwargs` must
     additionally supply:
+
         roq_params: str, array_like
             Parameters describing the domain of validity of the ROQ basis.
         roq_params_check: bool

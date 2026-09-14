@@ -9,21 +9,27 @@ extensions = [
     "myst_parser",
     "sphinx_copybutton",
     "sphinx_github_changelog",
-    # API reference: autodoc reads the docstrings, napoleon understands their
-    # numpydoc sections, viewcode links each entry to its source.
+    # API reference: autodoc reads the docstrings, numpydoc renders their
+    # sections, viewcode links each entry to its source, intersphinx turns
+    # external type names into links.
     "sphinx.ext.autodoc",
-    "sphinx.ext.napoleon",
+    "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "numpydoc",
 ]
 
-# numpydoc style; Google style stays enabled for the few docstrings using it.
-napoleon_google_docstring = True
-napoleon_numpy_docstring = True
+# Package landing pages (Subpackages/Submodules) list their contents as
+# autosummary tables; don't also auto-generate separate stub pages for
+# them -- sphinx-apidoc already generates the real per-module pages.
+autosummary_generate = False
 
-# Keep members in source order rather than alphabetical: a class reads better
-# when its methods appear in the order the author arranged them.
+# Show member functions/attributes in source order rather than alphabetically.
 autodoc_member_order = "bysource"
+# numpydoc adds its own (redundant) autosummary-style member listing on top
+# of autodoc's; this keeps it to just rendering the numpydoc-style sections
+# (Parameters/Returns/...) within each already-listed member's docstring.
+numpydoc_show_class_members = False
 
 # Importing every module at build time is unavoidable for autodoc, but the
 # optional backends need not be installed for the docs to build.

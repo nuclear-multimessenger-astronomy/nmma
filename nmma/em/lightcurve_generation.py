@@ -190,18 +190,19 @@ s_scale = (2 * tau_co * tau_ni) / (tau_co - tau_ni)
 
 
 def arnett_lc(t_day, param_dict):
-    """bolometric light curve functions from Arnett model of supernovae
-    -----------
-    Parameters:
+    """Bolometric light curve of the Arnett supernova model.
+
+    Parameters
+    ----------
     t_day: array-like
-        Time in days
+        Time in days.
     param_dict: dict
-        Dictionary containing the parameters for the Arnett model
+        Parameters of the Arnett model.
 
-    Returns:
-    Ls: array-like
-        Bolometric light curve
-
+    Returns
+    -------
+    array-like
+        Bolometric luminosity.
     """
     tau_m = param_dict["tau_m"]
     Mni = 10 ** param_dict["log10_mni"] * msun_cgs
@@ -223,18 +224,19 @@ def arnett_lc(t_day, param_dict):
 
 
 def arnett_modified_lc(t_day, param_dict):
-    """time delayed bolometric light curve functions from Arnett model
-    -----------
-    Parameters:
+    """Bolometric light curve of the Arnett model, with a time delay.
+
+    Parameters
+    ----------
     t_day: array-like
-        Time in days
+        Time in days.
     param_dict: dict
-        Dictionary containing the parameters for the Arnett model
+        Parameters of the Arnett model, including the delay ``t_0``.
 
-    Returns:
-    Ls: array-like
-        Bolometric light curve
-
+    Returns
+    -------
+    array-like
+        Bolometric luminosity.
     """
     Lbol_arnett = arnett_lc(t_day, param_dict)
     return Lbol_arnett * (1.0 - np.exp(-((param_dict["t_0"] / t_day) ** 2)))
