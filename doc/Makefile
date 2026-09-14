@@ -224,6 +224,6 @@ pseudoxml:
 
 .PHONY: apidoc
 apidoc:
-	sphinx-apidoc -o api/ ../nmma --no-toc --separate --force --templatedir=_templates/apidoc
+	sphinx-apidoc -o api/ --no-toc --separate --force --templatedir=_templates/apidoc ../nmma ../nmma/skyportal_osg.py
 	@echo
 	@echo "APIdoc run is complete."
