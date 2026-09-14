@@ -103,7 +103,7 @@ class NMMAInjectionCreator(InjectionCreator):
             self.include_checks = True
 
         # legacy
-        ## CHECKME:
+        # CHECKME:
         gw_injection_file = getattr(args, "gw_injection_file", self.filename)
         self.gw_injection_file = Path(gw_injection_file) if gw_injection_file else None
         self.reference_frequency = getattr(args, "reference_frequency", 20.0)
@@ -127,7 +127,7 @@ class NMMAInjectionCreator(InjectionCreator):
             needs (detectors/waveform args for 'snr', light-curve model
             args for 'peak_magnitude').
         """
-        
+
         self.conv_instructions = {}
         test_methods = []
         tests = process_multi_condition_string(args.tests)
@@ -280,13 +280,13 @@ class NMMAInjectionCreator(InjectionCreator):
             Fresh prior draw, `self.n_injection` rows (or however many
             `get_injection_dataframe` returns).
         """
-            
+
         dataframe_from_prior = self.get_injection_dataframe()
         try:  # FIXME: This could be handled more gracefully...
             swap_mask = dataframe_from_prior["mass_1"] < dataframe_from_prior["mass_2"]
-            dataframe_from_prior.loc[swap_mask, ["mass_1", "mass_2"]] = (
-                dataframe_from_prior.loc[swap_mask, ["mass_2", "mass_1"]].values
-            )
+            dataframe_from_prior.loc[
+                swap_mask, ["mass_1", "mass_2"]
+            ] = dataframe_from_prior.loc[swap_mask, ["mass_2", "mass_1"]].values
         except KeyError:
             pass
         if self.columns_to_remove is not None:
@@ -352,9 +352,11 @@ class NMMAInjectionCreator(InjectionCreator):
         uniformly, and drop those whose resulting ejecta mass isn't finite
         -- i.e. the assumed binary type isn't physically consistent with
         the chosen EOS for that injection's masses. Mirrors nmma 0.2.3's
-        --eject + --binary-type BNS/NSBH:
+        --eject + --binary-type BNS/NSBH::
+
             index_taken = np.where(isfinite(log10_mej_dyn) * isfinite(log10_mej_wind))[0]
             dataframe = dataframe.take(index_taken)
+
         applied once, not through the --tests redraw mechanism (which
         cannot work here: a mass read from --gw-injection-file is fixed and
         can never be redrawn away from failing a test).
@@ -448,7 +450,7 @@ class NMMAInjectionCreator(InjectionCreator):
             If `self.max_redraws` pool-replenishments are exhausted with
             rows still failing.
         """
-        
+
         redraw_from_prior = self.adjusted_prior_draw()
         redraws = 1
         failed_tests = 0
@@ -511,7 +513,7 @@ class NMMAInjectionCreator(InjectionCreator):
         """
 
         if gw_injection_file:
-            if not gw_injection_file.suffix in (".json", ".xml", ".xml.gz", ".dat"):
+            if gw_injection_file.suffix not in (".json", ".xml", ".xml.gz", ".dat"):
                 raise ValueError("Unknown injection file format")
 
             # load the injection json file
@@ -574,7 +576,7 @@ class NMMAInjectionCreator(InjectionCreator):
             conversion) and an existing `'tests_passed'` column, updated
             in place (multiplicatively).
         """
-        
+
         df["tests_passed"] *= np.isfinite(df["log10_mej_dyn"])
         df["tests_passed"] *= np.isfinite(df["log10_mej_wind"])
 
@@ -698,7 +700,7 @@ class NMMAInjectionCreator(InjectionCreator):
         -------
         pandas.DataFrame
             `dataframe` with `'snr'`/`'duration'` columns populated.
-        """        
+        """
         # FIXME: preferable to parallelise, but ifo meta_data is not thread-safe
 
         # records = dataframe.to_dict("records")
@@ -870,7 +872,7 @@ class NMMAInjectionCreator(InjectionCreator):
             If `injection_file`'s suffix isn't recognized -- in practice
             only '.xml', '.dat', and '.ecsv' ever match (see note above).
         """
-        
+
         # legacy imports
         from lalsimulation import (
             SimInspiralTransformPrecessingWvf2PE as lalsim_conversion,

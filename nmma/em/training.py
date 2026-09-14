@@ -861,6 +861,7 @@ def create_benchmark(
     plot=True,
 ):
     """Create a benchmark for the SVD model.
+
     Parameters
     ----------
     em_model : str
@@ -1247,11 +1248,13 @@ def min_max_scaling(data):
 
 
 def load_api_gp_model(gp):
-    """Load a gaussian-process-api GaussianProcess model
+    """Load a gaussian-process-api GaussianProcess model.
+
     Parameters
     ----------
     gp : dict
-        Dictionary representation of gaussian-process-api GaussianProcess model
+        Dictionary representation of gaussian-process-api GaussianProcess model.
+
     Returns
     -------
     gp_api.gaussian_process.GaussianProcess

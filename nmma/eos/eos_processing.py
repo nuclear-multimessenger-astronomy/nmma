@@ -53,7 +53,7 @@ def setup_eos_generator(args):
         return LEC7EoSGenerator(meta_dict)
     elif eos_model_type == "lec-13":
         return LEC13EoSGenerator(meta_dict)
-    ## add more models
+    # add more models
     else:
         raise ValueError(f"Unknown eos model type: {eos_model_type}")
 
@@ -73,6 +73,7 @@ class EoSGenerator:
     n_mass_samples: int, default 30
         Number of mass grid points per EOS; see ``set_mass_construction``.
     """
+
     eos_parameters = None
 
     def __init__(self, emulator_path, eos_parameters=None, n_mass_samples=30):
@@ -91,14 +92,14 @@ class EoSGenerator:
                 self.predict = self.tensorflow_predict
             elif k.backend.backend() == "jax":
                 self.predict = self.jax_predict
-        except:
+        except:  # noqa: E722
             import pickle
 
             with open(emulator_path, "rb") as f:
                 self.emulator = pickle.load(f)
             self.predict = self.pickle_predict
 
-        ## set the parameter-keys to be passed to the emulator
+        # set the parameter-keys to be passed to the emulator
         if eos_parameters:
             self.eos_parameters = eos_parameters
 
@@ -167,6 +168,7 @@ class NEPEoSGenerator(EoSGenerator):
         against the active Keras backend), "eos_parameters", and
         "n_mass_samples" (default 40) -- see ``set_mass_construction``.
     """
+
     def __init__(self, metadata):
 
         emulator_path = metadata["emulator_path"]
@@ -192,9 +194,11 @@ class NEPEoSGenerator(EoSGenerator):
         elif isinstance(n_mass_samples, (tuple, list)):
             # iterable containing mass points for fixed-distance lower end, variably spaced upper end and optionally mass value at which these methods will be concatenated; if not given, the default is 2.0
             try:
-                self.mass_samples_low, self.mass_samples_high, self.split_value = (
-                    n_mass_samples
-                )
+                (
+                    self.mass_samples_low,
+                    self.mass_samples_high,
+                    self.split_value,
+                ) = n_mass_samples
             except ValueError:
                 self.mass_samples_low, self.mass_samples_high = n_mass_samples
                 self.split_value = 2.0
@@ -261,6 +265,7 @@ class NEP5EoSGenerator(NEPEoSGenerator):
     """NEPEoSGenerator using the 5 NEP coefficients K_sat, L_sym, K_sym,
     3n_sat, 5n_sat as emulator inputs (the ``--micro-eos-model nep-5``
     default)."""
+
     eos_parameters = ["K_sat", "L_sym", "K_sym", "3n_sat", "5n_sat"]
 
 
@@ -276,6 +281,7 @@ class LECEoSGenerator(EoSGenerator):
         "radius_scaler", "mass_emulator", "radius_emulator",
         "lambda_emulator", and optionally "n_mass_samples" (default 30).
     """
+
     def __init__(self, metadata):
         self.feature_scaler = joblib.load(metadata["feature_scaler"])
         self.lambda_scaler = joblib.load(metadata["lambda_scaler"])
@@ -331,12 +337,14 @@ class LECEoSGenerator(EoSGenerator):
 class LEC7EoSGenerator(LECEoSGenerator):
     """LECEoSGenerator using the 6 chiral-EFT low-energy constants
     d11, d22, d3, d4, d6, d7 as emulator inputs."""
+
     eos_parameters = ["d11", "d22", "d3", "d4", "d6", "d7"]
 
 
 class LEC13EoSGenerator(LECEoSGenerator):
     """LECEoSGenerator using the 6 LEC7EoSGenerator coefficients plus 7
     saturation/speed-of-sound parameters (ksat, qsat, zsat, cssq1-4)."""
+
     eos_parameters = [
         "d11",
         "d22",
@@ -377,6 +385,7 @@ class EoSConverter:
         ``eos_data`` isn't already named that way), or "qur" (skip EOS
         entirely, use quasi-universal relations via ``radii_from_qur``).
     """
+
     def __init__(self, args, method=None):
         if method is None:
             if getattr(args, "eos_file", None) or getattr(args, "eos_data", None):
@@ -417,7 +426,7 @@ class EoSConverter:
                     # Needs `sorted(...)` here.
                     eos_files = list(eos_path.iterdir())
                 else:
-                    eos_files = [eos_path / f"{j+1}.dat" for j in range(args.Neos)]
+                    eos_files = [eos_path / f"{j + 1}.dat" for j in range(args.Neos)]
             else:
                 # FIX ME: glob() order is also not guaranteed sorted --
                 # same risk as Path.iterdir() above.
@@ -444,8 +453,8 @@ class EoSConverter:
                     # instead of returning False. Crashes by default
                     # (eos_to_ram=False) whenever eos_data isn't already
                     # named 1.dat, 2.dat, ...
-                    if not f.samefile(eos_dir / f"{i+1}.dat"):
-                        shutil.copy(f, eos_dir / f"{i+1}.dat")
+                    if not f.samefile(eos_dir / f"{i + 1}.dat"):
+                        shutil.copy(f, eos_dir / f"{i + 1}.dat")
                 self.eos_data = eos_dir
                 self.macro_conversion = self.eos_direct_load
 
@@ -475,7 +484,8 @@ class EoSConverter:
         """
         EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
         return [
-            np.loadtxt(self.eos_data / f"{j+1}.dat", usecols=[0, 1, 2]).T for j in EOSID
+            np.loadtxt(self.eos_data / f"{j + 1}.dat", usecols=[0, 1, 2]).T
+            for j in EOSID
         ]
 
     def eos_from_ram(self, converted_parameters):
@@ -594,7 +604,7 @@ def load_eos_files(eos_data, Neos):
     Parameters
     ----------
     eos_data: str | list of str
-        A directory path (globbed for "*.dat", sorted), or an
+        A directory path (globbed for ``*.dat``, sorted), or an
         already-resolved list of files.
     Neos: int | None
         If given, asserted to match the number of files found.
@@ -652,7 +662,7 @@ def load_macro_characteristics_from_tabulated_eos_set(
     # would make it return None regardless. This backs the `combine-EOS`
     # console script (nmma.post_processing.ns_characteristics.main), which
     # is therefore also broken; no test currently covers it.
-    ####SETUP
+    # SETUP
     do_rads = False
     do_lams = False
     mtovs = np.empty(Neos)
@@ -671,7 +681,7 @@ def load_macro_characteristics_from_tabulated_eos_set(
         lambdas = np.empty_like(Neos, len(masses_for_char_lambdas))
     eos_data, Neos = load_eos_files(eos_data, Neos)
 
-    ### Main Loop
+    # Main Loop
     for i, eos_file in enumerate(eos_data):
         m, r, lam = np.loadtxt(eos_file, usecols=[1, 0, 2], unpack=True)
         mtovs[i] = m[-1]
@@ -689,6 +699,7 @@ def load_macro_characteristics_from_tabulated_eos_set(
     # end and implicitly returns None, so the caller's tuple-unpacking
     # (e.g. `Mmax_prior, R14_prior = load_macro_characteristics_from...`)
     # would fail even if the np.empty_like crash above were fixed.
+
 
 def load_tabulated_macro_eos_set_to_dict(eos_data, weights=None, Neos=None):
     """Load a tabulated EOS set into a dict keyed by EOS index (1-based),

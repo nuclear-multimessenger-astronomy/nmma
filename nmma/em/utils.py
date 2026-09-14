@@ -1176,8 +1176,8 @@ def get_skymap_idx(ra, dec, nside):
     """
     Get the HEALPix pixel index for given RA and Dec coordinates.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     ra : float or array-like
         Right Ascension in degrees.
     dec : float or array-like
@@ -1187,8 +1187,8 @@ def get_skymap_idx(ra, dec, nside):
     nest : bool, optional
         Whether to use NESTED ordering. Default is True.
 
-    Returns:
-    --------
+    Returns
+    -------
     int or array-like
         The HEALPix pixel index corresponding to the input coordinates.
     """
@@ -1345,17 +1345,19 @@ def read_LANL_spectra(
     Read in spectra at multiple timesteps
     for Even et al. (2019) and subsequent
     paper data format. Written by Eve Chase.
+
     Parameters
     ----------
     filename: string
         path to spectrum file
+
     Returns
     -------
     spectra: dictionary
+
         - time in days as keys
-        - each time contains a dictionary with
-        a wavelength array in cm and a flux density
-        array in erg / s / cm^3
+        - each time contains a dictionary with a wavelength array in
+          cm and a flux density array in erg / s / cm^3
     """
 
     # Check that units are appropriate
@@ -1439,6 +1441,7 @@ def get_knprops_from_LANLfilename(filename):
     Typically this looks something like this:
     'Run_TP_dyn_all_lanth_wind2_all_md0.1_vd0.3_mw0.001_vw0.05_mags_2020-01-04.dat'
     Written by Eve Chase.
+
     Parameters
     ----------
     filename: str
@@ -1600,12 +1603,14 @@ def parse_LANLfile(filename, key="band"):
     Used to determine the number of rows for a given passband
     filter or timestep.
     Written by Eve Chase.
+
     Parameters
     ----------
     filename: string
         path to magnitude file
     key: string
         key to search for in file. Options: 'band', 'time'
+
     Returns
     -------
     nrows: int

@@ -9,15 +9,23 @@ from itertools import product
 
 from bilby import run_sampler
 from bilby.core.likelihood import Likelihood
-from bilby.core.prior import (Prior, Constraint, Interped, ConditionalPriorDict, PriorDict,
-                              MultivariateGaussianDist, MultivariateGaussian)
+from bilby.core.prior import (
+    Prior,
+    Constraint,
+    Interped,
+    ConditionalPriorDict,
+    PriorDict,
+    MultivariateGaussianDist,
+    MultivariateGaussian,
+)
 from bilby.core.result import FileMovedError
 from .utils import input_obj_to_str, read_bestfit_from_posterior
-from .constants import  set_cosmology
+from .constants import set_cosmology
 from .conversion import cosmology_to_distance
 from .parsing import single_messenger_analysis_parsing, nmma_base_parsing
 
-def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes = []):
+
+def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes=[]):
     """Build kwargs for ``_callable`` from ``namespace``, matching each of
     its signature parameters (with or without a default) against a
     same-named (optionally prefixed) attribute on ``namespace``.
@@ -29,7 +37,7 @@ def initialisation_args_from_signature_and_namespace(_callable, namespace, prefi
     namespace: argparse.Namespace
         Source of values, e.g. parsed CLI args.
     prefixes: list of str, optional
-        Attribute-name prefixes to also try (e.g. "em_" to match
+        Attribute-name prefixes to also try (e.g. ``em_`` to match
         ``namespace.em_tmin`` for a ``tmin`` parameter), tried in order,
         first match wins. The bare (unprefixed) name is always tried too.
 
@@ -47,29 +55,36 @@ def initialisation_args_from_signature_and_namespace(_callable, namespace, prefi
     # entry), but it's unbounded accumulating state for the life of the
     # process. Should default to `prefixes=None` and do
     # `prefixes = list(prefixes) if prefixes else ['']` instead.
-    prefixes.append('')
-    signature = inspect.signature(_callable) 
-    #step 1: get all default kwargs from the signature
-    default_kwargs= {key: val.default for key, val in signature.parameters.items() if val.default is not inspect.Parameter.empty}
+    prefixes.append("")
+    signature = inspect.signature(_callable)
+    # step 1: get all default kwargs from the signature
+    default_kwargs = {
+        key: val.default
+        for key, val in signature.parameters.items()
+        if val.default is not inspect.Parameter.empty
+    }
 
-    #step 2: get all available kwargs from the namespace
+    # step 2: get all available kwargs from the namespace
     for key in signature.parameters.keys():
-        ## this checks if further parameters from args-Namespace are only used as shorthands in the class definition (e.g. tmin, tmax)
+        # this checks if further parameters from args-Namespace are only used as shorthands in the class definition (e.g. tmin, tmax)
         for prefix in prefixes:
-            if hasattr(namespace, prefix+key):
-                kwarg = getattr(namespace, prefix+key)
+            if hasattr(namespace, prefix + key):
+                kwarg = getattr(namespace, prefix + key)
                 if kwarg is not None:
                     default_kwargs[key] = kwarg
                 break
     return default_kwargs
+
 
 class NMMALikelihoodMixin:
     """Shared likelihood contract: constraint handling and the
     likelihood/log-likelihood interface. Mixed into ``NMMALikelihood``
     and, separately, the EOS ``JointEoSConstraint`` hierarchy.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
     @property
     def priors(self):
         """The sampling priors. Setting this also extracts
@@ -102,8 +117,9 @@ class NMMALikelihoodMixin:
             constr = {value.name: value}
         elif isinstance(value, dict):
             constr = value
-            assert all(isinstance(v, Constraint) for v in value.values()), \
-                "All entries in constraints dict must be of type Constraint"
+            assert all(
+                isinstance(v, Constraint) for v in value.values()
+            ), "All entries in constraints dict must be of type Constraint"
         # FIX ME: no else/final branch -- assigning `.constraints` to
         # anything other than a PriorDict, Constraint, or dict leaves
         # `constr` unset, so this raises a confusing UnboundLocalError
@@ -115,12 +131,11 @@ class NMMALikelihoodMixin:
         """Product of each constraint's ``.prob(value)`` for
         ``out_sample`` -- 0 if any constraint is violated, else the
         joint probability."""
-        return np.prod([con.prob(out_sample[k] ) for k, con in self.constraints.items()])
+        return np.prod([con.prob(out_sample[k]) for k, con in self.constraints.items()])
 
     def identity_conversion(self, parameters):
         """No-op parameter conversion; returns ``parameters`` unchanged."""
         return parameters
-
 
     def __call__(self, parameters):
         """``exp(self.log_likelihood(parameters))`` -- the plain (not
@@ -140,7 +155,6 @@ class NMMALikelihoodMixin:
         """Always True; subclasses override for messenger-specific
         checks."""
         return True
-
 
     def final_diagnostics(self, bestfit_params, args, result=None):
         """Delegate to ``self.sub_model.final_diagnostics``, if it has
@@ -172,30 +186,46 @@ class NMMALikelihoodMixin:
         bestfit_params = read_bestfit_from_posterior(args)
         bestfit_params = self.parameter_conversion(bestfit_params)
         return self.final_diagnostics(bestfit_params, args, result)
-           
+
     def check_parameter_equivalencies(self, parameter_names):
         """Check for equivalent parameters and terminate if found"""
-        #FIXME: to be extended
+        # FIXME: to be extended
         single_equivalency_groups = [
             ["inclination_EM", "KNtheta", "theta_jn", "cos_theta_jn", "thetaObs"],
         ]
         for group in single_equivalency_groups:
             intersection = set(parameter_names).intersection(set(group))
-            if len(intersection)>1:
-                raise ValueError(f"Multiple equivalent parameters found: {intersection}. Please only provide one of these.")
-            
+            if len(intersection) > 1:
+                raise ValueError(
+                    f"Multiple equivalent parameters found: {intersection}. Please only provide one of these."
+                )
+
         double_equivalency_groups = [
-            ['redshift', 'luminosity_distance', 'Hubble_constant'], # FIXME: this would be ok if Omega_matter is investigated
-            ['mass_1', 'mass_1_source', 'chirp_mass', 'mass_ratio', 'eta','mass_2', 'mass_2_source'],
+            [
+                "redshift",
+                "luminosity_distance",
+                "Hubble_constant",
+            ],  # FIXME: this would be ok if Omega_matter is investigated
+            [
+                "mass_1",
+                "mass_1_source",
+                "chirp_mass",
+                "mass_ratio",
+                "eta",
+                "mass_2",
+                "mass_2_source",
+            ],
         ]
         for group in double_equivalency_groups:
             intersection = set(parameter_names).intersection(set(group))
-            if len(intersection)>2:
-                raise ValueError(f"Mutually dependent parameters found: {intersection}. Please only provide up to two of these.")
+            if len(intersection) > 2:
+                raise ValueError(
+                    f"Mutually dependent parameters found: {intersection}. Please only provide up to two of these."
+                )
 
-    
-class NMMALikelihood(NMMALikelihoodMixin,Likelihood):
-    """ The base likelihood object for modular multi-messenger analysis
+
+class NMMALikelihood(NMMALikelihoodMixin, Likelihood):
+    """The base likelihood object for modular multi-messenger analysis
 
     Parameters
     ----------
@@ -209,22 +239,21 @@ class NMMALikelihood(NMMALikelihoodMixin,Likelihood):
 
     """
 
-    def __init__(self,sub_model, priors, **kwargs):
+    def __init__(self, sub_model, priors, **kwargs):
         super().__init__()
 
         self.sub_model = sub_model
         try:
             self._noise_logl = self.sub_model.noise_log_likelihood()
         except AttributeError:
-            self._noise_logl = 0.
+            self._noise_logl = 0.0
         self.conv_functions = []
         self.priors = priors
         self.setup_submodel_conversion()
 
     def __repr__(self):
         """``"{class_name} with {sub_model!r}"``."""
-        return self.__class__.__name__ + ' with ' + self.sub_model.__repr__()
-
+        return self.__class__.__name__ + " with " + self.sub_model.__repr__()
 
     def setup_parameter_conversion(self):
         """Register ``cosmology_to_distance`` into ``conv_functions`` if
@@ -245,7 +274,7 @@ class NMMALikelihood(NMMALikelihoodMixin,Likelihood):
         added last (e.g. by ``setup_submodel_conversion``, called in
         ``__init__``) run first, ahead of ones added later (e.g. by
         ``setup_parameter_conversion``)."""
-        #reverse because "main conversion" are added last
+        # reverse because "main conversion" are added last
         for conv in reversed(self.conv_functions):
             parameters = conv(parameters)
         return parameters
@@ -261,14 +290,15 @@ class NMMALikelihood(NMMALikelihoodMixin,Likelihood):
         if not np.isfinite(logL_model):
             return np.nan_to_num(-np.inf)
         return logL_model
-    
+
     def noise_log_likelihood(self):
         """Cached noise log-likelihood from ``self.sub_model``, or 0. if
         it doesn't define one."""
         return self._noise_logl
 
+
 class NMMADummyPrior(Prior):
-    """ A dummy prior that can be read from a prior-file into a prior dict, but is set to be replaced later
+    """A dummy prior that can be read from a prior-file into a prior dict, but is set to be replaced later
 
     Parameters
     ----------
@@ -277,8 +307,9 @@ class NMMADummyPrior(Prior):
         ``adjust_priors_for_nmma`` (dispatched on the dict key this is
         stored under, e.g. containing "h5" or "hubble").
     """
+
     def __init__(self, setup_props):
-        super().__init__(name='NMMADummyPrior')
+        super().__init__(name="NMMADummyPrior")
         self.setup_props = setup_props
 
     @classmethod
@@ -306,6 +337,7 @@ class NMMADummyPrior(Prior):
         setup_props = literal_eval(repr_str)
         return cls(setup_props)
 
+
 def adjust_priors_for_nmma(priors, logger=None):
     """Replace any ``NMMADummyPrior`` placeholders in ``priors`` with the
     real prior their key implies (a multivariate Gaussian from an HDF5
@@ -329,18 +361,23 @@ def adjust_priors_for_nmma(priors, logger=None):
     for key, prior in priors.copy().items():
         if not isinstance(prior, NMMADummyPrior):
             continue
-        elif 'h5' in key:
+        elif "h5" in key:
             priors.pop(key)  # Remove the dummy prior
             if logger:
-                logger.info(f"Replacing dummy prior for {key} with multivariate Gaussian prior from HDF5 file")
+                logger.info(
+                    f"Replacing dummy prior for {key} with multivariate Gaussian prior from HDF5 file"
+                )
             priors = h5_to_multivar_prior(prior.setup_props, priors)
-        elif 'hubble' in key.lower():
+        elif "hubble" in key.lower():
             priors.pop(key)  # Remove the dummy prior
             if logger:
-                logger.info(f"Replacing dummy prior for {key} with Interped prior from Hubble weighting file")
+                logger.info(
+                    f"Replacing dummy prior for {key} with Interped prior from Hubble weighting file"
+                )
             priors = adjust_hubble_prior(priors, prior.setup_props, logger)
         # to be extended
     return priors
+
 
 def adjust_hubble_prior(priors, args, logger=None):
     """Set the cosmology (if sampling over the Hubble constant) and, if
@@ -363,10 +400,10 @@ def adjust_hubble_prior(priors, args, logger=None):
         ``priors``, with "Hubble_constant" replaced if a weighting file
         was given.
     """
-    if getattr(args, 'Hubble', False) or "Hubble_constant" in priors:  
-        set_cosmology(getattr(args, 'cosmology', None))
+    if getattr(args, "Hubble", False) or "Hubble_constant" in priors:
+        set_cosmology(getattr(args, "cosmology", None))
 
-    hubble_weight = input_obj_to_str(args, 'Hubble_weight')
+    hubble_weight = input_obj_to_str(args, "Hubble_weight")
     if hubble_weight:
         if logger:
             logger.info("Sampling over Hubble constant with pre-calculated prior")
@@ -375,8 +412,8 @@ def adjust_hubble_prior(priors, args, logger=None):
             Hubble_prior_data = pd.read_csv(hubble_weight, delimiter=" ", header=0)
             xx = Hubble_prior_data.Hubble.to_numpy()
             yy = Hubble_prior_data.prior_weight.to_numpy()
-        except:
-            xx, yy =  np.loadtxt(hubble_weight).T
+        except:  # noqa: E722
+            xx, yy = np.loadtxt(hubble_weight).T
 
         Hmin = xx[0]
         Hmax = xx[-1]
@@ -386,7 +423,8 @@ def adjust_hubble_prior(priors, args, logger=None):
         )
     return priors
 
-def h5_to_multivar_prior(h5_file_path, priors = {}):
+
+def h5_to_multivar_prior(h5_file_path, priors={}):
     """Build a MultivariateGaussian prior over each dataset in an HDF5
     file (mean/covariance estimated from the stored samples), merged
     into ``priors`` (upgraded to a ConditionalPriorDict if it wasn't one
@@ -410,7 +448,7 @@ def h5_to_multivar_prior(h5_file_path, priors = {}):
     # leak keys from the first call into the second's result. Currently
     # dormant since the only call site (adjust_priors_for_nmma) always
     # passes priors explicitly, but a landmine for any other caller.
-    h5_file_path = input_obj_to_str(h5_file_path, 'h5 file path')
+    h5_file_path = input_obj_to_str(h5_file_path, "h5 file path")
     with h5py.File(h5_file_path, "r") as f:
         # Load the data from the HDF5 file
         keys = list(f.keys())
@@ -430,6 +468,7 @@ def h5_to_multivar_prior(h5_file_path, priors = {}):
         return priors
     return ConditionalPriorDict(priors)
 
+
 def check_priors_and_likelihood_for_nmma(priors, likelihood):
     """Final pre-sampling touch-up: move any stray ``Constraint`` priors
     into ``likelihood.constraints``, guard against a ``priors``
@@ -446,13 +485,16 @@ def check_priors_and_likelihood_for_nmma(priors, likelihood):
     priors, likelihood
     """
     # remove constraints from priors and add to likelihood (should have happened already, but just in case)
-    constraints = {k: priors.pop(k) for k in priors.copy().keys()
-                    if isinstance(priors[k], Constraint)}
+    constraints = {
+        k: priors.pop(k)
+        for k in priors.copy().keys()
+        if isinstance(priors[k], Constraint)
+    }
     likelihood.constraints.update(constraints)
 
     test_draw = priors.sample(1)
     test_conversion = priors.conversion_function(test_draw)
-    if len(set(test_conversion.keys()) ) != len(test_conversion.keys()):
+    if len(set(test_conversion.keys())) != len(test_conversion.keys()):
         # FIX ME: intent looks like it's meant to preserve the original
         # (duplicate-key-producing) conversion_function by moving it into
         # likelihood.conv_functions, while swapping priors.conversion_function
@@ -466,10 +508,11 @@ def check_priors_and_likelihood_for_nmma(priors, likelihood):
         # twice). Needs the old function captured before the overwrite.
         priors.conversion_function = priors.default_conversion_function
         likelihood.conv_functions.append(likelihood.priors.conversion_function)
-        
+
     # add final conversions
     likelihood.setup_parameter_conversion()
     return priors, likelihood
+
 
 def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
     """Run bilby's run_sampler and post-process the result: convert the
@@ -508,11 +551,12 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
     print(sampler_kwargs)
 
     # check if it is running with reactive sampler
-    nlive = None if getattr(args, 'reactive_sampling', False) else args.nlive
+    nlive = None if getattr(args, "reactive_sampling", False) else args.nlive
     if nlive is None and args.sampler != "ultranest":
-        raise ValueError("reactive sampling is only available for ultranest, "
-                         "please set nlive or use ultranest sampler")
-
+        raise ValueError(
+            "reactive sampling is only available for ultranest, "
+            "please set nlive or use ultranest sampler"
+        )
 
     if args.skip_sampling:
         print("Sampling for 1 iteration and plotting checkpointed results.")
@@ -522,7 +566,7 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
             sampler_kwargs["niter"] = 1
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
-    
+
     result = run_sampler(
         likelihood,
         priors,
@@ -558,11 +602,13 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         result.priors = result_prior
         # result.save_posterior_samples()
 
-    if injection_parameters: 
-        var_columns = {col for col in result.posterior 
-                       if len(result.posterior[col].unique()) > 1}
-        injection_parameters = {k: v for k, v in injection_parameters.items()
-                        if k in var_columns}
+    if injection_parameters:
+        var_columns = {
+            col for col in result.posterior if len(result.posterior[col].unique()) > 1
+        }
+        injection_parameters = {
+            k: v for k, v in injection_parameters.items() if k in var_columns
+        }
     try:
         result.plot_corner(injection_parameters, priors)
     except RuntimeError:
@@ -570,13 +616,14 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         for k, v in priors.copy().items():
             v.latex_label = None
             priors[k] = v
-        result.priors = priors 
+        result.priors = priors
         result.plot_corner(injection_parameters, priors)
-        
+
     if args.bestfit or args.plot:
         result.posterior = likelihood.posterior_conversion(result.posterior)
         likelihood.post_process_bestfit(args, result)
     return result
+
 
 def multi_analysis_loop(args, analysis_setup):
     """Run one or more analyses, expanding ``--multi``/``--matrix``
@@ -603,18 +650,19 @@ def multi_analysis_loop(args, analysis_setup):
     rank = 0
     try:
         from mpi4py import MPI
+
         rank = MPI.COMM_WORLD.Get_rank()
         if MPI.COMM_WORLD.Get_size() > 1:
             USE_MPI = True
-    except:
+    except:  # noqa: E722
         pass
-        
-    if rank != 0 and not getattr(args, 'verbose', False):
+
+    if rank != 0 and not getattr(args, "verbose", False):
         devnull = os.open(os.devnull, os.O_WRONLY)
         os.dup2(devnull, 1)
         os.dup2(devnull, 2)
-        
-    if getattr(args, 'multi', None):
+
+    if getattr(args, "multi", None):
         sub_runs = []
         # FIX ME: `len(args.multi) == 1` is meant to distinguish "sweep
         # one parameter across a list of values" (this branch) from
@@ -634,18 +682,18 @@ def multi_analysis_loop(args, analysis_setup):
             for i, val in enumerate(vals):
                 run_args = deepcopy(args)
                 setattr(run_args, arg, val)
-                setattr(run_args, 'label', f"{args.label}_{i}")
+                setattr(run_args, "label", f"{args.label}_{i}")
                 sub_runs.append(run_args)
         else:
             for run_name, changes in args.multi.items():
                 run_args = deepcopy(args)
-                setattr(run_args, 'label', f"{args.label}_{run_name}")
+                setattr(run_args, "label", f"{args.label}_{run_name}")
                 for key, value in changes.items():
                     if key not in args:
                         raise KeyError(f"{key} not a known argument... please remove")
                     setattr(run_args, key, value)
                 sub_runs.append(run_args)
-    elif getattr(args, 'matrix', None):
+    elif getattr(args, "matrix", None):
         sub_runs = []
         keys = args.matrix.keys()
         vals = args.matrix.values()
@@ -653,8 +701,8 @@ def multi_analysis_loop(args, analysis_setup):
             run_args = deepcopy(args)
             run_name = args.label
             for i, var in enumerate(arg_variation):
-                rep = f'_{var}'
-                if len(rep)>20:
+                rep = f"_{var}"
+                if len(rep) > 20:
                     # FIX ME: keys/vals are dict_keys/dict_values views
                     # (from args.matrix.keys()/.values() above), which
                     # aren't subscriptable -- confirmed this raises
@@ -667,20 +715,21 @@ def multi_analysis_loop(args, analysis_setup):
                     var_idx = vals[i].index(var)
                     rep = f"_{key}_{var_idx}"
                 run_name += rep
-            setattr(run_args, 'label', run_name)
+            setattr(run_args, "label", run_name)
             for key, val in zip(keys, arg_variation):
                 if key not in args:
                     raise KeyError(f"{key} not a known argument... please remove")
                 setattr(run_args, key, val)
             sub_runs.append(run_args)
-            
+
     else:
         sub_runs = [args]
     for run_args in sub_runs:
         priors, likelihood, injection_parameters = analysis_setup(run_args)
         priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
-        if USE_MPI and run_args.sampler =='dynesty':
+        if USE_MPI and run_args.sampler == "dynesty":
             from .mpi_setup import pbilby_sampling
+
             run_function = pbilby_sampling
         else:
             run_function = bilby_sampling
