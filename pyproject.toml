@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8"]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,8 @@ authors = [
 description = "A nuclear physics multi-messenger Bayesian inference library"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
-license = {text = "GPLv3"}
+license = "GPL-3.0-only"
+license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md", "LICENSES/LicenseRef-NMMA-Logo.txt"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
@@ -83,11 +84,6 @@ doc = [
 grb = [
     "afterglowpy>=0.7.3",
     "wrapt_timeout_decorator",
-]
-neuralnet = [
-    "torch",
-    "nflows",
-    "torchvision",
 ]
 production = [
     "nestcheck",
