@@ -3,9 +3,53 @@ import os
 
 sys.path.insert(0, os.path.abspath(".."))
 
-import nmma
+import nmma  # noqa: E402  (must follow the sys.path insert above)
 
-extensions = ["myst_parser", "sphinx_copybutton","sphinx_github_changelog"]
+extensions = [
+    "myst_parser",
+    "sphinx_copybutton",
+    "sphinx_github_changelog",
+    # API reference: autodoc reads the docstrings, napoleon understands their
+    # numpydoc sections, viewcode links each entry to its source.
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+]
+
+# numpydoc style; Google style stays enabled for the few docstrings using it.
+napoleon_google_docstring = True
+napoleon_numpy_docstring = True
+
+# Keep members in source order rather than alphabetical: a class reads better
+# when its methods appear in the order the author arranged them.
+autodoc_member_order = "bysource"
+
+# Importing every module at build time is unavoidable for autodoc, but the
+# optional backends need not be installed for the docs to build.
+autodoc_mock_imports = [
+    "afterglowpy",
+    "cocteau",
+    "dustmaps",
+    "fiesta",
+    "gwemopt",
+    "keras",
+    "m4opt",
+    "nflows",
+    "tensorflow",
+    "torch",
+]
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    # bilby is by far the most referenced external package in our docstrings.
+    "bilby": ("https://lscsoft.docs.ligo.org/bilby", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy", None),
+    "astropy": ("https://docs.astropy.org/en/stable", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+    "pandas": ("https://pandas.pydata.org/docs", None),
+}
 myst_enable_extensions = [
     "amsmath",
     "colon_fence",
@@ -58,12 +102,11 @@ copyright = "2023, The NMMA Team"
 author = "The NMMA Team"
 
 
-
 version = nmma.__version__
 release = version
 
 
-language = None
+language = "en"
 
 
 exclude_patterns = ["_build"]

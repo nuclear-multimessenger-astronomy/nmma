@@ -467,6 +467,7 @@ User Guide
    GW-EM-resampling
    combined_analysis
    Cluster_Resources
+   api/modules
    contributing
    changelog
 
