@@ -101,6 +101,8 @@ sampler = [
 ]
 
 [tool.setuptools_scm]
+# Version is derived from the latest git tag (e.g. v1.2.3 -> 1.2.3).
+# Untagged commits get a .devN+<hash> suffix. Nothing is stored in the tree.
 
 [project.scripts]
 nmma-generation = "nmma.joint.generation:nmma_generation"
