@@ -1,58 +1,63 @@
+# --- Build Stage ---
 # Use official Ubuntu 22.04 image as base
-FROM ubuntu:22.04
+FROM ubuntu:22.04 AS builder
 
-# Update the repository for package indexes
-RUN apt-get update
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
-RUN apt-get install -y \
-    python3 \
-    git \
-    python3-pip \
-    && apt-get clean \
+# Update the repository for package indexes and install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-dev \
+    git cmake make g++ gcc gfortran \
+    liblapacke-dev liblapack-dev libblas-dev \
+    libopenmpi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
-WORKDIR /work
-
-# Clone the Git repository
-RUN git clone https://github.com/nuclear-multimessenger-astronomy/nmma/
-
-# Set the working directory to the cloned repository
-WORKDIR /work/nmma
-
-RUN apt-get update
-RUN apt-get install -y libopenmpi-dev openmpi-bin openmpi-doc
-RUN apt install -y python3-mpi4py
-#install dependencies
-RUN pip3 install numpy
-RUN pip3 install -r /work/nmma/doc_requirements.txt -r /work/nmma/grb_requirements.txt -r /work/nmma/production_requirements.txt -r /work/nmma/requirements.txt
+WORKDIR /build
 
 # Clone and build Multinest
-RUN git clone https://github.com/JohannesBuchner/MultiNest
+RUN git clone https://github.com/JohannesBuchner/MultiNest \
+    && cd MultiNest/build \
+    && cmake .. \
+    && make
 
-WORKDIR /work/nmma/MultiNest
+# Clone the Git repository (with build arguments for forks/branches)
+ARG REPO_URL="https://github.com/nuclear-multimessenger-astronomy/nmma.git"
+ARG BRANCH="main"
+RUN git clone --branch ${BRANCH} ${REPO_URL} /build/nmma
 
-RUN apt-get install -y \
-    cmake \
-    liblapacke-dev \
-    liblapack-dev \
-    libblas-dev 
+# Set the working directory to the cloned repository
+WORKDIR /build/nmma
 
-RUN cd build && cmake .. && make
+# Clone and install PyMultiNest, and install dependencies
+RUN git clone https://github.com/JohannesBuchner/PyMultiNest/ /build/PyMultiNest \
+    && pip3 wheel --no-cache-dir --wheel-dir /build/wheels /build/PyMultiNest .[production,grb] Flask Jinja2
+
+# --- Runtime Stage ---
+# Use official Ubuntu 22.04 image as base
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies (runtime only)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip \
+    liblapack3 libblas3 openmpi-bin \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Transfer the compiled MultiNest shared libraries from the builder
+COPY --from=builder /build/MultiNest/lib /usr/local/lib/MultiNest
 
 # Set environment variable
-ENV LD_LIBRARY_PATH=/work/nmma/MultiNest/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib/MultiNest:$LD_LIBRARY_PATH
 
-# Clone and install PyMultiNest
-RUN git clone https://github.com/JohannesBuchner/PyMultiNest/ /work/nmma/PyMultiNest
-WORKDIR /work/nmma/PyMultiNest
-RUN python3 setup.py install --user
+# Transfer and install the pre-built Python wheels
+COPY --from=builder /build/wheels /wheels
+RUN pip3 install --no-cache-dir /wheels/* --no-index
 
 # Add the executable path to the enviromental variable PATH
 ENV PATH=$PATH:$HOME/.local/bin/
 
-RUN pip3 install nmma
-RUN pip3 install --upgrade Flask Jinja2
-
+WORKDIR /work
 CMD ["bash"]
