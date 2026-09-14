@@ -356,14 +356,24 @@ class MainHandler(tornado.web.RequestHandler):
 
 class HealthHandler(tornado.web.RequestHandler):
     def get(self):
-        self.write("OK")
+        self.write({"status": "ok", "message": "API is responsive"})
 
+class ReadyHandler(tornado.web.RequestHandler):
+    def get(self):
+        # Verifies the container has properly mounted the models
+        prior_directory = f"{os.path.dirname(os.path.realpath(__file__))}/priors"
+        if os.path.exists(prior_directory):
+            self.write({"status": "ok", "message": "API is ready to accept jobs"})
+        else:
+            self.set_status(503)
+            self.write({"status": "unavailable", "message": "Prior directory missing"})
 
 def make_app():
     return tornado.web.Application(
         [
             (r"/analysis", MainHandler),
             (r"/health", HealthHandler),
+            (r"/ready", ReadyHandler),
         ]
     )
 
