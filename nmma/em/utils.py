@@ -287,7 +287,8 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 
 
 def check_model_time_consistency(
-    light_curve_data, light_curve_model, priors, injection=None
+    light_curve_data, light_curve_model, priors, injection=None, allow_data_cuts=False
+
 ):
 
     lc_times, lc_mags, lc_uncertainties, trigger_time = light_curve_data
@@ -327,7 +328,7 @@ def check_model_time_consistency(
     t_obs_start_max = (1 + zmax) * t_source_min + t0_max
     t_obs_end_min = (1 + zmin) * t_source_max + t0_min
 
-    if injection is not None:
+    if injection or allow_data_cuts:
         for key, time in lc_times.items():
             print(
                 f"Cutting light curve data for filter {key} to model time range {t_obs_start_max} - {t_obs_end_min}."
