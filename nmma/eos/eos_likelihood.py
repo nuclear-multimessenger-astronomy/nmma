@@ -20,6 +20,27 @@ nmma_colors = fig_setup()
 
 
 def setup_tabulated_eos_priors(args, priors, logger=None):
+    """Add an "EOS" prior to ``priors``, in place, for sampling over a set
+    of tabulated EOS files.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed CLI args. ``Neos`` sets how many EOS to sample over
+        directly; otherwise it's taken from the length of ``eos_weight``
+        (if given) or the file count in ``eos_data`` (``Neos=0`` counts
+        as unset). ``eos_weight`` also sets the prior's per-EOS weights,
+        otherwise they're uniform.
+    priors: bilby.core.prior.PriorDict
+        Prior dict to add the "EOS" entry to.
+    logger: logging.Logger, optional
+        If given, logs that tabulated-EOS sampling is being used.
+
+    Returns
+    -------
+    priors: bilby.core.prior.PriorDict
+        The same dict, with "EOS" added.
+    """
     if logger:
         logger.info("Sampling over precomputed EOSs")
     weights = np.loadtxt(args.eos_weight) if getattr(args, "eos_weight", None) else None
@@ -34,6 +55,24 @@ def setup_tabulated_eos_priors(args, priors, logger=None):
 
 
 def setup_eos_kwargs(data_dump, args, logger):
+    """Build the kwargs for ``EquationofStateLikelihood`` when the EOS is
+    generated on the fly (the "emulated" case).
+
+    Parameters
+    ----------
+    data_dump: dict
+        Generation-time data dump; must contain ``"eos_constraint_dict"``.
+    args: argparse.Namespace
+        Parsed CLI args, passed to ``EoSConverter(args, "emulated")``.
+    logger: logging.Logger
+        Unused; accepted for interface consistency with the other
+        messengers' ``setup_*_kwargs``.
+
+    Returns
+    -------
+    dict
+        ``{"constraint_dict": ..., "eos_converter": EoSConverter(...)}``.
+    """
     # default_eos_kwargs = initialisation_args_from_signature_and_namespace(EquationofStateLikelihood, args)
     # eos_kwargs = default_eos_kwargs | dict(
     eos_kwargs = dict(
@@ -45,6 +84,24 @@ def setup_eos_kwargs(data_dump, args, logger):
 
 
 def tabulated_eos_setup(args):
+    """Build priors and an EquationofStateLikelihood for a tabulated-EOS
+    run.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed CLI args (``eos_data``, ``eos_weight``, ``Neos``,
+        ``eos_to_ram``, plus any constraint args for
+        ``compose_eos_constraints``). ``Neos`` is resolved and written
+        back onto ``args`` in place.
+
+    Returns
+    -------
+    priors: bilby.core.prior.PriorDict
+    eos_likelihood: EquationofStateLikelihood
+    injection_parameters: None
+        Always None; EOS has no injection parameters of its own.
+    """
     priors = PriorDict()
     priors = setup_tabulated_eos_priors(args, priors)
     args.Neos = priors["EOS"].ncategories
@@ -59,15 +116,53 @@ def tabulated_eos_setup(args):
 
 
 class EquationofStateLikelihood(NMMALikelihood):
+    """Likelihood for sampling over an EOS against a set of astrophysical
+    constraints, via a JointEoSConstraint sub-model.
+
+    Parameters
+    ----------
+    priors: bilby.core.prior.PriorDict
+        Sampling priors.
+    constraint_dict: dict
+        Constraints to apply, as built by ``compose_eos_constraints``.
+    eos_converter: EoSConverter
+        Converts sampled EOS parameters to macroscopic mass/radius/tidal
+        properties.
+    """
     def __init__(self, priors, constraint_dict, eos_converter, **kwargs):
         constraint = JointEoSConstraint(constraint_dict, eos_converter=eos_converter)
         # TODO: to be extended for more complex likelihood expressions
         super().__init__(constraint, priors, **kwargs)
 
     def setup_submodel_conversion(self):
+        """Register the EOS parameter conversion so it runs on every
+        ``self.parameter_conversion`` call."""
         self.conv_functions.append(self.sub_model.parameter_conversion)
 
     def final_diagnostics(self, bestfit_params, args, result=None, fig=None):
+        """Draw and save the best-fit EOS's mass-radius diagnostic plot, with
+        constraint overlays and, if ``result`` is given, posterior credible
+        bands and the injected EOS's curve.
+
+        Parameters
+        ----------
+        bestfit_params: dict
+            Best-fit sample to convert and plot.
+        args: argparse.Namespace
+            Must have ``label`` and ``outdir`` (used for the saved filename).
+            ``fig`` — an existing Figure to overlay onto (skipping
+            constraints already labelled on it) — is optional, defaulting
+            to None (start fresh).
+        result: bilby.core.result.Result, optional
+            If given, also draws 50%/90% credible bands from
+            ``result.posterior`` and, if set, ``result.injection_parameters``.
+        fig: unused
+            Ignored — pass an existing figure via ``args.fig`` instead.
+
+        Returns
+        -------
+        fig: matplotlib.figure.Figure
+        """
         matplotlib.rcParams.update({"font.size": 16, "font.family": "serif"})
         # matplotlib.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
         bestfit_params = self.parameter_conversion(bestfit_params)
@@ -151,6 +246,26 @@ class EquationofStateLikelihood(NMMALikelihood):
 def compose_eos_constraints(
     args, constraint_kinds=["lower_mtov", "upper_mtov", "mass_radius"]
 ):
+    """Build the full EOS constraint dict from CLI args, merged on top of
+    any existing ``args.eos_constraint_json`` file, and persist the result
+    back to that file.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed CLI args; see ``read_constraint_from_args`` for how each
+        kind is read. ``eos_constraint_json`` is optional — without a
+        readable/writable path, constraints are just read from args with
+        no persistence.
+    constraint_kinds: list of str, default ["lower_mtov", "upper_mtov", "mass_radius"]
+        Which constraint kinds to read.
+
+    Returns
+    -------
+    dict
+        ``{constraint_kind: {label: {property: value, ...}, ...}, ...}``,
+        merged per-label with any constraints already on file.
+    """
     try:
         with open(args.eos_constraint_json, "r") as f:
             constraint_dict = json.load(f)
@@ -177,7 +292,25 @@ def compose_eos_constraints(
 
 
 def read_constraint_from_args(args, constraint_kind):
-    "Routine to read prepare constraint in expected dict-format from argparse namespace during generation process"
+    """Assemble one kind of EOS constraint into the dict format expected by
+    ``JointEoSConstraint.initialise_from_dict``.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command-line arguments, as produced during the generation
+        step (e.g. by ``nmma-generation``).
+    constraint_kind : str
+        Which kind of constraint to read, e.g. ``"lower_mtov"``,
+        ``"upper_mtov"`` or ``"mass_radius"``.
+
+    Returns
+    -------
+    dict or None
+        ``{label: {property: value, ...}, ...}`` for every named
+        constraint of this kind, or ``None`` if none were specified.
+    """
+    
     ##preferred: Have the dict with the subconstraints already set up
     prep_dict = getattr(args, constraint_kind, None)
     if prep_dict:
@@ -214,6 +347,19 @@ def read_constraint_from_args(args, constraint_kind):
 
 
 class JointEoSConstraint:
+    """Combines one or more EOS constraints, evaluating their combined
+    log-likelihood against a converted EOS's macroscopic parameters.
+
+    Parameters
+    ----------
+    *constraints: EoSConstraint | JointEoSConstraint | dict
+        Constraints to combine. An ``EoSConstraint`` is used as-is, a
+        ``JointEoSConstraint`` is flattened (its own constraints merged
+        in), and a dict is expanded via ``initialise_from_dict``.
+    eos_converter: EoSConverter, optional
+        Converts sampled EOS parameters to macroscopic properties. If
+        omitted, a placeholder with no macro parameters is used.
+    """
     def __init__(self, *constraints, eos_converter=None):
         self.constraints = self.initialise_constraints(constraints)
 
@@ -222,6 +368,7 @@ class JointEoSConstraint:
         self.eos_converter = eos_converter
 
     def __repr__(self):
+        """Combined repr of the constraints, joined with "and"/commas."""
         if len(self.constraints) == 1:
             return f"{self.constraints[0].__repr__()}"
         elif len(self.constraints) == 2:
@@ -232,6 +379,8 @@ class JointEoSConstraint:
             return f"{self.__class__.__name__} of {', '.join([cons.__repr__() for cons in self.constraints[:-1]])} and {self.constraints[-1].__repr__()}"
 
     def initialise_constraints(self, constraint_tuple):
+        """Flatten the constructor's ``*constraints`` into a plain list of
+        ``EoSConstraint`` instances, expanding any dicts along the way."""
         constraint_list = []
         for constraint in constraint_tuple:
             if isinstance(constraint, EoSConstraint):
@@ -243,6 +392,19 @@ class JointEoSConstraint:
         return constraint_list
 
     def initialise_from_dict(self, constraint_dict):
+        """Build EoSConstraint instances from a
+        ``{constraint_kind: {label: {property: value, ...}}}`` dict, as
+        produced by ``compose_eos_constraints``.
+
+        Parameters
+        ----------
+        constraint_dict: dict
+            Keyed by "lower_mtov", "upper_mtov", or "mass_radius".
+
+        Returns
+        -------
+        list of EoSConstraint
+        """
         constraint_list = []
         for constraint_type, constr_class in zip(
             ["lower_mtov", "upper_mtov"], [LowerMTOVConstraint, UpperMTOVConstraint]
@@ -271,9 +433,12 @@ class JointEoSConstraint:
         return constraint_list
 
     def parameter_conversion(self, parameters):
+        """Forward to ``self.eos_converter.parameter_conversion``."""
         return self.eos_converter.parameter_conversion(parameters)
 
     def log_likelihood(self, parameters):
+        """Sum each constraint's log-likelihood, evaluated against
+        ``parameters`` and ``self.eos_converter.macro_parameters``."""
         logls = [
             con.log_likelihood(parameters, self.eos_converter.macro_parameters)
             for con in self.constraints
@@ -283,19 +448,34 @@ class JointEoSConstraint:
     def tabulate_weighted_eos(
         self, parameters, outdir, weight_path=None, normalise=True
     ):
-        """Given a directory of macroscopic EOSs and nmma.joint.Constraint,
-        returns sorted EOSs and the corresponding prior weights
+        """Evaluate this constraint on a set of EOSs and write them out sorted
+        by weight, for use as a WeightedCategorical EOS prior.
+
+        If ``outdir`` already contains a ``sorted`` directory and
+        ``eos_weights.dat``, that cached result is returned as-is.
 
         Parameters
         ----------
         parameters: dict | str | int | float
-            parameters for which the eos should be tabulated. If str, int or float, it is assumed to reweight all EOSs in the data directory
+            EOSs to evaluate, as ``{"EOS": array_of_indices}``. A bare
+            str/int/float N is shorthand for ``{"EOS": np.arange(N)}``.
         outdir: str
-            path to the directory where sorted EoSs should be stored
-        weight_path: str | None
-            If given, filename to save computed EOS weights. Default is None.
-        normalise: Bool
-            Whether to return normalised weights. Default is True"""
+            Directory to write the sorted EOSs and weights into.
+        weight_path: str, optional
+            Path to prior weights to combine with the new constraint weights.
+        normalise: bool, default True
+            Whether to normalise the resulting weights to sum to 1.
+
+        Returns
+        -------
+        weight_path: str
+            Path to the written weights file.
+        file_path: str
+            Directory of sorted EOS files, named ``1.dat``, ``2.dat``, ...
+            in ascending weight.
+        n_eos: int
+            Number of EOSs that produced a valid weight.
+        """
 
         file_path = Path(outdir, "sorted")
         if file_path.is_dir() and Path(outdir, "eos_weights.dat").is_file():
@@ -345,6 +525,19 @@ class JointEoSConstraint:
         return weight_path, file_path, len(good_data)
 
     def eval_eos_data(self, eos_data):
+        """Evaluate this constraint's log-likelihood for one EOS's (R, M, Λ)
+        curve, at ``TOV_mass = M[-1]``. Returns None if ``eos_data`` doesn't
+        unpack to exactly 3 elements.
+
+        Parameters
+        ----------
+        eos_data: tuple
+            ``(radii, masses, lambdas)`` for one EOS.
+
+        Returns
+        -------
+        float or None
+        """
         try:
             R, M, _ = eos_data
             self.eos_converter.macro_parameters = {"radii": R, "masses": M}
@@ -354,11 +547,28 @@ class JointEoSConstraint:
 
 
 class EoSConstraint:
+    """Base class for a single EOS constraint (mass-only or mass-radius).
+
+    Parameters
+    ----------
+    name: str, optional
+        Identifier of the measurement. If omitted, ``self.name`` falls
+        back to the class name — but ``repr()`` doesn't: a known bug
+        leaves ``self.base_repr`` as literal ``None`` in that case, so
+        ``repr()`` renders as ``"None "`` instead.
+    arxiv_ref: str, optional
+        Identifier of a relevant source, appended to ``repr()`` if set.
+    plot_kwargs: dict, optional
+        Overrides for the default line/contour style used by ``plot``.
+    """
     def __init__(self, name=None, arxiv_ref=None, plot_kwargs=None):
         self.repr_add = ""
         self.type = "macro"
         if name is None:
             self.name = self.__class__.__name__
+            # FIX ME: this should probably be `self.base_repr = self.name`
+            # (the class name) -- as written, base_repr is literally None,
+            # so repr() below renders as the string "None " when name is omitted.
             self.base_repr = name
         else:
             self.name = name
@@ -367,6 +577,8 @@ class EoSConstraint:
         self.plot_kwargs = plot_kwargs if plot_kwargs is not None else {}
 
     def __repr__(self):
+        """``"{class_name} based on {name}"``, plus ``" (see arxiv:...)"``
+        if set. Broken (renders ``"None "``) when ``name`` was omitted."""
         out = f"{self.base_repr} {self.repr_add}"
         if self.arxiv_ref:
             out = f"{out} (see arxiv:{self.arxiv_ref})"
@@ -374,6 +586,25 @@ class EoSConstraint:
 
 
 class MassConstraint(EoSConstraint):
+    """Base class for a Gaussian mass-bound constraint (see
+    LowerMTOVConstraint/UpperMTOVConstraint for the actual bounds).
+
+    Parameters
+    ----------
+    measured_mass: float
+        Observed mass (in solar masses).
+    measure_error: float
+        1-sigma uncertainty of the measurement.
+    name: str, optional
+        Identifier of the measurement.
+    arxiv_ref: str, optional
+        Identifier of a relevant source.
+    plot_kwargs: dict, optional
+        Overrides for the default line style used by ``plot``.
+    lognorm_method: callable
+        ``norm.logcdf`` or ``norm.logsf``, set by subclasses to pick the
+        bound's direction.
+    """
     def __init__(
         self,
         measured_mass,
@@ -391,12 +622,17 @@ class MassConstraint(EoSConstraint):
         self.linestyle = "--"
 
     def __repr__(self):
+        """``"{class_name} of {mass}+-{error} M_sun based on {name}"``."""
         out = f"{self.__class__.__name__} of {self.mass}+-{self.error} M_sun"
         if self.name != "Mass Constraint":
             out = f"{out} based on {self.name}"
         return out
 
     def log_likelihood(self, parameters, local_parameters=None):
+        """``self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)``,
+        where ``tov_mass`` is ``parameters['TOV_mass']`` if present, else
+        the last mass in ``local_parameters['masses']`` (per-EOS, if a
+        list of arrays)."""
         tov_mass = parameters.get("TOV_mass", None)
         if tov_mass is None:
             if isinstance(local_parameters["masses"], list):
@@ -406,7 +642,22 @@ class MassConstraint(EoSConstraint):
         return self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)
 
     def plot(self, ax, **kwargs):
-        """Plot the mass constraint on the given figure."""
+        """Draw this constraint as a horizontal line at ``self.mass``, spanning
+        the current x-limits of a mass-radius plot, labelled with ``self.name``.
+
+        Parameters
+        ----------
+        ax: matplotlib.axes.Axes
+            Mass-radius axes to draw on (mass on y, radius on x).
+        **kwargs
+            Overrides for ``self.plot_kwargs`` (e.g. color, linestyle,
+            linewidth), passed to ``ax.hlines``.
+
+        Returns
+        -------
+        ax: matplotlib.axes.Axes
+            The same axes, for chaining.
+        """
         x_lim = ax.get_xlim()
         plot_kwargs = self.plot_kwargs | kwargs
         if "color" not in plot_kwargs:
@@ -435,23 +686,25 @@ class MassConstraint(EoSConstraint):
 
 
 class LowerMTOVConstraint(MassConstraint):
-    """Constraint that an EOS supports at least a certain TOV mass(within Gaussian uncertainty)"""
+    """Constraint that an EOS supports at least a certain TOV mass.
+
+    Parameters
+    ----------
+    measured_mass: float
+        Observed mass (in solar masses).
+    measure_error: float
+        1-sigma uncertainty of the measurement.
+    name: str, optional
+        Identifier of the measurement.
+    arxiv_ref: str, optional
+        Identifier of a relevant source.
+    plot_kwargs: dict, optional
+        Overrides for the default line style used by ``plot``.
+    """
 
     def __init__(
         self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None
     ):
-        """
-        Parameters
-        ----------
-        measured_mass: float
-            Observed mass (in solar masses)
-        measure_error: float
-            1-sigma uncertainty of the measurement
-        name: str
-            identifier of the measurement
-        arxiv_ref: str
-            Identifier of a relevant source
-        """
         super().__init__(
             measured_mass,
             measure_error,
@@ -463,23 +716,26 @@ class LowerMTOVConstraint(MassConstraint):
 
 
 class UpperMTOVConstraint(MassConstraint):
-    """Constraint that an EOS supports at most a certain TOV mass (within Gaussian uncertainty)"""
+    """Constraint that an EOS supports at most a certain TOV mass
+    (within Gaussian uncertainty).
+
+    Parameters
+    ----------
+    measured_mass: float
+        Observed mass (in solar masses).
+    measure_error: float
+        1-sigma uncertainty of the measurement.
+    name: str, optional
+        Identifier of the measurement.
+    arxiv_ref: str, optional
+        Identifier of a relevant source.
+    plot_kwargs: dict, optional
+        Overrides for the default line style used by ``plot``.
+    """
 
     def __init__(
         self, measured_mass, measure_error, name=None, arxiv_ref=None, plot_kwargs=None
     ):
-        """
-        Parameters
-        ----------
-        measured_mass: float
-            Observed mass (in solar masses)
-        measure_error: float
-            1-sigma uncertainty of the measurement
-        name: str, optional
-            identifier of the measurement
-        arxiv_ref: str, optional
-            Identifier of a relevant source
-        """
         super().__init__(
             measured_mass,
             measure_error,
@@ -492,8 +748,28 @@ class UpperMTOVConstraint(MassConstraint):
 
 
 class MassRadiusConstraint(EoSConstraint):
-    """Constraint that an EOS adheres to  certain mass-radius region"""
+    """Constraint that an EOS adheres to a certain mass-radius region.
 
+    Parameters
+    ----------
+    mass_array: np.array, optional
+        Array (or similar) with mass posterior of M-R measurement, must be
+        specified along an equal-length radius_array.
+    radius_array: np.array, optional
+        Array (or similar) with radius posterior of M-R measurement, must
+        be specified along an equal-length mass_array.
+    weights: np.array, optional
+        Weights for the M-R samples, aligned with mass_array/radius_array.
+    file_path: str, optional
+        Path to a data file containing radius and mass posteriors. If
+        provided, mass_array and radius_array are ignored.
+    name: str, optional
+        Identifier of the measurement.
+    arxiv_ref: str, optional
+        Identifier of a relevant source.
+    plot_kwargs: dict, optional
+        Overrides for the default line style used by ``plot``.
+    """
     def __init__(
         self,
         mass_array=None,
@@ -504,21 +780,6 @@ class MassRadiusConstraint(EoSConstraint):
         arxiv_ref=None,
         plot_kwargs=None,
     ):
-        """
-        Parameters
-        ----------
-        mass_array: np.array, optional
-            Array (or similar) with mass posterior of M-R measurement, must be specified along an equal-length radius_array
-        radius_array: np.array, optional
-            Array (or similar) with radius posterior of M-R measurement, must be specified along an equal-length mass_array
-        file_path: str, optional
-            path to data_file that contains radius and mass posteriors. If provided, mass_array and radius_array are ignored
-        name: str
-            identifier of the measurement
-        arxiv_ref: str
-            Identifier of a relevant source
-        """
-
         super().__init__(name, arxiv_ref, plot_kwargs)
         if file_path:
             mass_array, radius_array, weights = self.read_data(file_path)
@@ -530,7 +791,22 @@ class MassRadiusConstraint(EoSConstraint):
         self.test_masses = np.linspace(1.2, 2.5, 151)
 
     def read_data(self, file_path):
-        """Read mass-radius data from a file."""
+        """Load an M-R(-weight) file, auto-detecting orientation and which
+        column is mass vs. radius (masses are assumed <= 3, radii > 3).
+
+        Parameters
+        ----------
+        file_path: str
+            Whitespace-delimited file with 2 columns (mass, radius) or 3
+            (mass, radius, weight), in either row or column orientation.
+
+        Returns
+        -------
+        masses: np.ndarray
+        radius: np.ndarray
+        weights: np.ndarray or None
+            None if the file had only 2 columns.
+        """
         data = np.loadtxt(file_path, unpack=True)
         if data.shape[0] not in [2, 3]:
             data = data.T
@@ -554,6 +830,12 @@ class MassRadiusConstraint(EoSConstraint):
             radius = data_1
             masses = data_2
 
+        # FIX ME: operator precedence makes this `(not (masses > 0).all())
+        # and (masses < 5).all() and (radius > 3).all()`, not
+        # `not ((masses > 0).all() and (masses < 5).all() and (radius > 3).all())`
+        # as the error message below implies -- so an out-of-range value
+        # (e.g. a mass of 6 M_sun mixed with plausible radii) currently
+        # slips through without raising.
         if not (masses > 0).all() and (masses < 5).all() and (radius > 3).all():
             min_mass = np.min(masses)
             max_mass = np.max(masses)
@@ -572,21 +854,26 @@ class MassRadiusConstraint(EoSConstraint):
         return masses, radius, weights
 
     def set_grid(self, masses, radii, weights, mass_step=0.01, radius_step=0.03):
-        """Set up a grid upon which to build a histogram of mass-radius data to approximate the pdf.
-        Note that when using multiple mass-radius measurements, all measurements should use the same stepsizes!
+        """Bin M-R(-weight) samples into a smoothed 2D histogram, stored as
+        ``self.histogram`` (with edges ``self.rad_edges``/``self.mass_edges``)
+        for use as an approximate mass-radius pdf.
+
+        Trims the 0.1%/99.9% tails of each axis and pads the range by 5%
+        before binning. When combining multiple measurements, use the same
+        step sizes for all of them.
+
         Parameters
         ----------
         masses: np.array
-            Array with mass posterior of M-R measurement
+            Mass posterior samples of the M-R measurement.
         radii: np.array
-            Array with radius posterior of M-R measurement, must be specified along an equal-length mass_array
+            Radius posterior samples, same length as ``masses``.
         weights: np.array, optional
-            Array with weights of the M-R samples, must be specified along an equal-length mass_array
-            mass_step: float
-            step size for mass grid in solar masses, default is 0.01 Msun
-        radius_step: float
-            step size for radius grid in km, default is 0.02 km (20 m)
-
+            Sample weights, same length as ``masses``.
+        mass_step: float, default 0.01
+            Mass grid step size, in solar masses.
+        radius_step: float, default 0.03
+            Radius grid step size, in km.
         """
         mass_bins = self.set_bins(masses, mass_step)
         rad_bins = self.set_bins(radii, radius_step)
@@ -604,17 +891,54 @@ class MassRadiusConstraint(EoSConstraint):
         self.histogram = gaussian_filter(histogram * dmass * drad, sigma=3)
 
     def set_bins(self, array, step_size, sensitivity=0.001):
+        """Bin edges for ``array``, from the [sensitivity, 1-sensitivity]
+        quantile range padded by 5% on each side, stepped by ``step_size``.
+
+        Parameters
+        ----------
+        array: np.array
+        step_size: float
+        sensitivity: float, default 0.001
+            Quantile tail to trim before padding.
+
+        Returns
+        -------
+        np.ndarray
+            Bin edges.
+        """
         low, high = np.quantile(array, [sensitivity, 1.0 - sensitivity])
         bins = np.arange(0.95 * low, 1.05 * high, step_size, dtype=np.float64)
         return bins
 
     def log_likelihood(self, parameters, local_parameters):
+        """Look up this constraint's histogram-based log-likelihood at
+        ``TOV_mass`` (or ``local_parameters['masses'][-1]`` if absent),
+        via ``single_logl``. Intended to fall back to a per-EOS list when
+        ``local_parameters`` holds a batch (list of arrays) of
+        masses/radii, one entry per EOS.
+
+        Parameters
+        ----------
+        parameters: dict
+            May contain "TOV_mass".
+        local_parameters: dict
+            "masses" and "radii" (arrays for one EOS, or lists of arrays
+            for a batch).
+
+        Returns
+        -------
+        float or list of float
+        """
         try:
             tov_mass = parameters.get("TOV_mass", local_parameters["masses"][-1])
             return self.single_logl(
                 tov_mass, local_parameters["masses"], local_parameters["radii"]
             )
         except (ValueError, IndexError):
+            # FIX ME: this re-runs the exact same call that just raised,
+            # so it raises again here and the batch fallback below is
+            # never actually reached -- this path currently crashes
+            # instead of returning a per-EOS list.
             self.single_logl(
                 tov_mass, local_parameters["masses"], local_parameters["radii"]
             )
@@ -624,6 +948,13 @@ class MassRadiusConstraint(EoSConstraint):
             ]
 
     def single_logl(self, tov_mass, masses, radii):
+        """Sum this constraint's binned mass-radius pdf along one EOS's
+        M(R) curve, up to ``tov_mass``, and return its log.
+
+        Interpolates ``radii`` onto ``self.test_masses`` (clipped below
+        ``tov_mass``), bins each point into ``self.histogram``, and
+        returns the log of the summed probability mass.
+        """
         ## interpolate radii along equally spaced mass grid up to MTov
         test_mass_range = self.test_masses[self.test_masses < tov_mass]
         test_radii = np.interp(test_mass_range, masses, radii)
@@ -634,8 +965,24 @@ class MassRadiusConstraint(EoSConstraint):
         return log_l
 
     def plot(self, ax, **kwargs):
-        """Plot the mass-radius constraint on the given figure."""
+        """Draw 50%/90% highest-posterior-density contours of this
+        constraint's mass-radius pdf on ``ax``, labelling the 50% contour
+        with ``self.name``.
 
+        Parameters
+        ----------
+        ax: matplotlib.axes.Axes
+            Mass-radius axes to draw on (mass on y, radius on x).
+        **kwargs
+            Overrides for ``self.plot_kwargs`` (e.g. ``color``, or
+            ``manual`` — an (x, y) tuple or list of them for manual
+            contour-label placement), passed to ``ax.contour``.
+
+        Returns
+        -------
+        ax: matplotlib.axes.Axes
+            The same axes, for chaining.
+        """
         Xc = 0.5 * (self.rad_edges[:-1] + self.rad_edges[1:])
         Yc = 0.5 * (self.mass_edges[:-1] + self.mass_edges[1:])
 

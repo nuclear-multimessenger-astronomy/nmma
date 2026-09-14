@@ -14,6 +14,14 @@ else:
     matplotlib.rcParams['mathtext.fontset'] = "stix" 
 
 def fig_setup():
+    """Apply NMMA's default matplotlib rcParams and return an infinite cycle 
+    over its house color
+    palette.
+
+    Returns
+    -------
+    itertools.cycle
+    """
     fig_width_pt = 750.0  # Get this from LaTeX using \showthe\columnwidth
     inches_per_pt = 1.0 / 72.27  # Convert pt to inch
     golden_mean = (np.sqrt(5) - 1.0) / 2.0  # Aesthetic ratio
@@ -47,20 +55,20 @@ def fig_setup():
     return itertools.cycle(color_array)
 
 def plotting_parameters_from_priors(priors, keys=None):
-    """
-    Extracts plotting parameters from the priors dictionary.
+    """Build a {name: latex_label} dict of the varying priors for 
+    labeling plots.
 
     Parameters
     ----------
-    priors : dict
-        Dictionary containing prior information.
-    keys : list, optional
-        List of keys to extract from the priors. If None, all keys are used.
+    priors: dict | str
+        A PriorDict, or a path to a prior file.
+    keys: list, optional
+        Restrict to these keys; defaults to all of them.
 
     Returns
     -------
     dict
-        Dictionary with plotting parameters.
+        {name: latex_label} for each varying (non-fixed) prior.
     """
     if isinstance(priors, str):
         priors = PriorDict(filename=priors)
@@ -72,7 +80,27 @@ def plotting_parameters_from_priors(priors, keys=None):
     return {k: v.latex_label for k, v in priors.items() if k in keys and not isinstance(v, DeltaFunction)}
 
 def setup_multi_axes(num_axes, sharex=False, sharey=False, ncols=None, dpi=250, **fig_kwargs):
-    "Set up a multi-panel figure with the specified number of axes, essentially stolen from corner.py"
+    """Build a grid of ``num_axes`` subplots, sized similarly to
+    corner.py's convention (auto square-ish grid if ``ncols`` isn't
+    given).
+
+    Parameters
+    ----------
+    num_axes: int
+    sharex, sharey: bool, default False
+    ncols: int, optional
+        Defaults to min(5, ceil(sqrt(num_axes))).
+    dpi: int, default 250
+    **fig_kwargs
+        Passed to ``plt.subplots`` (e.g. ``figsize``, if not
+        auto-computed).
+
+    Returns
+    -------
+    fig: matplotlib.figure.Figure
+    axes: matplotlib.axes.Axes or np.ndarray of Axes
+        Flattened if there's more than one.
+    """
     fig_setup()
     if ncols is None:
         ncols = np.min([5, np.ceil(np.sqrt(num_axes)).astype(int)])
@@ -101,6 +129,17 @@ def setup_multi_axes(num_axes, sharex=False, sharey=False, ncols=None, dpi=250, 
 
 
 def fading_cmap(color):
+    """Build a colormap from transparent white (0) to opaque ``color``
+    (1) for shading credible regions.
+
+    Parameters
+    ----------
+    color: matplotlib color
+
+    Returns
+    -------
+    matplotlib.colors.LinearSegmentedColormap
+    """
     cmap = LinearSegmentedColormap.from_list("custom_cmap", ["white",color], gamma = 2)
 
     cdict = cmap._segmentdata.copy()
