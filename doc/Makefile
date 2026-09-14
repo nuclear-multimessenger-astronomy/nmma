@@ -224,6 +224,6 @@ pseudoxml:
 
 .PHONY: apidoc
 apidoc:
-	sphinx-apidoc -o api/ ../nmma --no-toc --separate --no-headings --force
+	sphinx-apidoc -o api/ ../nmma --no-toc --separate --force
 	@echo
 	@echo "APIdoc run is complete."
