@@ -11,6 +11,7 @@ isn't pointed to by ``$NMMA_FIESTA_SURROGATES`` (CI sets this after the
 """
 
 import os
+
 import pytest
 
 pytest.importorskip(

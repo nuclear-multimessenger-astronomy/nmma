@@ -1,8 +1,8 @@
-from pathlib import Path
-import shutil
 from argparse import Namespace
-from nmma.em.lightcurve_handling import resample_lightcurve_grid
+from pathlib import Path
+
 from nmma.em.io import convert_skyportal_lcs
+from nmma.em.lightcurve_handling import resample_lightcurve_grid
 
 data_dir = Path(__file__).parent.parent / "data"
 

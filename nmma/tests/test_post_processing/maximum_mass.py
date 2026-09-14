@@ -1,8 +1,8 @@
+import shutil
 from argparse import Namespace
 from pathlib import Path
-import pytest
-import shutil
 
+import pytest
 
 from nmma.post_processing import maximum_mass_constraint
 

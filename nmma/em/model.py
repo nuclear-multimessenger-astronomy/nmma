@@ -1,26 +1,27 @@
+from ast import literal_eval
 from copy import copy
+from pathlib import Path
+
 import joblib
 import numpy as np
-from scipy.special import logsumexp
-from astropy import units as u
 import sncosmo
-from sncosmo.models import _SOURCES
-from ast import literal_eval
+from astropy import units as u
 from bilby.gw.cosmology import get_cosmology
 from fiesta.inference.lightcurve_model import FluxModel
-from . import utils
-from . import lightcurve_generation as lc_gen
+from scipy.special import logsumexp
+from sncosmo.models import _SOURCES
 
 from ..core.base import initialisation_args_from_signature_and_namespace
 from ..core.constants import c_SI
 from ..core.conversion import (
-    observation_angle_conversion,
-    get_redshift,
     distance_modulus_nmma,
     get_cosmo_grids,
+    get_redshift,
+    observation_angle_conversion,
 )
-from ..core.gitlab import get_models_home, get_model
-from pathlib import Path
+from ..core.gitlab import get_model, get_models_home
+from . import lightcurve_generation as lc_gen
+from . import utils
 
 ln10 = np.log(10)
 
@@ -431,10 +432,11 @@ class LightCurveModelContainer:
 
 
 class FiestaModel(LightCurveModelContainer):
-    
     load_dir_string = None
-    
-    def __init__(self, model, filters=None, surrogate_dir=None, sample_times=None, **kwargs):
+
+    def __init__(
+        self, model, filters=None, surrogate_dir=None, sample_times=None, **kwargs
+    ):
         """A light curve model object for evaluating light curves using fiesta.
 
         Parameters
@@ -480,7 +482,9 @@ class FiestaModel(LightCurveModelContainer):
         try:
             self.fiesta_model = FluxModel(**fiesta_kwargs)
         except OSError:
-            fiesta_kwargs["directory"] = Path(surrogate_dir, self.load_dir_string, model, "model")
+            fiesta_kwargs["directory"] = Path(
+                surrogate_dir, self.load_dir_string, model, "model"
+            )
             self.fiesta_model = FluxModel(**fiesta_kwargs)
         if sample_times is not None:
             print("Warning: sample_times are not used in FiestaModel, ignoring.")
@@ -667,8 +671,10 @@ class SVDLightCurveModel(LightCurveModelContainer):
             self.model_times = self.setup_model_times()
 
         except ValueError:
-            raise ValueError("Model file not found: {modelfile}\n \
-                If possible, try removing the --local-only flag and rerun.")
+            raise ValueError(
+                "Model file not found: {modelfile}\n \
+                If possible, try removing the --local-only flag and rerun."
+            )
 
         if self.filters is None:
             try:
@@ -687,7 +693,6 @@ class SVDLightCurveModel(LightCurveModelContainer):
                     self.svd_mag_model[filt]["gps"][ii] = load_api_gp_model(gp_model)
 
         elif self.interpolation_type in ("keras", "tensorflow", "torch", "jax"):
-
             import keras as k
 
             def keras_load_model(model_file):
@@ -810,7 +815,9 @@ class FiestaKilonovaModel(FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
+
     load_dir_string = "KN"
+
     def __init__(self, model="Bu2026_MLP", **kwargs):
         super().__init__(model, **kwargs)
 
@@ -880,10 +887,10 @@ class FiestaGRBModel(GRBMixin, FiestaModel):
         A light curve model object to evaluate the light curve
         from a set of parameters.
     """
-    load_dir_string ="GRB"
-    def __init__(
-        self, model="afgpy_gaussian_CVAE", **kwargs
-    ):
+
+    load_dir_string = "GRB"
+
+    def __init__(self, model="afgpy_gaussian_CVAE", **kwargs):
         super().__init__(model, **kwargs)
 
 
@@ -1102,8 +1109,8 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
     def check_vs_priors(self, priors):
         print("""
             Note: Most source models in sncosmo use an 'amplitude' parameter,
-            that can differ drastically from model to model and requires a carefully chosen prior. 
-            NMMA allows an alternative approach that anchors the peak magnitude 
+            that can differ drastically from model to model and requires a carefully chosen prior.
+            NMMA allows an alternative approach that anchors the peak magnitude
             with a fiducial absolute magnitude of -19.35 and samples the parameters
             'supernova_mag_boost' and 'supernova_mag_stretch' instead to allow a more
             direct phyiscal interpretation.
@@ -1475,7 +1482,6 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
             else:
                 stacked_mags[filt] = -5.0 / 2.0 * logsumexp(mAB_list, axis=0) / ln10
         return stacked_mags
-
 
 
 def single_model_from_args(

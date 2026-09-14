@@ -9,6 +9,7 @@ on:
   pull_request:
     branches:
       - main
+      - dev
     paths-ignore:
       - "doc/**"
   workflow_dispatch:
@@ -71,12 +72,10 @@ jobs:
           echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/MultiNest/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
           echo "DYLD_LIBRARY_PATH=$GITHUB_WORKSPACE/MultiNest/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
 
-      - name: Lint with flake8
+      - name: Lint with Ruff
         run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude docs
-          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude docs,versioneer.py,nmma/_version.py,nmma/tests,nmma/*/__init__.py
+          pip install ruff
+          ruff check .
 
       - name: Download fiesta-surrogates from HuggingFace
         run: |

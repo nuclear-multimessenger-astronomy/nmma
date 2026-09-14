@@ -1,17 +1,16 @@
 from pathlib import Path
-import numpy as np
+
 import h5py
 import matplotlib.pyplot as plt
-
-
-from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict, EoSConverter
-
-from ..em.lightcurve_generation import create_light_curve_data
-from ..em import io, model, utils, em_parsing as emp
-from ..em.plotting_utils import lc_plot_with_histogram
+import numpy as np
 
 from ..core import conversion as conv
 from ..core.utils import read_trigger_time
+from ..em import em_parsing as emp
+from ..em import io, model, utils
+from ..em.lightcurve_generation import create_light_curve_data
+from ..em.plotting_utils import lc_plot_with_histogram
+from ..eos.eos_processing import EoSConverter, load_tabulated_macro_eos_set_to_dict
 
 
 def marginalised_lightcurve_expectation_from_gw_samples(args=None):
@@ -52,7 +51,8 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         args.gps = np.median(data_out["t0"])
 
     elif args.coinc_file is not None:
-        from ligo.skymap import bayestar, distance, io as lio
+        from ligo.skymap import bayestar, distance
+        from ligo.skymap import io as lio
 
         data_out = Table.read(
             args.coinc_file, format="ligolw", tablename="sngl_inspiral"
@@ -82,7 +82,6 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
 
     mag_ds, matter = [], []
     for ii in range(args.Nmarg):
-
         outdir = Path(args.outdir) / f"{ii:d}"
         outdir.mkdir(parents=True, exist_ok=True)
 
