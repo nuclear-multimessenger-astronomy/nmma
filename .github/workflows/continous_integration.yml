@@ -33,14 +33,29 @@ jobs:
 
       - name: Check SPDX license headers
         run: |
-          status=0
-          while IFS= read -r file; do
-            if [[ -s "$file" ]] && ! grep -q '^# SPDX-License-Identifier: GPL-3.0-only$' "$file"; then
-              echo "Missing SPDX license header: $file"
-              status=1
-            fi
-          done < <(git ls-files '*.py')
-          exit "$status"
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          files = subprocess.run(
+              ["git", "ls-files", "*.py"],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout.splitlines()
+          header = "# SPDX-License-Identifier: GPL-3.0-only"
+            missing = []
+            for file in files:
+              lines = Path(file).read_text(encoding="utf-8").splitlines()
+              if lines and lines[0] == header:
+                continue
+              if lines:
+                missing.append(file)
+          if missing:
+              print("Missing SPDX license header:")
+              print("\n".join(missing))
+              raise SystemExit(1)
+          PY
 
       - name: Set up Python with Conda ${{ matrix.python-version }}
         uses: conda-incubator/setup-miniconda@v3
