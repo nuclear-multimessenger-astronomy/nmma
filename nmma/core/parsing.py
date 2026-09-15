@@ -184,14 +184,11 @@ def base_analysis_parsing(parser):
         action="store_true",
         help="Whether to generate analytical check-point plots",
     )
-<<<<<<< HEAD
     parser.add_argument(
         "--allow-data-cuts",
         action="store_true",
         help="Allow automatic cutting of data to workflow needs (default: False)",
     )
-=======
->>>>>>> dev
     return parser
 
 
