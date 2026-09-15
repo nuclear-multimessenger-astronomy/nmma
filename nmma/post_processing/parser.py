@@ -193,6 +193,7 @@ def corner_plot_parser(parser):
     parser.add_argument("--bestfit-params",
         help="Use the values from the bestfit_params.json file to plot the truth on the corner plot; Either use injection JSON or bestfit_params.json, not both" )
 
+    # FIXME: -o/--output parsed but never read by plot_multi_corner; figure never saved
     parser.add_argument("-o", "--output", help="output file name.")
     parser.add_argument("--kwargs", default="{}",
         help="kwargs to be passed to corner.corner. Eg: {'plot_datapoints': False}, enclose {} in double quotes" )

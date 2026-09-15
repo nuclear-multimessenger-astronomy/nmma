@@ -32,6 +32,8 @@ def injection_parsing(parser):
     parser = eos_parsing(parser)
     parser = em_analysis_parsing(parser)
     parser = gw_injection_parsing(parser)
+    # FIXME: joint_likelihood_parsing overwrites injection_parsing's parser.description;
+    # --help shows wrong text
     parser = joint_likelihood_parsing(parser)
 
     # NMMA-added options

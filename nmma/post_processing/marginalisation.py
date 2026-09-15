@@ -54,6 +54,8 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     # gwpy is nasty in overwriting matplotlib, so we should only load it if truly needed
     from gwpy.table import Table
 
+    # FIXME: emp.lc_marginalisation_parser undefined; parser lives in
+    # post_processing/parser.py
     args = emp.parsing_and_logging(emp.lc_marginalisation_parser, args)
     ### FIXME: lc_marginalisation_parser is defined in nmma/post_processing/parser.py, not nmma/em/em_parsing.py. Since emp is bound to the em_parsing module, emp.lc_marginalisation_parser doesn't exist.
 

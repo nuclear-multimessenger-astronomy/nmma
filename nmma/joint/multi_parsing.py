@@ -214,6 +214,7 @@ def remove_argument_from_parser(parser, arg):
                 parser._handle_conflict_resolve(None, [("--" + arg, action)])
             except ValueError as e:
                 logger.warning(f"Error removing {arg}: {e}")
+    # FIXME: Debug "arg not found" logged outside loop, fires on successful removals
     logger.debug(f"Request to remove arg {arg} from bilby_pipe args, but arg not found")
 
 

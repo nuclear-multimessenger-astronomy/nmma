@@ -50,6 +50,8 @@ def find_spread_from_resampling(
     """
     med, uplim, lowlim = [], [], []
     for weight in cumprod:
+        # FIXME: Duplicate resampling_method call; first result overwritten and
+        # discarded
         samples = resampling_method(prior_dist, weight, post_samplesize)
         # calculate the posterior distribution using the prior samples
         # and the weighting that we previously calculated
@@ -293,6 +295,8 @@ class EjectaResamplerMixIn:
             C2 = (
                 m2 / r2 * geom_msun_km
             )  ### disfavour EOS if secondary cannot be supported as NS
+        # FIXME: Unreachable except ZeroDivisionError: numpy float division yields inf,
+        # not exception
         except ZeroDivisionError:
             return np.nan_to_num(-np.inf)
         if not self.withNSBH:
@@ -369,6 +373,8 @@ def main_resampling():
     # down sample
     weights = np.ones(len(GWsamples))
     weights /= np.sum(weights)
+    # FIXME: sample(frac=30000/len) raises ValueError when GW samples file has under
+    # 30000 rows
     GWsamples = GWsamples.sample(
         frac=30000 / len(GWsamples), weights=weights, random_state=42
     )

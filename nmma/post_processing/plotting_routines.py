@@ -290,6 +290,8 @@ def plot_histograms_only(
             ax = prepare_titles(ax, plot_quantities, i, use_kwargs)
         else:
             ax.xaxis.set_label_position("top")
+            # FIXME: show_titles=False branch reads title_kwargs['fontsize']; default {}
+            # raises KeyError
             ax.set_xlabel(
                 plot_quantities["labels"][i], fontsize=title_kwargs["fontsize"]
             )
@@ -350,6 +352,10 @@ def plot_multi_corner(args, key_selection=None, save=False):
         else [f for f in args.posterior_files]
     )
     for i, f in enumerate(args.posterior_files):
+        # FIXME: Unpacking dict .items() into plot_keys/plot_labels yields tuples,
+        # usually raises ValueError
+        # FIXME: plot_multi_corner reads args.prior; parser defines prior_filename,
+        # causing AttributeError
         plot_keys, plot_labels = corepu.plotting_parameters_from_priors(
             args.prior, keys=key_selection
         ).items()
@@ -357,20 +363,30 @@ def plot_multi_corner(args, key_selection=None, save=False):
             truths = utils.read_injection_file(args.injection_json)
             truths = truths.iloc[args.injection_num].to_dict()
             truths = np.array([truths[k] for k in plot_keys])
+            # FIXME: args.verbose read; corner_plot_parser defines no --verbose, causing
+            # AttributeError
             if args.verbose:
                 print("\nLoaded Injection:")
                 print(f"Truths from injection: {truths}")
         elif args.bestfit_params is not None:
+            # FIXME: args.bestfit_json read; parser only defines bestfit_params.
+            # AttributeError.
             truths = utils.read_bestfit_from_json(
                 args.bestfit_json, plot_keys, args.verbose
             )
         else:
             truths = None
 
+        # FIXME: Tuple from setup_corner_plot assigned to fig; fig.savefig raises
+        # AttributeError
         fig = setup_corner_plot(
             f,
+            # FIXME: Empty list passed as limits; setup_plot_quantities indexes
+            # limits[i], raising IndexError
             [],
             label=labels[i],
+            # FIXME: truths lands in plot_kwargs, duplicating explicit truths at
+            # corner_plot call
             truths=truths,
             fig=fig,
             quantiles=quantiles,
@@ -741,6 +757,7 @@ def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
             (np.amin(zeta), np.amax(zeta)),
             (np.amin(MTOV), 2.7),
         )
+    # FIXME: outdir passed positionally as corner_plot's fig argument; nothing is saved
     corner_plot(plot_samples.T, labels, limits, outdir)
 
 
