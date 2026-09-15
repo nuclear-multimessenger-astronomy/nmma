@@ -1,7 +1,8 @@
 import numpy as np
+import pandas as pd
 from scipy.stats import norm, truncnorm
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
-from ..core.conversion import convert_mtot_mni
+from ..core.conversion import convert_mtot_mni, observation_angle_conversion
 from ..core.utils import read_trigger_time
 from . import model, utils, systematics
 from .lightcurve_handling import post_process_bestfit as lch_bestfit
@@ -432,3 +433,245 @@ class MultiFilterTransient(BasicEMTransient):
 
     def final_diagnostics(self, bestfit_params, args, result=None):
         return lch_bestfit(self, bestfit_params, args, result)
+
+
+class MultiFilterNondetectionTransient:
+    """A collection of multi-filter non-detection (upper limit) data at many sky positions
+
+    Loads a csv of pointings/non-detections, such as a GWTreasureMap-style survey
+    report, and groups the rows by sky position (ra, dec). Every row is by
+    definition a non-detection (a "depth", i.e. a limiting magnitude, rather than
+    a measurement), so for each position the per-filter observation times and
+    limiting magnitudes are stored in the standard nmma light curve dict format
+    {filter: {"time": ..., "mag": ..., "mag_error": ...}}, with ``mag_error`` set to
+    ``np.inf`` throughout - the same convention used to mark the ``infIdx``
+    (non-detection) entries in `BasicEMTransient.chisquare_gaussianlog_from_lc_data`.
+
+    A stored position can be queried by (ra, dec) to retrieve its non-detection
+    data, or compared directly against a candidate light curve to compute the
+    associated upper-limit log-likelihood contribution.
+
+    Parameters
+    ----------
+    filename: str
+        Path to a csv file of non-detections/pointings.
+    ra_column, dec_column: str (default: "ra", "dec")
+        Names of the columns holding the sky position of each pointing.
+    time_column: str (default: "t_from_T0")
+        Name of the column holding the observation time (relative to trigger time).
+    filter_column: str (default: "filters")
+        Name of the column holding the filter name.
+    depth_column: str (default: "depth")
+        Name of the column holding the limiting magnitude (upper limit).
+
+    """
+
+    def __init__(
+        self,
+        filename,
+        ra_column="ra",
+        dec_column="dec",
+        time_column="t_from_T0",
+        filter_column="filters",
+        depth_column="depth",
+    ):
+        self.filename = filename
+        self.ra_column = ra_column
+        self.dec_column = dec_column
+        self.time_column = time_column
+        self.filter_column = filter_column
+        self.depth_column = depth_column
+
+        data = pd.read_csv(filename)
+        required_columns = (
+            ra_column,
+            dec_column,
+            time_column,
+            filter_column,
+            depth_column,
+        )
+        missing = [c for c in required_columns if c not in data.columns]
+        if missing:
+            raise ValueError(f"Missing expected column(s) {missing} in {filename}")
+
+        self.observed_filters = sorted(data[filter_column].unique().tolist())
+
+        self.data = {}
+        for position, group in data.groupby([ra_column, dec_column], sort=False):
+            ra, dec = position
+            position_data = {}
+            for filt, sub_data in group.groupby(filter_column):
+                order = np.argsort(sub_data[time_column].to_numpy())
+                position_data[filt] = {
+                    "time": sub_data[time_column].to_numpy()[order],
+                    "mag": sub_data[depth_column].to_numpy()[order],
+                    "mag_error": np.full(len(sub_data), np.inf),
+                }
+            self.data[(float(ra), float(dec))] = position_data
+
+        self.positions = list(self.data.keys())
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__} ({len(self.positions)} positions, "
+            f"filters={self.observed_filters})"
+        )
+
+    def _resolve_position(self, ra, dec):
+        # FIXME: this is where some pixel or box should come into play
+        position = (float(ra), float(dec))
+        if position not in self.data:
+            raise KeyError(
+                f"No non-detection data stored for position (ra={ra}, dec={dec})."
+            )
+        return position
+
+    def query(self, ra, dec):
+        """Return the stored non-detection dataset for a sky position
+
+        Parameters
+        ----------
+        ra, dec: float
+            Sky position to query. Must match a stored position exactly.
+
+        Returns
+        -------
+        dict
+            {filter: {"time": array, "mag": array, "mag_error": array}}, the upper
+            limits (magnitudes) and their observation times for each filter observed
+            at that position. ``mag_error`` is ``np.inf`` throughout, marking every
+            entry as a non-detection.
+
+        """
+        position = self._resolve_position(ra, dec)
+        return self.data[position]
+
+    def log_likelihood_upper_limits(self, ra, dec, obs_times, model_lc, sigma):
+        """Compute the non-detection (upper limit) log-likelihood contribution of a
+        candidate light curve against the stored data for a sky position, using the
+        same Gaussian survival function treatment as the ``infIdx`` branch of
+        `BasicEMTransient.chisquare_gaussianlog_from_lc_data`.
+
+        Parameters
+        ----------
+        ra, dec: float
+            Sky position whose non-detection data to compare against.
+        obs_times: array or dict
+            Times at which `model_lc` is evaluated. If a dict, it must contain one
+            array per filter (matching `model_lc`); otherwise the same times are
+            assumed for every filter.
+        model_lc: dict
+            Model light curve, filter -> array of model magnitudes evaluated at
+            `obs_times`, e.g. as returned by a `LightCurveModel.gen_detector_lc` call.
+        sigma: float or dict
+            The 1-sigma uncertainty to assume for the model magnitude when
+            evaluating the survival function (e.g. a systematic error budget),
+            either a single value applied to all filters or a dict per filter.
+
+        Returns
+        -------
+        float
+            The summed log-likelihood over all filters and non-detections at that
+            position.
+
+        """
+        position_data = self.query(ra, dec)
+        sigma_dict = utils.set_filter_associated_dict(
+            sigma, list(position_data.keys()), default_limit=0.0
+        )
+
+        logL = 0.0
+        for filt, filt_data in position_data.items():
+            if filt not in model_lc:
+                continue
+
+            filt_obs_times = (
+                obs_times[filt] if isinstance(obs_times, dict) else obs_times
+            )
+
+            est_mag = utils.autocomplete_data(
+                filt_data["time"],
+                filt_obs_times,
+                model_lc[filt],
+                extrapolate=np.inf,
+            )
+
+            logL += np.sum(norm.logsf(filt_data["mag"], est_mag, sigma_dict[filt]))
+
+        return logL
+
+
+class NondetectionKilonovaSubModel:
+    """Generates a kilonova lightcurve from the (EOS + ejecta) converted
+    parameters and scores it against stored non-detections (a
+    `MultiFilterNondetectionTransient`) at the sampled sky position.
+
+    Intended as a sub-model to be wrapped in `nmma.core.base.NMMALikelihood`
+    and combined with other messengers via
+    `nmma.joint.joint_likelihood.MultiMessengerLikelihood`.
+
+    Parameters
+    ----------
+    lc_model: fiesta.models.FluxSurrogate
+        A fiesta flux surrogate model exposing `.parameter_distributions` and
+        `.predict(parameters)`.
+    nondetections: MultiFilterNondetectionTransient
+        The stored non-detection (upper limit) data to score the generated
+        light curve against.
+    filter_map: dict
+        Mapping from `nondetections`' (generic) filter names to `lc_model`'s
+        filter names, e.g. {"g": "ztfg", "r": "ztfr"}.
+    sigma: float or dict
+        The 1-sigma uncertainty to assume for the model magnitude, passed
+        through to `MultiFilterNondetectionTransient.log_likelihood_upper_limits`.
+
+    """
+
+    def __init__(self, lc_model, nondetections, filter_map, sigma):
+        self.lc_model = lc_model
+        self.nondetections = nondetections
+        self.filter_map = filter_map
+        self.sigma = sigma
+
+    def __repr__(self):
+        return f"{self.__class__.__name__} (filters={list(self.filter_map)})"
+
+    def noise_log_likelihood(self):
+        return 0.0
+
+    def log_likelihood(self, parameters):
+        # FIXME: this is hardcoding this class for the Bu2019 NSBH model, should generalize the API
+        parameters = observation_angle_conversion(parameters)
+
+        # The surrogate is only trained within a finite domain (see its *_metadata.pkl);
+        # clip to it so the model always returns a (labeled) curve instead of NaNs.
+        bounds = self.lc_model.parameter_distributions
+        dyn_lo, dyn_hi = bounds["log10_mej_dyn"][:2]
+        wind_lo, wind_hi = bounds["log10_mej_wind"][:2]
+        theta_lo, theta_hi = bounds["KNtheta"][:2]
+
+        log10_mej_dyn = float(np.clip(parameters["log10_mej_dyn"], dyn_lo, dyn_hi))
+        log10_mej_wind = float(np.clip(parameters["log10_mej_wind"], wind_lo, wind_hi))
+        KNtheta = float(np.clip(parameters["KNtheta"], theta_lo, theta_hi))
+
+        lc_parameters = dict(
+            log10_mej_dyn=log10_mej_dyn,
+            log10_mej_wind=log10_mej_wind,
+            KNtheta=KNtheta,
+            luminosity_distance=parameters["luminosity_distance"],
+            redshift=parameters["redshift"],
+        )
+        times, mag = self.lc_model.predict(lc_parameters)
+        self.last_times, self.last_mag = times, mag  # stashed for inspection/plotting
+
+        model_lc = {
+            generic: np.asarray(mag[ztf_name])
+            for generic, ztf_name in self.filter_map.items()
+            if ztf_name in mag
+        }
+
+        ra_deg = float(np.degrees(parameters["ra"]))
+        dec_deg = float(np.degrees(parameters["dec"]))
+        return self.nondetections.log_likelihood_upper_limits(
+            ra_deg, dec_deg, times, model_lc, sigma=self.sigma
+        )
