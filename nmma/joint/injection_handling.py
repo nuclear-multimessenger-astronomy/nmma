@@ -883,7 +883,7 @@ class NMMAInjectionCreator(InjectionCreator):
 
         if injection_file.suffix in (".xml", ".xml.gz"):
             table = Table.read(
-                injection_file, format="ligolw", tablename="sim_inspiral"
+                injection_file, tablename="sim_inspiral"
             )
         elif injection_file.suffix == ".dat":
             table = Table.read(injection_file, format="csv", delimiter="\t")
