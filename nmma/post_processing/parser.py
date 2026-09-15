@@ -2,6 +2,21 @@ from ..em.em_parsing import (
     basic_em_only_parsing, em_time_parsing, em_model_parsing, grb_parsing
 )
 def joint_postprocess_parser(parser):
+    """
+    Add the arguments shared by the joint GW+EM post-processing tools.
+
+    Used as a base by :func:`R14_parser` and :func:`Hubble_parser`.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the shared arguments added.
+    """
     parser.add_argument("--outdir", metavar="PATH", required=True)
     parser.add_argument("--cred-interval", type=float, default=0.95, 
         help="Credible interval to be calculated (default: 0.95)")
@@ -15,8 +30,24 @@ def joint_postprocess_parser(parser):
     return parser
 
 def R14_parser(parser):
-    parser.description="Calculate the trend of estimated R14 with GW+EM input"
-    
+    """
+    Add the arguments for the R14 trend calculation.
+
+    Extends :func:`joint_postprocess_parser`. Backs the ``combine-EOS``
+    entry point.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the R14 trend arguments added.
+    """
+    parser.description = "Calculate the trend of estimated R14 with GW+EM input"
+
     parser = joint_postprocess_parser(parser)
     parser.add_argument("--label", metavar="NAME", required=True)
     parser.add_argument("--R14-true", type=float, default=11.55,
@@ -34,8 +65,25 @@ def R14_parser(parser):
     return parser
     
 
-def Hubble_parser(parser): 
-    parser.description="Calculate the combination and seperate trend of estimated Hubble constant with GW and EM input"
+
+def Hubble_parser(parser):
+    """
+    Add the arguments for the Hubble constant estimate.
+
+    Extends :func:`joint_postprocess_parser`. Backs the
+    ``gwem-Hubble-estimate`` entry point.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the Hubble constant arguments added.
+    """
+    parser.description = "Calculate the combination and seperate trend of estimated Hubble constant with GW and EM input"
 
     parser = joint_postprocess_parser(parser)
     parser.add_argument("--output-label", metavar="NAME", required=True)
@@ -50,7 +98,22 @@ def Hubble_parser(parser):
     return parser
 
 def resampling_parser(parser):
-    parser.description="Inference on binary source parameters with kilonova ejecta posterior and GW source posterior given."
+    """
+    Add the arguments for the GW-EM resampling.
+
+    Backs the ``gwem-resampling`` entry point.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the resampling arguments added.
+    """
+    parser.description = "Inference on binary source parameters with kilonova ejecta posterior and GW source posterior given."
 
     parser.add_argument("--outdir", metavar="PATH", required=True)
     parser.add_argument("--GWsamples", metavar="PATH", required=True,
@@ -70,7 +133,20 @@ def resampling_parser(parser):
     return parser
 
 def maximum_mass_parser(parser):
-    parser.description="Inference on the maximum mass constraint of the EOS when a joint posterior for binary components, ejecta and EOS is provided."
+    """
+    Add the arguments for the EOS maximum mass constraint.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the maximum mass arguments added.
+    """
+    parser.description = "Inference on the maximum mass constraint of the EOS when a joint posterior for binary components, ejecta and EOS is provided."
 
     parser.add_argument("--outdir", metavar="PATH", required=True)
     parser.add_argument("--joint-posterior", required=True,
@@ -89,7 +165,20 @@ def maximum_mass_parser(parser):
     return parser
 
 def corner_plot_parser(parser):
-    parser.description="Generate corner plot"
+    """
+    Add the arguments for generating a corner plot from posterior files.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the corner plot arguments added.
+    """
+    parser.description = "Generate corner plot"
 
     parser.add_argument("-f", "--posterior-files", nargs="+", required=True,
         help="CSV file path for posteriors")
@@ -112,7 +201,23 @@ def corner_plot_parser(parser):
 
 
 def lc_marginalisation_parser(parser):
-    parser.description="Summary analysis for nmma injection file"
+    """
+    Add the arguments for the light curve marginalisation.
+
+    Composes the EM parsers from :mod:`nmma.em.em_parsing` and adds the
+    arguments specific to the marginalisation.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the marginalisation arguments added.
+    """
+    parser.description = "Summary analysis for nmma injection file"
 
     parser = basic_em_only_parsing(parser)
     parser = em_time_parsing(parser)
