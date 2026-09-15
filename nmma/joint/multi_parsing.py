@@ -19,6 +19,24 @@ logger = bilby.core.utils.logger
 
 
 def _create_base_nmma_parser(sampler="dynesty", parents=[]):
+    """
+    Build the parser shared by :func:`create_nmma_generation_parser` and
+    :func:`create_nmma_analysis_parser`.
+
+    Parameters
+    ----------
+    sampler : str, default="dynesty"
+        ``"all"`` or ``"dynesty"`` additionally applies
+        :func:`nmma.core.parsing.dynesty_parsing` and
+        :func:`multi_dynesty_parsing`.
+    parents : list, default=[]
+        Passed to ``argparse.ArgumentParser`` as ``parents``.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The newly created parser.
+    """
     base_parser = argparse.ArgumentParser(
         "base", parents=parents, conflict_handler="resolve", add_help=False
     )
@@ -46,6 +64,19 @@ def _create_base_nmma_parser(sampler="dynesty", parents=[]):
 
 def em_settings_parsing(parser):
     # general args
+    """
+    Add ``--light-curve-data`` in an "EM analysis input arguments" group.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the argument to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the arguments added.
+    """
     em_input_parser = parser.add_argument_group(
         title="EM analysis input arguments", description="Specify EM analysis inputs"
     )
@@ -56,6 +87,19 @@ def em_settings_parsing(parser):
 
 
 def multi_dynesty_parsing(parser):
+    """
+    Add the dynesty sampler arguments in their own group.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the arguments added.
+    """
     sampler_group = parser.add_argument_group(title="Setting for the Dynesty Sampler")
 
     sampler_group.add_argument(
@@ -91,6 +135,19 @@ def multi_dynesty_parsing(parser):
 
 
 def add_misc_settings(parser):
+    """
+    Add ``--clean`` and ``--plot`` in a "Misc. Settings" group.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the arguments added.
+    """
     misc_group = parser.add_argument_group(title="Misc. Settings")
     misc_group.add_argument(
         "-c", "--clean", action="store_true", help="Run clean: ignore any resume files"
@@ -104,6 +161,22 @@ def add_misc_settings(parser):
 
 
 def run_parsing(parser):
+    """
+    Add the main run arguments in their own group.
+
+    ``data_dump`` is added twice, as an optional positional and as
+    ``--data-dump``, both writing to the ``data_dump`` destination.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the arguments added.
+    """
     run_group = parser.add_argument_group(title="Setting for the Main run")
     run_group.add_argument("data_dump", nargs="?")  # nargs makes it optional
     run_group.add_argument(
@@ -121,6 +194,20 @@ def run_parsing(parser):
 
 
 def remove_argument_from_parser(parser, arg):
+    """
+    Remove an argument from ``parser`` by its destination.
+
+    ``arg`` is matched with ``-`` replaced by ``_`` against each
+    ``action.dest``. A ``ValueError`` raised during removal is caught and
+    logged as a warning.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to remove the argument from.
+    arg : str
+        Argument name without leading dashes.
+    """
     for action in parser._actions:
         if action.dest == arg.replace("-", "_"):
             try:
@@ -131,6 +218,17 @@ def remove_argument_from_parser(parser, arg):
 
 
 def _create_reduced_bilby_pipe_parser():
+    """
+    Build the ``bilby_pipe`` parser with a fixed list of arguments removed.
+
+    The removed names cover versioning, scheduler and submission settings,
+    post-processing hooks, sampler selection and the plotting options.
+
+    Returns
+    -------
+    The parser from ``bilby_pipe.parser.create_parser`` with
+    ``top_level=False``, after the removals.
+    """
     bilby_pipe_parser = bp_parser.create_parser(top_level=False)
     bilby_pipe_arguments_to_ignore = [
         "version",
@@ -170,7 +268,15 @@ def _create_reduced_bilby_pipe_parser():
 
 
 def create_nmma_generation_parser():
-    """Parser for nmma_generation"""
+    """
+    Build the parser for ``nmma_generation``.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        :func:`_create_base_nmma_parser` with ``sampler="all"`` and
+        :func:`_create_reduced_bilby_pipe_parser` as a parent.
+    """
     bilby_pipe_parser = _create_reduced_bilby_pipe_parser()
     generation_parser = _create_base_nmma_parser(
         sampler="all", parents=[bilby_pipe_parser]
@@ -188,21 +294,21 @@ def create_nmma_generation_parser():
 
 def parse_generation_args(cli_args=[""]):
     """
-    Returns dictionary of arguments, as specified in the
-    parser.
-
-    If no cli_args arguments are specified, returns the default arguments
-    (by running the parser with no ini file and no CLI arguments)
+    Parse arguments for ``nmma_generation``.
 
     Parameters
     ----------
-    cli_args: list of strings (default: [""])
-        List of arguments to be parsed. If empty, returns default arguments
+    cli_args : list of str, default=[""]
+        Arguments to parse, passed through
+        :func:`nmma.core.parsing.check_for_config` first.
 
     Returns
     -------
-    args: dict or Namespace
-
+    argparse.Namespace
+        The parsed arguments.
+    argparse.ArgumentParser
+        The parser they were parsed with, as returned by
+        :func:`nmma.core.parsing.check_for_config`.
     """
     generation_parser = create_nmma_generation_parser()
     generation_parser, cli_args = check_for_config(cli_args, [generation_parser], False)
@@ -211,14 +317,45 @@ def parse_generation_args(cli_args=[""]):
 
 
 def create_nmma_analysis_parser(sampler="dynesty"):
-    """Parser for nmma_analysis"""
+    """
+    Build the parser for ``nmma_analysis``.
+
+    Parameters
+    ----------
+    sampler : str, default="dynesty"
+        Passed to :func:`_create_base_nmma_parser`.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The base parser with :func:`run_parsing` applied.
+    """
     parser = _create_base_nmma_parser(sampler=sampler)
     parser = run_parsing(parser)
     return parser
 
 
 def parse_analysis_args(parser, args=None):
-    """Parse the command line arguments for nmma_analysis and nmma_gw_analysis"""
+    """
+    Parse arguments for ``nmma_analysis``.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to parse with.
+    args : list of str, default=None
+        Passed to ``parser.parse_args`` as ``args``.
+
+    Returns
+    -------
+    argparse.Namespace
+        The parsed arguments.
+
+    Raises
+    ------
+    ValueError
+        If ``walks`` exceeds ``maxmcmc``, or if ``nact`` is below 1.
+    """
     args = parser.parse_args(args=args)
 
     if args.walks > args.maxmcmc:
