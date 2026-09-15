@@ -612,9 +612,10 @@ class NondetectionKilonovaSubModel:
 
     Parameters
     ----------
-    lc_model: fiesta.models.FluxSurrogate
-        A fiesta flux surrogate model exposing `.parameter_distributions` and
-        `.predict(parameters)`.
+    lc_model: fiesta.models.FiestaModel
+        Any fiesta model (e.g. a Bu2019/Bu2026 kilonova `FiestaKN` surrogate, an
+        `FiestaGRB` afterglow model, ...) exposing `.parameter_names`,
+        `.parameter_distributions`, and `.predict(parameters)`.
     nondetections: MultiFilterNondetectionTransient
         The stored non-detection (upper limit) data to score the generated
         light curve against.
@@ -640,27 +641,32 @@ class NondetectionKilonovaSubModel:
         return 0.0
 
     def log_likelihood(self, parameters):
-        # FIXME: this is hardcoding this class for the Bu2019 NSBH model, should generalize the API
         parameters = observation_angle_conversion(parameters)
 
-        # The surrogate is only trained within a finite domain (see its *_metadata.pkl);
-        # clip to it so the model always returns a (labeled) curve instead of NaNs.
         bounds = self.lc_model.parameter_distributions
-        dyn_lo, dyn_hi = bounds["log10_mej_dyn"][:2]
-        wind_lo, wind_hi = bounds["log10_mej_wind"][:2]
-        theta_lo, theta_hi = bounds["KNtheta"][:2]
+        lc_parameters = {}
+        for key in self.lc_model.parameter_names:
+            if key not in parameters:
+                # mirror nmma.em.model.LightCurveModelContainer.parameter_conversion:
+                # fall back to a log10/delog10 counterpart if that's what was sampled
+                if key.startswith("log10_") and key[len("log10_") :] in parameters:
+                    parameters[key] = np.log10(parameters[key[len("log10_") :]])
+                elif "log10_" + key in parameters:
+                    parameters[key] = 10 ** parameters["log10_" + key]
 
-        log10_mej_dyn = float(np.clip(parameters["log10_mej_dyn"], dyn_lo, dyn_hi))
-        log10_mej_wind = float(np.clip(parameters["log10_mej_wind"], wind_lo, wind_hi))
-        KNtheta = float(np.clip(parameters["KNtheta"], theta_lo, theta_hi))
+            value = parameters[key]
+            # The surrogate is only trained within a finite domain (see its
+            # *_metadata.pkl); clip to it so the model always returns a
+            # (labeled) curve instead of NaNs.
+            if key in bounds:
+                lo, hi = bounds[key][:2]
+                value = float(np.clip(value, lo, hi))
+            lc_parameters[key] = value
 
-        lc_parameters = dict(
-            log10_mej_dyn=log10_mej_dyn,
-            log10_mej_wind=log10_mej_wind,
-            KNtheta=KNtheta,
-            luminosity_distance=parameters["luminosity_distance"],
-            redshift=parameters["redshift"],
-        )
+        # not part of parameter_names, but required by predict()
+        lc_parameters["luminosity_distance"] = parameters["luminosity_distance"]
+        lc_parameters["redshift"] = parameters["redshift"]
+
         times, mag = self.lc_model.predict(lc_parameters)
         self.last_times, self.last_mag = times, mag  # stashed for inspection/plotting
 
