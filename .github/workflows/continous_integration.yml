@@ -6,12 +6,16 @@ on:
       - main
     paths-ignore:
       - "doc/**"
+      - "**/*.md"
+      - ".gitignore"
   pull_request:
     branches:
       - main
       - dev
     paths-ignore:
       - "doc/**"
+      - "**/*.md"
+      - ".gitignore"  
   workflow_dispatch:
 
 jobs:
