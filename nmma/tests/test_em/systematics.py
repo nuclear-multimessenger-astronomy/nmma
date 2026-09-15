@@ -1,16 +1,17 @@
 import pytest
 from yaml import YAMLError
-from nmma.em.systematics import (
-    ValidationError,
-    validate_only_one_true,
-    validate_filters,
-    handle_withTime,
-    handle_withoutTime,
-    main,
-    ALLOWED_FILTERS,
-    ALLOWED_DISTRIBUTIONS,
-)
+
 from nmma.core.utils import load_yaml
+from nmma.em.systematics import (
+    ALLOWED_DISTRIBUTIONS,
+    ALLOWED_FILTERS,
+    ValidationError,
+    handle_withoutTime,
+    handle_withTime,
+    main,
+    validate_filters,
+    validate_only_one_true,
+)
 
 
 @pytest.fixture

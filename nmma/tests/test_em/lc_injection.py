@@ -1,14 +1,16 @@
-from argparse import Namespace
-import numpy as np
-from pathlib import Path
 import shutil
+from argparse import Namespace
+from pathlib import Path
+
+import numpy as np
 import pytest
 
-from nmma.em import em_parsing, lightcurve_handling as lch
+from nmma.core.parsing import nmma_base_parsing
+from nmma.core.utils import read_injection_file
+from nmma.em import em_parsing
+from nmma.em import lightcurve_handling as lch
 from nmma.em.io import load_em_observations
 from nmma.em.model import single_model_from_mapping
-from nmma.core.utils import read_injection_file
-from nmma.core.parsing import nmma_base_parsing
 from nmma.joint import injection_handling, joint_parsing
 
 DATADIR = Path(__file__).parent.parent / "data"
@@ -113,9 +115,9 @@ def lightcurveInjectionTest(model_name):
             output_directory / f"{command_line_lightcurve_label}_0_lc.json"
         )
 
-        assert (
-            command_line_lightcurve_file.exists()
-        ), "command line lightcurve file does not exist"
+        assert command_line_lightcurve_file.exists(), (
+            "command line lightcurve file does not exist"
+        )
 
         return load_em_observations(command_line_lightcurve_file)
 
@@ -164,9 +166,9 @@ def lightcurveInjectionTest(model_name):
         filters_from_function = lightcurve_from_function.keys()
         filters_from_command_line = lightcurve_from_command_line.keys()
 
-        assert set(filters_from_function) == set(
-            filters_from_command_line
-        ), "filters from function and command line do not match"
+        assert set(filters_from_function) == set(filters_from_command_line), (
+            "filters from function and command line do not match"
+        )
         # goes filter by filter and checks that each array matches
         for filter_name in filters_from_function:
             cli_mags = lightcurve_from_command_line[filter_name]["mag"]
@@ -202,29 +204,29 @@ def test_validate_lightcurves():
         cutoff_time=0,
         verbose=True,
     )
-    assert lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for 3 observations in the ztf g filter failed"
+    assert lch.validate_lightcurve(**vars(args)), (
+        "Test for 3 observations in the ztf g filter failed"
+    )
 
     args.filters = ["ztfr"]
     args.min_obs = 1
-    assert lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for 1 observation in the ztf r filter failed"
+    assert lch.validate_lightcurve(**vars(args)), (
+        "Test for 1 observation in the ztf r filter failed"
+    )
 
     args.filters = ["ztfg", "ztfr"]
-    assert lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for  passing multiple filters failed"
+    assert lch.validate_lightcurve(**vars(args)), (
+        "Test for  passing multiple filters failed"
+    )
 
     args.filters = None
     args.min_obs = 0
-    assert lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for automatic filter selection failed"
+    assert lch.validate_lightcurve(**vars(args)), (
+        "Test for automatic filter selection failed"
+    )
 
     args.cutoff_time = 1
     args.min_obs = 1
-    assert not lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for setting cutoff time failed"
+    assert not lch.validate_lightcurve(**vars(args)), (
+        "Test for setting cutoff time failed"
+    )

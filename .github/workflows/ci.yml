@@ -70,8 +70,8 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade "git+https://github.com/bitranox/wrapt_timeout_decorator.git@${{ env.WRAPT_TIMEOUT_DECORATOR_REF }}"
-          python -m pip install -e ".[grb,neuralnet,dev]"
+          uv pip install --system --upgrade "git+https://github.com/bitranox/wrapt_timeout_decorator.git@${{ env.WRAPT_TIMEOUT_DECORATOR_REF }}"
+          uv pip install --system -e ".[grb,dev]"
 
       - name: Cache MultiNest build
         id: cache-multinest

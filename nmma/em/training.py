@@ -1,33 +1,35 @@
-import json
-from pathlib import Path
 import copy
 import inspect
-from glob import glob
-from tqdm.contrib.concurrent import process_map
-import joblib
+import json
 import warnings
+from glob import glob
+from pathlib import Path
+
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm.contrib.concurrent import process_map
 
-from .utils import autocomplete_data, interpolate_nans, setup_sample_times
-from ..core.gitlab import get_models_home, get_model
-
-
-from . import model_parameters, plotting_utils as pu
-from .model import SVDLightCurveModel
-from .io import read_training_data
+from ..core.gitlab import get_model, get_models_home
+from . import model_parameters
+from . import plotting_utils as pu
 from .em_parsing import (
-    parsing_and_logging,
-    svd_training_parser,
-    svd_model_benchmark_parser,
     benchmark_plots_parser,
+    parsing_and_logging,
+    svd_model_benchmark_parser,
+    svd_training_parser,
 )
+from .io import read_training_data
+from .model import SVDLightCurveModel
+from .utils import autocomplete_data, interpolate_nans, setup_sample_times
 
 try:
     import keras as k
 except ImportError:
-    print("Install keras and better explicitly set the 'KERAS_BACKEND' \
-          as env-variable if you want to use it...")
+    print(
+        "Install keras and better explicitly set the 'KERAS_BACKEND' \
+          as env-variable if you want to use it..."
+    )
 
 try:
     from sklearn.gaussian_process import GaussianProcessRegressor
@@ -588,9 +590,11 @@ def create_svdmodel():
     try:
         training_model = KerasTrainingModel(*training_args, **training_kwargs)
     except:
-        print("Your settings are not compatible with a keras training model.\n \
+        print(
+            "Your settings are not compatible with a keras training model.\n \
               Please consider adjusting your setup.\n \
-            We will now try to train a legacy SVD model.")
+            We will now try to train a legacy SVD model."
+        )
         training_kwargs["interpolation_type"] = args.interpolation_type
         training_model = SVDTrainingModel(*training_args, **training_kwargs)
 
@@ -746,8 +750,10 @@ def create_benchmark(
         # save json file with filter-by-filter details
         json.dump({em_model: filts_dict}, f, indent=2)
     print(f"Saved file containing reduced chi2 percentiles at {outfile}.")
-    print(f"Stats below are reduced chi2 distribution percentiles \
-           {percentiles} for each filter:")
+    print(
+        f"Stats below are reduced chi2 distribution percentiles \
+           {percentiles} for each filter:"
+    )
     print(filts_dict)
 
     if plot:

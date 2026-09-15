@@ -1,16 +1,17 @@
-from pathlib import Path
-import pandas as pd
 import warnings
-import numpy as np
-import scipy.stats
-import scipy.integrate
+from pathlib import Path
 
-from bilby.gw.prior import PriorDict
-from bilby.core.prior import Uniform
 import bilby.gw.conversion as conversion
-from .parser import maximum_mass_parser
-from ..core.parsing import nmma_base_parsing
+import numpy as np
+import pandas as pd
+import scipy.integrate
+import scipy.stats
+from bilby.core.prior import Uniform
+from bilby.gw.prior import PriorDict
+
 from ..core.constants import MeV_per_fm3_to_Msun_per_km3, geom_msun_km, particle_mass
+from ..core.parsing import nmma_base_parsing
+from .parser import maximum_mass_parser
 
 
 def baryonic_Kepler_mass(mTOV, R_14, ratio_R, delta):

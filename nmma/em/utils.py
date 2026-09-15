@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
-from scipy.interpolate import UnivariateSpline
 import sncosmo
-from sncosmo.bandpasses import _BANDPASSES, _BANDPASS_INTERPOLATORS
+from scipy.interpolate import UnivariateSpline
+from sncosmo.bandpasses import _BANDPASS_INTERPOLATORS, _BANDPASSES
 
 try:
     from m4opt.missions import uvex
@@ -12,27 +12,25 @@ except Exception as e:
     M4OPT_INSTALLED = False
     print(f"Warning: m4opt not installed. {e}")
     print("\nInstall m4opt if you want to use uvex filters")
-import healpy as hp
-from astropy.io import fits
-from dust_extinction.shapes import P92
-from dust_extinction.parameter_averages import G23
-from dust_extinction.baseclasses import BaseExtModel
-
-import matplotlib
-import matplotlib.pyplot as plt
-
 import warnings
-from numpy.exceptions import VisibleDeprecationWarning
 
 import astropy.units
-from ..core.conversion import (
-    distance_modulus_nmma,
-    luminosity_distance_to_redshift,
-    cosmology_to_distance,
-)
+import healpy as hp
+import matplotlib
+import matplotlib.pyplot as plt
+from astropy.io import fits
+from dust_extinction.baseclasses import BaseExtModel
+from dust_extinction.parameter_averages import G23
+from dust_extinction.shapes import P92
+from numpy.exceptions import VisibleDeprecationWarning
 
 # some frequently used constants:
-from ..core.constants import c_cgs, c_SI, eV_per_h_SI
+from ..core.constants import c_SI, eV_per_h_SI
+from ..core.conversion import (
+    cosmology_to_distance,
+    distance_modulus_nmma,
+    luminosity_distance_to_redshift,
+)
 
 warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
@@ -216,9 +214,9 @@ def set_filter_associated_dict(quantity, filters, default_limit=np.inf):
         return {x: float(quantity) for x in filters}
 
     elif isinstance(quantity, (list, tuple)):
-        assert len(quantity) == len(
-            filters
-        ), f" {quantity} must match the number of filters: {filters}."
+        assert len(quantity) == len(filters), (
+            f" {quantity} must match the number of filters: {filters}."
+        )
         return {x: float(y) for x, y in zip(filters, quantity)}
 
     elif isinstance(quantity, dict):

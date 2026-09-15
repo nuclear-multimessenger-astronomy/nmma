@@ -32,6 +32,8 @@ Read our official documentation: [NMMA Documentation](https://nuclear-multimesse
 
 Check out our contribution guide: [For contributors](https://nuclear-multimessenger-astronomy.github.io/nmma/contributing.html)
 
+NMMA was initiated and originally created by Michael Coughlin, Tim Dietrich and Peter T. H. Pang and is now developed by its contributors.
+
 A tutorial on how to produce simulations of lightcurves is given here [tutorial-lightcurve_simulation.ipynb](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/tutorials/tutorial-lightcurve_simulation.ipynb)
 
 
@@ -150,6 +152,16 @@ UltraNest:
     year = "2021"
 }
 ```
+
+## License and trademarks
+
+The NMMA source code is licensed under GNU GPL version 3 only
+(`GPL-3.0-only`). See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The software licence does not grant rights to use the NMMA name, logo,
+or project branding, or to imply affiliation with or endorsement by
+NMMA. Truthful referential use is permitted subject to
+[TRADEMARKS.md](TRADEMARKS.md).
 
 
 ### Acknowledgments

@@ -1,20 +1,21 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from arviz import hdi
 import scipy.stats
-from bilby.gw.prior import PriorDict
+from arviz import hdi
 from bilby.core.prior import Uniform
+from bilby.gw.prior import PriorDict
 
-from .parser import resampling_parser
-from ..core.parsing import nmma_base_parsing
+from ..core.constants import geom_msun_km
 from ..core.conversion import (
     BNSEjectaFitting,
     NSBHEjectaFitting,
-    luminosity_distance_to_redshift,
     chirp_mass_and_eta_to_component_masses,
+    luminosity_distance_to_redshift,
 )
-from ..core.constants import geom_msun_km
+from ..core.parsing import nmma_base_parsing
+from .parser import resampling_parser
 from .plotting_routines import resampling_corner_plot
 
 
@@ -65,7 +66,6 @@ def construct_EM_KDE(EMsamples, combine_ejecta_mass):
 
 
 class EjectaResamplerMixIn:
-
     def __init__(
         self,
         GWsamples,

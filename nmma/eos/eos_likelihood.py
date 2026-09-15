@@ -1,20 +1,21 @@
-from argparse import Namespace
-from pathlib import Path
-import shutil
 import json
+import shutil
+from argparse import Namespace
 from ast import literal_eval
+from pathlib import Path
+
 import matplotlib
-from tqdm.contrib.concurrent import process_map
 import numpy as np
+from bilby.core.prior import PriorDict, WeightedCategorical
+from scipy.ndimage import gaussian_filter
 from scipy.special import logsumexp
 from scipy.stats import norm
-from scipy.ndimage import gaussian_filter
-from matplotlib import pyplot as plt
-from bilby.core.prior import WeightedCategorical, PriorDict
-from .eos_processing import EoSConverter
+from tqdm.contrib.concurrent import process_map
+
 from ..core.base import NMMALikelihood
+from ..core.plotting_utils import fading_cmap, fig_setup, setup_multi_axes
 from ..core.utils import nan_level
-from ..core.plotting_utils import fading_cmap, setup_multi_axes, fig_setup
+from .eos_processing import EoSConverter
 
 nmma_colors = fig_setup()
 
@@ -340,7 +341,7 @@ class JointEoSConstraint:
 
         sort_idcs = np.argsort(save_weights)
         for i, idx in enumerate(sort_idcs):
-            np.savetxt(file_path / f"{i+1}.dat", np.column_stack(good_data[idx]))
+            np.savetxt(file_path / f"{i + 1}.dat", np.column_stack(good_data[idx]))
         np.savetxt(weight_path, np.array(save_weights)[sort_idcs])
         return weight_path, file_path, len(good_data)
 
@@ -658,9 +659,9 @@ class MassRadiusConstraint(EoSConstraint):
             manual = False
         elif isinstance(manual, (list, tuple)):
             if len(manual) == 1:
-                assert (
-                    len(manual[0]) == 2
-                ), "Manual position for label must be a tuple of (x,y) coordinates"
+                assert len(manual[0]) == 2, (
+                    "Manual position for label must be a tuple of (x,y) coordinates"
+                )
             elif (
                 len(manual) == 2
                 and isinstance(manual[0], (int, float, np.floating))
