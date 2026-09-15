@@ -12,10 +12,10 @@ on:
     branches:
       - main
       - dev
-    paths-ignore:
-      - "doc/**"
-      - "**/*.md"
-      - ".gitignore"  
+    paths:
+      - "nmma/**"
+      - "pyproject.toml"
+      - "*_requirements.txt"
   workflow_dispatch:
 
 jobs:
