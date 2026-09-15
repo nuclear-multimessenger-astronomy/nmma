@@ -1,4 +1,17 @@
 repos:
+  - repo: local
+    hooks:
+      - id: add-spdx-header
+        name: Add SPDX license headers
+        entry: >-
+          python -c 'import sys; from pathlib import Path;
+          h = "# SPDX-License-Identifier: GPL-3.0-only\n# SPDX-FileCopyrightText: The NMMA Team\n";
+          [p.write_text(h + text, encoding="utf-8") for filename in sys.argv[1:]
+          for p in [Path(filename)] for text in [p.read_text(encoding="utf-8")]
+          if not text.startswith(h)]'
+        language: system
+        types: [python]
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.3.0
     hooks:
