@@ -117,9 +117,9 @@ class NMMALikelihoodMixin:
             constr = {value.name: value}
         elif isinstance(value, dict):
             constr = value
-            assert all(
-                isinstance(v, Constraint) for v in value.values()
-            ), "All entries in constraints dict must be of type Constraint"
+            assert all(isinstance(v, Constraint) for v in value.values()), (
+                "All entries in constraints dict must be of type Constraint"
+            )
         # FIX ME: no else/final branch -- assigning `.constraints` to
         # anything other than a PriorDict, Constraint, or dict leaves
         # `constr` unset, so this raises a confusing UnboundLocalError

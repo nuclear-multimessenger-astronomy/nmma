@@ -540,7 +540,7 @@ def read_spectroscopy_files(
             if ii == 0:
                 lambda_d = group["wavelength"].to_numpy()
                 jj = np.where(
-                    (lambda_d >= wavelength_min) & ((lambda_d <= wavelength_max))
+                    (lambda_d >= wavelength_min) & (lambda_d <= wavelength_max)
                 )[0]
                 lambda_d = lambda_d[jj]
             spec = group["fnu"].to_numpy()[jj]

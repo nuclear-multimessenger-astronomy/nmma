@@ -316,9 +316,9 @@ class SystematicsHandler:
             self.compute_em_err = self.from_param
         else:
             self.err_params = [f"{name}_{i}" for i, _ in enumerate(time_range)]
-            assert all(
-                p in priors for p in self.err_params
-            ), "Required systematics prior missing"
+            assert all(p in priors for p in self.err_params), (
+                "Required systematics prior missing"
+            )
             self.time_nodes = time_range
             self.compute_em_err = self.from_parameters
 
@@ -507,9 +507,9 @@ class FilterSystematicsHandler(SystematicsHandler):
                         filt, time_range, name, priors, clean=False
                     )
 
-        assert (
-            cleared or len(self.missing_filters) == 0
-        ), f"Some filters are missing systematic uncertainty definitions: {self.missing_filters}"
+        assert cleared or len(self.missing_filters) == 0, (
+            f"Some filters are missing systematic uncertainty definitions: {self.missing_filters}"
+        )
         if not self.interpolate_map:
             if len(set(self.direct_sys_map.values())) == 1:
                 self.compute_em_err = self.from_param

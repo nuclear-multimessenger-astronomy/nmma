@@ -324,9 +324,9 @@ def set_filter_associated_dict(quantity, filters, default_limit=np.inf):
         return {x: float(quantity) for x in filters}
 
     elif isinstance(quantity, (list, tuple)):
-        assert len(quantity) == len(
-            filters
-        ), f" {quantity} must match the number of filters: {filters}."
+        assert len(quantity) == len(filters), (
+            f" {quantity} must match the number of filters: {filters}."
+        )
         return {x: float(y) for x, y in zip(filters, quantity)}
 
     elif isinstance(quantity, dict):

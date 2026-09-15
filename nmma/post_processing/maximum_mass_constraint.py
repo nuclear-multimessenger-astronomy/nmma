@@ -226,7 +226,6 @@ class PostmergerInferenceMixIn:
             case via `warnings.warn`).
         """
 
-
         R, M, L, P0 = np.loadtxt(
             self.eos_path_macro / f"{EOS}.dat", unpack=True, skiprows=0
         )

@@ -129,6 +129,7 @@ class EquationofStateLikelihood(NMMALikelihood):
         Converts sampled EOS parameters to macroscopic mass/radius/tidal
         properties.
     """
+
     def __init__(self, priors, constraint_dict, eos_converter, **kwargs):
         constraint = JointEoSConstraint(constraint_dict, eos_converter=eos_converter)
         # TODO: to be extended for more complex likelihood expressions
@@ -310,7 +311,7 @@ def read_constraint_from_args(args, constraint_kind):
         ``{label: {property: value, ...}, ...}`` for every named
         constraint of this kind, or ``None`` if none were specified.
     """
-    
+
     ##preferred: Have the dict with the subconstraints already set up
     prep_dict = getattr(args, constraint_kind, None)
     if prep_dict:
@@ -360,6 +361,7 @@ class JointEoSConstraint:
         Converts sampled EOS parameters to macroscopic properties. If
         omitted, a placeholder with no macro parameters is used.
     """
+
     def __init__(self, *constraints, eos_converter=None):
         self.constraints = self.initialise_constraints(constraints)
 
@@ -520,7 +522,7 @@ class JointEoSConstraint:
 
         sort_idcs = np.argsort(save_weights)
         for i, idx in enumerate(sort_idcs):
-            np.savetxt(file_path / f"{i+1}.dat", np.column_stack(good_data[idx]))
+            np.savetxt(file_path / f"{i + 1}.dat", np.column_stack(good_data[idx]))
         np.savetxt(weight_path, np.array(save_weights)[sort_idcs])
         return weight_path, file_path, len(good_data)
 
@@ -561,6 +563,7 @@ class EoSConstraint:
     plot_kwargs: dict, optional
         Overrides for the default line/contour style used by ``plot``.
     """
+
     def __init__(self, name=None, arxiv_ref=None, plot_kwargs=None):
         self.repr_add = ""
         self.type = "macro"
@@ -605,6 +608,7 @@ class MassConstraint(EoSConstraint):
         ``norm.logcdf`` or ``norm.logsf``, set by subclasses to pick the
         bound's direction.
     """
+
     def __init__(
         self,
         measured_mass,
@@ -770,6 +774,7 @@ class MassRadiusConstraint(EoSConstraint):
     plot_kwargs: dict, optional
         Overrides for the default line style used by ``plot``.
     """
+
     def __init__(
         self,
         mass_array=None,
@@ -1005,9 +1010,9 @@ class MassRadiusConstraint(EoSConstraint):
             manual = False
         elif isinstance(manual, (list, tuple)):
             if len(manual) == 1:
-                assert (
-                    len(manual[0]) == 2
-                ), "Manual position for label must be a tuple of (x,y) coordinates"
+                assert len(manual[0]) == 2, (
+                    "Manual position for label must be a tuple of (x,y) coordinates"
+                )
             elif (
                 len(manual) == 2
                 and isinstance(manual[0], (int, float, np.floating))

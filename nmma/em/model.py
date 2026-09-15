@@ -210,7 +210,6 @@ class LightCurveModelContainer:
         extinction_model=None,
         **kwargs,
     ):
-
         self.model = model
         self.identify_model_parameters(model_parameters)
         self.redshift_func = get_redshift
@@ -943,7 +942,6 @@ class SVDLightCurveModel(LightCurveModelContainer):
                     self.svd_mag_model[filt]["gps"][ii] = load_api_gp_model(gp_model)
 
         elif self.interpolation_type in ("keras", "tensorflow", "torch", "jax"):
-
             import keras as k
 
             def keras_load_model(model_file):

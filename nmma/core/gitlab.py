@@ -345,7 +345,7 @@ def get_model(
             )
         else:
             raise ValueError(
-                f'models list from GitLab does not have filters {",".join(missing_filters)} for {model_name}'
+                f"models list from GitLab does not have filters {','.join(missing_filters)} for {model_name}"
             )
 
     core_format = "joblib"
@@ -360,9 +360,7 @@ def get_model(
     core_model_name = "_".join(model_name_components)
 
     filepaths = (
-        [models_home / f"{core_model_name}.{core_format}"]
-        if not filters_only
-        else []
+        [models_home / f"{core_model_name}.{core_format}"] if not filters_only else []
     ) + [models_home / model_name / f"{f}.{filter_format}" for f in filters]
     urls = (
         [f"{base_url}/{core_model_name}.{core_format}"] if not filters_only else []

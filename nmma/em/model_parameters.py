@@ -1,4 +1,5 @@
 """Script with various functions to extract the parameters of models from their naming convention for filenames."""
+
 import re
 import numpy as np
 

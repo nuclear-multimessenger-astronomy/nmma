@@ -113,9 +113,9 @@ def lightcurveInjectionTest(model_name):
             output_directory / f"{command_line_lightcurve_label}_0_lc.json"
         )
 
-        assert (
-            command_line_lightcurve_file.exists()
-        ), "command line lightcurve file does not exist"
+        assert command_line_lightcurve_file.exists(), (
+            "command line lightcurve file does not exist"
+        )
 
         return load_em_observations(command_line_lightcurve_file)
 
@@ -164,9 +164,9 @@ def lightcurveInjectionTest(model_name):
         filters_from_function = lightcurve_from_function.keys()
         filters_from_command_line = lightcurve_from_command_line.keys()
 
-        assert set(filters_from_function) == set(
-            filters_from_command_line
-        ), "filters from function and command line do not match"
+        assert set(filters_from_function) == set(filters_from_command_line), (
+            "filters from function and command line do not match"
+        )
         # goes filter by filter and checks that each array matches
         for filter_name in filters_from_function:
             cli_mags = lightcurve_from_command_line[filter_name]["mag"]
@@ -202,29 +202,29 @@ def test_validate_lightcurves():
         cutoff_time=0,
         verbose=True,
     )
-    assert lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for 3 observations in the ztf g filter failed"
+    assert lch.validate_lightcurve(**vars(args)), (
+        "Test for 3 observations in the ztf g filter failed"
+    )
 
     args.filters = ["ztfr"]
     args.min_obs = 1
-    assert lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for 1 observation in the ztf r filter failed"
+    assert lch.validate_lightcurve(**vars(args)), (
+        "Test for 1 observation in the ztf r filter failed"
+    )
 
     args.filters = ["ztfg", "ztfr"]
-    assert lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for  passing multiple filters failed"
+    assert lch.validate_lightcurve(**vars(args)), (
+        "Test for  passing multiple filters failed"
+    )
 
     args.filters = None
     args.min_obs = 0
-    assert lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for automatic filter selection failed"
+    assert lch.validate_lightcurve(**vars(args)), (
+        "Test for automatic filter selection failed"
+    )
 
     args.cutoff_time = 1
     args.min_obs = 1
-    assert not lch.validate_lightcurve(
-        **vars(args)
-    ), "Test for setting cutoff time failed"
+    assert not lch.validate_lightcurve(**vars(args)), (
+        "Test for setting cutoff time failed"
+    )

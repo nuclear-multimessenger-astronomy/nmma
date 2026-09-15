@@ -18,7 +18,6 @@ logger = logging.getLogger("nmma")
 
 
 def setup_logger(log_level="INFO"):
-
     try:
         level = getattr(logging, log_level.upper())
     except:
@@ -165,9 +164,9 @@ def get_posteriors(posterior_samples, outdir=None):
     posterior_samples = Path(posterior_samples)
     if not posterior_samples.is_file():
         posterior_samples = Path(outdir) / posterior_samples
-        assert (
-            posterior_samples.is_file()
-        ), f"Posterior samples file {posterior_samples} not found."
+        assert posterior_samples.is_file(), (
+            f"Posterior samples file {posterior_samples} not found."
+        )
 
     stem, suffix = posterior_samples.stem, posterior_samples.suffix
 

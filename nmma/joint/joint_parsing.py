@@ -5,7 +5,6 @@ from ..gw.gw_parsing import gw_injection_parsing
 
 
 def injection_parsing(parser):
-
     """
     Add the arguments for creating an NMMA injection file.
 

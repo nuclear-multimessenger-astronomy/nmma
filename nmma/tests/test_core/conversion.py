@@ -30,12 +30,12 @@ def test_bns_ejecta_conversion_rejects_non_ns_component():
     log10_mej_dyn, log10_mej_wind, log10_mej_total, _ = fitter.bns_ejecta_conversion(
         params
     )
-    assert not np.isfinite(
-        log10_mej_dyn[0]
-    ), "log10_mej_dyn should be -inf when mass_1 isn't a real NS under this EOS"
-    assert not np.isfinite(
-        log10_mej_wind[0]
-    ), "log10_mej_wind should be -inf when mass_1 isn't a real NS under this EOS"
+    assert not np.isfinite(log10_mej_dyn[0]), (
+        "log10_mej_dyn should be -inf when mass_1 isn't a real NS under this EOS"
+    )
+    assert not np.isfinite(log10_mej_wind[0]), (
+        "log10_mej_wind should be -inf when mass_1 isn't a real NS under this EOS"
+    )
     assert not np.isfinite(log10_mej_total[0])
 
 
@@ -82,6 +82,6 @@ def test_kn_ejecta_fitting_requires_both_components_to_be_ns():
     assert not np.isfinite(log10_mej_dyn[0]), "invalid secondary should give -inf"
     assert not np.isfinite(log10_mej_wind[0]), "invalid secondary should give -inf"
     assert not np.isfinite(log10_mej_total[0]), "invalid secondary should give -inf"
-    assert np.isfinite(
-        log10_mej_dyn[1]
-    ), "a genuine BNS row should not be affected by the fix"
+    assert np.isfinite(log10_mej_dyn[1]), (
+        "a genuine BNS row should not be affected by the fix"
+    )

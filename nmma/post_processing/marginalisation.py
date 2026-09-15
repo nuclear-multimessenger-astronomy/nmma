@@ -120,7 +120,6 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
 
     mag_ds, matter = [], []
     for ii in range(args.Nmarg):
-
         outdir = Path(args.outdir) / f"{ii:d}"
         outdir.mkdir(parents=True, exist_ok=True)
 
@@ -260,7 +259,7 @@ def get_all_gw_quantities(data_out):
         added and a1/a2/theta_jn/tilt1/tilt2 present (a1/a2 possibly
         wrong/missing depending on the ordering issue above).
     """
-    
+
     try:
         data_out["mchirp"], data_out["eta"], data_out["q"] = (
             conv.component_masses_to_mass_quantities(data_out["m1"], data_out["m2"])
@@ -274,7 +273,7 @@ def get_all_gw_quantities(data_out):
 
     data_out["weight"] = 1.0 / len(data_out["m1"])
 
-    ### FIXME: get_all_gw_quantities computes chi_eff before its own fallback logic can supply the values it needs. The chi_eff line requires a1/a2 to already exist, but the two mechanisms that would supply them — the 0.0-default loop and the spin1z/spin2z fallback — both run after it. 
+    ### FIXME: get_all_gw_quantities computes chi_eff before its own fallback logic can supply the values it needs. The chi_eff line requires a1/a2 to already exist, but the two mechanisms that would supply them — the 0.0-default loop and the spin1z/spin2z fallback — both run after it.
     data_out["chi_eff"] = (
         data_out["m1"] * data_out["a1"] + data_out["m2"] * data_out["a2"]
     ) / (data_out["m1"] + data_out["m2"])

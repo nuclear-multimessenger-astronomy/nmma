@@ -114,7 +114,6 @@ class BaseTrainingModel:
         start_training=True,
         continue_training=False,
     ):
-
         self.model = model
         self.svd_path = get_models_home(svd_path)
         self.modelfile = self.svd_path / f"{self.model}.joblib"
@@ -405,7 +404,6 @@ class KerasTrainingModel(BaseTrainingModel):
     """
 
     def __init__(self, *args, **kwargs):
-
         self.model_specifier = ""
         self.file_ending = "keras"
         super().__init__(*args, **kwargs)
@@ -548,7 +546,6 @@ class SklearnGPTrainingModel(BaseTrainingModel):
     """
 
     def __init__(self, *args, **kwargs):
-
         self.model_specifier = ""
         self.file_ending = "joblib"
         super().__init__(*args, **kwargs)

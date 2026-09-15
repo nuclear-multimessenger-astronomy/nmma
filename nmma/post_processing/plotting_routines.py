@@ -313,7 +313,6 @@ def plot_histograms_only(
 
 
 def plot_multi_corner(args, key_selection=None, save=False):
-
     """
     Draw a corner plot for each entry of ``args.posterior_files``, each
     into the same figure.
@@ -413,7 +412,6 @@ def setup_corner_plot(
     best_fit=False,
     **plot_kwargs,
 ):
-
     """
     Draw a corner plot of the posterior samples.
 
@@ -534,7 +532,6 @@ def setup_corner_plot(
 
 
 def prepare_titles(ax, plot_quantities, i, title_kwargs, offset_ax=None):
-
     """
     Write the summary title for one panel.
 
@@ -573,7 +570,7 @@ def prepare_titles(ax, plot_quantities, i, title_kwargs, offset_ax=None):
     ax.text(0.0, 0.0, new_title, transform=ax.transAxes, **title_kwargs)
     if len(ax.texts) == 1:
         ax.set_title(
-            f'{plot_quantities["labels"][i]}={ax.texts[0].get_text()}',
+            f"{plot_quantities['labels'][i]}={ax.texts[0].get_text()}",
             color="black",
             fontsize=ax.texts[0].get_fontsize(),
         )
@@ -654,7 +651,6 @@ def corner_plot(plot_samples, labels, limits, fig=None, save=False, **kwargs):
 
 
 def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
-
     r"""
     Draw the corner plot summarising a GW-EM resampling run.
 

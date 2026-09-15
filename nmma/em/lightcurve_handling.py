@@ -504,7 +504,6 @@ class LightCurveHandler:
     """
 
     def __init__(self, args):
-
         self.filters = utils.set_filters(args)
         cosmology = get_cosmology()
         # Use redshift or dMpc if z is not provided

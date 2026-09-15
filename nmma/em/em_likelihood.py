@@ -112,7 +112,6 @@ class EMTransientLikelihood(NMMALikelihood):
         verbose=False,
         **kwargs,
     ):
-
         basic_transient_args = (
             light_curve_model,
             light_curve_data,
@@ -262,7 +261,6 @@ class BasicEMTransient:
         detection_limit,
         verbose,
     ):
-
         self.light_curve_model = light_curve_model
 
         self.light_curve_model.check_vs_priors(priors)
@@ -571,7 +569,6 @@ class MultiFilterTransient(BasicEMTransient):
         detection_limit,
         verbose,
     ):
-
         self.observed_filters = filters
         (
             self.model_filter_mapping,

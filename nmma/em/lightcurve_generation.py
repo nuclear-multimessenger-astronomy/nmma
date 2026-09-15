@@ -215,9 +215,7 @@ def arnett_lc(t_day, param_dict):
     int_B = arnett_lc_get_int_B(x, y, s)
 
     lbol = (
-        Mni
-        * np.exp(-(x**2))
-        * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
+        Mni * np.exp(-(x**2)) * ((epsilon_ni - epsilon_co) * int_A + epsilon_co * int_B)
     )
 
     return lbol
@@ -613,9 +611,7 @@ def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
             # NOTE: workaround  for potential bug in sncosmo: buffer error if lambdaa as float
             flux_AA = sn_model.flux(sample_times_stretched, [lambda_AA]).flatten()
             # see https://en.wikipedia.org/wiki/AB_magnitude
-            mag[filt] = utils.flux_to_ABmag(
-                flux_AA * 3.34e4 * lambda_AA**2, unit="Jy"
-            )
+            mag[filt] = utils.flux_to_ABmag(flux_AA * 3.34e4 * lambda_AA**2, unit="Jy")
     return mag
 
 
@@ -1474,7 +1470,6 @@ def create_light_curve_data(
 
     if not keep_infinite_data:
         for filt, val_dict in observed_data.items():
-
             keep_idx = np.isfinite(val_dict["mag"]) & np.isfinite(val_dict["mag_error"])
             observed_data[filt] = {key: val[keep_idx] for key, val in val_dict.items()}
 
@@ -1857,7 +1852,7 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
                         for value in df["mag"].values:
                             if ztfuncer.iloc[argmin_slice]["interval"].left > value:
                                 print(
-                                    f'WARNING: {value} is outside of the measured uncertainty region with a lower limit of {ztfuncer.iloc[argmin_slice]["interval"].left}'
+                                    f"WARNING: {value} is outside of the measured uncertainty region with a lower limit of {ztfuncer.iloc[argmin_slice]['interval'].left}"
                                 )
 
                     sim.loc[row.name, "mag_error"] = float(df["mag_error"])

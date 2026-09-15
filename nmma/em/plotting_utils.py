@@ -99,7 +99,6 @@ def basic_em_analysis_plot(
 
     # prepare figure
     if not shared_data or not fig:
-
         if not fig:
             fig = init_em_analysis_plot(plot_filters, ncols)
 
@@ -488,7 +487,7 @@ def plot_benchmark_percentiles(model, model_benchmarks, outdir):
     ax.set_xlabel("Filter")
     ax.set_ylabel(r"Reduced $\chi^{2}$")
     ax.legend(
-        title=f"Percentile\n (max $\chi^{2}$ = {np.round(np.max(pctls_100),1)})",  # noqa
+        title=f"Percentile\n (max $\chi^{2}$ = {np.round(np.max(pctls_100), 1)})",  # noqa
         loc=2,
     )
     ax.set_title(f"{model} benchmark percentiles")

@@ -77,7 +77,6 @@ class EoSGenerator:
     eos_parameters = None
 
     def __init__(self, emulator_path, eos_parameters=None, n_mass_samples=30):
-
         # load the emulator
         try:
             self.emulator = k.saving.load_model(
@@ -170,12 +169,11 @@ class NEPEoSGenerator(EoSGenerator):
     """
 
     def __init__(self, metadata):
-
         emulator_path = metadata["emulator_path"]
         if metadata.get("backend", False):
-            assert (
-                k.backend.backend() == metadata["backend"]
-            ), f"Keras Backend mismatch: {k.backend.backend()} vs {metadata['backend']}. please set the environment variable KERAS_BACKEND to {metadata['backend']}"
+            assert k.backend.backend() == metadata["backend"], (
+                f"Keras Backend mismatch: {k.backend.backend()} vs {metadata['backend']}. please set the environment variable KERAS_BACKEND to {metadata['backend']}"
+            )
         super().__init__(emulator_path, metadata.get("eos_parameters", None))
 
         n_mass_samples = metadata.get("n_mass_samples", 40)
@@ -432,9 +430,9 @@ class EoSConverter:
                 # same risk as Path.iterdir() above.
                 eos_files = list(Path().glob(args.eos_data))
                 if getattr(args, "Neos", None):
-                    assert args.Neos == len(
-                        eos_files
-                    ), "Number of EOS files found does not match Neos"
+                    assert args.Neos == len(eos_files), (
+                        "Number of EOS files found does not match Neos"
+                    )
 
             self.Neos = len(eos_files)
             # Case 3a: precomputed eos data is loaded to ram

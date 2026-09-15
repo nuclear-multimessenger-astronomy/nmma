@@ -140,6 +140,7 @@ class EjectaResamplerMixIn:
         KDEs of ``GWsamples.chi_1`` and ``GWsamples.chi_2``. Only set when
         ``withNSBH`` is True.
     """
+
     def __init__(
         self,
         GWsamples,

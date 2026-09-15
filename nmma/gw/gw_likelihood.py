@@ -1,9 +1,19 @@
 import numpy as np
 from ast import literal_eval
-from bilby.gw.likelihood import GravitationalWaveTransient, ROQGravitationalWaveTransient, RelativeBinningGravitationalWaveTransient, MBGravitationalWaveTransient
+from bilby.gw.likelihood import (
+    GravitationalWaveTransient,
+    ROQGravitationalWaveTransient,
+    RelativeBinningGravitationalWaveTransient,
+    MBGravitationalWaveTransient,
+)
 from bilby.gw.source import binary_neutron_star_frequency_sequence
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
-from ..core.conversion import (bbh_source_frame, bns_source_frame, tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion)
+from ..core.conversion import (
+    bbh_source_frame,
+    bns_source_frame,
+    tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion,
+)
+
 
 def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     """Assemble the keyword arguments for `GravitationalWaveTransientLikelihood`.
@@ -54,38 +64,44 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     """
 
     default_gw_kwargs = initialisation_args_from_signature_and_namespace(
-        GravitationalWaveTransientLikelihood, args, prefixes=['gw_'])
+        GravitationalWaveTransientLikelihood, args, prefixes=["gw_"]
+    )
     gw_kwargs = default_gw_kwargs | dict(
-            interferometers=data_dump["ifo_list"],
-            waveform_generator=data_dump["waveform_generator"],
-        
-        )
-    if args.likelihood_type == 'ROQGravitationalWaveTransient':
+        interferometers=data_dump["ifo_list"],
+        waveform_generator=data_dump["waveform_generator"],
+    )
+    if args.likelihood_type == "ROQGravitationalWaveTransient":
         gw_kwargs.pop("time_marginalization", None)
         gw_kwargs.pop("jitter_time", None)
         args.weight_file = data_dump["meta_data"].get("weight_file", None)
         gw_kwargs.update(roq_likelihood_kwargs(args, logger))
 
-    elif args.likelihood_type == 'RelativeBinningGravitationalWaveTransient':
+    elif args.likelihood_type == "RelativeBinningGravitationalWaveTransient":
         if isinstance(args.fiducial_parameters, str):
             fiducial_parameters = literal_eval(args.fiducial_parameters)
         else:
             fiducial_parameters = args.fiducial_parameters
         gw_kwargs.update(
-            fiducial_parameters=fiducial_parameters, epsilon=args.epsilon,
-            update_fiducial_parameters=args.update_fiducial_parameters
+            fiducial_parameters=fiducial_parameters,
+            epsilon=args.epsilon,
+            update_fiducial_parameters=args.update_fiducial_parameters,
         )
-    elif args.likelihood_type == 'MBGravitationalWaveTransient':
+    elif args.likelihood_type == "MBGravitationalWaveTransient":
         gw_kwargs.pop("time_marginalization", None)
         gw_kwargs.pop("jitter_time", None)
-        ## NOTE: This is a temporary fix to remove defaults set by bilby-pipe. 
+        ## NOTE: This is a temporary fix to remove defaults set by bilby-pipe.
         # Will likely be adressed in bilby-pipe in the future.
-        gw_kwargs['waveform_generator'].waveform_arguments.pop('minimum_frequency', None)
-        gw_kwargs['waveform_generator'].waveform_arguments.pop('maximum_frequency', None)
+        gw_kwargs["waveform_generator"].waveform_arguments.pop(
+            "minimum_frequency", None
+        )
+        gw_kwargs["waveform_generator"].waveform_arguments.pop(
+            "maximum_frequency", None
+        )
         gw_kwargs.update(reference_chirp_mass=args.reference_chirp_mass)
 
     gw_kwargs.update(**kwargs)
     return gw_kwargs
+
 
 def roq_likelihood_kwargs(args, logger):
     """Return the kwargs required for the ROQ setup
@@ -127,8 +143,9 @@ def roq_likelihood_kwargs(args, logger):
         kwargs["quadratic_matrix"] = args.roq_quadratic_matrix
     return kwargs
 
+
 class GravitationalWaveTransientLikelihood(NMMALikelihood):
-    """ A GravitationalWaveTransient likelihood object
+    """A GravitationalWaveTransient likelihood object
 
     This likelihood uses the usual gravitational-wave transient
     but include an EOS handling for parameter conversion.
@@ -143,7 +160,7 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
         A list of `bilby.detector.Interferometer` instances - contains the
         detector data and power spectral densities
     waveform_generator: `bilby.waveform_generator.WaveformGenerator`
-        An object which computes the frequency-domain strain of the signal, 
+        An object which computes the frequency-domain strain of the signal,
         given some set of parameters
     gw_likelihood_type: str
         The gravitational-wave likelihood to be taken
@@ -191,7 +208,7 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
 
         - "geocent"/"geocenter": sample in the time at the Earth's center,
           this is the default
-        - e.g., "H1": sample in the time of arrival at H1    
+        - e.g., "H1": sample in the time of arrival at H1
     kwargs:
         Additional keyword arguments passed to the likelihood class. These might be required by the chosen gw_likelihood_type!
 
@@ -211,9 +228,21 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
     when building this likelihood via the normal pipeline.)
     """
 
-    def __init__(self,priors, interferometers,  
-                 waveform_generator, gw_likelihood_type='GravitationalWaveTransient', time_marginalization=False, distance_marginalization=False, phase_marginalization=False, distance_marginalization_lookup_table=None, jitter_time=True, reference_frame="sky", time_reference="geocenter", **kwargs):
-
+    def __init__(
+        self,
+        priors,
+        interferometers,
+        waveform_generator,
+        gw_likelihood_type="GravitationalWaveTransient",
+        time_marginalization=False,
+        distance_marginalization=False,
+        phase_marginalization=False,
+        distance_marginalization_lookup_table=None,
+        jitter_time=True,
+        reference_frame="sky",
+        time_reference="geocenter",
+        **kwargs,
+    ):
         waveform_generator.parameter_conversion = self.gw_identity_conversion
         waveform_generator.start_time = interferometers[0].time_array[0]
 
@@ -229,19 +258,21 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
             reference_frame=reference_frame,
             time_reference=time_reference,
             jitter_time=jitter_time,
-            **kwargs
+            **kwargs,
         )
 
-        if gw_likelihood_type == 'GravitationalWaveTransient':
+        if gw_likelihood_type == "GravitationalWaveTransient":
             gw_transient = GravitationalWaveTransient(**gw_likelihood_kwargs)
 
-        elif gw_likelihood_type == 'ROQGravitationalWaveTransient':
+        elif gw_likelihood_type == "ROQGravitationalWaveTransient":
             gw_transient = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
-        elif gw_likelihood_type == 'RelativeBinningGravitationalWaveTransient':
-            gw_transient = RelativeBinningGravitationalWaveTransient(**gw_likelihood_kwargs)
+        elif gw_likelihood_type == "RelativeBinningGravitationalWaveTransient":
+            gw_transient = RelativeBinningGravitationalWaveTransient(
+                **gw_likelihood_kwargs
+            )
 
-        elif gw_likelihood_type == 'MBGravitationalWaveTransient':
+        elif gw_likelihood_type == "MBGravitationalWaveTransient":
             gw_transient = MBGravitationalWaveTransient(**gw_likelihood_kwargs)
         else:
             ### FIXME: Not an f-string and no .format() call, so {} is never substituted.
@@ -249,11 +280,14 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
 
         super().__init__(gw_transient, priors)
 
-        if "neutron_star" in self.sub_model.waveform_generator.frequency_domain_source_model.__name__:
+        if (
+            "neutron_star"
+            in self.sub_model.waveform_generator.frequency_domain_source_model.__name__
+        ):
             self.parameter_conversion = bns_source_frame
         else:
             self.parameter_conversion = bbh_source_frame
-    
+
     def posterior_conversion(self, posterior_samples):
         """Add derived spin/tidal summary parameters to posterior samples, in place.
 
@@ -276,24 +310,24 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
         if "chi_eff" not in posterior_samples:
             try:
                 ### FIXME: Python evaluates dict.get's default argument eagerly, before checking whether the key exists. So posterior_samples['spin_1z'] is evaluated unconditionally — if spin_1z/spin_2z aren't in the samples (the normal case when a run uses chi_1/chi_2 instead), this raises KeyError, which gets caught by the surrounding except KeyError: pass and chi_eff is silently never added — even though chi_1/chi_2 were present. I confirmed this directly: a sample dict with chi_1/chi_2 (no spin_1z/spin_2z) produced no chi_eff key at all, while a dict with only spin_1z/spin_2z worked correctly. In practice, only the spin_1z/spin_2z path in the docstring actually works.
-                q = posterior_samples['mass_ratio']
-                chi_1 = posterior_samples.get('chi_1', posterior_samples['spin_1z'])
-                chi_2 = posterior_samples.get('chi_2', posterior_samples['spin_2z'])
-                posterior_samples['chi_eff'] = (chi_1 + q*chi_2)/(1+q)
+                q = posterior_samples["mass_ratio"]
+                chi_1 = posterior_samples.get("chi_1", posterior_samples["spin_1z"])
+                chi_2 = posterior_samples.get("chi_2", posterior_samples["spin_2z"])
+                posterior_samples["chi_eff"] = (chi_1 + q * chi_2) / (1 + q)
             except KeyError:
                 pass
         if "lambda_tilde" not in posterior_samples:
             try:
-                lambda1 = posterior_samples['lambda_1']
-                lambda2 = posterior_samples['lambda_2']
-                q = posterior_samples['mass_ratio']
+                lambda1 = posterior_samples["lambda_1"]
+                lambda2 = posterior_samples["lambda_2"]
+                q = posterior_samples["mass_ratio"]
                 # Calculate the effective tidal deformability
-                lambdaT, delta_lambda_t  = tidal_conversion(lambda1, lambda2, q)
-                posterior_samples['lambda_tilde'] = lambdaT
-                posterior_samples['delta_lambda_t'] = delta_lambda_t
+                lambdaT, delta_lambda_t = tidal_conversion(lambda1, lambda2, q)
+                posterior_samples["lambda_tilde"] = lambdaT
+                posterior_samples["delta_lambda_t"] = delta_lambda_t
             except KeyError:
                 pass
-        
+
         return posterior_samples
 
     ### CHECKME: Check all functions below if they are needed or if they can be removed.
@@ -307,14 +341,14 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
             Always True currently; relative-binning-specific checks are not
             yet implemented (see inline TODO).
         """
-        
-        #TODO: add additional checks RelativeBinning!
+
+        # TODO: add additional checks RelativeBinning!
         return True
-    
+
     def final_diagnostics(self, bestfit_params, args, result=None):
         # TODO add some nice plotting for final waveform
         pass
-    
+
     def noise_log_likelihood(self):
         return self.sub_model.noise_log_likelihood()
 

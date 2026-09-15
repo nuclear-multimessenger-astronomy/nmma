@@ -284,9 +284,9 @@ class NMMAInjectionCreator(InjectionCreator):
         dataframe_from_prior = self.get_injection_dataframe()
         try:  # FIXME: This could be handled more gracefully...
             swap_mask = dataframe_from_prior["mass_1"] < dataframe_from_prior["mass_2"]
-            dataframe_from_prior.loc[
-                swap_mask, ["mass_1", "mass_2"]
-            ] = dataframe_from_prior.loc[swap_mask, ["mass_2", "mass_1"]].values
+            dataframe_from_prior.loc[swap_mask, ["mass_1", "mass_2"]] = (
+                dataframe_from_prior.loc[swap_mask, ["mass_2", "mass_1"]].values
+            )
         except KeyError:
             pass
         if self.columns_to_remove is not None:

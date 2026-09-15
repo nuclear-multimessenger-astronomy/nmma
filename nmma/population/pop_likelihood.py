@@ -8,6 +8,7 @@ class NeutronStarPopulation:
     a given population model from Landry & Read.
     (https://doi.org/10.3847/2041-8213/ac2f3e)
     """
+
     def __init__(self, model_name, beta=0.0):
         """
         Parameters
@@ -22,18 +23,17 @@ class NeutronStarPopulation:
             unequal-mass systems in the log-likelihood.
         """
         self.beta = beta
-        if model_name.lower() == 'flat':
+        if model_name.lower() == "flat":
             m_min, m_max = 1.1, 2.0
             self.distribution = uniform(loc=m_min, scale=m_max)
-        elif model_name.lower() == 'peak':
+        elif model_name.lower() == "peak":
             m_min, m_max = 1.1, 2.1
             loc = 1.5
             scale = 1.0
             trunc_low = (m_min - loc) / scale
             trunc_high = (m_max - loc) / scale
-            self.distribution = truncnorm(trunc_low, trunc_high,
-                                          loc=loc, scale=scale)
-        ### FIXME: Unrecognized model_name fails silently at construction, then crashes unhelpfully later: there's no else branch, so passing e.g. NeutronStarPopulation('gaussian') succeeds without error and produces an object with no self.distribution at all. 
+            self.distribution = truncnorm(trunc_low, trunc_high, loc=loc, scale=scale)
+        ### FIXME: Unrecognized model_name fails silently at construction, then crashes unhelpfully later: there's no else branch, so passing e.g. NeutronStarPopulation('gaussian') succeeds without error and produces an object with no self.distribution at all.
 
     def log_likelihood(self, parameters):
         """
@@ -53,6 +53,8 @@ class NeutronStarPopulation:
             Sum of the log-pdf of both component masses under
             ``self.distribution`` plus ``beta * log(mass_ratio)``.
         """
-        return (self.distribution.logpdf(parameters['mass_1_source'])
-                + self.distribution.logpdf(parameters['mass_2_source'])
-                + np.log(parameters['mass_ratio']**self.beta))
+        return (
+            self.distribution.logpdf(parameters["mass_1_source"])
+            + self.distribution.logpdf(parameters["mass_2_source"])
+            + np.log(parameters["mass_ratio"] ** self.beta)
+        )

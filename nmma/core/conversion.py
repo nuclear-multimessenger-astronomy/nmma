@@ -440,7 +440,6 @@ def reweight_to_flat_mass_prior(df):
 
 
 def convert_mtot_mni(params):
-
     """
     Add ``mni``, ``mtot``, ``mrp``, ``mni_c`` and ``mrp_c`` to ``params``.
 
@@ -716,9 +715,7 @@ def gaussian_jet_energy_to_central_isotropic_energy_equivalent(
     """
 
     # this is the analytical expression for int_{0}^{alphaWing*thetaCore} sin(x) *exp(-1/2 (x/thetac)^2) dx
-    prefactor = (
-        np.sqrt(np.pi) * 1.0j * thetaCore * np.exp(-(thetaCore**2) / 2) / 2**1.5
-    )
+    prefactor = np.sqrt(np.pi) * 1.0j * thetaCore * np.exp(-(thetaCore**2) / 2) / 2**1.5
     first_term = erf(0.5 * (np.sqrt(2) * 1.0j * thetaCore + np.sqrt(2) * alphaWing))
     second_term = erf(0.5 * (np.sqrt(2) * 1.0j * thetaCore - np.sqrt(2) * alphaWing))
     third_term = 2 * erf(1.0j * thetaCore / np.sqrt(2))
@@ -767,6 +764,7 @@ class EjectaFitting:
         The keys :meth:`__call__` writes, in the order
         :meth:`ejecta_parameter_conversion` returns them.
     """
+
     mass_fitting_keys = ["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
     def __call__(self, parameters):
@@ -807,6 +805,7 @@ class EjectaFitting:
 
 class NSBHEjectaFitting(EjectaFitting):
     """Ejecta fitting for an NSBH system."""
+
     def chibh2risco(self, chi_bh):
         """see, e.g., https://arxiv.org/pdf/2011.08948.pdf, eq. 2-4.
         This expression gives the innermost stable circular orbit (ISCO) in units of the black hole mass as a function of the dimensionless spin parameter chi_bh.
@@ -899,7 +898,6 @@ class NSBHEjectaFitting(EjectaFitting):
         n1=-8.63604211e-01,
         n2=-1.68399507,
     ):
-
         """
         equation (9) in https://arxiv.org/abs/2002.07728
 
@@ -932,7 +930,6 @@ class NSBHEjectaFitting(EjectaFitting):
         return mdyn
 
     def nsbh_parameter_conversion(self, converted_parameters):
-
         """
         Fit the ejecta parameters for an NSBH system.
 
@@ -1013,6 +1010,7 @@ class NSBHEjectaFitting(EjectaFitting):
 
 class BNSEjectaFitting(EjectaFitting):
     """Ejecta fitting for a BNS system."""
+
     def log10_disk_mass_fitting(
         self,
         total_mass,
@@ -1277,7 +1275,6 @@ class BNSEjectaFitting(EjectaFitting):
         return chi_BH
 
     def bns_ejecta_conversion(self, converted_parameters):
-
         # prevent the output message flooded by these warning messages
         """
         Fit the ejecta masses for a BNS system.
@@ -1350,7 +1347,6 @@ class BNSEjectaFitting(EjectaFitting):
         return log10_mej_dyn, log10_mej_wind, log10_mej_total, log10_mdisk_fit
 
     def grb_energy_conversion(self, converted_parameters, log10_mdisk_fit):
-
         # GRB afterglow energy
         """
         Fit ``log10_E0`` from the disk mass.
@@ -1452,6 +1448,7 @@ class BNSEjectaFitting(EjectaFitting):
 
 class KilonovaEjectaFitting(BNSEjectaFitting, NSBHEjectaFitting):
     """Ejecta fitting that selects the BNS or NSBH conversion per system."""
+
     def ejecta_parameter_conversion(self, parameters):
         # FIXME Weizmann: routing used to check radius_1>0 alone for BNS,
         # not radius_2>0 too. mass_1 >= mass_2 by convention, so in the
@@ -1521,6 +1518,7 @@ class MultimessengerConversion:
     *conversions
         Callables applied in order by :meth:`core_conversion`.
     """
+
     def __init__(self, *conversions):
         self._conversions = conversions
 
@@ -1664,6 +1662,7 @@ class MultimessengerConversion:
         ``parameters``.
         """
         return parameters
+
 
 # fmt: off
 label_mapping = {

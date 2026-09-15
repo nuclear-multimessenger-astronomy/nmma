@@ -33,5 +33,4 @@ def cleanup_outdir(args):
 
 
 def test_maximum_mass_resampling(args):
-
     maximum_mass_constraint.main(args)
