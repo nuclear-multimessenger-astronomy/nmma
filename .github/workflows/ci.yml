@@ -26,6 +26,8 @@ jobs:
         with:
           python-version: "3.13"
       - uses: pre-commit/action@v3.0.1
+      - name: Check uv.lock is up to date
+        run: uv lock --check
 
   pytest:
     runs-on: ubuntu-latest
