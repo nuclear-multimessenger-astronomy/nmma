@@ -1,10 +1,10 @@
-## Inference of electromagnetic signals
+# Inference of electromagnetic signals
 
-Given a light curve from an optical survey telescope (and potential follow-up), the goal is to analyze the light curve to perform parameter inference. Within NMMA, there are a number of [models](./models.html) available. Some are analytic / semi-analytic models that can be sampled, others rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks).
+Given a light curve from an optical survey telescope (and potential follow-up), the goal is to analyze the light curve to perform parameter inference. Within NMMA, there are a number of [models](models) available. Some are analytic / semi-analytic models that can be sampled, others rely on sampling from a grid of modeled lightcurves through the use of Principle Component Analysis (PCA) and an interpolation scheme (either Gaussian process modeling or neural networks).
 
 In many cases, the lightcurve predicted by each set of parameters is **extremely high-dimensional**, given the number of measurements made. Our goal for this example is to to determine the best-fit model parameters for an object based on its observed lightcurve.
 
-### Filters
+## Filters
 Often you will see that lightcurve may contain data from SDSS, for example `sdssr`, `sdssg`, `sdssr`, etc. Since the current SVD models are only trained for `sdssu` filter, it is advised that the following filter names should be changed to that of Pan-STARRS1 in the lightcurve data file.
 
 :::{table}
@@ -25,7 +25,7 @@ And corresponding to this, the filter flag should be `--filter ps1__g,ps1__r,ps_
 The same is applicable for LSST filters.
 :::
 
-### Example fit to simulated data
+## Example fit to simulated data
 
 Following the quick start, we assume that an injection file has been made generated and made available. For example, there are a number of extra parameters available to modify the light curve sampling, including:
 
@@ -53,7 +53,7 @@ Taking Rubin as an example:
 
 	lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --outdir outdir --label injection --prior priors/Bu2019lm.prior --tmin 0.05 --tmax 20 --dt 0.1 --error-budget 1 --nlive 512 --Ebv-max 0 --injection ./injection.json --injection-num 0 --injection-outfile outdir/lc.csv --generation-seed 42 --filters sdssu,ps1__g,ps1__r,ps1__i,ps1__z,ps1__y --plot --remove-nondetections --rubin-ToO-type  --injection-detection-limit 23.9,25.0,24.7,24.0,23.3,22.1
 
-### Analysis of a real object
+## Analysis of a real object
 
 Of course, analysis of simulated objects are not the ultimate goal for the analysis. However, we can also analyze real light curves. We take as an example one of the files in example_files/candidate_data/ (ZTF21abjvfbc.dat) and run:
 
@@ -66,7 +66,7 @@ This produces a light curve and parameter inference of the form:
 ![ZTF21abjvfbc corner plot](images/ZTF21abjvfbc_corner.png)
 ![ZTF21abjvfbc light curve fit](images/ZTF21abjvfbc_lightcurves.png)
 
-### Inference of multiple EM signals
+## Inference of multiple EM signals
 
 Whereas the examples above dealt with stand-alone Bayesian inferences of just one model or astrophysical source, NMMA enables to run a combined inference using multiple models. Below, we show examples for 2 different types of sources:
 

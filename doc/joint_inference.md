@@ -1,4 +1,4 @@
-## Multi-messenger inference
+# Multi-messenger inference
 
 A joint inference on gravitational-wave and electromagnetic signals requires NMMA to run on a supercomputer cluster because large memory space are required and need to be shared across many CPU cores. Here, we consider a full joint inference on the binary neutron star merger observed on 17th August 2017. 
 
