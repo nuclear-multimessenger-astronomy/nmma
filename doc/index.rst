@@ -250,6 +250,7 @@ Install C compiler and cmake:
          conda install -c conda-forge fftw
          DYLD_LIBRARY_PATH=$HOME/anaconda3/envs/nmma_env
          pip install pyfftw
+
       Replace ``DYLD_LIBRARY`` path by your NMMA virtual environment path if it is not same as give here
 
 #. The ``osx-arm64`` conda-forge channel does not include
@@ -468,6 +469,8 @@ User Guide
    combined_analysis
    Cluster_Resources
    contributing
+   gwemopt_light_curves_detection
+   observing-scenarios-light-curves
    changelog
 
 
