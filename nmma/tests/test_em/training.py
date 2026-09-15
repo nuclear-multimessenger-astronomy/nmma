@@ -26,7 +26,6 @@ def cleanup_outdir():
 
 
 def test_training():
-
     # The number of PCA components we'll use to represent each lightcurve
     n_coeff = 3
     model_name = "Bu2019lm_sparse"

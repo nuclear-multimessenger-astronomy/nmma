@@ -1,3 +1,4 @@
+# CHECK ME: Can this file be removed?
 import numpy as np
 import scipy.constants
 from scipy.integrate import solve_ivp
@@ -9,6 +10,29 @@ particle_to_geometric = particle_to_SI * SI_to_geometric
 
 
 def tov_ode(h, y, eos):
+    """Right-hand side of the TOV + tidal-perturbation ODEs, in the
+    enthalpy formulation (integrated from the center down to the
+    surface at h=0, avoiding the r=0 coordinate singularity).
+
+    Parameters
+    ----------
+    h: float
+        Pseudo-enthalpy (geometric units) -- the integration variable.
+    y: list of float
+        [r, m, H, b]: radius, enclosed mass, and the tidal-perturbation
+        function H and its derivative-related quantity b (all geometric
+        units).
+    eos: object
+        Must provide ``energy_density_from_pseudo_enthalpy``,
+        ``pressure_from_pseudo_enthalpy``, and
+        ``log_dedp_from_log_pressure`` (particle-physics units,
+        converted internally).
+
+    Returns
+    -------
+    list of float
+        [dr/dh, dm/dh, dH/dh, db/dh].
+    """
     r, m, H, b = y
     e = eos.energy_density_from_pseudo_enthalpy(h) * particle_to_geometric
     p = eos.pressure_from_pseudo_enthalpy(h) * particle_to_geometric
@@ -33,7 +57,23 @@ def tov_ode(h, y, eos):
 
 
 def calc_k2(R, M, H, b):
+    """Tidal Love number k2 from the surface values of the TOV +
+    perturbation solution, via the standard closed-form expression in
+    terms of compactness C=M/R and y=R*b/H (e.g. Hinderer 2008).
 
+    Parameters
+    ----------
+    R, M: float
+        Surface radius and mass, in geometric units.
+    H, b: float
+        Surface values of the tidal-perturbation function and its
+        derivative-related quantity.
+
+    Returns
+    -------
+    float
+        Dimensionless tidal Love number k2.
+    """
     y = R * b / H
     C = M / R
 
@@ -66,7 +106,27 @@ def calc_k2(R, M, H, b):
 
 
 def TOVSolver(eos, pc_pp):
+    """Solve the TOV + tidal-perturbation equations for a star with
+    central pressure ``pc_pp``, returning its mass, radius, and tidal
+    Love number.
 
+    Parameters
+    ----------
+    eos: object
+        Equation-of-state object; see ``tov_ode`` for the required
+        interface, plus ``pseudo_enthalpy_from_pressure``,
+        ``energy_density_from_pressure``, and ``dedp_from_pressure``
+        (particle-physics units, e.g. MeV/fm^3).
+    pc_pp: float
+        Central pressure, in the same units ``eos`` expects.
+
+    Returns
+    -------
+    M, R: float
+        Mass and radius, in geometric units (length).
+    k2: float
+        Dimensionless tidal Love number.
+    """
     # central values
     hc = eos.pseudo_enthalpy_from_pressure(pc_pp)
     ec = eos.energy_density_from_pressure(pc_pp) * particle_to_geometric

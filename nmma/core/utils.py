@@ -18,7 +18,6 @@ logger = logging.getLogger("nmma")
 
 
 def setup_logger(log_level="INFO"):
-
     try:
         level = getattr(logging, log_level.upper())
     except:

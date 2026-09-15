@@ -3,9 +3,59 @@ import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
-import nmma
+import nmma  # noqa: E402  (must follow the sys.path insert above)
 
-extensions = ["myst_parser", "sphinx_copybutton", "sphinx_github_changelog"]
+extensions = [
+    "myst_parser",
+    "sphinx_copybutton",
+    "sphinx_github_changelog",
+    # API reference: autodoc reads the docstrings, numpydoc renders their
+    # sections, viewcode links each entry to its source, intersphinx turns
+    # external type names into links.
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "numpydoc",
+]
+
+# Package landing pages (Subpackages/Submodules) list their contents as
+# autosummary tables; don't also auto-generate separate stub pages for
+# them -- sphinx-apidoc already generates the real per-module pages.
+autosummary_generate = False
+
+# Show member functions/attributes in source order rather than alphabetically.
+autodoc_member_order = "bysource"
+# numpydoc adds its own (redundant) autosummary-style member listing on top
+# of autodoc's; this keeps it to just rendering the numpydoc-style sections
+# (Parameters/Returns/...) within each already-listed member's docstring.
+numpydoc_show_class_members = False
+
+# Importing every module at build time is unavoidable for autodoc, but the
+# optional backends need not be installed for the docs to build.
+autodoc_mock_imports = [
+    "afterglowpy",
+    "cocteau",
+    "dustmaps",
+    "fiesta",
+    "gwemopt",
+    "keras",
+    "m4opt",
+    "nflows",
+    "tensorflow",
+    "torch",
+]
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    # bilby is by far the most referenced external package in our docstrings.
+    "bilby": ("https://lscsoft.docs.ligo.org/bilby", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy", None),
+    "astropy": ("https://docs.astropy.org/en/stable", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+    "pandas": ("https://pandas.pydata.org/docs", None),
+}
 myst_enable_extensions = [
     "amsmath",
     "colon_fence",
@@ -62,7 +112,7 @@ version = nmma.__version__
 release = version
 
 
-language = None
+language = "en"
 
 
 exclude_patterns = ["_build"]

@@ -177,7 +177,7 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = [
-    "E501", 
+    "E501",
     "E722", # Bare Except
     "E741", # Ambiguous variable name
     "F841", # Local variable assigned but never used

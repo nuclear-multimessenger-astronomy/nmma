@@ -68,7 +68,27 @@ DEFAULT_FILTERS = [
 
 
 def setup_sample_times(args):
-    "create an array of sample times used for generating EM model lightcurves from args"
+    """Build the time grid an EM model will be evaluated on.
+
+    Returning None is the normal case: the model then picks its own grid,
+    which is the range it was actually trained or derived over.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed command-line arguments, read for the time bounds, the number
+        of steps and the scale.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        The time grid in days, or None to let the model decide.
+
+    Raises
+    ------
+    ValueError
+        If the requested time scale is neither linear nor logarithmic.
+    """
     tmin = args.em_tmin
     tmax = args.em_tmax
 
@@ -92,6 +112,31 @@ def setup_sample_times(args):
 
 
 def set_filters(args):
+    """Work out which filters the analysis should run on.
+
+    Either the filters are named outright, or they are derived from the
+    detectors that will observe: naming ZTF asks for its three bands, naming
+    Rubin asks for whichever set its target-of-opportunity tier uses.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed command-line arguments, read for filters, em_detectors and
+        rubin_ToO_type.
+
+    Returns
+    -------
+    list of str or None
+        The filters, or None when nothing was requested, in which case the
+        model uses everything it supports.
+
+    Raises
+    ------
+    ValueError
+        If filters were requested but none of them is usable.
+    NotImplementedError
+        If a detector has no filter set defined for it.
+    """
     filters = None  # default value
     if args.filters:
         filters = args.filters
@@ -138,6 +183,27 @@ def set_filters(args):
 
 
 def create_detection_limit(args, filters, default_limit=np.inf):
+    """Work out how deep each filter went.
+
+    The limit may be given outright, read off an m4opt skymap at the
+    position of the source, or, failing both, derived from the detectors
+    that observed.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    filters: list of str
+        Filters to provide a limit for.
+    default_limit: float, optional
+        Limit for filters nothing is known about. Infinite by default,
+        which means no limit at all.
+
+    Returns
+    -------
+    dict
+        Limiting magnitude per filter.
+    """
     if getattr(args, "detection_limit", None):
         return set_filter_associated_dict(args.detection_limit, filters, default_limit)
     elif getattr(args, "detection_limit_fits_file", None):
@@ -195,6 +261,21 @@ def create_detection_limit(args, filters, default_limit=np.inf):
 
 
 def detection_limit_from_m4opt_fits_file(args):
+    """Read the limiting magnitude off an m4opt coverage map.
+
+    The map gives a depth in every direction; only the pixel containing the
+    source is of interest.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed command-line arguments, holding the map and the sky position.
+
+    Returns
+    -------
+    float
+        Limiting magnitude at the position of the source.
+    """
     # Open the FITS file
     hdul = fits.open(args.detection_limit_fits_file)
     # Get the BinTableHDU containing the HEALPix data
@@ -209,6 +290,33 @@ def detection_limit_from_m4opt_fits_file(args):
 
 
 def set_filter_associated_dict(quantity, filters, default_limit=np.inf):
+    """Spread a quantity over the filters, however it was written.
+
+    A single number applies to every filter; a sequence is matched to them
+    in order; a mapping is taken as it is, with anything missing falling
+    back on the default.
+
+    Parameters
+    ----------
+    quantity: float or list or tuple or dict
+        The quantity, in any of those forms.
+    filters: list of str
+        Filters to cover.
+    default_limit: float, optional
+        Value for filters a mapping does not mention.
+
+    Returns
+    -------
+    dict
+        The quantity per filter.
+
+    Raises
+    ------
+    AssertionError
+        If a sequence does not have one entry per filter.
+    ValueError
+        If the quantity is in none of the supported forms.
+    """
     if isinstance(quantity, (int, float)):
         # If a single value is provided, apply it to all filters
         return {x: float(quantity) for x in filters}
@@ -229,6 +337,29 @@ def set_filter_associated_dict(quantity, filters, default_limit=np.inf):
 
 
 def cut_data_to_time_range(data, args, trigger_time, tmin=0, tmax=np.inf):
+    """Keep only the observations inside the requested time window.
+
+    Times are counted from the trigger. A filter left with nothing is
+    dropped altogether rather than kept empty.
+
+    Parameters
+    ----------
+    data: dict
+        Photometry per filter, modified in place.
+    args: argparse.Namespace
+        Parsed command-line arguments, read for the window.
+    trigger_time: float
+        Time of the trigger, in MJD.
+    tmin: float, optional
+        Start of the window, used when args does not give one.
+    tmax: float, optional
+        End of the window, used when args does not give one.
+
+    Returns
+    -------
+    dict
+        The photometry, restricted to the window.
+    """
     tmin = getattr(args, "data_tmin", tmin)
     tmax = getattr(args, "data_tmax", tmax)
 
@@ -251,15 +382,29 @@ def cut_data_to_time_range(data, args, trigger_time, tmin=0, tmax=np.inf):
 
 
 def setup_filtered_lc_data(light_curve_data, trigger_time):
-    """Set up the light curve data for the EM transient
+    """Recount the observing times from the trigger, filter by filter.
+
+    Models describe a transient from its onset, so the data have to be
+    expressed the same way. A trigger later than the first observation is
+    refused outright: it would put data before the transient began.
 
     Parameters
     ----------
     light_curve_data: dict
-        Dictionary of light curve data, with keys as filters and values as arrays of time, magnitude, and uncertainty
-    trigger_time: float, optional
-        Time of the kilonova trigger in Modified Julian Day. If not provided, the minimum time in the data will be used
+        Photometry per filter, holding time, mag and mag_error.
+    trigger_time: float
+        Time of the trigger, in MJD.
 
+    Returns
+    -------
+    tuple
+        Times counted from the trigger, magnitudes, uncertainties, and the
+        trigger time itself.
+
+    Raises
+    ------
+    ValueError
+        If the trigger is later than the earliest observation.
     """
 
     lc_times = {}
@@ -287,6 +432,35 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 def check_model_time_consistency(
     light_curve_data, light_curve_model, priors, injection=None
 ):
+    """Check the data fall inside the window the model can describe.
+
+    Redshift and timeshift both move the model in time, and their priors
+    bound how far. Beyond those bounds the model says nothing, so data
+    falling outside are either cut, for an injection, or reported as a
+    configuration error, for real observations.
+
+    Parameters
+    ----------
+    light_curve_data: tuple
+        Times, magnitudes, uncertainties and trigger time.
+    light_curve_model: nmma.em.model.LightCurveModelContainer
+        Model whose validity range is being checked.
+    priors: bilby.core.prior.PriorDict
+        Priors, read for the redshift and the timeshift.
+    injection: dict or None, optional
+        Injection parameters. When not None, the data are cut to the model
+        range instead of being checked.
+
+    Returns
+    -------
+    tuple
+        The light curve data, possibly cut.
+
+    Raises
+    ------
+    ValueError
+        If real observations fall outside what the model can describe.
+    """
 
     lc_times, lc_mags, lc_uncertainties, trigger_time = light_curve_data
     data_tmin, data_tmax = np.inf, -np.inf
@@ -348,6 +522,21 @@ def check_model_time_consistency(
 
 
 def setup_bolometric_lc_data(light_curve_data, trigger_time):
+    """Recount a bolometric light curve from the trigger, and sort it.
+
+    Parameters
+    ----------
+    light_curve_data: pandas.DataFrame
+        Holds phase, Lbb and Lbb_unc columns.
+    trigger_time: float
+        Time of the trigger, in MJD.
+
+    Returns
+    -------
+    tuple
+        Times counted from the trigger, luminosities, uncertainties, and
+        the trigger time itself.
+    """
     data_time = light_curve_data["phase"].to_numpy()
     sort_ids = np.argsort(data_time)
     return (
@@ -359,6 +548,21 @@ def setup_bolometric_lc_data(light_curve_data, trigger_time):
 
 
 def transform_to_app_mag_dict(mag_dict, params):
+    """Move absolute magnitudes out to the observer.
+
+    Parameters
+    ----------
+    mag_dict: dict
+        Absolute magnitude per filter, modified in place.
+    params: dict
+        Holds luminosity_distance, in Mpc. Ten parsecs are assumed when it
+        is missing, which leaves the magnitudes absolute.
+
+    Returns
+    -------
+    dict
+        The same magnitudes, now apparent.
+    """
     d_lum = params.get(
         "luminosity_distance", 1e-5
     )  # assume 10 pc =1e-5 Mpc for abs_mag
@@ -369,11 +573,19 @@ def transform_to_app_mag_dict(mag_dict, params):
 
 
 def get_extinction_model(ext_model=None, Rv=None):
-    """Prepare Model to compute extinction factors
+    """Pick the extinction curve, and the frame it applies in.
+
+    Where the dust sits decides which frame the curve is evaluated in: the
+    Milky Way screen lies at redshift zero, so it is seen in the observer
+    frame, while dust in the host moves with it and is seen in the rest
+    frame.
+
     Parameters
     ----------
-    ext_model : str or dust_extinction.baseclasses.BaseExtModel
-    Rv : floator, optional
+    ext_model : str or dust_extinction.baseclasses.BaseExtModel, optional
+        Name of the curve, or an already-built model, which is returned
+        unchanged and assumed to sit in the host.
+    Rv : float, optional
         Total-to-selective extinction; 3.1 is the G23 MW average and must
         stay consistent with the curve (curve and Rv form one package).
 
@@ -384,6 +596,12 @@ def get_extinction_model(ext_model=None, Rv=None):
     evaluated in the OBSERVER frame (the Galactic dust screen is at z=0),
     following the approach of M4OPT (m4opt.synphot.extinction).
     P92_SMC_host (default): Pei (1992) SMC curve, evaluated in the REST frame of the host galaxy (the dust screen is at z=z_host).
+
+    Returns
+    -------
+    tuple
+        The extinction model, and the frame it must be evaluated in,
+        ``obs`` or ``host``.
     """
     # FIXME: Handle more cases
 
@@ -447,11 +665,24 @@ def get_all_bandpass_metadata():
 
 
 def get_filter_name_mapping(observed_filters):
-    """
-    Creates a mapping of filter names between their observation channel signature and a corresponding model filter.
+    """Match every observed filter to what the models actually provide.
 
-    Returns:
-        dict: A dictionary mapping between observed and modelled filters.
+    Observed and modelled filters rarely carry the same names. Most map one
+    to one, sometimes after a spelling change; the broad survey bands have
+    no counterpart at all and must be rebuilt by averaging neighbours.
+
+    Parameters
+    ----------
+    observed_filters: list of str or str
+        Filters the data were taken in.
+
+    Returns
+    -------
+    filter_maps: dict
+        For each observed filter, the modelled one to read it from.
+    averaging_filters: dict
+        For each filter with no direct counterpart, the modelled filters to
+        average instead.
     """
     unprocessed_filts = [
         "u",
@@ -518,6 +749,27 @@ def get_filter_name_mapping(observed_filters):
 
 
 def map_observable_to_modelled_filters(obs_filter):
+    """Name the modelled filters a broad observing band can be built from.
+
+    Surveys observe through bands no model provides directly, such as the
+    very wide ZTF w. Those are reconstructed by averaging the neighbouring
+    modelled bands.
+
+    Parameters
+    ----------
+    obs_filter: str
+        The observed filter.
+
+    Returns
+    -------
+    list of str
+        Modelled filters to average.
+
+    Raises
+    ------
+    ValueError
+        If the filter has no averaging recipe.
+    """
     # NOTE: this is a hardcoded mapping of observable filters to modelled filters,
     # needs to correspond to the filters in average_mags
     map_dict = {
@@ -535,6 +787,29 @@ def map_observable_to_modelled_filters(obs_filter):
 
 
 def average_mags(mag, filt):
+    """Reconstruct a broad band by averaging the modelled ones.
+
+    Averaging magnitudes amounts to a geometric mean of the fluxes, which is
+    defensible here because the spectrum goes roughly as a power law in
+    frequency over such a band.
+
+    Parameters
+    ----------
+    mag: dict
+        Magnitude of each modelled filter.
+    filt: str
+        Observed filter to reconstruct.
+
+    Returns
+    -------
+    numpy.ndarray
+        Magnitude in the observed filter.
+
+    Raises
+    ------
+    ValueError
+        If the filter has no averaging recipe.
+    """
     # These average between filters is equivalent to
     # the geometric mean of the flux. These averages
     # are kind of justifiable because the spectral
@@ -556,6 +831,20 @@ def average_mags(mag, filt):
 
 
 def get_filtered_mag(mag, filt):
+    """Get the magnitude of one filter, averaging it if need be.
+
+    Parameters
+    ----------
+    mag: dict
+        Magnitude per modelled filter.
+    filt: str
+        Filter wanted.
+
+    Returns
+    -------
+    numpy.ndarray
+        Magnitude in that filter.
+    """
     direct_map, averaging_filters = get_filter_name_mapping(filt)
     if filt in averaging_filters:
         return average_mags(mag, filt)
@@ -564,13 +853,21 @@ def get_filtered_mag(mag, filt):
 
 
 def interpolate_nans(data_dict: dict) -> dict:
-    """
-    Interpolates the NaN values in a photometric data.
+    """Fill the gaps left by NaN magnitudes in a training grid.
 
-    Args:
-        data_dict (dict): Dictionary containing photometric data. The keys correspond to the filenames
-        of the data. The values are dictionaries of which the keys correspond to time (t) or the filters considered.
-        The corresponding values are the time grid (in days) and the magnitudes of the different filters.
+    A light curve with fewer than two usable points is left untouched:
+    there is nothing to interpolate between.
+
+    Parameters
+    ----------
+    data_dict: dict
+        Training grid, keyed by file name. Each entry holds a time grid
+        under ``t`` and one magnitude array per filter. Modified in place.
+
+    Returns
+    -------
+    dict
+        The same grid, with the gaps filled where that was possible.
     """
 
     # Iterate over all the data files
@@ -597,9 +894,40 @@ def interpolate_nans(data_dict: dict) -> dict:
 def autocomplete_data(
     interp_points, ref_points, ref_data, extrapolate="linear", ref_value=np.inf
 ):
-    """
-    Interpolates and extrapolates reference data to a 1-D array of arguments. This can be wide off!
-    This basically extends np.interp to ignore nans and provide simple extrapolations.
+    """Read reference data at new points, extending it past its edges.
+
+    This is np.interp with two additions: NaNs in the reference are skipped
+    rather than poisoning the result, and several ways of extending beyond
+    the reference range are offered. Extrapolation is guesswork by nature
+    and can be badly off, so prefer a constant or a fixed value whenever
+    the caller knows what lies outside.
+
+    Parameters
+    ----------
+    interp_points: numpy.ndarray
+        Points to evaluate at.
+    ref_points: numpy.ndarray
+        Points the reference data is given on.
+    ref_data: numpy.ndarray
+        The reference data, NaNs allowed.
+    extrapolate: str or float or sequence, optional
+        How to extend beyond the reference range: ``linear`` continues the
+        slope of the outermost pair, ``constant`` holds the edge value,
+        ``spline`` fits a smoothing spline, a number fills both sides with
+        it, and a pair fills each side separately.
+    ref_value: float, optional
+        Value returned when fewer than two reference points are usable.
+        Doubles as the smoothing factor of the spline.
+
+    Returns
+    -------
+    numpy.ndarray
+        The data at the requested points.
+
+    Raises
+    ------
+    ValueError
+        If the extrapolation method is not recognised.
     """
 
     data_mask = np.isfinite(ref_data)
@@ -649,6 +977,23 @@ def autocomplete_data(
 
 
 def get_default_filts_lambdas(filters=None):
+    """Give every filter its effective wavelength.
+
+    Covers three families: bands hardcoded here, every bandpass sncosmo
+    knows about, and the m4opt missions when that package is installed.
+    Radio and X-ray channels are named by their frequency or energy and
+    converted on the fly.
+
+    Parameters
+    ----------
+    filters: list of str, optional
+        Filters wanted. All known ones are returned when omitted.
+
+    Returns
+    -------
+    tuple
+        The filter names, and their effective wavelength in metres.
+    """
 
     filts = [
         "u",
@@ -751,6 +1096,26 @@ def get_default_filts_lambdas(filters=None):
 
 
 def extract_unit(filter_string, indicator, target_unit):
+    """Read a physical value out of a filter name.
+
+    Radio and X-ray channels carry their own value in their name, as in
+    ``radio-5.5GHz`` or ``X-ray-1keV``. Astropy handles the conversion, so
+    any unit it knows can be written there.
+
+    Parameters
+    ----------
+    filter_string: str
+        The filter name.
+    indicator: str
+        Prefix to strip, ``radio`` or ``X-ray``.
+    target_unit: str
+        Unit to convert to.
+
+    Returns
+    -------
+    float
+        The value, in the requested unit.
+    """
     # calculate the lambdas based on the filter name
     # split the filter name
     filter_string = filter_string.replace(f"{indicator}-", "")
@@ -762,7 +1127,30 @@ def extract_unit(filter_string, indicator, target_unit):
 
 
 def flux_to_ABmag(flux, unit="cgs", residual_mag=None):
-    """see https://en.wikipedia.org/wiki/AB_magnitude"""
+    """Convert a flux density into an AB magnitude.
+
+    The zero point depends on the unit the flux is given in. A light curve
+    with fewer than two positive points is returned as all NaN, and
+    individual non-positive points become non-detections.
+
+    Parameters
+    ----------
+    flux: numpy.ndarray
+        Flux density.
+    unit: str, optional
+        Unit of the flux: ``cgs``, ``Jy`` or ``mJy``.
+    residual_mag: float, optional
+        Zero point to use instead of the one implied by the unit.
+
+    Returns
+    -------
+    numpy.ndarray
+        AB magnitudes, infinite where the flux was not positive.
+
+    Notes
+    -----
+    See https://en.wikipedia.org/wiki/AB_magnitude
+    """
     if unit == "cgs":
         residual_magnitude = -48.6
     elif unit == "Jy":
@@ -786,8 +1174,8 @@ def get_skymap_idx(ra, dec, nside):
     """
     Get the HEALPix pixel index for given RA and Dec coordinates.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     ra : float or array-like
         Right Ascension in degrees.
     dec : float or array-like
@@ -797,8 +1185,8 @@ def get_skymap_idx(ra, dec, nside):
     nest : bool, optional
         Whether to use NESTED ordering. Default is True.
 
-    Returns:
-    --------
+    Returns
+    -------
     int or array-like
         The HEALPix pixel index corresponding to the input coordinates.
     """
@@ -812,9 +1200,18 @@ def get_skymap_idx(ra, dec, nside):
 
 
 class SpectraOverTime:
-    """
-    A collection of spectra at successive timesteps
+    """A collection of spectra at successive timesteps.
+
     Written by Eve Chase.
+
+    Parameters
+    ----------
+    timesteps: numpy.ndarray
+        Times of the spectra, in days.
+    spectra: numpy.ndarray
+        One Spectrum per timestep.
+    num_angles: int
+        Number of angular bins, each assumed to span an equal solid angle.
     """
 
     def __init__(self, timesteps=np.array([]), spectra=np.array([]), num_angles=1):
@@ -836,9 +1233,18 @@ class SpectraOverTime:
 
 
 class Spectrum:
-    """
-    Spectrum as a function of wavelength
+    """A spectrum, as a function of wavelength.
+
     Written by Eve Chase.
+
+    Parameters
+    ----------
+    timestep: float
+        Time of the spectrum, in days.
+    wavelengths: numpy.ndarray
+        Wavelengths, in cm.
+    flux_density: numpy.ndarray
+        Flux at 10 pc, in erg/s/cm3.
     """
 
     def __init__(self, timestep=None, wavelengths=None, flux_density=None):
@@ -858,12 +1264,20 @@ class Spectrum:
         self.flux_density_arr = flux_density.cgs
 
     def interpolate(self, vals):
-        """
-        Interpolate a functional form of the flux density
-        array as a function of wavelength
+        """Read the spectrum at arbitrary wavelengths.
+
+        Wavelengths outside the range the spectrum covers return zero
+        rather than an extrapolation.
+
+        Parameters
+        ----------
+        vals: numpy.ndarray
+            Wavelengths to evaluate, in cgs units.
+
         Returns
         -------
-        interpolated spectrum
+        numpy.ndarray
+            Flux density at those wavelengths.
         """
 
         # Values must be in cgs for interpolation
@@ -872,12 +1286,22 @@ class Spectrum:
         )
 
     def plot(self, ax=None, **kwargs):
-        """
-        Plot spectrum in format similar to Even et al. (2019)
-        Returns:
-        --------
-        ax: Axes object
-            contains figure information
+        """Draw the spectrum, following Even et al. (2019).
+
+        Wavelengths are shown in microns on a log scale, and the flux is
+        converted to a luminosity per unit wavelength at ten parsecs.
+
+        Parameters
+        ----------
+        ax: matplotlib.axes.Axes, optional
+            Axes to draw into. A new figure is made when omitted.
+        **kwargs
+            Passed on to plot.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+            The axes that were drawn into.
         """
 
         if ax is None:
@@ -919,17 +1343,19 @@ def read_LANL_spectra(
     Read in spectra at multiple timesteps
     for Even et al. (2019) and subsequent
     paper data format. Written by Eve Chase.
+
     Parameters
     ----------
     filename: string
         path to spectrum file
+
     Returns
     -------
     spectra: dictionary
+
         - time in days as keys
-        - each time contains a dictionary with
-        a wavelength array in cm and a flux density
-        array in erg / s / cm^3
+        - each time contains a dictionary with a wavelength array in
+          cm and a flux density array in erg / s / cm^3
     """
 
     # Check that units are appropriate
@@ -1013,10 +1439,18 @@ def get_knprops_from_LANLfilename(filename):
     Typically this looks something like this:
     'Run_TP_dyn_all_lanth_wind2_all_md0.1_vd0.3_mw0.001_vw0.05_mags_2020-01-04.dat'
     Written by Eve Chase.
+
     Parameters
     ----------
     filename: str
         string representation of filename
+
+    Returns
+    -------
+    dict
+        The kilonova parameters encoded in the name: the two ejecta masses
+        and velocities, the viewing angle, the wind configuration and the
+        ejecta morphology.
     """
 
     wind = None
@@ -1167,12 +1601,14 @@ def parse_LANLfile(filename, key="band"):
     Used to determine the number of rows for a given passband
     filter or timestep.
     Written by Eve Chase.
+
     Parameters
     ----------
     filename: string
         path to magnitude file
     key: string
         key to search for in file. Options: 'band', 'time'
+
     Returns
     -------
     nrows: int

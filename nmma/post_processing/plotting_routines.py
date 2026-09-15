@@ -29,6 +29,44 @@ def setup_plot_quantities(
     default_labels={},
     **plot_kwargs,
 ):
+    """
+    Collect the quantities used to plot a set of posterior samples.
+
+    Loads the samples, decides which parameters to show, and builds the
+    labels, summary titles, axis limits and truth values shared by
+    :func:`plot_histograms_only` and :func:`setup_corner_plot`.
+
+    Parameters
+    ----------
+    posterior_samples : pandas.DataFrame, dict, str, pathlib.Path or argparse.Namespace
+        Samples, or something :func:`nmma.core.utils.get_posteriors` can
+        load them from.
+    limits : list of tuple or None
+        One ``(min, max)`` pair per entry of ``plot_keys``, widened in place
+        to cover the samples. If None, each entry starts at ``(inf, -inf)``.
+    plot_keys : list of str or None
+        Parameters to show. If None, every column of the samples is used
+        except ``log_likelihood`` and ``log_prior``.
+    injection : dict, pandas.DataFrame, pandas.Series or None
+        Truth values. A DataFrame is reduced to its first row.
+    post_dir : str or pathlib.Path, default=None
+        Directory to resolve ``posterior_samples`` against, passed through
+        to :func:`nmma.core.utils.get_posteriors`.
+    default_labels : dict, default={}
+        Fallback axis labels, consulted for keys that
+        :data:`nmma.core.conversion.label_mapping` does not cover.
+    **plot_kwargs
+        Only ``quantiles`` (passed to :func:`nmma.core.utils.sig_lims`) and
+        ``label`` are read.
+
+    Returns
+    -------
+    dict
+        With keys ``samples`` (``(n_samples, n_keys)`` array), ``keys``,
+        ``labels``, ``titles``, ``limits``, ``truths`` and ``best_fit``
+        (the highest-``log_likelihood`` row, or all-None if the samples
+        carry no ``log_likelihood`` column).
+    """
     plot_quantities = {}
     # load samples
     posterior_samples = utils.get_posteriors(posterior_samples, post_dir)
@@ -116,6 +154,57 @@ def plot_histograms_only(
     fig_kwargs={},
     **plot_kwargs,
 ):
+    """
+    Plot the 1D marginal histogram of each parameter on its own panel.
+
+    Parameters
+    ----------
+    posterior_samples : pandas.DataFrame, dict, str, pathlib.Path or argparse.Namespace
+        Samples, or something :func:`nmma.core.utils.get_posteriors` can
+        load them from.
+    limits : list of tuple, default=None
+        One ``(min, max)`` pair per entry of ``plot_keys``, widened in place
+        to cover the samples.
+    plot_keys : list of str, default=None
+        Parameters to show. Defaults to every column except
+        ``log_likelihood`` and ``log_prior``.
+    fig : matplotlib.figure.Figure, default=None
+        Figure to draw into. If None, one is created with
+        :func:`nmma.core.plotting_utils.setup_multi_axes`.
+    injection : dict, pandas.DataFrame, pandas.Series, default=None
+        Truth values. A scalar is drawn as a vertical line, a pair as a
+        shaded band.
+    post_dir : str or pathlib.Path, default=None
+        Directory to resolve ``posterior_samples`` against.
+    default_labels : dict, default={}
+        Fallback axis labels.
+    best_fit : bool, default=False
+        Mark the highest-likelihood sample with a dash-dotted line.
+    show_titles : bool, default=True
+        Put the summary title above each panel. If False, the label is
+        placed on the top axis instead.
+    prior : dict, default=None
+        Priors to overplot. ``bilby`` ``Constraint`` priors are skipped.
+    ncols : int, default=None
+        Panel columns, passed to
+        :func:`nmma.core.plotting_utils.setup_multi_axes`.
+    title_kwargs : dict, default={}
+        Text properties for the panel titles. ``color`` and ``fontsize``
+        default to the series colour and the axis title size.
+    fig_kwargs : dict, default={}
+        Passed to :func:`nmma.core.plotting_utils.setup_multi_axes`.
+    **plot_kwargs
+        Passed to ``Axes.hist``. ``color`` selects the series colour,
+        otherwise the next colour of ``nmma_colors`` is taken; ``label``
+        adds an entry to a figure-level legend.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The figure drawn into.
+    list of tuple
+        The axis limits.
+    """
     plot_quantities = setup_plot_quantities(
         posterior_samples,
         limits,
@@ -202,6 +291,8 @@ def plot_histograms_only(
             ax = prepare_titles(ax, plot_quantities, i, use_kwargs)
         else:
             ax.xaxis.set_label_position("top")
+            # FIXME: show_titles=False branch reads title_kwargs['fontsize']; default {}
+            # raises KeyError
             ax.set_xlabel(
                 plot_quantities["labels"][i], fontsize=title_kwargs["fontsize"]
             )
@@ -223,7 +314,35 @@ def plot_histograms_only(
 
 
 def plot_multi_corner(args, key_selection=None, save=False):
+    """
+    Draw a corner plot for each entry of ``args.posterior_files``, each
+    into the same figure.
 
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed arguments. Reads ``posterior_files``, ``label_name``,
+        ``kwargs`` (a string evaluated with :func:`ast.literal_eval` and
+        forwarded to ``corner.corner``), ``prior``, ``injection_json``,
+        ``injection_num``, ``bestfit_params``, ``bestfit_json`` and
+        ``verbose``.
+    key_selection : list of str, default=None
+        Restrict the plotted parameters to this subset of the prior, passed
+        to
+        :func:`nmma.core.plotting_utils.plotting_parameters_from_priors`.
+    save : str or bool, default=False
+        Path to write the figure to. If falsy, nothing is written.
+
+    Returns
+    -------
+    The value returned by the last :func:`setup_corner_plot` call.
+
+    Notes
+    -----
+    Truths are taken from ``injection_json`` at row ``injection_num`` if
+    given, otherwise from ``bestfit_params``. Quantiles are fixed at
+    ``[0.16, 0.5, 0.84]``.
+    """
     plot_kwargs = literal_eval(args.kwargs)
     quantiles = [0.16, 0.5, 0.84]
     fig = None
@@ -233,6 +352,10 @@ def plot_multi_corner(args, key_selection=None, save=False):
         else [f for f in args.posterior_files]
     )
     for i, f in enumerate(args.posterior_files):
+        # FIXME: Unpacking dict .items() into plot_keys/plot_labels yields tuples,
+        # usually raises ValueError
+        # FIXME: plot_multi_corner reads args.prior; parser defines prior_filename,
+        # causing AttributeError
         plot_keys, plot_labels = corepu.plotting_parameters_from_priors(
             args.prior, keys=key_selection
         ).items()
@@ -240,20 +363,30 @@ def plot_multi_corner(args, key_selection=None, save=False):
             truths = utils.read_injection_file(args.injection_json)
             truths = truths.iloc[args.injection_num].to_dict()
             truths = np.array([truths[k] for k in plot_keys])
+            # FIXME: args.verbose read; corner_plot_parser defines no --verbose, causing
+            # AttributeError
             if args.verbose:
                 print("\nLoaded Injection:")
                 print(f"Truths from injection: {truths}")
         elif args.bestfit_params is not None:
+            # FIXME: args.bestfit_json read; parser only defines bestfit_params.
+            # AttributeError.
             truths = utils.read_bestfit_from_json(
                 args.bestfit_json, plot_keys, args.verbose
             )
         else:
             truths = None
 
+        # FIXME: Tuple from setup_corner_plot assigned to fig; fig.savefig raises
+        # AttributeError
         fig = setup_corner_plot(
             f,
+            # FIXME: Empty list passed as limits; setup_plot_quantities indexes
+            # limits[i], raising IndexError
             [],
             label=labels[i],
+            # FIXME: truths lands in plot_kwargs, duplicating explicit truths at
+            # corner_plot call
             truths=truths,
             fig=fig,
             quantiles=quantiles,
@@ -280,7 +413,55 @@ def setup_corner_plot(
     best_fit=False,
     **plot_kwargs,
 ):
+    """
+    Draw a corner plot of the posterior samples.
 
+    Wraps :func:`corner_plot` and then adjusts the diagonal panels: rescales
+    them to their histogram height, optionally overplots the prior and the
+    best fit, and rewrites the titles through :func:`prepare_titles`.
+
+    Parameters
+    ----------
+    posterior_samples : pandas.DataFrame, dict, str, pathlib.Path or argparse.Namespace
+        Samples, or something :func:`nmma.core.utils.get_posteriors` can
+        load them from.
+    limits : list of tuple, default=None
+        One ``(min, max)`` pair per entry of ``plot_keys``, widened in place
+        to cover the samples.
+    plot_keys : list of str, default=None
+        Parameters to show. Defaults to every column except
+        ``log_likelihood`` and ``log_prior``.
+    fig : matplotlib.figure.Figure, default=None
+        Figure to draw into.
+    injection : dict, pandas.DataFrame, pandas.Series, default=None
+        Truth values, resolved by :func:`setup_plot_quantities` and passed
+        to ``corner.corner`` as ``truths``.
+    post_dir : str or pathlib.Path, default=None
+        Directory to resolve ``posterior_samples`` against.
+    default_labels : dict, default={}
+        Fallback axis labels.
+    prior : dict, default=None
+        Priors to overplot on the diagonal. ``bilby`` ``Constraint`` priors
+        are skipped.
+    show_titles : bool or None, default=True
+        True puts the summary title on the diagonal panels via
+        :func:`prepare_titles`; None puts the label on the top axis
+        instead; False leaves the titles alone.
+    best_fit : bool, default=False
+        Mark the highest-likelihood sample with a dash-dotted line.
+    **plot_kwargs
+        Passed to :func:`corner_plot`. ``color`` selects the series colour,
+        otherwise the next colour of ``nmma_colors`` is taken; ``label``
+        adds a legend entry; ``title_kwargs`` sets the title text
+        properties.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The figure drawn into.
+    list of tuple
+        The axis limits.
+    """
     plot_quantities = setup_plot_quantities(
         posterior_samples,
         limits,
@@ -352,7 +533,35 @@ def setup_corner_plot(
 
 
 def prepare_titles(ax, plot_quantities, i, title_kwargs, offset_ax=None):
+    """
+    Write the summary title for one panel.
 
+    Folds any axis offset into the quoted numbers, then either sets the
+    title directly (when this is the only text on the panel) or hands the
+    panel to :func:`nmma.core.plotting_utils.arange_titles`, which
+    positions the texts according to how many have accumulated.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Panel to title.
+    plot_quantities : dict
+        As returned by :func:`setup_plot_quantities`; ``titles`` and
+        ``labels`` are read.
+    i : int
+        Index into ``titles`` and ``labels``.
+    title_kwargs : dict
+        Text properties for the title. The key ``move`` is consumed here,
+        not passed on: it lists the indices, titles or labels whose text
+        should be shifted upward.
+    offset_ax : matplotlib.axes.Axes, default=None
+        Axis whose tick formatter supplies the offset. Defaults to ``ax``.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The titled panel.
+    """
     title = plot_quantities["titles"][i]
     if offset_ax is None:
         offset_ax = ax
@@ -386,6 +595,34 @@ def prepare_titles(ax, plot_quantities, i, title_kwargs, offset_ax=None):
 
 
 def corner_plot(plot_samples, labels, limits, fig=None, save=False, **kwargs):
+    """
+    Draw a corner plot with the NMMA default styling.
+
+    Thin wrapper around ``corner.corner``. The defaults set 50 bins, a
+    smoothing of 1.3, quantiles ``[0.16, 0.5, 0.84]``, contour levels
+    ``(0.10, 0.32, 0.68, 0.95)``, ``fill_contours=True``, and
+    ``plot_density=False`` with ``plot_datapoints=False``.
+
+    Parameters
+    ----------
+    plot_samples : numpy.ndarray
+        Samples of shape ``(n_samples, n_parameters)``.
+    labels : list of str
+        Axis label per parameter.
+    limits : list of tuple
+        ``(min, max)`` range per parameter, passed as ``range``.
+    fig : matplotlib.figure.Figure, default=None
+        Figure to draw into.
+    save : str or bool, default=False
+        Path to write the figure to. If falsy, nothing is written.
+    **kwargs
+        Passed to ``corner.corner``, overriding any of the defaults above.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The figure drawn into.
+    """
     default_kwargs = dict(
         bins=50,
         smooth=1.3,
@@ -415,7 +652,39 @@ def corner_plot(plot_samples, labels, limits, fig=None, save=False, **kwargs):
 
 
 def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
+    r"""
+    Draw the corner plot summarising a GW-EM resampling run.
 
+    Converts the sampled chirp mass and mass ratio to component masses and,
+    for a BNS, reads the tidal deformabilities and the maximum mass from the
+    EOS tables held on the solver: the deformabilities are interpolated at
+    the component masses, the maximum mass is the last tabulated mass.
+
+    Parameters
+    ----------
+    posterior_samples : pandas.DataFrame
+        Resampling output, with columns ``chirp_mass``, ``mass_ratio``,
+        ``alpha``, ``zeta`` and, for a BNS, ``EOS``.
+    solution : EjectaResamplerMixIn
+        The resampling solver, read for its ``EOS_masses_dict`` and
+        ``EOS_lambda_dict`` tables.
+    outdir : str
+        Output directory, passed through to :func:`corner_plot`.
+    withNSBH : bool
+        True plots the NSBH parameters
+        (:math:`\mathcal{M}_c, q, \alpha, \zeta`); False adds the
+        effective tidal deformability and the maximum mass for a BNS.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    For a BNS the 90th percentile of the effective tidal deformability is
+    printed. The mass ratio is plotted inverted (:math:`m_1 / m_2`) and
+    capped at 3; the maximum mass is capped at 2.7 solar masses.
+    """
     mc = posterior_samples["chirp_mass"].to_numpy()
     invq = posterior_samples["mass_ratio"].to_numpy()
     alpha = posterior_samples["alpha"].to_numpy()
@@ -485,11 +754,34 @@ def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
             (np.amin(zeta), np.amax(zeta)),
             (np.amin(MTOV), 2.7),
         )
+    # FIXME: outdir passed positionally as corner_plot's fig argument; nothing is saved
     corner_plot(plot_samples.T, labels, limits, outdir)
 
 
 def plot_R14_trend(args):
     # load the data
+    """
+    Plot the R14 constraint as a function of the number of events.
+
+    Draws two stacked panels: the median radius with its asymmetric error
+    bars for the GW-only and the joint GW+EM data sets, and below it the
+    mean of the two errors as a percentage of the median, on a log scale,
+    with reference lines at 10, 5 and 1 per cent.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed arguments. Reads ``outdir`` and ``label`` to locate
+        ``{outdir}/GW_EM_R14trend_{label}.dat``, ``gwR14trend`` to locate
+        ``{gwR14trend}/GW_R14trend.dat``, and ``R14_true`` for the
+        reference line marking the injected value.
+
+    Returns
+    -------
+    None
+        The figure is written to
+        ``{outdir}/R14_trend_GW_EM_{label}.pdf``.
+    """
     data_GWEM = pd.read_csv(
         f"{args.outdir}/GW_EM_R14trend_{args.label}.dat", header=0, delimiter=" "
     )

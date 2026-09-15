@@ -43,6 +43,16 @@ matplotlib.rcParams["text.usetex"] = False
 
 
 def get_version_info():
+    """Collect version strings of key dependencies and of nmma itself.
+
+    Returns
+    -------
+    dict
+        Mapping of package name (``bilby_version``, ``bilby_pipe_version``,
+        ``dynesty_version``, ``lalsimulation_version``, ``nmma_version``)
+        to its installed version string.
+    """
+
     return dict(
         bilby_version=bilby.__version__,
         bilby_pipe_version=bilby_pipe.__version__,
@@ -53,14 +63,50 @@ def get_version_info():
 
 
 def remove_expandable_args(parser, required_arg_groups):
+    """Strip argument groups from a parser that aren't needed for this run.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser whose action groups will be pruned in place.
+    required_arg_groups : list of str
+        Titles of the argument groups to keep; any group not in this list
+        is removed from ``parser._action_groups``.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with unneeded argument groups removed.
+    """
+
     for ag in parser._action_groups:
         if ag.title not in required_arg_groups:
             parser._action_groups.remove(ag)
+    ### CHECKME OR FIXME: removing an element from a list while iterating over it with a plain for loop shifts every later index, so the loop skips whatever comes right after each removal. Given groups [A, B, C, D, E] with only A, D required, it should strip B, C, E but actually only strips B and E — C silently survives. Consequence: write_complete_config_file's "cleaned" complete-ini can retain argument groups that don't belong to the run's actual messenger combination, whenever two or more unwanted groups happen to be adjacent in parser._action_groups.
 
     return parser
 
 
 def determine_required_args(analysis_categories):
+    """Determine which argparse group titles are relevant to this run.
+
+    Starts from a base set of groups needed by every run, then adds
+    messenger-specific groups (GW, EM, EOS, Hubble, tabulated EOS)
+    depending on which categories are present.
+
+    Parameters
+    ----------
+    analysis_categories : list of str
+        Combined ``messengers`` and ``analysis_modifiers`` for the run,
+        e.g. may contain ``'gw'``, ``'em'``, ``'eos'``, ``'Hubble'``,
+        ``'tabulated_eos'``.
+
+    Returns
+    -------
+    list of str
+        Argument group titles required for this run's config/parser.
+    """
+
     required_args = [
         "positional arguments",
         "options",
@@ -142,6 +188,25 @@ def write_complete_config_file(parser, args, inputs, remove_none=True):
 
 
 def create_generation_logger(outdir, label):
+    """Set up and return the logger used during data generation.
+
+    Configures bilby's logger to write into ``<outdir>/data`` and points
+    bilby_pipe's data_generation logger at the same logger instance so
+    log output from both packages is unified.
+
+    Parameters
+    ----------
+    outdir : str
+        Base output directory for the run.
+    label : str
+        Run label, used to name the log file.
+
+    Returns
+    -------
+    logging.Logger
+        The configured logger.
+    """
+
     logger = bilby.core.utils.logger
     bilby.core.utils.setup_logger(outdir=str(Path(outdir, "data")), label=label)
     bilby_pipe.data_generation.logger = logger
@@ -150,15 +215,45 @@ def create_generation_logger(outdir, label):
 
 class NMMADataGenerationInput(bilby_pipe.input.Input):
     """
-    NMMADataGenerationInput class.
-    Inherits from bilby_pipe.input.Input.
-    Note that many of the args are not specified in the NMMA parsing,
-    but are required by bilby_pipe and are set as the default there.
+    Data-generation input object for an NMMA run.
+
+    Inherits from `bilby_pipe.input.Input`. Given parsed generation CLI
+    arguments, resolves cosmology, run/output naming, injection
+    parameters, and trigger time; assembles priors and per-messenger
+    data (GW waveform generator/interferometers, EOS constraints,
+    EM light-curve data and filter systematics) via
+    `adjust_priors_and_data`; test-builds the joint
+    `MultiMessengerLikelihood` against a prior sample to catch setup
+    errors early; and pickles the resulting data dump to disk via
+    `save_data_dump` for the analysis stage to consume.
+
+    Note that many args are not specified in the NMMA parsing but are
+    required by bilby_pipe and are set to their defaults there.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed generation CLI arguments.
+    unknown_args : list of str
+        CLI arguments not recognized by the generation parser, forwarded
+        to bilby_pipe.
+    logger : logging.Logger, optional
+        Logger used during setup and prior/data adjustment.
+
+    Attributes
+    ----------
+    messengers : list of str
+        Active messengers for this run (subset of ``gw``, ``eos``, ``em``).
+    analysis_modifiers : list of str
+        Active analysis modifiers (e.g. ``Hubble``, ``tabulated_eos``).
+    data_dump : dict
+        Assembled run configuration and data, pickled to `data_dump_file`.
+    lhood : MultiMessengerLikelihood
+        Joint likelihood built from `data_dump` and the adjusted priors.
     """
 
     ###FIXME get rid of compulsory GW structure
     def __init__(self, args, unknown_args, logger=None):
-
         # nmma-defaults that might conflict with bilby/bilby_pipe defaults
         gen_cosmo = set_cosmology(getattr(args, "cosmology", None))
         args.cosmology = gen_cosmo.name
@@ -287,10 +382,12 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 constraint = JointEoSConstraint(
                     eos_constraint_dict, eos_converter=eos_converter
                 )
-                args.eos_weight, args.eos_data, args.Neos = (
-                    constraint.tabulate_weighted_eos(
-                        args.Neos, args.outdir, args.eos_weight
-                    )
+                (
+                    args.eos_weight,
+                    args.eos_data,
+                    args.Neos,
+                ) = constraint.tabulate_weighted_eos(
+                    args.Neos, args.outdir, args.eos_weight
                 )
             priors = setup_tabulated_eos_priors(args, priors, logger)
 
@@ -383,7 +480,6 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         )
 
     def save_data_dump(self):
-
         with open(self.data_dump_file, "wb+") as file:
             pickle.dump(self.data_dump, file)
 
