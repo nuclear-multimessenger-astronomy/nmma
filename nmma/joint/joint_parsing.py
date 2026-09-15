@@ -6,6 +6,23 @@ from ..gw.gw_parsing import gw_injection_parsing
 
 def injection_parsing(parser):
 
+    """
+    Add the arguments for creating an NMMA injection file.
+
+    Composes the base and pipe injection parsers, the EOS, EM and GW
+    parsers and :func:`joint_likelihood_parsing`, then adds the
+    NMMA-specific options.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the arguments to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the injection arguments added.
+    """
     parser.description = (
         "Create a file of nmma-injections, processing a bilby injection if needed"
     )
@@ -115,6 +132,19 @@ def injection_parsing(parser):
 
 
 def joint_likelihood_parsing(parser):
+    """
+    Add the ``--ejecta-conversion`` flag.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Parser to add the argument to.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The same parser, with the argument added.
+    """
     parser.description = (
         "Set up a joint NMMA likelihood from provided messengers and analysis modifiers"
     )
