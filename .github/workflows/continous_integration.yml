@@ -43,14 +43,16 @@ jobs:
               capture_output=True,
               text=True,
           ).stdout.splitlines()
-          header = "# SPDX-License-Identifier: GPL-3.0-only"
+            header = (
+              "# SPDX-License-Identifier: GPL-3.0-only\n"
+              "# SPDX-FileCopyrightText: The NMMA Team"
+            )
             missing = []
             for file in files:
-              lines = Path(file).read_text(encoding="utf-8").splitlines()
-              if lines and lines[0] == header:
+              text = Path(file).read_text(encoding="utf-8")
+              if text.startswith(header):
                 continue
-              if lines:
-                missing.append(file)
+              missing.append(file)
           if missing:
               print("Missing SPDX license header:")
               print("\n".join(missing))
