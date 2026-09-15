@@ -1,5 +1,8 @@
+import astropy.units as u
+import astropy_healpix as ah
 import numpy as np
 import pandas as pd
+from ligo.skymap.io import read_sky_map
 from scipy.stats import norm, truncnorm
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
 from ..core.conversion import convert_mtot_mni, observation_angle_conversion
@@ -436,25 +439,35 @@ class MultiFilterTransient(BasicEMTransient):
 
 
 class MultiFilterNondetectionTransient:
-    """A collection of multi-filter non-detection (upper limit) data at many sky positions
+    """A collection of multi-filter non-detection (upper limit) data, indexed by
+    the HEALPix tile of a multi-order (MOC) skymap.
 
-    Loads a csv of pointings/non-detections, such as a GWTreasureMap-style survey
-    report, and groups the rows by sky position (ra, dec). Every row is by
-    definition a non-detection (a "depth", i.e. a limiting magnitude, rather than
-    a measurement), so for each position the per-filter observation times and
-    limiting magnitudes are stored in the standard nmma light curve dict format
+    Loads a multi-order skymap (a GW localization, e.g. a ``.multiorder.fits``
+    file) to get its HEALPix tessellation, and a csv of pointings/non-detections,
+    such as a GWTreasureMap-style survey report. Every csv row is assigned to the
+    skymap tile (identified by its UNIQ pixel id) that contains its (ra, dec), and
+    rows are then grouped by that pixel id rather than by raw sky position. Every
+    row is by definition a non-detection (a "depth", i.e. a limiting magnitude,
+    rather than a measurement), so for each pixel the per-filter observation times
+    and limiting magnitudes are stored in the standard nmma light curve dict format
     {filter: {"time": ..., "mag": ..., "mag_error": ...}}, with ``mag_error`` set to
     ``np.inf`` throughout - the same convention used to mark the ``infIdx``
     (non-detection) entries in `BasicEMTransient.chisquare_gaussianlog_from_lc_data`.
 
-    A stored position can be queried by (ra, dec) to retrieve its non-detection
-    data, or compared directly against a candidate light curve to compute the
-    associated upper-limit log-likelihood contribution.
+    A stored pixel can be queried by (ra, dec) to retrieve its non-detection data
+    (an empty dict if that pixel was not covered by any pointing in the csv), or
+    compared directly against a candidate light curve to compute the associated
+    upper-limit log-likelihood contribution.
 
     Parameters
     ----------
     filename: str
         Path to a csv file of non-detections/pointings.
+    skymap_filename: str
+        Path to a multi-order (MOC) skymap fits file, read with
+        `ligo.skymap.io.read_sky_map(..., moc=True)`. Its HEALPix tiles (one per
+        UNIQ value, each at its own resolution) define the pixelization that csv
+        rows and queried sky positions are both mapped onto.
     ra_column, dec_column: str (default: "ra", "dec")
         Names of the columns holding the sky position of each pointing.
     time_column: str (default: "t_from_T0")
@@ -469,6 +482,7 @@ class MultiFilterNondetectionTransient:
     def __init__(
         self,
         filename,
+        skymap_filename,
         ra_column="ra",
         dec_column="dec",
         time_column="t_from_T0",
@@ -476,11 +490,20 @@ class MultiFilterNondetectionTransient:
         depth_column="depth",
     ):
         self.filename = filename
+        self.skymap_filename = skymap_filename
         self.ra_column = ra_column
         self.dec_column = dec_column
         self.time_column = time_column
         self.filter_column = filter_column
         self.depth_column = depth_column
+
+        # Multi-order skymap tessellation: one HEALPix tile per UNIQ value, each at
+        # its own resolution (nside/level).
+        skymap = read_sky_map(skymap_filename, moc=True, distances=True)
+        self.uniq = np.asarray(skymap["UNIQ"])
+        level, ipix = ah.uniq_to_level_ipix(self.uniq)
+        self.tile_nside = ah.level_to_nside(level)
+        self.tile_ipix = ipix
 
         data = pd.read_csv(filename)
         required_columns = (
@@ -496,45 +519,60 @@ class MultiFilterNondetectionTransient:
 
         self.observed_filters = sorted(data[filter_column].unique().tolist())
 
+        pixel_ids = self._pixel_ids_for_positions(
+            data[ra_column].to_numpy(), data[dec_column].to_numpy()
+        )
+        data = data.assign(_pixel_id=pixel_ids)
+
         self.data = {}
-        for position, group in data.groupby([ra_column, dec_column], sort=False):
-            ra, dec = position
-            position_data = {}
+        for pixel_id, group in data.groupby("_pixel_id", sort=False):
+            pixel_data = {}
             for filt, sub_data in group.groupby(filter_column):
                 order = np.argsort(sub_data[time_column].to_numpy())
-                position_data[filt] = {
+                pixel_data[filt] = {
                     "time": sub_data[time_column].to_numpy()[order],
                     "mag": sub_data[depth_column].to_numpy()[order],
                     "mag_error": np.full(len(sub_data), np.inf),
                 }
-            self.data[(float(ra), float(dec))] = position_data
+            self.data[int(pixel_id)] = pixel_data
 
-        self.positions = list(self.data.keys())
-        self._positions_array = np.array(self.positions, dtype=float).reshape(-1, 2)
+        self.pixel_ids = sorted(self.data.keys())
 
     def __repr__(self):
         return (
-            f"{self.__class__.__name__} ({len(self.positions)} positions, "
+            f"{self.__class__.__name__} ({len(self.pixel_ids)} pixels, "
             f"filters={self.observed_filters})"
         )
 
-    # FIXME: this is where the bodies are buried for this function
-    def _resolve_position(self, ra, dec, position_tolerance: float=1e-3):
+    def _pixel_ids_for_positions(self, ra_deg, dec_deg):
+        """Find, for each (ra, dec) [deg], the UNIQ pixel id of the skymap tile
+        that contains it.
+
+        Every position is expected to fall in exactly one tile of the (full-sky)
+        skymap tessellation; a position outside the tessellation raises, since that
+        indicates a mismatched/invalid skymap rather than simply "not observed".
         """
-        Stupid function for now, but should be replaced with the pixel/MOC lookup idea. 
-        
-        position_tolerance is very loose for testing purposes
-        """
-        ra, dec = float(ra), float(dec)
-        diffs = np.abs(self._positions_array - np.array([ra, dec]))
-        matches = np.flatnonzero(np.all(diffs <= position_tolerance, axis=1))
-        if len(matches) == 0:
-            raise KeyError(
-                f"No non-detection data stored for position (ra={ra}, dec={dec})."
+        ra_deg = np.atleast_1d(np.asarray(ra_deg, dtype=float))
+        dec_deg = np.atleast_1d(np.asarray(dec_deg, dtype=float))
+
+        cand_ipix = ah.lonlat_to_healpix(
+            ra_deg[:, None] * u.deg,
+            dec_deg[:, None] * u.deg,
+            self.tile_nside[None, :],
+            order="nested",
+        )
+        matches = cand_ipix == self.tile_ipix[None, :]
+
+        uncovered = np.flatnonzero(~matches.any(axis=1))
+        if len(uncovered) > 0:
+            raise ValueError(
+                f"{len(uncovered)} sky position(s) not covered by skymap "
+                f"{self.skymap_filename}, e.g. (ra={ra_deg[uncovered[0]]}, "
+                f"dec={dec_deg[uncovered[0]]})."
             )
-        # if more than one stored position falls within tolerance, take the closest
-        idx = matches[np.argmin(diffs[matches].sum(axis=1))]
-        return self.positions[idx]
+
+        match_idx = matches.argmax(axis=1)  # first matching tile per position
+        return self.uniq[match_idx].astype(np.int64)
 
     def query(self, ra, dec):
         """Return the stored non-detection dataset for a sky position
@@ -542,19 +580,22 @@ class MultiFilterNondetectionTransient:
         Parameters
         ----------
         ra, dec: float
-            Sky position to query. Must match a stored position exactly.
+            Sky position to query (deg). Mapped onto the skymap tessellation to
+            find its pixel id.
 
         Returns
         -------
         dict
             {filter: {"time": array, "mag": array, "mag_error": array}}, the upper
             limits (magnitudes) and their observation times for each filter observed
-            at that position. ``mag_error`` is ``np.inf`` throughout, marking every
-            entry as a non-detection.
+            at that pixel. ``mag_error`` is ``np.inf`` throughout, marking every
+            entry as a non-detection. Empty if the pixel is not covered by any
+            pointing in the csv (i.e. not observed) - callers should treat this as
+            contributing zero to the log-likelihood.
 
         """
-        position = self._resolve_position(ra, dec)
-        return self.data[position]
+        (pixel_id,) = self._pixel_ids_for_positions(ra, dec)
+        return self.data.get(int(pixel_id), {})
 
     def log_likelihood_upper_limits(self, ra, dec, obs_times, model_lc, sigma):
         """Compute the non-detection (upper limit) log-likelihood contribution of a
