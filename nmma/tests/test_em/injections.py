@@ -1,29 +1,14 @@
-import shutil
 from argparse import Namespace
-from pathlib import Path
-
 import numpy as np
-import pytest
+import os
+import shutil
 
-from nmma.core.parsing import nmma_base_parsing
-from nmma.core.utils import read_injection_file
-from nmma.em import em_parsing
-from nmma.em import lightcurve_handling as lch
+from nmma.em import em_parsing, lightcurve_handling as lch
 from nmma.em.io import load_em_observations
-from nmma.em.model import single_model_from_mapping
+from nmma.em.model import get_lc_model_from_modelname
+from nmma.core.utils import read_injection_file
+from nmma.core.parsing import nmma_base_parsing
 from nmma.joint import injection_handling, joint_parsing
-
-DATADIR = Path(__file__).parent.parent / "data"
-BASEDIR = DATADIR.parent.parent.parent
-PRIORDIR = BASEDIR / "priors/"
-OUTDIR = DATADIR / "outdir"
-
-
-@pytest.fixture(autouse=True)
-def cleanup_outdir():
-    yield
-    if Path(OUTDIR).exists():
-        shutil.rmtree(OUTDIR, ignore_errors=True)
 
 
 def lightcurveInjectionTest(model_name):
@@ -35,6 +20,17 @@ def lightcurveInjectionTest(model_name):
     Name of model prior to test (e.g. 'nugent-hyper'). Must be included in ./priors/ directory
     """
     print("running lightcurve injection test for ", model_name)
+    print(
+        "current working directory: ", os.getcwd()
+    )  # assumes run in root nmma folder, will need to modify if this is not true
+    workingDir = os.path.dirname(__file__)
+    dataDir = os.path.join(workingDir, "data")
+    test_directory = os.path.join(dataDir, model_name)
+    priorDir = os.path.join(workingDir, "../../priors/")
+    svdmodels = os.path.join(workingDir, "../../svdmodels/")
+    if os.path.isdir(test_directory):
+        shutil.rmtree(test_directory, ignore_errors=True)
+    os.makedirs(test_directory, exist_ok=True)
 
     def create_injection_from_command_line(model_name):
         """
@@ -51,17 +47,19 @@ def lightcurveInjectionTest(model_name):
         """
 
         if model_name == "nugent-hyper":
-            prior_path = PRIORDIR / ("sncosmo-generic.prior")
+            prior_path = os.path.join(priorDir, "sncosmo-generic" + ".prior")
         elif model_name == "TrPi2018":
-            prior_path = DATADIR / ("TrPi2018_pinned_parameters.prior")
+            prior_path = os.path.join(
+                dataDir, "TrPi2018_pinned_parameters" + ".prior"
+            )  # pinning the parameter svalues in the prior file
         else:
-            prior_path = PRIORDIR / (model_name + ".prior")
-        assert prior_path.exists(), "prior file does not exist"
-        injection_name = OUTDIR / model_name / "injection.json"
+            prior_path = os.path.join(priorDir, model_name + ".prior")
+        assert os.path.exists(prior_path), "prior file does not exist"
+        injection_name = os.path.join(test_directory, model_name + "_injection.json")
 
         args = nmma_base_parsing(joint_parsing.injection_parsing, [])
         non_default_args = dict(
-            prior_file=str(prior_path),
+            prior_file=prior_path,
             simple_setup=True,
             injection_file=injection_name,
             post_processing=["ejecta"],
@@ -74,7 +72,7 @@ def lightcurveInjectionTest(model_name):
             setattr(args, key, value)
         injection_handling.generate_injection(args)
 
-        assert injection_name.exists(), "injection file does not exist"
+        assert os.path.exists(injection_name), "injection file does not exist"
         return injection_name
 
     def create_lightcurve_from_command_line(model_name, injection_file):
@@ -93,31 +91,34 @@ def lightcurveInjectionTest(model_name):
         path to the lightcurve file created by light_curve_generation
         """
         # prior_path = os.path.join("./priors/", model_name + ".prior")
-        output_directory = OUTDIR / model_name
+        output_directory = test_directory
         command_line_lightcurve_label = model_name + "_command_line"
 
-        args = em_parsing.nmma_base_parsing(em_parsing.lightcurve_parser, [])
+        args = em_parsing.parsing_and_logging(em_parsing.lightcurve_parser, [])
         non_default_args = dict(
-            injection_file=str(injection_file),
+            injection_file=injection_file,
             label=command_line_lightcurve_label,
             em_model=model_name,
-            svd_path=BASEDIR / "nmma_models" / "svdmodels",
+            svd_path=svdmodels,
+            em_tmin=0.01,
+            em_tmax=20.0,
+            em_tstep=0.5,
             filters="sdssu",
             outdir=output_directory,
-            interpolation_type="tensorflow",
+            interpolation_type="sklearn_gp",
             injection_error_budget=0.0,
             ignore_timeshift=True,
         )
         args.__dict__.update(non_default_args)
+
         lch.lcs_from_injection_parameters(args)
 
-        command_line_lightcurve_file = (
-            output_directory / f"{command_line_lightcurve_label}_0_lc.json"
+        command_line_lightcurve_file = os.path.join(
+            output_directory, f"{command_line_lightcurve_label}_0_lc.json"
         )
-
-        assert command_line_lightcurve_file.exists(), (
-            "command line lightcurve file does not exist"
-        )
+        assert os.path.exists(
+            command_line_lightcurve_file
+        ), "command line lightcurve file does not exist"
 
         return load_em_observations(command_line_lightcurve_file)
 
@@ -135,13 +136,17 @@ def lightcurveInjectionTest(model_name):
         - lightcurve_from_function: dictionary
         dictionary of lightcurve generated via functions
         """
-        assert injection_file.exists(), "injection file does not exist"
+        assert os.path.exists(injection_file), "injection file does not exist"
         injection_dict = read_injection_file(injection_file)
         lightcurve_parameters = {k: v[0] for k, v in injection_dict.items()}
-        init_kwargs = dict(model=model_name, filters=["sdssu"])
+        init_kwargs = dict(
+            model=model_name,
+            filters=["sdssu"],
+            sample_times=np.arange(0.01, 20.0 + 0.5, 0.5),
+        )
         if model_name == "Ka2017":
             init_kwargs["interpolation_type"] = "sklearn_gp"
-        model_class = single_model_from_mapping(model_name)
+        model_class = get_lc_model_from_modelname(model_name)
         lightcurve_model = model_class(**init_kwargs)
         lc_params = lightcurve_model.parameter_conversion(lightcurve_parameters)
         _, func_lc = lightcurve_model.gen_detector_lc(lc_params)
@@ -166,9 +171,9 @@ def lightcurveInjectionTest(model_name):
         filters_from_function = lightcurve_from_function.keys()
         filters_from_command_line = lightcurve_from_command_line.keys()
 
-        assert set(filters_from_function) == set(filters_from_command_line), (
-            "filters from function and command line do not match"
-        )
+        assert set(filters_from_function) == set(
+            filters_from_command_line
+        ), "filters from function and command line do not match"
         # goes filter by filter and checks that each array matches
         for filter_name in filters_from_function:
             cli_mags = lightcurve_from_command_line[filter_name]["mag"]
@@ -181,15 +186,31 @@ def lightcurveInjectionTest(model_name):
                 )
             ), f"lightcurve tolerance for {filter_name} exceeded"
 
-    injection_file = create_injection_from_command_line(model_name)
-    cl_lc_dict = create_lightcurve_from_command_line(model_name, injection_file)
-    func_lc_dict = create_lightcurve_from_function(model_name, injection_file)
+    def cleanup_files():
+        """
+        deletes test files directory
+        """
+        shutil.rmtree(test_directory, ignore_errors=True)
+        assert not os.path.exists(test_directory), "test directory has not been deleted"
 
-    compare_lightcurves(func_lc_dict, cl_lc_dict)
+    injection_file = create_injection_from_command_line(model_name)
+    command_line_lightcurve_dictionary = create_lightcurve_from_command_line(
+        model_name, injection_file
+    )
+    function_lightcurve_dictionary = create_lightcurve_from_function(
+        model_name, injection_file
+    )
+
+    compare_lightcurves(
+        function_lightcurve_dictionary, command_line_lightcurve_dictionary
+    )
+
+    # if all of the above works, then we don't need the files anymore
+    cleanup_files()
 
 
 def test_injections():
-    for model_name in ["salt2", "nugent-hyper", "Me2017", "Piro2021", "TrPi2018"]:
+    for model_name in ["nugent-hyper", "salt2", "Me2017", "Piro2021", "TrPi2018"]:
         lightcurveInjectionTest(model_name)
 
 
@@ -204,29 +225,29 @@ def test_validate_lightcurves():
         cutoff_time=0,
         verbose=True,
     )
-    assert lch.validate_lightcurve(**vars(args)), (
-        "Test for 3 observations in the ztf g filter failed"
-    )
+    assert lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for 3 observations in the ztf g filter failed"
 
     args.filters = ["ztfr"]
     args.min_obs = 1
-    assert lch.validate_lightcurve(**vars(args)), (
-        "Test for 1 observation in the ztf r filter failed"
-    )
+    assert lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for 1 observation in the ztf r filter failed"
 
     args.filters = ["ztfg", "ztfr"]
-    assert lch.validate_lightcurve(**vars(args)), (
-        "Test for  passing multiple filters failed"
-    )
+    assert lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for  passing multiple filters failed"
 
     args.filters = None
     args.min_obs = 0
-    assert lch.validate_lightcurve(**vars(args)), (
-        "Test for automatic filter selection failed"
-    )
+    assert lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for automatic filter selection failed"
 
     args.cutoff_time = 1
     args.min_obs = 1
-    assert not lch.validate_lightcurve(**vars(args)), (
-        "Test for setting cutoff time failed"
-    )
+    assert not lch.validate_lightcurve(
+        **vars(args)
+    ), "Test for setting cutoff time failed"

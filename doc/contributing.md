@@ -2,7 +2,15 @@
 
 ### License
 
-NMMA is released under the MIT license, which means that you are allowed to modify the code for your own purposes, as long as you retain our [copyright notice](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/master/LICENSE.txt).
+NMMA source code is licensed under GNU GPL version 3 only (`GPL-3.0-only`).
+See the repository [LICENSE](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/LICENSE)
+and [NOTICE](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/NOTICE).
+The NMMA name and logo are governed separately by the
+[trademark policy](https://github.com/nuclear-multimessenger-astronomy/nmma/blob/main/TRADEMARKS.md).
+
+Code contributions are accepted for inclusion under `GPL-3.0-only`.
+New source files that include an SPDX licence identifier must use
+`SPDX-License-Identifier: GPL-3.0-only`.
 
 However, we would love to grow the NMMA community, and integrate improvements directly into our [code repository on GitHub](https://github.com/nuclear-multimessenger-astronomy/nmma).
 
@@ -51,6 +59,19 @@ We don't like arguing about code style, and likely you don't
 either. Therefore, we use code formatters: black for Python.
 Code is an art, and opinions differ of what
 looks good: we choose to spend our time writing correct, elegant code.
+
+### Pre-commit hooks
+
+Install the development dependencies and enable the repository's Git hooks
+after cloning:
+
+```bash
+python -m pip install -e ".[dev]"
+pre-commit install
+```
+
+The hooks run automatically before each commit. To run them against the
+entire repository, use `pre-commit run --all-files`.
 
 ### Testing
 

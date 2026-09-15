@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "setuptools-scm"]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,21 +10,21 @@ authors = [
 description = "A nuclear physics multi-messenger Bayesian inference library"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
-license = {text = "GPLv3"}
+license = "GPL-3.0-only"
+license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md", "LICENSES/LicenseRef-NMMA-Logo.txt"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    'Programming Language :: Python :: 3.12',
-    'Programming Language :: Python :: 3.13',
-    'Intended Audience :: Science/Research',
-    'Intended Audience :: End Users/Desktop',
-    'Intended Audience :: Developers',
-    'Natural Language :: English',
-    'Topic :: Scientific/Engineering',
-    'Topic :: Scientific/Engineering :: Astronomy',
-    'Topic :: Scientific/Engineering :: Physics',
-    'Operating System :: POSIX',
-    'Operating System :: Unix',
-    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
 ]
 dynamic = ["version"]
 dependencies = [
@@ -51,14 +51,16 @@ dependencies = [
     "healpy",
     "scikit-learn",
     'tensorflow-cpu>=2.19; platform_system == "Linux"',
+    "python-ligo-lw",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "pre-commit",
     "pytest",
     "pytest-cov",
     "pytest-aiohttp",
-    "flake8",
+    "ruff",
     "sqlparse",
     "freezegun",
     "PyJWT",
@@ -84,11 +86,6 @@ grb = [
     "afterglowpy>=0.7.3",
     "wrapt_timeout_decorator",
 ]
-neuralnet = [
-    "torch",
-    "nflows",
-    "torchvision",
-]
 production = [
     "nestcheck",
     "mpi4py",
@@ -100,8 +97,9 @@ sampler = [
     "ultranest",
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "nmma.__version__"}
+[tool.setuptools_scm]
+# Version is derived from the latest git tag (e.g. v1.2.3 -> 1.2.3).
+# Untagged commits get a .devN+<hash> suffix. Nothing is stored in the tree.
 
 [project.scripts]
 nmma-generation = "nmma.joint.generation:nmma_generation"
@@ -164,25 +162,33 @@ exclude_lines = [
     "err =",
     "logger.error",
     "raise"
-    ]
+]
 ignore_errors = true
-
-[tool.isort]
-profile = "black"
 
 [tool.pytest.ini_options]
 addopts = "--verbose -r s"
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
 
-[tool.bumpver]
-current_version = "1.0.1"
-version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
-commit_message = "bump version {old_version} -> {new_version}"
-commit = true
-tag = true
-push = true
+[tool.ruff]
+target-version = "py312"
+line-length = 88
 
-[tool.bumpver.file_patterns]
-"pyproject.toml" = ['current_version = "{version}"']
-"nmma/__init__.py" = ['__version__ = "{version}"']
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501", 
+    "E722", # Bare Except
+    "E741", # Ambiguous variable name
+    "F841", # Local variable assigned but never used
+]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

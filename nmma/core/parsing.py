@@ -1,11 +1,12 @@
 import argparse
-import configargparse
-import yaml
+import operator
 import sys
 from pathlib import Path
-import operator
 
+import configargparse
+import yaml
 from bilby.core.utils import setup_logger
+
 from .gitlab import refresh_models_list
 
 
@@ -183,11 +184,14 @@ def base_analysis_parsing(parser):
         action="store_true",
         help="Whether to generate analytical check-point plots",
     )
+<<<<<<< HEAD
     parser.add_argument(
         "--allow-data-cuts",
         action="store_true",
         help="Allow automatic cutting of data to workflow needs (default: False)",
     )
+=======
+>>>>>>> dev
     return parser
 
 

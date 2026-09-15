@@ -1,9 +1,10 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
+
 import pytest
 
-from nmma.core.utils import read_injection_file
 from nmma.core.parsing import nmma_base_parsing
+from nmma.core.utils import read_injection_file
 from nmma.joint import injection_handling, joint_parsing
 
 nmma_dir = Path(__file__).parent.parent.parent.parent
@@ -104,7 +105,6 @@ def test_binary_type_filter_end_to_end(args):
     "prefer the already-sampled value" behaviour, it always overwrote).
     """
 
-
     # First rows of the real, tracked example file: a known, fixed mix of
     # one BNS-under-ALF2, one NSBH-under-ALF2 and one BBH-under-ALF2 event
     # (masses verified by hand against ALF2's ~2.0854 Msun TOV mass).
@@ -127,5 +127,5 @@ def test_binary_type_filter_end_to_end(args):
         injection_dict["radius_1"], injection_dict["radius_2"]
     ):
         assert radius_1 > 0 and radius_2 > 0, (
-            "every kept injection must have both components be a real NS " "under ALF2"
+            "every kept injection must have both components be a real NS under ALF2"
         )

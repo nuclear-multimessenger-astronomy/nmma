@@ -1,7 +1,6 @@
 import numpy as np
-from scipy.integrate import solve_ivp
 import scipy.constants
-
+from scipy.integrate import solve_ivp
 
 # unit conversion for pressure / energy_density
 particle_to_SI = scipy.constants.e * 1e51
