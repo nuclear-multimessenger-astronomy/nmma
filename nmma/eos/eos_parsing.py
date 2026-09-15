@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 from ..core.parsing import single_messenger_analysis_parsing, yaml_parse
 
 

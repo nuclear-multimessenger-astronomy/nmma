@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 """Tests for the SkyPortal/OSG bridge: argv assembly + happy/failure paths.
 
 The actual NMMA invocation is patched out — we only verify the bridge

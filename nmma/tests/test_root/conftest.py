@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 """Point sncosmo and dustmaps at the vendored nmma-data submodule.
 
 Avoids hitting the SVO / sncosmo CDN / Harvard dataverse during tests when

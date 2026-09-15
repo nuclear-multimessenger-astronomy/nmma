@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 from ..em.em_parsing import (
     basic_em_only_parsing,
     em_model_parsing,

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 ## file to store constants used throughout the code. We try to default to the standards in astropy.constants
 
 from astropy import constants as const

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 import numpy as np
 
 from nmma.em.lightcurve_generation import setup_HoNa_params, temp_photosphere_HoNa

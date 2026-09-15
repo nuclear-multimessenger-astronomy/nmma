@@ -31,6 +31,34 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Check SPDX license headers
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          files = subprocess.run(
+              ["git", "ls-files", "*.py"],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout.splitlines()
+          header = (
+              "# SPDX-License-Identifier: GPL-3.0-only\n"
+              "# SPDX-FileCopyrightText: The NMMA Team"
+          )
+          missing = []
+          for file in files:
+              text = Path(file).read_text(encoding="utf-8")
+              if text.startswith(header):
+                  continue
+              missing.append(file)
+          if missing:
+              print("Missing SPDX license header:")
+              print("\n".join(missing))
+              raise SystemExit(1)
+          PY
+
       - name: Set up Python with Conda ${{ matrix.python-version }}
         uses: conda-incubator/setup-miniconda@v3
         with:
