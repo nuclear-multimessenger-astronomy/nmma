@@ -1,17 +1,16 @@
 import copy
-from joblib import load
+from importlib import resources
 
 import numpy as np
 import pandas as pd
-from importlib import resources
-
 import scipy
+from joblib import load
 from scipy.integrate import quad, solve_ivp
-from scipy.special import erfc
 from scipy.interpolate import CubicSpline
+from scipy.special import erfc
 
-from . import utils
 from ..core.utils import read_trigger_time
+from . import utils
 
 try:
     import afterglowpy
@@ -31,8 +30,8 @@ except ImportError:
         return inner
 
 
-# some frequently used constants:
-from ..core.constants import msun_cgs, c_cgs, h, kb, sigSB, arad, D
+### some frequently used constants:
+from ..core.constants import D, arad, c_cgs, h, kb, msun_cgs, sigSB
 
 seconds_a_day = 86400.0
 abs_mag_dist_factor = D**2
@@ -1834,10 +1833,12 @@ def adjust_data_for_ztf(data, args, filters, rng, sample_times, trigger_time):
                     )  # estimate_mag_err maps filter numbers
 
                     df["mag_err"] = df.apply(
-                        lambda x: (ztfuncer["band"] == x["passband"])
-                        & (
-                            pd.arrays.IntervalArray(ztfuncer["interval"]).contains(
-                                x["mag"]
+                        lambda x: (
+                            (ztfuncer["band"] == x["passband"])
+                            & (
+                                pd.arrays.IntervalArray(ztfuncer["interval"]).contains(
+                                    x["mag"]
+                                )
                             )
                         ),
                         axis=1,

@@ -1,11 +1,12 @@
 import argparse
-import configargparse
-import yaml
+import operator
 import sys
 from pathlib import Path
-import operator
 
+import configargparse
+import yaml
 from bilby.core.utils import setup_logger
+
 from .gitlab import refresh_models_list
 
 
@@ -52,7 +53,7 @@ def parsing_and_logging(parser_func, args=None):
         setup_logger(outdir=args.outdir, label=args.label)
         Path(args.outdir).mkdir(parents=True, exist_ok=True)
         print("Setting up logger and storage directory")
-    except Exception as e:
+    except Exception:
         pass
     return args
 
@@ -412,17 +413,6 @@ def single_messenger_analysis_parsing(parser):
 
 
 def base_injection_parsing(parser):
-    """Add CLI args for injection-file generation: output file/format
-    and generation seed.
-
-    Parameters
-    ----------
-    parser: argparse.ArgumentParser
-
-    Returns
-    -------
-    argparse.ArgumentParser
-    """
     parser.add_argument(
         "-f",
         "--injection-file",

@@ -1,11 +1,12 @@
-from pathlib import Path
-import numpy as np
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
-from . import em_parsing as emp
+import numpy as np
+
 from ..core.parsing import nmma_base_parsing, slurm_analysis_parser
-from ..core.utils import read_injection_file, load_yaml
+from ..core.utils import load_yaml, read_injection_file
+from . import em_parsing as emp
 
 
 def lc_creation():

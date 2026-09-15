@@ -1,20 +1,20 @@
 import numpy as np
 import pandas as pd
-from scipy.special import erf
-from scipy.integrate import simpson
-from astropy import units
 from astropy import cosmology as cosmo
-from .constants import geom_msun_km, msun_to_ergs, msun_s, get_cosmology, set_cosmology
-
+from astropy import units
 from bilby.gw.conversion import (
+    chirp_mass_and_mass_ratio_to_total_mass,
     component_masses_to_chirp_mass,
     component_masses_to_symmetric_mass_ratio,
-    lambda_1_lambda_2_to_lambda_tilde,
     convert_to_lal_binary_black_hole_parameters,
     convert_to_lal_binary_neutron_star_parameters,
     generate_mass_parameters,
-    chirp_mass_and_mass_ratio_to_total_mass,
+    lambda_1_lambda_2_to_lambda_tilde,
 )
+from scipy.integrate import simpson
+from scipy.special import erf
+
+from .constants import geom_msun_km, get_cosmology, msun_s, msun_to_ergs, set_cosmology
 
 
 def val_to_scalar(val):

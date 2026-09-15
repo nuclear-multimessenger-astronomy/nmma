@@ -1,28 +1,17 @@
-"""Parameter inference on electromagnetic transients.
-
-This module assembles the data -> model -> prior -> likelihood chain and
-hands the sampling over to :func:`nmma.core.base.multi_analysis_loop`.
-
-It backs two commands: ``lightcurve-analysis`` for multi-band photometric
-fits (:func:`main`) and ``lightcurve-analysis-lbol`` for bolometric ones
-(:func:`lbol_main`).
-"""
-
-from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .lightcurve_handling import create_light_curve_data, adjust_injection_parameters
-from .em_likelihood import EMTransientLikelihood
-from .prior import create_prior_from_args
-from . import io, model, utils, systematics
-from .em_parsing import (
-    parsing_and_logging,
-    multi_wavelength_analysis_parser,
-    bolometric_parser,
-)
 from ..core.base import multi_analysis_loop
-from ..core.utils import injection_from_args, set_filename, read_trigger_time
+from ..core.utils import injection_from_args, read_trigger_time, set_filename
+from . import io, model, systematics, utils
+from .em_likelihood import EMTransientLikelihood
+from .em_parsing import (
+    bolometric_parser,
+    multi_wavelength_analysis_parser,
+    parsing_and_logging,
+)
+from .lightcurve_handling import adjust_injection_parameters, create_light_curve_data
+from .prior import create_prior_from_args
 
 
 def data_from_injection(args, filters):
@@ -318,165 +307,6 @@ def analysis_setup(args):
     return priors, likelihood, injection_parameters
 
 
-def nnanalysis(args):
-    """Infer kilonova parameters with a pre-trained normalizing flow.
-
-    A likelihood-free alternative to the sampler-based path: the photometry
-    is padded onto a fixed time grid, embedded, and passed to a frozen flow
-    that yields posterior samples directly. A corner plot is written to
-    ``args.outdir``.
-
-    Parameters
-    ----------
-    args: argparse.Namespace
-        Parsed command-line arguments. ``args.em_model`` must be ``Ka2017``.
-
-    Raises
-    ------
-    ValueError
-        If the injection parameters do not match those the flow was trained
-        on (``log10_mej``, ``log10_vej`` and ``log10_Xlan``).
-
-    Notes
-    -----
-    Filters are hard-coded to ``ztfg``, ``ztfr`` and ``ztfi``, and the time
-    grid to 121 points spaced by 0.25 day. The process exits if a model
-    other than ``Ka2017`` is requested.
-    """
-
-    # import functions
-    from ..mlmodel.dataprocessing import pad_the_data
-    from ..mlmodel.embedding import SimilarityEmbedding
-    from ..mlmodel.normalizingflows import normflow_params
-    from ..mlmodel.inference import cast_as_bilby_result
-    import torch
-    from nflows.flows import Flow
-
-    # only continue if the Kasen model is selected
-    if isinstance(args.em_model, str):
-        args.em_model = args.em_model.split(",")
-    if args.em_model[0] != "Ka2017":
-        print(
-            "WARNING: model selected is not currently compatible with this inference method"
-        )
-        exit()
-
-    # only can use ztfr, ztfg, and ztfi filters in the light curve data
-    print(
-        "Currently filters are hardcoded to ztfr, ztfi, and ztfg. Continuing with these filters."
-    )
-    filters = ["ztfg", "ztfi", "ztfr"]
-
-    # create the kilonova data if an injection set is given
-    if args.injection_file:
-        data, injection_parameters = data_from_injection(args, filters)
-    else:
-        # load the lightcurve data
-        data = io.load_em_observations(args)
-
-    detection_limit = utils.create_detection_limit(args, filters, 22.0)
-    data = inspect_detection_limit(detection_limit, data)
-    data = check_detections(data, args.remove_nondetections)
-    filters_to_analyze = set_analysis_filters(filters, data)
-    detection_limit = {filt: detection_limit[filt] for filt in filters_to_analyze}
-
-    model.create_light_curve_model_from_args(
-        args,
-        filters=filters_to_analyze,
-    )
-
-    # setup the prior
-    systematics_handler = systematics.FilterSystematicsHandler(
-        filters_to_analyze, args.systematics_file, error_budget=args.em_error_budget
-    )
-    priors = create_prior_from_args(args, systematics_handler)
-
-    # now that we have the kilonova light curve, we need to pad it with non-detections
-    # this part is currently hard coded in terms of the times !!!! likely will need the most work
-    # (so that the 'fixed' and 'shifted' are properly represented)
-    num_points = 121
-    num_channels = 3
-    time_step = 0.25
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using {device}")
-
-    # Convert data dict to DataFrame with time and filter columns
-    res = next(iter(data))
-    t_list = (data[res]["time"]).tolist()
-    data_df = pd.DataFrame({"t": t_list})
-    for key in data:
-        data_df[key] = data[key]["mag"]
-    column_list = data_df.columns.to_list()
-
-    # pad the data
-
-    padded_data_df = pad_the_data(
-        data_df,
-        column_list,
-        desired_count=num_points,
-        filler_time_step=time_step,
-        filler_data=detection_limit[
-            column_list[-1]
-        ],  # some value from the detection limit dict
-    )
-    # change the data into pytorch tensors
-    data_tensor = torch.tensor(
-        padded_data_df.iloc[:, 1:4].values.reshape(1, num_points, num_channels),
-        dtype=torch.float32,
-    ).transpose(1, 2)
-
-    # set up the embedding
-    similarity_embedding = SimilarityEmbedding(
-        num_dim=7,
-        num_hidden_layers_f=1,
-        num_hidden_layers_h=1,
-        num_blocks=4,
-        kernel_size=5,
-        num_dim_final=5,
-    ).to(device)
-    num_dim = 7
-    SAVEPATH = Path(__file__).parent.parent / "mlmodel/similarity_embedding_weights.pth"
-    similarity_embedding.load_state_dict(torch.load(SAVEPATH, map_location=device))
-    for name, param in similarity_embedding.named_parameters():
-        param.requires_grad = False
-
-    # set up the normalizing flows
-    transform, base_dist, embedding_net = normflow_params(
-        similarity_embedding, 9, 5, 90, context_features=num_dim, num_dim=num_dim
-    )
-    flow = Flow(transform, base_dist, embedding_net).to(device=device)
-    PATH_nflow = Path(__file__).parent.parent / "mlmodel/frozen-flow-weights.pth"
-    flow.load_state_dict(torch.load(PATH_nflow, map_location=device))
-
-    nsamples = 20000
-    with torch.no_grad():
-        samples = flow.sample(nsamples, context=data_tensor)
-        samples = samples.cpu().reshape(nsamples, 3)
-
-    try:
-        param_tensor = torch.tensor(
-            [
-                injection_parameters["log10_mej"],
-                injection_parameters["log10_vej"],
-                injection_parameters["log10_Xlan"],
-            ],
-            dtype=torch.float32,
-        )
-        with torch.no_grad():
-            truth = param_tensor
-    except NameError:
-        truth = None
-    except KeyError:
-        raise ValueError(
-            "The injection parameters provided do not match the parameters the flow has been trained on"
-        )
-
-    flow_result = cast_as_bilby_result(samples, truth, priors=priors)
-    flow_result.plot_corner(save=True, label=args.label, outdir=args.outdir)
-    print("saved posterior plot")
-
-
 def main(args=None):
     """Entry point of the ``lightcurve-analysis`` command.
 
@@ -502,10 +332,7 @@ def main(args=None):
     args = parsing_and_logging(multi_wavelength_analysis_parser, args)
     args.__dict__.update(non_default)
 
-    if args.sampler == "neuralnet":
-        nnanalysis(args)
-    else:
-        multi_analysis_loop(args, analysis_setup)
+    multi_analysis_loop(args, analysis_setup)
 
 
 def lbol_main(args=None):

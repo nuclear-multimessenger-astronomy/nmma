@@ -1,18 +1,19 @@
 import argparse
 
 import numpy as np
-from .utils import DEFAULT_FILTERS
+
 from ..core.gitlab import DEFAULT_MODELS_HOME
 
 # parsing_and_logging is re-exported: analysis, training and the lightcurve
 # handlers reach it through this module rather than through core.parsing.
-from ..core.parsing import (  # noqa: F401
-    parsing_and_logging,
-    nmma_base_parsing,
-    single_messenger_analysis_parsing,
+from ..core.parsing import (
     base_injection_parsing,
+    nmma_base_parsing,  # noqa: F401
+    parsing_and_logging,  # noqa: F401,
+    single_messenger_analysis_parsing,
     yaml_parse,
 )
+from .utils import DEFAULT_FILTERS
 
 
 def em_time_parsing(parser):

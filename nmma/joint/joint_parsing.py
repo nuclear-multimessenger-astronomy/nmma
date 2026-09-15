@@ -1,6 +1,6 @@
 from ..core.parsing import base_injection_parsing, pipe_inj_parsing
 from ..em.em_parsing import em_analysis_parsing
-from ..eos.eos_parsing import tabulated_eos_parsing, eos_parsing
+from ..eos.eos_parsing import eos_parsing, tabulated_eos_parsing
 from ..gw.gw_parsing import gw_injection_parsing
 
 

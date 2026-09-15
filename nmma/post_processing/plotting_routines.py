@@ -1,19 +1,20 @@
+from ast import literal_eval
+
+import bilby
 import corner
 import numpy as np
 import pandas as pd
-from matplotlib.ticker import MaxNLocator
 import seaborn
 from matplotlib import pyplot as plt
-from ast import literal_eval
-import bilby
+from matplotlib.ticker import MaxNLocator
 
+from ..core import parsing, utils
+from ..core import plotting_utils as corepu
 from ..core.conversion import (
     chirp_mass_and_eta_to_component_masses,
-    tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities,
     label_mapping,
+    tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities,
 )
-from ..core import utils, parsing
-from ..core import plotting_utils as corepu
 from .parser import corner_plot_parser
 
 nmma_colors = corepu.fig_setup()

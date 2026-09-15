@@ -1,8 +1,8 @@
 ## file to store constants used throughout the code. We try to default to the standards in astropy.constants
 
 from astropy import constants as const
-from astropy import units as u
 from astropy import cosmology
+from astropy import units as u
 from bilby.gw import cosmology as bilby_cosmo
 
 # helpers

@@ -1,13 +1,12 @@
 import numpy as np
 import pandas as pd
 import scipy.stats
-
 from tqdm import tqdm
 
-from ..core.utils import read_injection_file
 from ..core.constants import c_kms
 from ..core.conversion import reweight_to_flat_mass_prior
 from ..core.parsing import nmma_base_parsing
+from ..core.utils import read_injection_file
 from .parser import Hubble_parser
 from .resampling import find_spread_from_resampling
 

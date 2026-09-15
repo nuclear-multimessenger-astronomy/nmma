@@ -1,11 +1,12 @@
-import os
 import copy
 import glob
-import numpy as np
-import pytest
+import os
 import shutil
 
-from nmma.em import training, model_parameters, io
+import numpy as np
+import pytest
+
+from nmma.em import io, model_parameters, training
 
 # Bu2019lm_sparse is an SVD model trained from scratch by this test. Replaced
 # by externally-trained fiesta surrogates fetched from HuggingFace; this in-CI

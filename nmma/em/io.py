@@ -1,13 +1,14 @@
+import argparse
 import json
 from pathlib import Path
-import argparse
-from astropy.table import Table
-from astropy.time import Time
+
 import h5py
 import numpy as np
 import pandas as pd
-from bilby.core.utils import decode_bilby_json
 import scipy.signal
+from astropy.table import Table
+from astropy.time import Time
+from bilby.core.utils import decode_bilby_json
 
 from ..core.utils import NumpyEncoder
 

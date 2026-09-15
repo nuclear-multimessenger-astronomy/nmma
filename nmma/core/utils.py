@@ -1,18 +1,18 @@
-import os
 import json
+import logging
+import os
+from argparse import Namespace
+from pathlib import Path
+
 import h5py
 import numpy as np
 import pandas as pd
-from argparse import Namespace
-from bilby.core.utils import decode_bilby_json, random as bilby_random
-from bilby.core.result import read_in_result
-from bilby.core.prior import PriorDict
-from astropy import time
-
-from pathlib import Path
 import yaml
-
-import logging
+from astropy import time
+from bilby.core.prior import PriorDict
+from bilby.core.result import read_in_result
+from bilby.core.utils import decode_bilby_json
+from bilby.core.utils import random as bilby_random
 
 logger = logging.getLogger("nmma")
 
@@ -175,7 +175,7 @@ def get_posteriors(posterior_samples, outdir=None):
         return result.posterior
 
     elif suffix in [".csv", ".txt", ".dat"]:
-        posterior_samples = pd.read_csv(posterior_samples, sep="\s+", header=0)
+        posterior_samples = pd.read_csv(posterior_samples, sep=r"\s+", header=0)
     elif suffix == ".json":
         with open(posterior_samples, "r") as f:
             samples_dict = json.load(f, object_hook=decode_bilby_json)

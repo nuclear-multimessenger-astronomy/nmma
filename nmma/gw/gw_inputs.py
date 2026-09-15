@@ -30,6 +30,8 @@ class NMMAGravitationalWaveInput(DataInput):
 
         args.gw_likelihood_type = self.likelihood_type
 
+    "Quick wrapper to fix some issues with the bilby_pipe data generation"
+
     @DataInput.interferometers.setter
     def interferometers(self, interferometers):
         """Set interferometers, restricting frequency dicts to active detectors.

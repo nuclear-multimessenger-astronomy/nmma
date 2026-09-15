@@ -1,16 +1,16 @@
-import numpy as np
 from ast import literal_eval
+
+import numpy as np
 from bilby.gw.likelihood import (
     GravitationalWaveTransient,
-    ROQGravitationalWaveTransient,
-    RelativeBinningGravitationalWaveTransient,
     MBGravitationalWaveTransient,
+    RelativeBinningGravitationalWaveTransient,
+    ROQGravitationalWaveTransient,
 )
-from bilby.gw.source import binary_neutron_star_frequency_sequence
+
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
+from ..core.conversion import bbh_source_frame, bns_source_frame
 from ..core.conversion import (
-    bbh_source_frame,
-    bns_source_frame,
     tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion,
 )
 
@@ -265,6 +265,14 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
             gw_transient = GravitationalWaveTransient(**gw_likelihood_kwargs)
 
         elif gw_likelihood_type == "ROQGravitationalWaveTransient":
+            """Additional params:
+            roq_params: str, array_like
+                Parameters describing the domain of validity of the ROQ basis.
+            roq_params_check: bool
+                If true, run tests using the roq_params to check the prior and data are
+                valid for the ROQ
+            roq_scale_factor: float
+                The ROQ scale factor used."""
             gw_transient = ROQGravitationalWaveTransient(**gw_likelihood_kwargs)
 
         elif gw_likelihood_type == "RelativeBinningGravitationalWaveTransient":

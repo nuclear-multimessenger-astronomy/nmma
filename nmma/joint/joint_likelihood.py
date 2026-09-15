@@ -3,13 +3,13 @@ from bilby.core.likelihood import JointLikelihood
 
 from ..core.base import NMMALikelihood, NMMALikelihoodMixin
 from ..core.conversion import MultimessengerConversion
-from ..gw.gw_likelihood import GravitationalWaveTransientLikelihood, setup_gw_kwargs
+from ..em.em_likelihood import EMTransientLikelihood, setup_em_kwargs
 from ..eos.eos_likelihood import (
+    EoSConverter,
     EquationofStateLikelihood,
     setup_eos_kwargs,
-    EoSConverter,
 )
-from ..em.em_likelihood import EMTransientLikelihood, setup_em_kwargs
+from ..gw.gw_likelihood import GravitationalWaveTransientLikelihood, setup_gw_kwargs
 from ..population.pop_likelihood import NeutronStarPopulation
 
 
@@ -256,7 +256,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin, JointLikelihood):
             logger.info("Using universal relations for tidal deformabilities")
             conversion_instructions["eos"] = EoSConverter(args, "qur")
 
-        if "eos" in conversion_instructions and not "gw" in conversion_instructions:
+        if "eos" in conversion_instructions and "gw" not in conversion_instructions:
             eos_converter = conversion_instructions["eos"]
             eos_converter.parameter_conversion = eos_converter.compute_macro_parameters
             conversion_instructions["eos"] = eos_converter

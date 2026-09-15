@@ -1,8 +1,10 @@
-from ast import literal_eval
 import inspect
+import warnings
+from ast import literal_eval
+
 import numpy as np
 from bilby.core import prior as bprior
-import warnings
+
 from ..core.utils import load_yaml
 from .utils import autocomplete_data, set_filter_associated_dict
 
@@ -674,7 +676,7 @@ class FilterSystematicsHandler(SystematicsHandler):
                 systematics_filters[filter_group] = filter_group
                 self.missing_filters.remove(filter_group)
 
-        # By this procedure, every filter should immediately be assigned to a systematics filter-group that we can use to calculate the systematics error
+        ## By this procedure, every filter should immediately be assigned to a systematics filter-group that we can use to calculate the systematics error
         time_nodes = np.round(
             np.linspace(*self.time_range, time_dep_sys_dict["time_nodes"]), decimals=2
         )

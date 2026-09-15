@@ -1,28 +1,29 @@
 import os
-from pathlib import Path
-import sys
-import traceback
-from io import BufferedWriter
-from copy import deepcopy
 import pickle
 import signal
-from functools import wraps
-from time import time
+import sys
+import traceback
+from copy import deepcopy
 from datetime import timedelta
-from matplotlib import pyplot as plt
+from functools import wraps
+from io import BufferedWriter
+from pathlib import Path
+from time import time
+
+import dynesty
 import numpy as np
+from bilby.core.sampler import base_sampler as bs
+from bilby.core.sampler import dynesty3_utils as dy_utils
+from bilby.core.sampler.dynesty import dynesty_stats_plot
+from dynesty.plotting import runplot, traceplot
+from matplotlib import pyplot as plt
+from numpy.random import PCG64, Generator, SeedSequence
 from pandas import DataFrame
-from numpy.random import Generator, PCG64, SeedSequence
 from schwimmbad import MPIPool, MultiPool
 
-from bilby.core.sampler import base_sampler as bs, dynesty3_utils as dy_utils
-from bilby.core.sampler.dynesty import dynesty_stats_plot
-import dynesty
-from dynesty.plotting import traceplot, runplot
-
 from .conversion import label_mapping
-from .utils import rejection_sample, read_bestfit_from_posterior, logger
 from .parsing import process_sampler_kwargs
+from .utils import logger, read_bestfit_from_posterior, rejection_sample
 
 
 def time_storage(func):

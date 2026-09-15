@@ -1,28 +1,29 @@
 import inspect
 import os
-import h5py
 from ast import literal_eval
-import numpy as np
-import pandas as pd
 from copy import deepcopy
 from itertools import product
 
+import h5py
+import numpy as np
+import pandas as pd
 from bilby import run_sampler
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import (
-    Prior,
+    ConditionalPriorDict,
     Constraint,
     Interped,
-    ConditionalPriorDict,
-    PriorDict,
-    MultivariateGaussianDist,
     MultivariateGaussian,
+    MultivariateGaussianDist,
+    Prior,
+    PriorDict,
 )
 from bilby.core.result import FileMovedError
-from .utils import input_obj_to_str, read_bestfit_from_posterior
+
 from .constants import set_cosmology
 from .conversion import cosmology_to_distance
-from .parsing import single_messenger_analysis_parsing, nmma_base_parsing
+from .parsing import nmma_base_parsing, single_messenger_analysis_parsing
+from .utils import input_obj_to_str, read_bestfit_from_posterior
 
 
 def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes=[]):

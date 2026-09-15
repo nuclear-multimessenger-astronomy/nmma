@@ -1,11 +1,10 @@
-import numpy as np
-from scipy.interpolate import CubicSpline, UnivariateSpline, interp1d
-from scipy.integrate import solve_ivp, cumulative_trapezoid
-from scipy.optimize import minimize_scalar
-from .tov import TOVSolver
 import lal
+import numpy as np
+from scipy.integrate import cumulative_trapezoid, solve_ivp
+from scipy.interpolate import CubicSpline, UnivariateSpline, interp1d
+from scipy.optimize import minimize_scalar
 
-# CHECK ME: Can this be removed? It is not used anywhere in the code.
+from .tov import TOVSolver
 
 
 ### Test routine for EOS generation, to be replaced

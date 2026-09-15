@@ -14,17 +14,17 @@ license = "GPL-3.0-only"
 license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md", "LICENSES/LicenseRef-NMMA-Logo.txt"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    'Programming Language :: Python :: 3.12',
-    'Programming Language :: Python :: 3.13',
-    'Intended Audience :: Science/Research',
-    'Intended Audience :: End Users/Desktop',
-    'Intended Audience :: Developers',
-    'Natural Language :: English',
-    'Topic :: Scientific/Engineering',
-    'Topic :: Scientific/Engineering :: Astronomy',
-    'Topic :: Scientific/Engineering :: Physics',
-    'Operating System :: POSIX',
-    'Operating System :: Unix',
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
 ]
 dynamic = ["version"]
 dependencies = [
@@ -51,14 +51,16 @@ dependencies = [
     "healpy",
     "scikit-learn",
     'tensorflow-cpu>=2.19; platform_system == "Linux"',
+    "python-ligo-lw",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "pre-commit",
     "pytest",
     "pytest-cov",
     "pytest-aiohttp",
-    "flake8",
+    "ruff",
     "sqlparse",
     "freezegun",
     "PyJWT",
@@ -83,11 +85,6 @@ doc = [
 grb = [
     "afterglowpy>=0.7.3",
     "wrapt_timeout_decorator",
-]
-neuralnet = [
-    "torch",
-    "nflows",
-    "torchvision",
 ]
 production = [
     "nestcheck",
@@ -165,13 +162,33 @@ exclude_lines = [
     "err =",
     "logger.error",
     "raise"
-    ]
+]
 ignore_errors = true
-
-[tool.isort]
-profile = "black"
 
 [tool.pytest.ini_options]
 addopts = "--verbose -r s"
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",
+    "E722", # Bare Except
+    "E741", # Ambiguous variable name
+    "F841", # Local variable assigned but never used
+]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

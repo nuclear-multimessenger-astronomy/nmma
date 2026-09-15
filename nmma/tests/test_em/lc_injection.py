@@ -1,14 +1,16 @@
-from argparse import Namespace
-import numpy as np
-from pathlib import Path
 import shutil
+from argparse import Namespace
+from pathlib import Path
+
+import numpy as np
 import pytest
 
-from nmma.em import em_parsing, lightcurve_handling as lch
+from nmma.core.parsing import nmma_base_parsing
+from nmma.core.utils import read_injection_file
+from nmma.em import em_parsing
+from nmma.em import lightcurve_handling as lch
 from nmma.em.io import load_em_observations
 from nmma.em.model import single_model_from_mapping
-from nmma.core.utils import read_injection_file
-from nmma.core.parsing import nmma_base_parsing
 from nmma.joint import injection_handling, joint_parsing
 
 DATADIR = Path(__file__).parent.parent / "data"

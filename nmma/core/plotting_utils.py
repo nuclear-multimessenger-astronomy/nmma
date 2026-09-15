@@ -1,10 +1,11 @@
-from bilby.core.prior import PriorDict, DeltaFunction
-import numpy as np
-import matplotlib
-from matplotlib.colors import LinearSegmentedColormap
-import os
-from matplotlib import pyplot as plt
 import itertools
+import os
+
+import matplotlib
+import numpy as np
+from bilby.core.prior import DeltaFunction, PriorDict
+from matplotlib import pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
 if os.environ.get("CI") == "true":
     matplotlib.rcParams["text.usetex"] = False

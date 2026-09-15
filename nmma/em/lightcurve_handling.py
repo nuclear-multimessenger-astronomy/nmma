@@ -1,23 +1,23 @@
-from pathlib import Path
-import shutil
 import json
-import numpy as np
+import shutil
+from pathlib import Path
+
 import h5py
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-
+import numpy as np
 import sncosmo
 from astropy import units as u
 from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
+from tqdm import tqdm
 
-from .lightcurve_generation import create_light_curve_data
-from . import io, model, utils, em_parsing as emp
-from .plotting_utils import lc_plot_with_histogram, basic_em_analysis_plot
-
-from ..core.constants import get_cosmology, D, c_cgs
 from ..core import conversion as conv
-from ..core.utils import read_injection_file, set_filename, read_trigger_time
+from ..core.constants import D, c_cgs, get_cosmology
+from ..core.utils import read_injection_file, read_trigger_time, set_filename
+from . import em_parsing as emp
+from . import io, model, utils
+from .lightcurve_generation import create_light_curve_data
+from .plotting_utils import basic_em_analysis_plot, lc_plot_with_histogram
 
 
 def post_process_bestfit(transient, bestfit_params, args, result=None):

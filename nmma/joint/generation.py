@@ -6,43 +6,40 @@ output files, logs and plots. It will also generate a `data_dump` that stores
 information on the run settings and data to be analysed.
 """
 
-from pathlib import Path
-import sys
 import pickle
+import sys
+from pathlib import Path
 
 import bilby
 import bilby_pipe
 import bilby_pipe.data_generation
 import dynesty
 import lalsimulation
+import matplotlib  ### FIXME: better to handle on a general level, jointly with fiesta
 import numpy as np
 
-
-from .multi_parsing import parse_generation_args
+from .. import __version__
+from ..core.base import adjust_hubble_prior, adjust_priors_for_nmma
 from ..core.constants import set_cosmology
 from ..core.conversion import KilonovaEjectaFitting
-from ..core.base import adjust_priors_for_nmma, adjust_hubble_prior
 from ..core.utils import read_trigger_time
-from ..gw.gw_inputs import NMMAGravitationalWaveInput
-from ..em.prior import extinction_prior
-from ..em.io import load_em_observations
-from ..em.model import create_injection_model
-from ..em.lightcurve_generation import create_light_curve_data
-from ..em.systematics import FilterSystematicsHandler
 from ..em import utils as em_utils
+from ..em.io import load_em_observations
+from ..em.lightcurve_generation import create_light_curve_data
+from ..em.model import create_injection_model
+from ..em.prior import extinction_prior
+from ..em.systematics import FilterSystematicsHandler
 from ..eos.eos_likelihood import (
-    compose_eos_constraints,
     EoSConverter,
     JointEoSConstraint,
+    compose_eos_constraints,
     setup_tabulated_eos_priors,
 )
+from ..gw.gw_inputs import NMMAGravitationalWaveInput
 from .joint_likelihood import MultiMessengerLikelihood
-
-import matplotlib  ### FIXME: better to handle on a general level, jointly with fiesta
+from .multi_parsing import parse_generation_args
 
 matplotlib.rcParams["text.usetex"] = False
-
-from .. import __version__
 
 
 def get_version_info():
@@ -385,10 +382,12 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 constraint = JointEoSConstraint(
                     eos_constraint_dict, eos_converter=eos_converter
                 )
-                args.eos_weight, args.eos_data, args.Neos = (
-                    constraint.tabulate_weighted_eos(
-                        args.Neos, args.outdir, args.eos_weight
-                    )
+                (
+                    args.eos_weight,
+                    args.eos_data,
+                    args.Neos,
+                ) = constraint.tabulate_weighted_eos(
+                    args.Neos, args.outdir, args.eos_weight
                 )
             priors = setup_tabulated_eos_priors(args, priors, logger)
 
@@ -532,7 +531,7 @@ def generate_runner(cli_args=[""], **kwargs):
 
     write_complete_config_file(parser=generation_parser, args=args, inputs=inputs)
     logger.info(f"Complete ini written: {inputs.complete_ini_file}")
-    logger.info(f"Setup complete")
+    logger.info("Setup complete")
 
     return inputs, logger
 

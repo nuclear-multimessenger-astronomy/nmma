@@ -1,22 +1,29 @@
+import shutil
 from argparse import Namespace
 from pathlib import Path
-import pytest
-import numpy as np
-import shutil
 
-from nmma.em import (
-    em_parsing as emp,
-    lightcurve_handling as lch,
-    model,
-    analysis as ema,
-)
-from nmma.eos.eos_parsing import tabulated_eos_parsing
-from nmma.eos.eos_likelihood import tabulated_eos_setup
+import numpy as np
+import pytest
+
+from nmma.core import utils
 from nmma.core.base import multi_analysis_loop
 from nmma.core.parsing import parsing_and_logging
-from nmma.joint.joint_likelihood import MultiMessengerLikelihood
-from nmma.core import utils
+from nmma.em import (
+    analysis as ema,
+)
+from nmma.em import (
+    em_parsing as emp,
+)
+from nmma.em import (
+    lightcurve_handling as lch,
+)
+from nmma.em import (
+    model,
+)
+from nmma.eos.eos_likelihood import tabulated_eos_setup
+from nmma.eos.eos_parsing import tabulated_eos_parsing
 from nmma.joint import generation
+from nmma.joint.joint_likelihood import MultiMessengerLikelihood
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 

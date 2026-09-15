@@ -1,20 +1,21 @@
-from argparse import Namespace
-from pathlib import Path
-import shutil
 import json
+import shutil
+from argparse import Namespace
 from ast import literal_eval
+from pathlib import Path
+
 import matplotlib
-from tqdm.contrib.concurrent import process_map
 import numpy as np
+from bilby.core.prior import PriorDict, WeightedCategorical
+from scipy.ndimage import gaussian_filter
 from scipy.special import logsumexp
 from scipy.stats import norm
-from scipy.ndimage import gaussian_filter
-from matplotlib import pyplot as plt
-from bilby.core.prior import WeightedCategorical, PriorDict
-from .eos_processing import EoSConverter
+from tqdm.contrib.concurrent import process_map
+
 from ..core.base import NMMALikelihood
+from ..core.plotting_utils import fading_cmap, fig_setup, setup_multi_axes
 from ..core.utils import nan_level
-from ..core.plotting_utils import fading_cmap, setup_multi_axes, fig_setup
+from .eos_processing import EoSConverter
 
 nmma_colors = fig_setup()
 

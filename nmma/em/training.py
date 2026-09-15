@@ -1,27 +1,27 @@
-import json
-from pathlib import Path
 import copy
 import inspect
-from glob import glob
-from tqdm.contrib.concurrent import process_map
-import joblib
+import json
 import warnings
+from glob import glob
+from pathlib import Path
+
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm.contrib.concurrent import process_map
 
-from .utils import autocomplete_data, interpolate_nans, setup_sample_times
-from ..core.gitlab import get_models_home, get_model
-
-
-from . import model_parameters, plotting_utils as pu
-from .model import SVDLightCurveModel
-from .io import read_training_data
+from ..core.gitlab import get_model, get_models_home
+from . import model_parameters
+from . import plotting_utils as pu
 from .em_parsing import (
-    parsing_and_logging,
-    svd_training_parser,
-    svd_model_benchmark_parser,
     benchmark_plots_parser,
+    parsing_and_logging,
+    svd_model_benchmark_parser,
+    svd_training_parser,
 )
+from .io import read_training_data
+from .model import SVDLightCurveModel
+from .utils import autocomplete_data, interpolate_nans, setup_sample_times
 
 try:
     import keras as k

@@ -1,26 +1,27 @@
+from ast import literal_eval
 from copy import copy
+from pathlib import Path
+
 import joblib
 import numpy as np
-from scipy.special import logsumexp
-from astropy import units as u
 import sncosmo
-from sncosmo.models import _SOURCES
-from ast import literal_eval
+from astropy import units as u
 from bilby.gw.cosmology import get_cosmology
 from fiesta.inference.lightcurve_model import FluxModel
-from . import utils
-from . import lightcurve_generation as lc_gen
+from scipy.special import logsumexp
+from sncosmo.models import _SOURCES
 
 from ..core.base import initialisation_args_from_signature_and_namespace
 from ..core.constants import c_SI
 from ..core.conversion import (
-    observation_angle_conversion,
-    get_redshift,
     distance_modulus_nmma,
     get_cosmo_grids,
+    get_redshift,
+    observation_angle_conversion,
 )
-from ..core.gitlab import get_models_home, get_model
-from pathlib import Path
+from ..core.gitlab import get_model, get_models_home
+from . import lightcurve_generation as lc_gen
+from . import utils
 
 ln10 = np.log(10)
 

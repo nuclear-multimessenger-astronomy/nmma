@@ -1,4 +1,5 @@
 import numpy as np
+
 from nmma.core.conversion import BNSEjectaFitting, KilonovaEjectaFitting
 
 

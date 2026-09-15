@@ -2,14 +2,15 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 
 try:
-    from yaml import CLoader as Loader, load
+    from yaml import CLoader as Loader
+    from yaml import load
 except ImportError:
     from yaml import Loader, load
 import argparse
-import shutil
 import os
-from pathlib import Path
+import shutil
 import subprocess
+from pathlib import Path
 
 import requests
 from tqdm.auto import tqdm

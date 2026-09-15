@@ -1,17 +1,17 @@
 import argparse
+
 import bilby
 from bilby_pipe import parser as bp_parser
 
 from nmma.core.parsing import (
     base_analysis_parsing,
-    dynesty_parsing,
     check_for_config,
+    dynesty_parsing,
 )
-from nmma.joint.joint_parsing import joint_likelihood_parsing
 from nmma.em.em_parsing import em_analysis_parsing
 from nmma.eos.eos_parsing import eos_parsing, tabulated_eos_parsing
 from nmma.gw.gw_parsing import gw_parsing
-
+from nmma.joint.joint_parsing import joint_likelihood_parsing
 
 from .. import __version__  # noqa: E402
 

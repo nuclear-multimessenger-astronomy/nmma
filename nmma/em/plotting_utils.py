@@ -1,10 +1,11 @@
-import matplotlib.pyplot as plt
+from itertools import cycle
+from pathlib import Path
+
 import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.ticker import NullFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from itertools import cycle
-import numpy as np
-from pathlib import Path
 
 from nmma.core.plotting_utils import fig_setup
 

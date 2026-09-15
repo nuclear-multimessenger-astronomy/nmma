@@ -1,26 +1,27 @@
+from pathlib import Path
+
+import bilby
 import numpy as np
 import pandas as pd
-from pathlib import Path
-import bilby
 from bilby_pipe.create_injections import InjectionCreator
 
-
-from ..core.parsing import (
-    parsing_and_logging,
-    slurm_setup_parser,
-    nmma_base_parsing,
-    process_multi_condition_string,
-)
-from ..core.constants import set_cosmology, get_cosmology
-from ..core.utils import set_filename, rejection_sample, read_injection_file
+from ..core.constants import get_cosmology, set_cosmology
 from ..core.conversion import (
-    MultimessengerConversion,
-    KilonovaEjectaFitting,
     BNSEjectaFitting,
+    KilonovaEjectaFitting,
+    MultimessengerConversion,
     NSBHEjectaFitting,
     bbh_source_frame,
 )
-from ..em import utils, lightcurve_handling as lch
+from ..core.parsing import (
+    nmma_base_parsing,
+    parsing_and_logging,
+    process_multi_condition_string,
+    slurm_setup_parser,
+)
+from ..core.utils import read_injection_file, rejection_sample, set_filename
+from ..em import lightcurve_handling as lch
+from ..em import utils
 from ..em.model import create_injection_model
 from ..eos.eos_processing import EoSConverter
 from .joint_parsing import injection_parsing
@@ -874,11 +875,11 @@ class NMMAInjectionCreator(InjectionCreator):
         """
 
         # legacy imports
+        from astropy.table import Table as AstroTable
+        from gwpy.table import Table
         from lalsimulation import (
             SimInspiralTransformPrecessingWvf2PE as lalsim_conversion,
         )
-        from gwpy.table import Table
-        from astropy.table import Table as AstroTable
 
         try:
             import ligo.lw  # noqa F401

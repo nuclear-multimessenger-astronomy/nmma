@@ -3,8 +3,8 @@ import os
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
-from pathlib import Path
 import pickle
+from pathlib import Path
 
 try:
     from mpi4py import MPI
@@ -19,11 +19,12 @@ if rank != 0:
     os.dup2(devnull, 2)
 
 from bilby.core.prior import PriorDict
-from ..core.mpi_setup import pbilby_sampling
+
 from ..core.base import bilby_sampling
-from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args
-from .joint_likelihood import MultiMessengerLikelihood
+from ..core.mpi_setup import pbilby_sampling
 from ..core.utils import logger
+from .joint_likelihood import MultiMessengerLikelihood
+from .multi_parsing import create_nmma_analysis_parser, parse_analysis_args
 
 
 def analysis_runner(

@@ -1,9 +1,10 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
+
 import pytest
 
-from nmma.core.utils import read_injection_file
 from nmma.core.parsing import nmma_base_parsing
+from nmma.core.utils import read_injection_file
 from nmma.joint import injection_handling, joint_parsing
 
 nmma_dir = Path(__file__).parent.parent.parent.parent

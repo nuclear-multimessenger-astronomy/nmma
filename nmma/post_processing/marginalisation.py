@@ -1,17 +1,16 @@
 from pathlib import Path
-import numpy as np
+
 import h5py
 import matplotlib.pyplot as plt
-
-
-from ..eos.eos_processing import load_tabulated_macro_eos_set_to_dict, EoSConverter
-
-from ..em.lightcurve_generation import create_light_curve_data
-from ..em import io, model, utils, em_parsing as emp
-from ..em.plotting_utils import lc_plot_with_histogram
+import numpy as np
 
 from ..core import conversion as conv
 from ..core.utils import read_trigger_time
+from ..em import em_parsing as emp
+from ..em import io, model, utils
+from ..em.lightcurve_generation import create_light_curve_data
+from ..em.plotting_utils import lc_plot_with_histogram
+from ..eos.eos_processing import EoSConverter, load_tabulated_macro_eos_set_to_dict
 
 
 def marginalised_lightcurve_expectation_from_gw_samples(args=None):
@@ -90,7 +89,8 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         args.gps = np.median(data_out["t0"])
 
     elif args.coinc_file is not None:
-        from ligo.skymap import bayestar, distance, io as lio
+        from ligo.skymap import bayestar, distance
+        from ligo.skymap import io as lio
 
         data_out = Table.read(
             args.coinc_file, format="ligolw", tablename="sngl_inspiral"
@@ -261,9 +261,11 @@ def get_all_gw_quantities(data_out):
     """
 
     try:
-        data_out["mchirp"], data_out["eta"], data_out["q"] = (
-            conv.component_masses_to_mass_quantities(data_out["m1"], data_out["m2"])
-        )
+        (
+            data_out["mchirp"],
+            data_out["eta"],
+            data_out["q"],
+        ) = conv.component_masses_to_mass_quantities(data_out["m1"], data_out["m2"])
     except KeyError:
         data_out["eta"] = conv.mass_ratio_to_eta(data_out["q"])
         data_out["mchirp"] = data_out["mc"]

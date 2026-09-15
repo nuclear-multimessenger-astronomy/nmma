@@ -1,14 +1,16 @@
-import numpy as np
-import shutil
-from pathlib import Path
 import json
-import joblib
+import shutil
 from ast import literal_eval
+from pathlib import Path
+
+import joblib
 import keras as k
+import numpy as np
+
 from ..core.conversion import (
-    radii_from_qur,
     EOS_to_ns_parameters,
     EOS_to_system_parameters,
+    radii_from_qur,
 )
 
 

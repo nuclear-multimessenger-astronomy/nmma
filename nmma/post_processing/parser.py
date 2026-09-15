@@ -1,7 +1,7 @@
 from ..em.em_parsing import (
     basic_em_only_parsing,
-    em_time_parsing,
     em_model_parsing,
+    em_time_parsing,
     grb_parsing,
 )
 

@@ -11,9 +11,13 @@ repos:
       - id: black
         pass_filenames: true
         exclude: nb|.ipynb_checkpoints|data|dev|letsencrypt|logs|dask-worker-space
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.1.1
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.0
     hooks:
-      - id: flake8
-        pass_filenames: true
+      - id: ruff
+        args: [--fix]
+      - id: ruff
+        name: ruff check (unfixable errors)
+        args: [--no-fix]
+      - id: ruff-format
         exclude: nb|.ipynb_checkpoints|data|dev|letsencrypt|logs|dask-worker-space|__init__.py
