@@ -31,9 +31,6 @@ jobs:
 
   pytest:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -el {0}
     strategy:
       fail-fast: false
       matrix:
@@ -46,15 +43,10 @@ jobs:
           submodules: recursive
           fetch-depth: 0 # setuptools-scm needs tag history to resolve the version
 
-      - name: Set up Python with Conda ${{ matrix.python-version }}
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          miniforge-version: latest
-          use-mamba: true
-          mamba-version: "*"
-          activate-environment: nmma_env
-          channels: defaults
 
       - name: Cache fiesta-surrogates
         uses: actions/cache@v4
