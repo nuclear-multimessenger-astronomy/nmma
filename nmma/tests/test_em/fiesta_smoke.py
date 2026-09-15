@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 """Smoke test for the fiesta-surrogates pipeline.
 
 Single sanity check that ``FiestaKilonovaModel`` can instantiate against a

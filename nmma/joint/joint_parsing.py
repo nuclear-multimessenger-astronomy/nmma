@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 from ..core.parsing import base_injection_parsing, pipe_inj_parsing
 from ..em.em_parsing import em_analysis_parsing
 from ..eos.eos_parsing import eos_parsing, tabulated_eos_parsing

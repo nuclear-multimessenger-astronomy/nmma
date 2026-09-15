@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 

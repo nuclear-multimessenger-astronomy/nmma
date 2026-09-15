@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 import pytest
 
 from nmma.core.gitlab import get_model, refresh_models_list

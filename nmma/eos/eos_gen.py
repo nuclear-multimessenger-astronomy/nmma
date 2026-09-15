@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 import lal
 import numpy as np
 from scipy.integrate import cumulative_trapezoid, solve_ivp

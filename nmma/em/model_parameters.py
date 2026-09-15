@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 """Script with various functions to extract the parameters of models from their naming convention for filenames."""
 
 import re

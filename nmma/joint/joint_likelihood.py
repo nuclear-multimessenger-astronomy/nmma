@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 import numpy as np
 from bilby.core.likelihood import JointLikelihood
 

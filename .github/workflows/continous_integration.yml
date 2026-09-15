@@ -31,6 +31,17 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Check SPDX license headers
+        run: |
+          status=0
+          while IFS= read -r file; do
+            if [[ -s "$file" ]] && ! grep -q '^# SPDX-License-Identifier: GPL-3.0-only$' "$file"; then
+              echo "Missing SPDX license header: $file"
+              status=1
+            fi
+          done < <(git ls-files '*.py')
+          exit "$status"
+
       - name: Set up Python with Conda ${{ matrix.python-version }}
         uses: conda-incubator/setup-miniconda@v3
         with:

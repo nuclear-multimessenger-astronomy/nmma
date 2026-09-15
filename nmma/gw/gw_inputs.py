@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-FileCopyrightText: The NMMA Team
+
 # FIXME: This is a hacky subclass to adapt the bilby_pipe data generation to
 # our needs. We should at some point get rid of bilby pipe
 
