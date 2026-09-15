@@ -176,7 +176,6 @@ requirements.txt file which are necessary for NMMA:
    pip install dill
    pip install multiprocess
    pip install lalsuite
-   pip install python-ligo-lw
    pip install sncosmo
    pip install scikit-learn
    pip install joblib

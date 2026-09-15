@@ -51,7 +51,6 @@ dependencies = [
     "healpy",
     "scikit-learn",
     'tensorflow-cpu>=2.19; platform_system == "Linux"',
-    "python-ligo-lw",
 ]
 
 [project.optional-dependencies]

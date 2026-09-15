@@ -544,16 +544,9 @@ class NMMAInjectionCreator(InjectionCreator):
             SimInspiralTransformPrecessingWvf2PE as lalsim_conversion,
         )
 
-        try:
-            import ligo.lw  # noqa F401
-        except ImportError:
-            raise ImportError(
-                "You do not have ligo.lw installed: $ pip install python-ligo-lw"
-            )
-
         if injection_file.suffix in (".xml", ".xml.gz"):
             table = Table.read(
-                injection_file, format="ligolw", tablename="sim_inspiral"
+                injection_file, tablename="sim_inspiral"
             )
         elif injection_file.suffix == ".dat":
             table = Table.read(injection_file, format="csv", delimiter="\t")
