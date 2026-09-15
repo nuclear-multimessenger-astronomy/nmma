@@ -510,6 +510,7 @@ class MultiFilterNondetectionTransient:
             self.data[(float(ra), float(dec))] = position_data
 
         self.positions = list(self.data.keys())
+        self._positions_array = np.array(self.positions, dtype=float).reshape(-1, 2)
 
     def __repr__(self):
         return (
@@ -517,14 +518,23 @@ class MultiFilterNondetectionTransient:
             f"filters={self.observed_filters})"
         )
 
-    def _resolve_position(self, ra, dec):
-        # FIXME: this is where some pixel or box should come into play
-        position = (float(ra), float(dec))
-        if position not in self.data:
+    # FIXME: this is where the bodies are buried for this function
+    def _resolve_position(self, ra, dec, position_tolerance: float=1e-3):
+        """
+        Stupid function for now, but should be replaced with the pixel/MOC lookup idea. 
+        
+        position_tolerance is very loose for testing purposes
+        """
+        ra, dec = float(ra), float(dec)
+        diffs = np.abs(self._positions_array - np.array([ra, dec]))
+        matches = np.flatnonzero(np.all(diffs <= position_tolerance, axis=1))
+        if len(matches) == 0:
             raise KeyError(
                 f"No non-detection data stored for position (ra={ra}, dec={dec})."
             )
-        return position
+        # if more than one stored position falls within tolerance, take the closest
+        idx = matches[np.argmin(diffs[matches].sum(axis=1))]
+        return self.positions[idx]
 
     def query(self, ra, dec):
         """Return the stored non-detection dataset for a sky position
