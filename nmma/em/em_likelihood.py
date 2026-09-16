@@ -1,7 +1,7 @@
 import astropy.units as u
 import astropy_healpix as ah
+import json
 import numpy as np
-import pandas as pd
 from ligo.skymap.io import read_sky_map
 from scipy.stats import norm, truncnorm
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
@@ -443,99 +443,71 @@ class MultiFilterNondetectionTransient:
     the HEALPix tile of a multi-order (MOC) skymap.
 
     Loads a multi-order skymap (a GW localization, e.g. a ``.multiorder.fits``
-    file) to get its HEALPix tessellation, and a csv of pointings/non-detections,
-    such as a GWTreasureMap-style survey report. Every csv row is assigned to the
-    skymap tile (identified by its UNIQ pixel id) that contains its (ra, dec), and
-    rows are then grouped by that pixel id rather than by raw sky position. Every
-    row is by definition a non-detection (a "depth", i.e. a limiting magnitude,
+    file) to get its HEALPix tessellation, and a JSON of pointings/non-detections
+    that is already pre-grouped by skymap pixel id (built by
+    `build_pixel_observation_json` in
+    `optical_observations/GW230529/GW230529_treasuremap_optimize.py`). Every
+    entry is by definition a non-detection (a "depth", i.e. a limiting magnitude,
     rather than a measurement), so for each pixel the per-filter observation times
     and limiting magnitudes are stored in the standard nmma light curve dict format
     {filter: {"time": ..., "mag": ..., "mag_error": ...}}, with ``mag_error`` set to
-    ``np.inf`` throughout - the same convention used to mark the ``infIdx``
-    (non-detection) entries in `BasicEMTransient.chisquare_gaussianlog_from_lc_data`.
+    ``np.inf`` throughout.
 
     A stored pixel can be queried by (ra, dec) to retrieve its non-detection data
-    (an empty dict if that pixel was not covered by any pointing in the csv), or
-    compared directly against a candidate light curve to compute the associated
+    (an empty dict if that pixel was not covered by any pointing), or compared
+    directly against a candidate light curve to compute the associated
     upper-limit log-likelihood contribution.
 
     Parameters
     ----------
     filename: str
-        Path to a csv file of non-detections/pointings.
+        Path to a JSON file of non-detections/pointings, keyed by skymap UNIQ
+        pixel id: {"<uniq>": [{"time": [...]}, {"depth": [...]}, {"filter": [...]},
+        {"ra": [...]}, {"dec": [...]}]}. No csv input is supported anymore.
     skymap_filename: str
         Path to a multi-order (MOC) skymap fits file, read with
         `ligo.skymap.io.read_sky_map(..., moc=True)`. Its HEALPix tiles (one per
-        UNIQ value, each at its own resolution) define the pixelization that csv
-        rows and queried sky positions are both mapped onto.
-    ra_column, dec_column: str (default: "ra", "dec")
-        Names of the columns holding the sky position of each pointing.
-    time_column: str (default: "t_from_T0")
-        Name of the column holding the observation time (relative to trigger time).
-    filter_column: str (default: "filters")
-        Name of the column holding the filter name.
-    depth_column: str (default: "depth")
-        Name of the column holding the limiting magnitude (upper limit).
+        UNIQ value, each at its own resolution) define the pixelization used to
+        map queried sky positions onto the JSON's pixel ids.
 
     """
 
-    def __init__(
-        self,
-        filename,
-        skymap_filename,
-        ra_column="ra",
-        dec_column="dec",
-        time_column="t_from_T0",
-        filter_column="filters",
-        depth_column="depth",
-    ):
+    def __init__(self, filename, skymap_filename):
         self.filename = filename
         self.skymap_filename = skymap_filename
-        self.ra_column = ra_column
-        self.dec_column = dec_column
-        self.time_column = time_column
-        self.filter_column = filter_column
-        self.depth_column = depth_column
 
-        # Multi-order skymap tessellation: one HEALPix tile per UNIQ value, each at
-        # its own resolution (nside/level).
         skymap = read_sky_map(skymap_filename, moc=True, distances=True)
         self.uniq = np.asarray(skymap["UNIQ"])
         level, ipix = ah.uniq_to_level_ipix(self.uniq)
         self.tile_nside = ah.level_to_nside(level)
         self.tile_ipix = ipix
 
-        data = pd.read_csv(filename)
-        required_columns = (
-            ra_column,
-            dec_column,
-            time_column,
-            filter_column,
-            depth_column,
-        )
-        missing = [c for c in required_columns if c not in data.columns]
-        if missing:
-            raise ValueError(f"Missing expected column(s) {missing} in {filename}")
+        # Pixel ids come straight from the JSON's keys
+        with open(filename) as f:
+            pixel_obs_json = json.load(f)
 
-        self.observed_filters = sorted(data[filter_column].unique().tolist())
-
-        pixel_ids = self._pixel_ids_for_positions(
-            data[ra_column].to_numpy(), data[dec_column].to_numpy()
-        )
-        data = data.assign(_pixel_id=pixel_ids)
-
+        # Need to do a bit of preprocessing so that we have a dictionary with pixelid
+        # mapping to a lightcurve of non-detections data
         self.data = {}
-        for pixel_id, group in data.groupby("_pixel_id", sort=False):
-            pixel_data = {}
-            for filt, sub_data in group.groupby(filter_column):
-                order = np.argsort(sub_data[time_column].to_numpy())
-                pixel_data[filt] = {
-                    "time": sub_data[time_column].to_numpy()[order],
-                    "mag": sub_data[depth_column].to_numpy()[order],
-                    "mag_error": np.full(len(sub_data), np.inf),
-                }
-            self.data[int(pixel_id)] = pixel_data
+        observed_filters = set()
+        for pixel_id_str, columns in pixel_obs_json.items():
+            # columns is a list of single-key {field: [values]} dicts; merge into one dict of arrays.
+            merged = {key: np.asarray(values) for column in columns for key, values in column.items()}
 
+            pixel_data = {}
+            for filt in np.unique(merged["filter"]):
+                mask = merged["filter"] == filt
+                order = np.argsort(merged["time"][mask])
+                pixel_data[filt] = {
+                    "time": merged["time"][mask][order],
+                    "mag": merged["depth"][mask][order],
+                    "mag_error": np.full(int(mask.sum()), np.inf),
+                }
+                observed_filters.add(filt)
+
+            self.data[int(pixel_id_str)] = pixel_data
+
+        self.observed_filters = sorted(observed_filters)
         self.pixel_ids = sorted(self.data.keys())
 
     def __repr__(self):
@@ -548,9 +520,8 @@ class MultiFilterNondetectionTransient:
         """Find, for each (ra, dec) [deg], the UNIQ pixel id of the skymap tile
         that contains it.
 
-        Every position is expected to fall in exactly one tile of the (full-sky)
-        skymap tessellation; a position outside the tessellation raises, since that
-        indicates a mismatched/invalid skymap rather than simply "not observed".
+        Every position must return exactly one tile; a position outside the tessellation
+        raises, since that indicates a mismatched/invalid skymap rather than simply "not observed".
         """
         ra_deg = np.atleast_1d(np.asarray(ra_deg, dtype=float))
         dec_deg = np.atleast_1d(np.asarray(dec_deg, dtype=float))
@@ -564,6 +535,12 @@ class MultiFilterNondetectionTransient:
         matches = cand_ipix == self.tile_ipix[None, :]
 
         uncovered = np.flatnonzero(~matches.any(axis=1))
+        
+        # FIXME: the following is just to catch in case something weird happens,
+        # but it might occur due to some numerical noise or inaccuracies after which
+        # it will cause the sampler to break, so be careful and perhaps think about
+        # a specifci return value that we know means something weird happens and
+        # gracefully catch it by setting log likelihood to neg infty for instance.
         if len(uncovered) > 0:
             raise ValueError(
                 f"{len(uncovered)} sky position(s) not covered by skymap "
@@ -576,6 +553,8 @@ class MultiFilterNondetectionTransient:
 
     def query(self, ra, dec):
         """Return the stored non-detection dataset for a sky position
+        Empty if the pixel is not covered by any pointing in the JSON (i.e. not observed). 
+        Callers should treat this as contributing zero to the log-likelihood.
 
         Parameters
         ----------
@@ -589,9 +568,7 @@ class MultiFilterNondetectionTransient:
             {filter: {"time": array, "mag": array, "mag_error": array}}, the upper
             limits (magnitudes) and their observation times for each filter observed
             at that pixel. ``mag_error`` is ``np.inf`` throughout, marking every
-            entry as a non-detection. Empty if the pixel is not covered by any
-            pointing in the csv (i.e. not observed) - callers should treat this as
-            contributing zero to the log-likelihood.
+            entry as a non-detection.
 
         """
         (pixel_id,) = self._pixel_ids_for_positions(ra, dec)
@@ -669,24 +646,22 @@ class NondetectionKilonovaSubModel:
         `.parameter_distributions`, and `.predict(parameters)`.
     nondetections: MultiFilterNondetectionTransient
         The stored non-detection (upper limit) data to score the generated
-        light curve against.
-    filter_map: dict
-        Mapping from `nondetections`' (generic) filter names to `lc_model`'s
-        filter names, e.g. {"g": "ztfg", "r": "ztfr"}.
+        light curve against. Its filter names (`nondetections.observed_filters`,
+        set by the pixel-obs JSON) must match `lc_model`'s own filter names
+        directly -- no filter-name remapping is done.
     sigma: float or dict
         The 1-sigma uncertainty to assume for the model magnitude, passed
         through to `MultiFilterNondetectionTransient.log_likelihood_upper_limits`.
 
     """
 
-    def __init__(self, lc_model, nondetections, filter_map, sigma):
+    def __init__(self, lc_model, nondetections, sigma):
         self.lc_model = lc_model
         self.nondetections = nondetections
-        self.filter_map = filter_map
         self.sigma = sigma
 
     def __repr__(self):
-        return f"{self.__class__.__name__} (filters={list(self.filter_map)})"
+        return f"{self.__class__.__name__} (filters={self.lc_model.filters})"
 
     def noise_log_likelihood(self):
         return 0.0
@@ -721,11 +696,9 @@ class NondetectionKilonovaSubModel:
         times, mag = self.lc_model.predict(lc_parameters)
         self.last_times, self.last_mag = times, mag  # stashed for inspection/plotting
 
-        model_lc = {
-            generic: np.asarray(mag[ztf_name])
-            for generic, ztf_name in self.filter_map.items()
-            if ztf_name in mag
-        }
+        # nondetections' filter names already match lc_model's directly (see class
+        # docstring); log_likelihood_upper_limits itself skips any filter not observed.
+        model_lc = {filt: np.asarray(values) for filt, values in mag.items()}
 
         ra_deg = float(np.degrees(parameters["ra"]))
         dec_deg = float(np.degrees(parameters["dec"]))
