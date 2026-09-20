@@ -7,7 +7,7 @@ import numpy as np
 import sncosmo
 from astropy import units as u
 from bilby.gw.cosmology import get_cosmology
-from fiesta.inference.lightcurve_model import FluxModel
+from fiesta.model import FluxSurrogate
 from scipy.special import logsumexp
 from sncosmo.models import _SOURCES
 

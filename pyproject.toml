@@ -31,7 +31,7 @@ dependencies = [
     "future",
     "bilby>=2.7.1",
     "bilby_pipe>=1.7.0",
-    "fiestaEM>=0.2.1",
+    "fiestaEM>=0.3.0",
     "huggingface_hub",
     "schwimmbad",
     "colorcet",
