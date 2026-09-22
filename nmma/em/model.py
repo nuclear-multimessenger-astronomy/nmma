@@ -1,4 +1,3 @@
-from ast import literal_eval
 from copy import copy
 from pathlib import Path
 
@@ -6,17 +5,14 @@ import joblib
 import numpy as np
 import sncosmo
 from astropy import units as u
-from bilby.gw.cosmology import get_cosmology
-from fiesta.model import FluxSurrogate
+from fiesta.models import FluxSurrogate
 from scipy.special import logsumexp
 from sncosmo.models import _SOURCES
 
 from ..core.base import initialisation_args_from_signature_and_namespace
 from ..core.constants import c_SI
 from ..core.conversion import (
-    distance_modulus_nmma,
-    get_cosmo_grids,
-    get_redshift,
+    CosmologyConverter,
     observation_angle_conversion,
 )
 from ..core.gitlab import get_model, get_models_home
@@ -211,10 +207,8 @@ class LightCurveModelContainer:
         extinction_model=None,
         **kwargs,
     ):
-
         self.model = model
         self.identify_model_parameters(model_parameters)
-        self.redshift_func = get_redshift
         if isinstance(filters, str):
             filters = filters.split(",")
         self.filters = filters
@@ -223,6 +217,7 @@ class LightCurveModelContainer:
         self.good_parameters = True
         self.extinction_model = extinction_model
         self.extinction_frame = None
+        self.cosmo_converter = CosmologyConverter()
 
         # sample times are used as nodes to generate the light curve,
         # characterising the model's validity range and the resolution
@@ -271,38 +266,29 @@ class LightCurveModelContainer:
             if key not in priors:
                 print(f"Parameter {key} not found in priors, might fail.")
 
-        if (
-            "redshift" not in priors
-            and "luminosity_distance" in priors
-            and "Hubble_constant" not in priors
-        ):
-            dlum_prior = priors["luminosity_distance"]
-            cosmo = getattr(dlum_prior, "cosmology", get_cosmology())
-            dist_grid, z_grid = get_cosmo_grids(
-                dlum_prior.minimum, dlum_prior.maximum, cosmo
-            )
-
-            def redshift_from_dlum(parameters):
-                if "redshift" in parameters:
-                    return parameters["redshift"]
-                return np.interp(
-                    parameters["luminosity_distance"], dist_grid, z_grid
-                ).value
-
-            self.redshift_func = redshift_from_dlum
+        self.cosmo_converter = CosmologyConverter.from_priors(priors)
 
         if "Ebv" in priors:
-            ext_model, frame = utils.get_extinction_model(self.extinction_model)
-            if self.extinction_frame is None:
-                # for efficient computation of extinction corrections
-                self.wavenumbers = 1.0 / (self.lambdas * u.meter.to(u.micron))
-                if frame == "rest":
-                    self.extinction_wavenumbers = self.rest_wavenumbers
-                elif frame == "obs":
-                    self.extinction_wavenumbers = self.obs_wavenumbers
-                self.extinction_frame = frame
-                self.extinction_model = ext_model
-                self.extinction_range = self.extinction_model.x_range
+            self.setup_extinction()
+
+    def setup_extinction(self):
+        ext_model, frame = utils.get_extinction_model(self.extinction_model)
+        if self.extinction_frame is None:
+            # for efficient computation of extinction corrections
+            self.wavenumbers = 1.0 / (self.lambdas * u.meter.to(u.micron))
+            if frame == "rest":
+                self.extinction_wavenumbers = self.rest_wavenumbers
+            elif frame == "obs":
+                self.extinction_wavenumbers = self.obs_wavenumbers
+            self.extinction_frame = frame
+            self.extinction_model = ext_model
+            self.extinction_range = self.extinction_model.x_range
+
+    def rest_wavenumbers(self):
+        return self.wavenumbers * (1 + self.redshift)
+
+    def obs_wavenumbers(self):
+        return self.wavenumbers
 
     def sanity_checks(self, parameters):
         self.good_parameters = True
@@ -326,19 +312,29 @@ class LightCurveModelContainer:
     def em_parameter_setup(self, parameters, combine_params=True):
         # read here, but used later for correction that is observation-dependent
         self.Ebv = parameters.get("Ebv", 0.0)
-        self.luminosity_distance = parameters.get(
-            "luminosity_distance", 1e-5
-        )  # default 10pc = 1e-5 Mpc
-        self.distmod = distance_modulus_nmma(
-            self.luminosity_distance
-        )  # default 10pc = 1e-5 Mpc
         self.timeshift = parameters.get("timeshift", 0.0)
-
-        # redshift computation can be expensive, so we only do it
-        # once and store it for conversion to detector frame
-        self.redshift = self.redshift_func(parameters)
+        parameters = self.set_distance_parameters(parameters)
         if combine_params:
             return self.combine_lc_params(parameters)
+
+    def set_distance_parameters(self, parameters):
+        """Set the distance parameters in the parameters dictionary.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Updated parameters with distance information.
+        """
+        parameters = self.cosmo_converter(parameters)
+        self.luminosity_distance = parameters["luminosity_distance"]
+        self.distmod = self.cosmo_converter.distmod(parameters["luminosity_distance"])
+        self.redshift = parameters["redshift"]
+        return parameters
 
     def combine_lc_params(self, parameters):
         """Extract the light curve parameters in the necessary format.
@@ -357,26 +353,6 @@ class LightCurveModelContainer:
             key: parameters[key] if key in parameters else getattr(self, key)
             for key in self.model_parameters
         }
-
-    def rest_wavenumbers(self):
-        return self.wavenumbers * (1 + self.redshift)
-
-    def obs_wavenumbers(self):
-        return self.wavenumbers
-
-    def extinction_correction(self, model_mags):
-        ext_factor = np.ones_like(self.lambdas)
-        wavenumbers = self.extinction_wavenumbers()
-        k_min, k_max = self.extinction_range
-        covered = (wavenumbers >= k_min) & (wavenumbers <= k_max)
-        ext_factor[covered] = self.extinction_model.extinguish(
-            wavenumbers[covered], Ebv=self.Ebv
-        )
-        ext_mags = -2.5 * np.log10(ext_factor)
-        for ext_mag, filt in zip(ext_mags, self.default_filts):
-            if filt in model_mags:
-                model_mags[filt] += ext_mag
-        return model_mags
 
     def gen_detector_lc(self, parameters=None, sample_times=None):
         """Generate a light curve for given parameter as observable in detector frame.
@@ -408,7 +384,6 @@ class LightCurveModelContainer:
         raise NotImplementedError("This method should be implemented in subclasses.")
 
     def combine_detector_data(self, model_lc, observable_times):
-
         if self.extinction_frame:
             model_lc = self.extinction_correction(model_lc)
 
@@ -425,6 +400,20 @@ class LightCurveModelContainer:
             lc_data[filt] = apparent_magnitude
 
         return (observable_times, lc_data)
+
+    def extinction_correction(self, model_mags):
+        ext_factor = np.ones_like(self.lambdas)
+        wavenumbers = self.extinction_wavenumbers()
+        k_min, k_max = self.extinction_range
+        covered = (wavenumbers >= k_min) & (wavenumbers <= k_max)
+        ext_factor[covered] = self.extinction_model.extinguish(
+            wavenumbers[covered], Ebv=self.Ebv
+        )
+        ext_mags = -2.5 * np.log10(ext_factor)
+        for ext_mag, filt in zip(ext_mags, self.default_filts):
+            if filt in model_mags:
+                model_mags[filt] += ext_mag
+        return model_mags
 
     @property
     def citation(self):
@@ -480,12 +469,12 @@ class FiestaModel(LightCurveModelContainer):
             directory=surrogate_dir,
         )
         try:
-            self.fiesta_model = FluxModel(**fiesta_kwargs)
+            self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         except OSError:
             fiesta_kwargs["directory"] = Path(
                 surrogate_dir, self.load_dir_string, model, "model"
             )
-            self.fiesta_model = FluxModel(**fiesta_kwargs)
+            self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         if sample_times is not None:
             print("Warning: sample_times are not used in FiestaModel, ignoring.")
         kwargs["model_parameters"] = self.fiesta_model.parameter_names
@@ -828,7 +817,6 @@ class GRBMixin:
         super().__init__(*args, **kwargs)
 
     def parameter_conversion(self, parameters):
-
         # it is beneficial to sample the ratio of angles alpha instead of checking later whether this can be resolved
         try:
             # FIXME We should get rid of the resolution attribute and only use alphaWing
@@ -952,7 +940,6 @@ class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
         return np.geomspace(tmin, tmax, nsteps)
 
     def em_parameter_setup(self, parameters):
-
         # set on first call
         if self.flux_func is None:
             # case 1: use energy injection approach
@@ -1107,7 +1094,8 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         return sample_times
 
     def check_vs_priors(self, priors):
-        print("""
+        print(
+            """
             Note: Most source models in sncosmo use an 'amplitude' parameter,
             that can differ drastically from model to model and requires a carefully chosen prior.
             NMMA allows an alternative approach that anchors the peak magnitude
@@ -1115,7 +1103,8 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
             'supernova_mag_boost' and 'supernova_mag_stretch' instead to allow a more
             direct phyiscal interpretation.
             Your sampling priors should be set accordingly. See the NMMA documentation for more details.
-        """)
+        """
+        )
 
         if "supernova_mag_boost" in priors or "supernova_mag_stretch" in priors:
             self._anchor_amplitude()
@@ -1433,7 +1422,6 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
         return connected_times, total_lc
 
     def generate_lightcurve(self, sample_times, parameters, return_all=False):
-
         lc_per_model = []
         for model in self.lc_models:
             lc = model.generate_lightcurve(sample_times, parameters)
@@ -1487,7 +1475,6 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
 def single_model_from_args(
     model_class, model_name, args, filters, prefixes=["grb_", "em_"]
 ):
-
     # populate model-args from default and parsed args
     model_args = initialisation_args_from_signature_and_namespace(
         LightCurveModelContainer, args, prefixes=prefixes
@@ -1618,7 +1605,9 @@ def create_injection_model(args, filters=None):
             if val is None:
                 injection_dict = {}
             elif isinstance(val, str):
-                injection_dict = literal_eval(val)
+                raise ValueError(
+                    "injection_model_args should be a dictionary, not a string."
+                )
             else:
                 injection_dict = val
             for arg, val in injection_dict.items():
