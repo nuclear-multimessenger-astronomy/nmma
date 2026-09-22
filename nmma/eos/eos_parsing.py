@@ -2,6 +2,20 @@ from ..core.parsing import single_messenger_analysis_parsing, yaml_parse
 
 
 def tabulated_eos_parsing(parser):
+    """Add CLI args for sampling over a directory of precomputed EOS
+    files: ``--eos-data``, ``--Neos``, ``--eos-weight``, ``--eos-to-ram``.
+
+    Consumed by ``setup_tabulated_eos_priors``/``EoSConverter(..., "tabulated")``.
+
+    Parameters
+    ----------
+    parser: configargparse.ArgParser
+
+    Returns
+    -------
+    configargparse.ArgParser
+        The same parser, with the "Tabulated EOS input arguments" group added.
+    """
     tab_eos_input_parser = parser.add_argument_group(
         title="Tabulated EOS input arguments",
         description="Specify tabulated EOS inputs",
@@ -21,7 +35,24 @@ def tabulated_eos_parsing(parser):
 
 
 def eos_parsing(parser):
+    """Add CLI args for on-the-fly EOS generation (``--emulator-metadata``,
+    ``--micro-eos-model``) and for the astrophysical constraints
+    (``--lower-mtov*``, ``--upper-mtov*``, ``--mass-radius*``) evaluated
+    against it or a tabulated EOS.
 
+    Each constraint kind takes either one ``--<kind>`` dict flag, or
+    parallel ``--<kind>-name/-mass|file-path/-error/-arxiv/-plot-kwargs``
+    list flags — see ``read_constraint_from_args``.
+
+    Parameters
+    ----------
+    parser: configargparse.ArgParser
+
+    Returns
+    -------
+    configargparse.ArgParser
+        The same parser, with the "EOS input arguments" group added.
+    """
     eos_input_parser = parser.add_argument_group(
         title="EOS input arguments", description="Specify EOS inputs"
     )
@@ -54,6 +85,11 @@ def eos_parsing(parser):
         nargs="*",
         help="list of identifiers for further lower-mtov-values to consider",
     )
+    # FIX ME: missing type=float (cf. --Neos's type=int above) -- values
+    # come through as strings, which crashes at likelihood-evaluation time
+    # (LowerMTOVConstraint.log_likelihood -> norm.logcdf(loc=str, scale=str))
+    # rather than at parse time. --lower-mtov (the single dict flag) is
+    # unaffected since yaml_parse already returns real floats.
     eos_input_parser.add(
         "--lower-mtov-mass",
         nargs="*",
@@ -86,6 +122,7 @@ def eos_parsing(parser):
         nargs="*",
         help="list of identifiers for further upper-mtov-values to consider",
     )
+    # FIX ME: same missing type=float as --lower-mtov-mass/-error above.
     eos_input_parser.add(
         "--upper-mtov-mass",
         nargs="*",

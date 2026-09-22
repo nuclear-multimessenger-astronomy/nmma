@@ -12,9 +12,9 @@ from nmma.core.plotting_utils import fig_setup
 nmma_colors = fig_setup()
 
 
-##############################################
-################# MAIN PLOTS #################
-##############################################
+# ================================================
+# MAIN PLOTS
+# ================================================
 def basic_em_analysis_plot(
     transient,
     plot_filters,
@@ -32,8 +32,50 @@ def basic_em_analysis_plot(
     markersize=8,
     **kwargs,
 ):
+    """Draw the best-fit light curve against the data, one panel per filter.
 
-    ### setup to get quantities
+    Each panel carries the observations, the best-fit model with its error
+    band, and underneath a residual strip in units of sigma. The grid is
+    laid out to leave as few empty cells as possible.
+
+    Parameters
+    ----------
+    transient: nmma.em.em_likelihood.BasicEMTransient
+        Holds the observations to draw.
+    plot_filters: dict
+        Filters to draw, mapped to their axis labels.
+    mags_to_plot: dict
+        Best-fit magnitude per filter.
+    error_dict: dict
+        Error budget per filter, drawn as a band.
+    chi2_dict: dict
+        Reduced chi-square per filter, shown in the panel.
+    mismatches: dict
+        Residuals per filter, drawn in the lower strip.
+    sub_model_plot_props: dict or None
+        Per-component curves to overlay, for a combined model.
+    xlim: list
+        Time range, in days.
+    ylim: list
+        Magnitude range.
+    save_path: str or pathlib.Path
+        Destination file.
+    ncols: int, optional
+        Number of columns. Chosen from the filter count when omitted.
+    fig: matplotlib.figure.Figure, optional
+        Figure to draw into. A new one is built when omitted.
+    shared_data: bool, optional
+        If True, the same observations apply to every filter.
+    markersize: int, optional
+        Size of the data markers.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The figure that was saved.
+    """
+
+    # setup to get quantities
     filter_names = list(plot_filters.keys())
     if ncols is None:
         # Dynamic column count: one row for up to 3 filters (e.g.
@@ -56,7 +98,7 @@ def basic_em_analysis_plot(
     fit_color = kwargs.pop("color", next(nmma_colors))
     marker = kwargs.pop("marker", next(marker_cycle))
 
-    ### prepare figure
+    # prepare figure
     if not shared_data or not fig:
         if not fig:
             fig = init_em_analysis_plot(plot_filters, ncols)
@@ -94,7 +136,7 @@ def basic_em_analysis_plot(
                 # but keeps ax_delta visible at bottom
                 plt.setp(ax_sum.get_xticklabels(), visible=False)
 
-    ### plot lcs and residuals
+    # plot lcs and residuals
     time = mags_to_plot.pop("time")
     n_axes = (len(fig.axes) + 1) // 2
     for cnt, filt in enumerate(filter_names):
@@ -123,7 +165,7 @@ def basic_em_analysis_plot(
         )
         det_times = obs_times[filt][np.isfinite(obs_unc[filt])]
 
-        if det_times.size > 0:  ## show scatter
+        if det_times.size > 0:  # show scatter
             ax_delta = fig.axes[cnt + n_axes]
             offset, total_unc, signed_diff = mismatches[filt]
             # signed, normalized residual: (data - model) / sigma_tot, in
@@ -153,7 +195,7 @@ def basic_em_analysis_plot(
                     loc="best", frameon=False, handlelength=0, handletextpad=0
                 )
 
-    ### return figure
+    # return figure
     fig.tight_layout()
     if save_path:
         fig.savefig(save_path, bbox_inches="tight", dpi=250)
@@ -161,6 +203,25 @@ def basic_em_analysis_plot(
 
 
 def init_em_analysis_plot(plot_filters, ncols):
+    """Lay out the panels and their residual strips.
+
+    Each filter gets a main panel and, attached below it, a strip for the
+    normalised residuals. Only the bottom row keeps its x tick labels, the
+    others being hidden to stop the log-scale minor ticks from colliding
+    with the row underneath.
+
+    Parameters
+    ----------
+    plot_filters: dict
+        Filters to draw, mapped to their axis labels.
+    ncols: int
+        Number of columns.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The prepared figure.
+    """
 
     filter_names = list(plot_filters.keys())
     fig, axes = analysis_plot_geometry(filter_names, ncols=ncols)
@@ -200,6 +261,28 @@ def init_em_analysis_plot(plot_filters, ncols):
 def plot_bestfit_with_errors(
     ax_sum, time, mag_plot, error_budget, sub_model_plot_props, cnt, color
 ):
+    """Draw a best-fit curve and its error band into one panel.
+
+    When the model is a combination, each component is drawn as well, in its
+    own colour.
+
+    Parameters
+    ----------
+    ax_sum: matplotlib.axes.Axes
+        Panel to draw into.
+    time: numpy.ndarray
+        Times, in days.
+    mag_plot: numpy.ndarray
+        Best-fit magnitudes.
+    error_budget: numpy.ndarray
+        Half-width of the band around the curve.
+    sub_model_plot_props: dict or None
+        Per-component curves to overlay.
+    cnt: int
+        Index of the filter being drawn.
+    color: str
+        Colour of the combined curve.
+    """
 
     label = "combined" if sub_model_plot_props is not None else ""
     ax_sum.plot(time, mag_plot, color=color, linewidth=3, linestyle="--")
@@ -213,7 +296,7 @@ def plot_bestfit_with_errors(
     )
 
     if sub_model_plot_props is not None:
-        ## plot additional lcs for each sub_model
+        # plot additional lcs for each sub_model
         for model_name, prop_dict in sub_model_plot_props.items():
             mag_plot = prop_dict["plot_mags"][cnt]
             mag_err = prop_dict["plot_errors"][cnt]
@@ -230,10 +313,25 @@ def plot_bestfit_with_errors(
 
 
 def bolometric_lc_plot(transient, time, lc, save_path, color="coral"):
+    """Draw the best-fit bolometric light curve against the data.
+
+    Parameters
+    ----------
+    transient: nmma.em.em_likelihood.BasicEMTransient
+        Holds the observations to draw.
+    time: numpy.ndarray
+        Times, in days.
+    lc: numpy.ndarray
+        Best-fit luminosity, in erg/s.
+    save_path: str or pathlib.Path
+        Destination file.
+    color: str, optional
+        Colour of the model curve.
+    """
     fig, ax = plt.subplots(1, 1)
     ax = plot_observations(ax, transient, markersize=12)
 
-    ### plot the bestfit model
+    # plot the bestfit model
     ax.plot(time, lc, color=color, linewidth=3, linestyle="--")
 
     ax.set_ylabel("L [erg / s]")
@@ -245,8 +343,28 @@ def bolometric_lc_plot(transient, time, lc, save_path, color="coral"):
 def visualise_model_performance(
     training_data, training_model, light_curve_model, data_type
 ):
-    """Function to visualise training success and model performance by
-    comparing the model's light curves or spectra to the training data."""
+    """Compare a trained surrogate to the grid it was trained on.
+
+    Takes the first grid point, evaluates the surrogate at the same
+    parameters, and draws both, so that a training run can be judged at a
+    glance.
+
+    Parameters
+    ----------
+    training_data: dict
+        The training grid.
+    training_model: nmma.em.training.BaseTrainingModel
+        The model that was trained, read for its output directory.
+    light_curve_model: nmma.em.model.LightCurveModelContainer
+        The surrogate to evaluate.
+    data_type: str
+        Either photometry or spectroscopy.
+
+    Returns
+    -------
+    str
+        Path of the figure that was saved.
+    """
     # we can plot an example where we compare the model performance
     # to the grid points
 
@@ -318,6 +436,15 @@ def visualise_model_performance(
 
 
 def chi2_hists_from_dict(chi2_dict, outpath):
+    """Draw one chi-square histogram per filter.
+
+    Parameters
+    ----------
+    chi2_dict: dict
+        Reduced chi-square values per filter, one per grid point.
+    outpath: str or pathlib.Path
+        Directory the figures are written to, one file per filter.
+    """
     for filt, chi2_array in chi2_dict.items():
         plt.figure()
         plt.xlabel(r"$\chi^2 / {\rm d.o.f.}$")
@@ -329,6 +456,20 @@ def chi2_hists_from_dict(chi2_dict, outpath):
 
 
 def plot_benchmark_percentiles(model, model_benchmarks, outdir):
+    """Draw how well a surrogate reproduces its grid, filter by filter.
+
+    Bars are stacked by percentile, so a filter whose 75th percentile bar
+    towers over the others is one the surrogate struggles with.
+
+    Parameters
+    ----------
+    model: str
+        Name of the model being benchmarked.
+    model_benchmarks: dict
+        Per filter, the chi-square percentiles.
+    outdir: str or pathlib.Path
+        Directory the figure is written to.
+    """
     fig, ax = plt.subplots(figsize=(12, 8))
 
     filts = list(model_benchmarks.keys())
@@ -356,9 +497,9 @@ def plot_benchmark_percentiles(model, model_benchmarks, outdir):
     fig.savefig(f"{outdir}/benchmark_percentiles_{model}.pdf", bbox_inches="tight")
 
 
-###################################################
-################# PLOT STRUCTURES #################
-###################################################
+# ================================================
+# PLOT STRUCTURES
+# ================================================
 
 
 def basic_photo_lc_plot(
@@ -374,6 +515,36 @@ def basic_photo_lc_plot(
     ylabel_kwargs=dict(fontsize=30, rotation=90, labelpad=8),
     **kwargs,
 ):
+    """Stack one panel per filter, filled by a caller-supplied function.
+
+    This owns the layout, the axes and the saving; what goes inside each
+    panel is left to plot_fc, which is what lets very different figures
+    share the same frame.
+
+    Parameters
+    ----------
+    plot_fc: callable
+        Called as ``plot_fc(ax, filt, index)`` for each filter. Returns the
+        axes and, optionally, something to attach a colour bar to.
+    filters: list of str
+        Filters to draw, one panel each.
+    save_path: str or pathlib.Path
+        Destination file.
+    fontsize: int, optional
+        Base font size.
+    figsize: tuple, optional
+        Figure size, in inches.
+    colorbar: bool, optional
+        If True, attach a colour bar to each panel.
+    xlim: list, optional
+        Time range, in days.
+    ylim: list, optional
+        Magnitude range.
+    n_yticks: int, optional
+        Number of y ticks per panel.
+    ylabel_kwargs: dict, optional
+        Styling of the y axis labels.
+    """
 
     fig = plt.figure(figsize=figsize)
     ncols = 1
@@ -423,6 +594,22 @@ def basic_photo_lc_plot(
 def lc_comparison_plot(
     mag_dict, training_data, filters, sample_times, save_path, **kwargs
 ):
+    """Overlay an interpolated light curve on the grid point it came from.
+
+    Parameters
+    ----------
+    mag_dict: dict
+        Interpolated magnitude per filter.
+    training_data: numpy.ndarray
+        Magnitudes of the grid point, one column per filter.
+    filters: list of str
+        Filters to draw.
+    sample_times: numpy.ndarray
+        Times, in days.
+    save_path: str or pathlib.Path
+        Destination file.
+    """
+
     def lc_plot_fc(ax, filt, ii):
         ax.plot(sample_times, training_data[:, ii], "k--", label="grid")
         ax.plot(sample_times, mag_dict[filt], "b-", label="interpolated")
@@ -436,6 +623,26 @@ def lc_comparison_plot(
 def lc_plot_with_histogram(
     filters, data_dict, sample_times, save_path, percentiles=(10, 50, 90), **kwargs
 ):
+    """Draw a population of light curves as a density, with percentiles.
+
+    Each time bin is turned into a histogram over the population, so the
+    whole ensemble shows as a shaded density rather than as a tangle of
+    individual curves.
+
+    Parameters
+    ----------
+    filters: list of str
+        Filters to draw.
+    data_dict: dict
+        Magnitudes per filter, one row per light curve.
+    sample_times: numpy.ndarray
+        Times, in days.
+    save_path: str or pathlib.Path
+        Destination file.
+    percentiles: tuple, optional
+        Percentiles drawn as lines over the density.
+    """
+
     def lc_hist_fc(ax, filt, ii):
         plot_data = data_dict[filt]
 
@@ -474,6 +681,36 @@ def spec_subplot(
     fontsize=30,
     cbar_label="log10(Flux)",
 ):
+    """Draw one spectrum as a time-wavelength colour map.
+
+    Parameters
+    ----------
+    fig: matplotlib.figure.Figure
+        Figure the colour bar is attached to.
+    ax: matplotlib.axes.Axes
+        Panel to draw into.
+    X: numpy.ndarray
+        Time mesh, in days.
+    Y: numpy.ndarray
+        Wavelength mesh, in angstroms.
+    Z: numpy.ndarray
+        Flux on that mesh.
+    data_label: str
+        Title of the panel.
+    vmin: float, optional
+        Lower end of the colour scale.
+    vmax: float, optional
+        Upper end of the colour scale.
+    fontsize: int, optional
+        Base font size, restored afterwards.
+    cbar_label: str, optional
+        Label of the colour bar.
+
+    Returns
+    -------
+    tuple
+        The figure and the axes.
+    """
     old_pararams = matplotlib.rcParams.copy()
     matplotlib.rcParams.update(
         {
@@ -498,6 +735,23 @@ def spec_subplot(
 def basic_spec_plot(
     mesh_X, mesh_Y, spec_func, plot_entries, save_path, figsize=(32, 14)
 ):
+    """Draw several spectra side by side on a shared mesh.
+
+    Parameters
+    ----------
+    mesh_X: numpy.ndarray
+        Times, in days.
+    mesh_Y: numpy.ndarray
+        Wavelengths, in angstroms.
+    spec_func: callable
+        Draws one panel, typically spec_subplot.
+    plot_entries: dict
+        Spectra to draw, mapped from their panel titles.
+    save_path: str or pathlib.Path
+        Destination file.
+    figsize: tuple, optional
+        Figure size, in inches.
+    """
 
     XX, YY = np.meshgrid(mesh_X, mesh_Y)
     fig = plt.figure(figsize=figsize)
@@ -515,10 +769,27 @@ def basic_spec_plot(
     plt.close()
 
 
-##############################################
-############### HELPER FUNCTIONS #############
-##############################################
+# ================================================
+# HELPER FUNCTIONS
+# ================================================
 def check_limit(lim):
+    """Normalise an axis limit into a pair of floats.
+
+    Parameters
+    ----------
+    lim: str or list
+        Either a comma-separated string, or a pair of values.
+
+    Returns
+    -------
+    list of float
+        The two bounds.
+
+    Raises
+    ------
+    AssertionError
+        If the limit does not resolve to exactly two values.
+    """
     if isinstance(lim, str):
         lim = lim.split(",")
     lim = [float(val) for val in lim]
@@ -527,6 +798,30 @@ def check_limit(lim):
 
 
 def plot_observations(ax, transient, color="k", marker="D", **kwargs):
+    """Draw the observations, detections and upper limits apart.
+
+    Detections carry an error bar; non-detections, recognised by their
+    infinite uncertainty, are drawn as downward triangles instead.
+
+    Parameters
+    ----------
+    ax: matplotlib.axes.Axes
+        Panel to draw into.
+    transient: nmma.em.em_likelihood.BasicEMTransient
+        Holds the observations.
+    color: str, optional
+        Colour of the points.
+    marker: str, optional
+        Marker of the detections.
+    **kwargs
+        Passed on to errorbar. A ``filter`` entry restricts the drawing to
+        that filter.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The same axes.
+    """
     obs_times, obs_lc, obs_unc = (
         transient.light_curve_times,
         transient.light_curves,
@@ -538,7 +833,7 @@ def plot_observations(ax, transient, color="k", marker="D", **kwargs):
         obs_unc = obs_unc[filt]
         obs_times = obs_times[filt]
     # obs_times+= transient.trigger_time
-    detections = np.isfinite(obs_unc)  ## does not include nans or infs
+    detections = np.isfinite(obs_unc)  # does not include nans or infs
     ax.errorbar(
         obs_times[detections],
         obs_lc[detections],
@@ -548,7 +843,7 @@ def plot_observations(ax, transient, color="k", marker="D", **kwargs):
         **kwargs,
     )
 
-    non_detections = np.isinf(obs_unc)  ## does only include +-inf, not nans
+    non_detections = np.isinf(obs_unc)  # does only include +-inf, not nans
     ax.errorbar(
         obs_times[non_detections],
         obs_lc[non_detections],
@@ -560,6 +855,24 @@ def plot_observations(ax, transient, color="k", marker="D", **kwargs):
 
 
 def adjust_observations(ax, transient, filt, xlim, fix_ylim):
+    """Set the axis ranges of a panel around its data.
+
+    Unless a range is imposed, the magnitude limits are widened just enough
+    to hold the observations of that filter.
+
+    Parameters
+    ----------
+    ax: matplotlib.axes.Axes
+        Panel to adjust.
+    transient: nmma.em.em_likelihood.BasicEMTransient
+        Holds the observations.
+    filt: str
+        Filter drawn in this panel.
+    xlim: list
+        Time range, in days.
+    fix_ylim: list or None
+        Magnitude range to impose, or None to derive it from the data.
+    """
 
     ax.set_xlim(xlim)
     # ax_delta.set_xlim(xlim)
@@ -580,6 +893,24 @@ def adjust_observations(ax, transient, filt, xlim, fix_ylim):
 
 
 def analysis_plot_geometry(filters_to_plot, ncols=2):
+    """Build a figure whose panels keep the same size whatever the count.
+
+    Spacings are reasoned in inches rather than in fractions of the figure,
+    so that a four-filter and a nine-filter figure have panels of identical
+    size instead of squeezing them.
+
+    Parameters
+    ----------
+    filters_to_plot: list of str
+        Filters to draw, one panel each.
+    ncols: int, optional
+        Number of columns.
+
+    Returns
+    -------
+    tuple
+        The figure, and the axes as a two-dimensional array.
+    """
     # NOTE Should this be the preferred geometry for the plots?
     # set up the geometry for the all-in-one figure
     wspace = 0.6  # All in inches.
@@ -614,6 +945,20 @@ def analysis_plot_geometry(filters_to_plot, ncols=2):
 
 
 def get_time_limits_from_obs_data(transient, filter_names):
+    """Time range spanned by the observations, across several filters.
+
+    Parameters
+    ----------
+    transient: nmma.em.em_likelihood.BasicEMTransient
+        Holds the observations.
+    filter_names: list of str
+        Filters to consider.
+
+    Returns
+    -------
+    tuple
+        First and last observing time, in days.
+    """
     """
     A function that goes through the lc data and finds the time range that encompasses all data points.
     """
@@ -625,6 +970,20 @@ def get_time_limits_from_obs_data(transient, filter_names):
 
 
 def get_mag_limits_from_obs_data(transient, filt):
+    """Magnitude range spanned by the observations of one filter.
+
+    Parameters
+    ----------
+    transient: nmma.em.em_likelihood.BasicEMTransient
+        Holds the observations.
+    filt: str
+        Filter to consider.
+
+    Returns
+    -------
+    tuple
+        Faintest and brightest magnitude.
+    """
     """
     A function that goes through the lc data and finds the magnitude range for each filter.
     """
