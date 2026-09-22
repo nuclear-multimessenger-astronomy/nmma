@@ -79,7 +79,6 @@ def set_analysis_filters(filters, data):
 
 
 def bolometric_setup(args):
-
     # create the data
     # FIXME add  injection functionality
     # if args.injection_file:
@@ -88,7 +87,7 @@ def bolometric_setup(args):
 
     # load the bolometric data
     data = pd.read_csv(args.light_curve_data)
-    trigger_time = read_trigger_time(None, args)
+    trigger_time = read_trigger_time(None, args, "mjd")
     light_curve_data = utils.setup_bolometric_lc_data(data, trigger_time)
 
     light_curve_model = model.SimpleBolometricLightCurveModel(
@@ -118,12 +117,11 @@ def bolometric_setup(args):
 
 
 def analysis_setup(args):
-
     filters = utils.set_filters(args)
     if getattr(args, "light_curve_data", None):
         # load observational data
         data = io.load_em_observations(args, format="observations")
-        trigger_time = read_trigger_time(None, args)
+        trigger_time = read_trigger_time(None, args, "mjd")
         injection_parameters = getattr(args, "injection_parameters", None)
     else:
         # try to work with injection data instead
@@ -157,10 +155,15 @@ def analysis_setup(args):
             k: injection_parameters.get(k, None) for k in priors.keys()
         }
     light_curve_data = utils.check_model_time_consistency(
-        light_curve_data, light_curve_model, priors, injection_parameters
+        light_curve_data,
+        light_curve_model,
+        priors,
+        injection_parameters,
+        allow_data_cuts=args.allow_data_cuts,
     )
-    # check_model_time_consistency may cut the data; rebuild the handler so
-    # its per-filter error_budget arrays match the cut light_curve_times.
+    # check_model_time_consistency may cut the data;
+    # rebuild the handler so the per-filter error_budget arrays
+    #  match the cut light_curve_times.
     systematics_handler = systematics.FilterSystematicsHandler(
         filters_to_analyze,
         args.systematics_file,

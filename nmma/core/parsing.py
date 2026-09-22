@@ -30,7 +30,7 @@ def parsing_and_logging(parser_func, args=None):
         setup_logger(outdir=args.outdir, label=args.label)
         Path(args.outdir).mkdir(parents=True, exist_ok=True)
         print("Setting up logger and storage directory")
-    except Exception:
+    except Exception as e:
         pass
     return args
 
@@ -183,6 +183,11 @@ def base_analysis_parsing(parser):
         "--checkpoint-plot",
         action="store_true",
         help="Whether to generate analytical check-point plots",
+    )
+    parser.add_argument(
+        "--allow-data-cuts",
+        action="store_true",
+        help="Allow automatic cutting of data to workflow needs (default: False)",
     )
     return parser
 

@@ -9,7 +9,8 @@ from scipy.integrate import quad, solve_ivp
 from scipy.interpolate import CubicSpline
 from scipy.special import erfc
 
-from ..core.utils import read_trigger_time
+from nmma.core.utils import read_trigger_time
+
 from . import utils
 
 try:
@@ -326,7 +327,6 @@ def sn_lc(sample_times_stretched, sn_model, filters, lambdas):
 
 ## shock-cooling lightcurve
 def sc_bol_lc(sample_times, param_dict, compute_Rs):
-
     t = sample_times * seconds_a_day
 
     # fetch parameter values
@@ -363,7 +363,6 @@ def sc_bol_lc(sample_times, param_dict, compute_Rs):
 
 
 def sc_lc(lbol, Rs, nu_host, filters):
-
     sigmaT4 = lbol / (4 * np.pi * Rs * Rs)
     T = np.power(sigmaT4 / sigSB, 0.25)
     T[T == 0.0] = np.nan
@@ -666,7 +665,6 @@ def eff_metzger_lc(sample_times, param_dict, nu_host, filters):
 
 
 def HoNa_lc(sample_times, param_dict, nu_host, filters):
-
     # calculate the temperature and luminosity to feed into the blackbody radiation calculation
     conv_params = setup_HoNa_params(sample_times, param_dict)
     inv_temp, R_photo = temp_photosphere_HoNa(*conv_params, param_dict.get("n", 4.5))
@@ -837,7 +835,6 @@ def blackbody_constant_temperature(_, param_dict, nu_host, filters):
 
 
 def powerlaw_blackbody_constant_temperature_lc(_, param_dict, nu_host, filters):
-
     # calculate the powerlaw prefactor (with the reference filter 'g')
     nu_ref = nu_host[filters.index("g")]  # FIXME, seems like a legacy hack
     powerlaw_prefactor = np.power(nu_ref, param_dict["beta"]) * np.power(
@@ -862,10 +859,9 @@ def create_light_curve_data(
     keep_infinite_data=False,
     rng=None,
 ):
-
     injection_parameters = light_curve_model.parameter_conversion(injection_parameters)
     filters = utils.set_filters(args)
-    trigger_time = read_trigger_time(injection_parameters, args)
+    trigger_time = read_trigger_time(injection_parameters, args, "mjd")
     if trigger_time is None:
         trigger_time = 0.0
     if rng is None:
