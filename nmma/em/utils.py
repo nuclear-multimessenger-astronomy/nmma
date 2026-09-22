@@ -26,11 +26,7 @@ from numpy.exceptions import VisibleDeprecationWarning
 
 # some frequently used constants:
 from ..core.constants import c_SI, eV_per_h_SI
-from ..core.conversion import (
-    cosmology_to_distance,
-    distance_modulus_nmma,
-    luminosity_distance_to_redshift,
-)
+from ..core.conversion import CosmologyConverter
 
 warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
@@ -287,32 +283,31 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 def check_model_time_consistency(
     light_curve_data, light_curve_model, priors, injection=None
 ):
-
     lc_times, lc_mags, lc_uncertainties, trigger_time = light_curve_data
     data_tmin, data_tmax = np.inf, -np.inf
     for key in lc_times.keys():
         detections = np.isfinite(lc_mags[key]) & np.isfinite(lc_uncertainties[key])
-        data_tmin = np.minimum(data_tmin, lc_times[key][detections].min())
-        data_tmax = np.maximum(data_tmax, lc_times[key][detections].max())
+        check_times = lc_times[key][detections]
+        if check_times.size == 0:
+            continue
+        data_tmin = np.minimum(data_tmin, check_times.min())
+        data_tmax = np.maximum(data_tmax, check_times.max())
 
     # get minimal / maximal redshift from prior
     if "redshift" in priors:
         zmin, zmax = priors["redshift"].minimum, priors["redshift"].maximum
     elif "luminosity_distance" in priors:
+        converter = CosmologyConverter()
         if "Hubble_constant" in priors:
             min_pars = {par: priors[par].minimum for par in priors}
-            min_pars = cosmology_to_distance(min_pars)
+            min_pars = converter(min_pars)
             zmin = min_pars["redshift"]
             max_pars = {par: priors[par].maximum for par in priors}
-            max_pars = cosmology_to_distance(max_pars)
+            max_pars = converter(max_pars)
             zmax = max_pars["redshift"]
         else:
-            zmin = luminosity_distance_to_redshift(
-                priors["luminosity_distance"].minimum
-            )
-            zmax = luminosity_distance_to_redshift(
-                priors["luminosity_distance"].maximum
-            )
+            zmin = converter.redshift(priors["luminosity_distance"].minimum)
+            zmax = converter.redshift(priors["luminosity_distance"].maximum)
 
     # get minimal / maximal timeshift from prior
     try:
@@ -356,16 +351,6 @@ def setup_bolometric_lc_data(light_curve_data, trigger_time):
         light_curve_data["Lbb_unc"].to_numpy()[sort_ids],
         trigger_time,
     )
-
-
-def transform_to_app_mag_dict(mag_dict, params):
-    d_lum = params.get(
-        "luminosity_distance", 1e-5
-    )  # assume 10 pc =1e-5 Mpc for abs_mag
-    distance_modulus = distance_modulus_nmma(d_lum)
-    for k in mag_dict.keys():
-        mag_dict[k] += distance_modulus
-    return mag_dict
 
 
 def get_extinction_model(ext_model=None, Rv=None):
@@ -649,7 +634,6 @@ def autocomplete_data(
 
 
 def get_default_filts_lambdas(filters=None):
-
     filts = [
         "u",
         "g",

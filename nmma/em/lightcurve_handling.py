@@ -12,7 +12,7 @@ from scipy.signal import savgol_filter
 from tqdm import tqdm
 
 from ..core import conversion as conv
-from ..core.constants import D, c_cgs, get_cosmology
+from ..core.constants import D, c_cgs
 from ..core.utils import read_injection_file, read_trigger_time, set_filename
 from . import em_parsing as emp
 from . import io, model, utils
@@ -21,7 +21,6 @@ from .plotting_utils import basic_em_analysis_plot, lc_plot_with_histogram
 
 
 def post_process_bestfit(transient, bestfit_params, args, result=None):
-
     lc_model = transient.light_curve_model
     lc_model.good_parameters = True  # to avoid sanity check issues
     observable_times, best_mags = lc_model.gen_detector_lc(bestfit_params)
@@ -276,7 +275,6 @@ def make_injection_lightcurve_from_parameters(
 def make_injection(
     injection_params, args, injection_model, rng=None, keep_infinite_data=False
 ):
-
     injection_params = adjust_injection_parameters(
         injection_params, args, injection_model
     )
@@ -293,7 +291,6 @@ def make_injection(
 
 
 def adjust_injection_parameters(injection_parameters, args, injection_model):
-
     trigger_time = read_trigger_time(injection_parameters, args)
     injection_parameters["trigger_time"] = trigger_time or 0.0
     if args.ignore_timeshift:
@@ -328,17 +325,16 @@ def make_lcs(args=None):
 
 class LightCurveHandler:
     def __init__(self, args):
-
         self.filters = utils.set_filters(args)
-        cosmology = get_cosmology()
+        cosmo_converter = conv.CosmologyConverter()
         # Use redshift or dMpc if z is not provided
         if args.redshift is None:
             self.dMpc = args.dMpc
-            self.redshift = conv.luminosity_distance_to_redshift(self.dMpc, cosmology)
+            self.redshift = cosmo_converter.redshift(self.dMpc)
             dist_filler = f"dMpc{int(self.dMpc)}"
         else:
             self.redshift = args.redshift
-            self.dMpc = cosmology.luminosity_distance(self.redshift).to("Mpc").value
+            self.dMpc = cosmo_converter.luminosity_distance(self.redshift)
             dist_filler = f"z{self.redshift}"
 
         if args.doAB:

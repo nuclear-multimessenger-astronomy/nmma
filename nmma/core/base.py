@@ -21,7 +21,7 @@ from bilby.core.prior import (
 from bilby.core.result import FileMovedError
 
 from .constants import set_cosmology
-from .conversion import cosmology_to_distance
+from .conversion import CosmologyConverter
 from .parsing import nmma_base_parsing, single_messenger_analysis_parsing
 from .utils import input_obj_to_str, read_bestfit_from_posterior
 
@@ -190,7 +190,8 @@ class NMMALikelihood(NMMALikelihoodMixin, Likelihood):
     def setup_parameter_conversion(self):
         # FUTURE: add more standard conversions here
         if "Hubble_constant" in self.priors:
-            self.conv_functions.append(cosmology_to_distance)
+            cosmo_converter = CosmologyConverter.from_priors(self.priors)
+            self.conv_functions.append(cosmo_converter)
 
     def setup_submodel_conversion(self):
         pass
