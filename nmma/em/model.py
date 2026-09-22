@@ -274,7 +274,7 @@ class LightCurveModelContainer:
     def check_vs_priors(self, priors):
         """Warn about missing priors, and prepare what they imply.
 
-        Beyond warning, this sets up two things the priors decide: 
+        Beyond warning, this sets up two things the priors decide:
         How to handle cosmology-aware conversion between redshift and distance,
         and which extinction model to apply when Ebv is sampled.
 
@@ -313,7 +313,7 @@ class LightCurveModelContainer:
         numpy.ndarray
             Wavenumbers in 1/micron.
         """
-        
+
         return self.wavenumbers * (1 + self.redshift)
 
     def obs_wavenumbers(self):
@@ -324,7 +324,7 @@ class LightCurveModelContainer:
         numpy.ndarray
             Wavenumbers in 1/micron.
         """
-        
+
         return self.wavenumbers
 
     def sanity_checks(self, parameters):

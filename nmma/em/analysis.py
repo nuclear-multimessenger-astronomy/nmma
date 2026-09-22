@@ -224,7 +224,7 @@ def analysis_setup(args):
     Photometry is read from ``args.light_curve_data`` when given, or
     simulated from an injection otherwise. It is then cut to the requested
     time range and restricted to the available filters, before the light
-    curve model, the systematics handler and the priors are built. 
+    curve model, the systematics handler and the priors are built.
 
     Parameters
     ----------
