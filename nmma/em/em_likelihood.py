@@ -20,7 +20,11 @@ def setup_em_kwargs(priors, data_dump, args, logger=None):
     trigger_time = read_trigger_time(None, args)
     light_curve_data = utils.setup_filtered_lc_data(light_curve_data, trigger_time)
     light_curve_data = utils.check_model_time_consistency(
-        light_curve_data, light_curve_model, priors, args.injection, args.allow_data_cuts
+        light_curve_data,
+        light_curve_model,
+        priors,
+        args.injection,
+        args.allow_data_cuts,
     )
     sys_handler = systematics.FilterSystematicsHandler(
         filters,
@@ -83,7 +87,6 @@ class EMTransientLikelihood(NMMALikelihood):
         verbose=False,
         **kwargs,
     ):
-
         basic_transient_args = (
             light_curve_model,
             light_curve_data,
@@ -198,7 +201,6 @@ class BasicEMTransient:
         detection_limit,
         verbose,
     ):
-
         self.light_curve_model = light_curve_model
 
         self.light_curve_model.check_vs_priors(priors)
@@ -270,7 +272,6 @@ class BasicEMTransient:
     def chisquare_gaussianlog_from_lc_data(
         self, est_mag, data_mag, data_sigma, upperlim_sigma, lim=np.inf
     ):
-
         # seperate the data into bounds (inf err) and actual measurement
         finiteIdx = np.isfinite(data_sigma)
         infIdx = ~finiteIdx
@@ -304,7 +305,6 @@ class BasicEMTransient:
         return minus_chisquare, np.sum(gausslogsf)
 
     def truncated_gaussian(self, m_det, loc, scale, upper_lim):
-
         a = -np.inf  # no lower bound of truncation
         b = (upper_lim - loc) / scale  # upper bound in number of std-deviations
         return truncnorm.logpdf(m_det, a, b, loc=loc, scale=scale)
@@ -351,7 +351,6 @@ class MultiFilterTransient(BasicEMTransient):
         detection_limit,
         verbose,
     ):
-
         self.observed_filters = filters
         self.model_filter_mapping, self.obs_average_mapping = (
             utils.get_filter_name_mapping(filters)

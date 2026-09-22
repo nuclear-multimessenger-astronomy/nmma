@@ -281,8 +281,11 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 
 
 def check_model_time_consistency(
-    light_curve_data, light_curve_model, priors, injection=None, allow_data_cuts=False
-
+    light_curve_data,
+    light_curve_model,
+    priors,
+    injection=None,
+    allow_data_cuts=False,
 ):
     lc_times, lc_mags, lc_uncertainties, trigger_time = light_curve_data
     data_tmin, data_tmax = np.inf, -np.inf

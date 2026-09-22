@@ -155,14 +155,15 @@ def analysis_setup(args):
             k: injection_parameters.get(k, None) for k in priors.keys()
         }
     light_curve_data = utils.check_model_time_consistency(
-        light_curve_data, 
-        light_curve_model, 
-        priors, 
+        light_curve_data,
+        light_curve_model,
+        priors,
         injection_parameters,
         allow_data_cuts=args.allow_data_cuts,
     )
-    # check_model_time_consistency may cut the data; rebuild the handler so
-    # its per-filter error_budget arrays match the cut light_curve_times.
+    # check_model_time_consistency may cut the data;
+    # rebuild the handler so the per-filter error_budget arrays
+    #  match the cut light_curve_times.
     systematics_handler = systematics.FilterSystematicsHandler(
         filters_to_analyze,
         args.systematics_file,
