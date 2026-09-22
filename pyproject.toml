@@ -31,7 +31,7 @@ dependencies = [
     "future",
     "bilby>=2.7.1",
     "bilby_pipe>=1.7.0",
-    "fiestaEM>=0.2.1",
+    "fiestaEM>=0.3.0",
     "huggingface_hub",
     "schwimmbad",
     "colorcet",
@@ -166,7 +166,7 @@ exclude_lines = [
 ignore_errors = true
 
 [tool.pytest.ini_options]
-addopts = "--verbose -r s"
+addopts = "-ra"
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
 
@@ -177,7 +177,7 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = [
-    "E501", 
+    "E501",
     "E722", # Bare Except
     "E741", # Ambiguous variable name
     "F841", # Local variable assigned but never used

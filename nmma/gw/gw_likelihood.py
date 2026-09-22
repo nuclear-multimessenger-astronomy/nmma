@@ -9,7 +9,11 @@ from bilby.gw.likelihood import (
 )
 
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
-from ..core.conversion import bbh_source_frame, bns_source_frame
+from ..core.conversion import (
+    CosmologyConverter,
+    bbh_source_frame,
+    bns_source_frame,
+)
 from ..core.conversion import (
     tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion,
 )
@@ -193,7 +197,6 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
         time_reference="geocenter",
         **kwargs,
     ):
-
         waveform_generator.parameter_conversion = self.gw_identity_conversion
         waveform_generator.start_time = interferometers[0].time_array[0]
 
@@ -238,13 +241,18 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
 
         super().__init__(gw_transient, priors)
 
+    def setup_submodel_conversion(self):
         if (
             "neutron_star"
             in self.sub_model.waveform_generator.frequency_domain_source_model.__name__
         ):
-            self.parameter_conversion = bns_source_frame
+            self.conv_functions.append(bns_source_frame)
         else:
-            self.parameter_conversion = bbh_source_frame
+            self.conv_functions.append(bbh_source_frame)
+
+    def setup_parameter_conversion(self):
+        cosmo_converter = CosmologyConverter().from_priors(self.priors)
+        self.conv_functions.append(cosmo_converter)
 
     def posterior_conversion(self, posterior_samples):
         if "chi_eff" not in posterior_samples:

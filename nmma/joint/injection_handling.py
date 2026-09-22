@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 from bilby_pipe.create_injections import InjectionCreator
 
-from ..core.constants import get_cosmology, set_cosmology
 from ..core.conversion import (
     BNSEjectaFitting,
+    CosmologyConverter,
     KilonovaEjectaFitting,
     MultimessengerConversion,
     NSBHEjectaFitting,
@@ -37,7 +37,7 @@ class NMMAInjectionCreator(InjectionCreator):
             # convert string to dict
             args.prior_file = args.prior_dict
 
-        set_cosmology(getattr(args, "cosmology", None))
+        self.cosmo_converter = CosmologyConverter(getattr(args, "cosmology", None))
         super().__init__(
             prior_file=args.prior_file,
             prior_dict=args.prior_dict,
@@ -49,7 +49,7 @@ class NMMAInjectionCreator(InjectionCreator):
             duration=args.duration,
             post_trigger_duration=args.post_trigger_duration,
             generation_seed=args.generation_seed,
-            cosmology=get_cosmology(),
+            cosmology=self.cosmo_converter.cosmology,
         )
         self.rng = np.random.default_rng(self.generation_seed)
         for key, value in kwargs.items():

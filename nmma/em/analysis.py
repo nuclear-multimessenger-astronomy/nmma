@@ -79,7 +79,6 @@ def set_analysis_filters(filters, data):
 
 
 def bolometric_setup(args):
-
     # create the data
     # FIXME add  injection functionality
     # if args.injection_file:
@@ -88,7 +87,7 @@ def bolometric_setup(args):
 
     # load the bolometric data
     data = pd.read_csv(args.light_curve_data)
-    trigger_time = read_trigger_time(None, args)
+    trigger_time = read_trigger_time(None, args, "mjd")
     light_curve_data = utils.setup_bolometric_lc_data(data, trigger_time)
 
     light_curve_model = model.SimpleBolometricLightCurveModel(
@@ -118,12 +117,11 @@ def bolometric_setup(args):
 
 
 def analysis_setup(args):
-
     filters = utils.set_filters(args)
     if getattr(args, "light_curve_data", None):
         # load observational data
         data = io.load_em_observations(args, format="observations")
-        trigger_time = read_trigger_time(None, args)
+        trigger_time = read_trigger_time(None, args, "mjd")
         injection_parameters = getattr(args, "injection_parameters", None)
     else:
         # try to work with injection data instead
