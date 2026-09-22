@@ -1,0 +1,68 @@
+{%- macro automodule(modname, options) -%}
+.. automodule:: {{ modname }}
+{%- for option in options %}
+   :{{ option }}:
+{%- endfor %}
+{%- endmacro %}
+
+{%- macro autosummary_table(docnames) -%}
+.. autosummary::
+   :nosignatures:
+
+{% for docname in docnames %}
+   {{ docname }}
+{%- endfor %}
+{%- endmacro %}
+
+{%- macro hidden_toctree(docnames) -%}
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+{% for docname in docnames %}
+   {{ docname }}
+{%- endfor %}
+{%- endmacro %}
+
+{{- pkgname | e | heading }}
+
+{%- if is_namespace %}
+.. py:module:: {{ pkgname }}
+{% endif %}
+
+{%- if subpackages %}
+Subpackages
+-----------
+
+{{ autosummary_table(subpackages) }}
+
+{{ hidden_toctree(subpackages) }}
+{% endif %}
+
+{%- if submodules %}
+Submodules
+----------
+
+{% if separatemodules %}
+{{ autosummary_table(submodules) }}
+
+{{ hidden_toctree(submodules) }}
+{% else %}
+{%- for submodule in submodules %}
+{% if show_headings %}
+{{- submodule | e | heading(2) }}
+{% endif %}
+{{ automodule(submodule, automodule_options) }}
+{% endfor %}
+{%- endif %}
+{%- endif %}
+
+{%- if not is_namespace %}
+.. No "Module contents" heading here: __init__.py files in this repo
+   have no docstring/members of their own, so it would always render
+   empty. This automodule call just registers {{ pkgname }} as a
+   cross-reference target for the autosummary tables above (and on
+   the parent package's own page) to link into.
+
+{{ automodule(pkgname, automodule_options) }}
+{% endif %}

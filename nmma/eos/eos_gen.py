@@ -21,7 +21,6 @@ def eos_from_nep(
     Zsym_val=0.0,
     crust_path="data/BPS_crust_eos.dat",
 ):
-
     # Load crust EOS
     # will load an array with n, p, eps
     crust_EOS = np.loadtxt(crust_path)
@@ -110,7 +109,6 @@ class EOS_with_CSE:
         extension_scheme="peter",
         low_density_eos_stiff=None,
     ):
-
         self.seed = seed
 
         if not low_density_eos_stiff:
@@ -168,7 +166,6 @@ class EOS_with_CSE:
         self.__construct_all_interpolation()
 
     def __extend(self):
-
         # declare the cs2 on nodes
         cs2_draw = np.empty((self.N_seg + 2, 2))
         # first node is the end of the low density eos
@@ -242,7 +239,6 @@ class EOS_with_CSE:
         self.e_array = np.concatenate((self.e_low[n_low < self.n_connect], self.e_high))
 
     def __extend_v1(self):
-
         # fix the seed
         np.random.seed(self.seed)
 
@@ -307,7 +303,6 @@ class EOS_with_CSE:
         self.e_array = np.concatenate((self.e_low[n_low < self.n_connect], self.e_high))
 
     def __calculate_pseudo_enthalpy(self):
-
         intergrand = self.p_array / (self.e_array + self.p_array)
         self.h_array = (
             cumulative_trapezoid(intergrand, np.log(self.p_array), initial=0)
@@ -315,7 +310,6 @@ class EOS_with_CSE:
         )
 
     def __construct_all_interpolation(self):
-
         self.log_energy_density_from_log_pressure = interp1d(
             np.log(self.p_array),
             np.log(self.e_array),
@@ -453,7 +447,6 @@ class EOS_with_CSE:
         return e / p * self.log_dedp_from_log_pressure(np.log(p))
 
     def construct_family(self, ndat=100):
-
         pc_min = 3.5  # arbitary lower bound pc in MeV fm^-3
         pc_max = self.pressure_from_number_density(self.n_lim * 0.999)
 

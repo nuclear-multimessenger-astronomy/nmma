@@ -11,11 +11,28 @@ from .gitlab import refresh_models_list
 
 
 def yaml_parse(s):
+    """Parse a YAML string into a Python value; used as the CLI
+    argument type for dict/list-valued flags."""
     return yaml.safe_load(s)
 
 
 def parsing_and_logging(parser_func, args=None):
+    """Resolve ``args`` (parsing it via ``parser_func`` if not already a
+    Namespace), validate PyMultiNest's 64-character outdir limit,
+    optionally refresh the SVD models list, and set up the logger and
+    output directory.
 
+    Parameters
+    ----------
+    parser_func: callable | list of callable
+        See ``nmma_base_parsing``; only used if ``args`` isn't already a
+        Namespace.
+    args: argparse.Namespace | str | list of str | None, optional
+
+    Returns
+    -------
+    argparse.Namespace
+    """
     if not isinstance(args, argparse.Namespace):
         args = nmma_base_parsing(parser_func, args)
 
@@ -23,6 +40,12 @@ def parsing_and_logging(parser_func, args=None):
         if len(args.outdir) > 64:
             raise ValueError("output directory name is longer than 64 characters")
 
+    # FIX ME: singular "refresh_model_list" doesn't match the real CLI
+    # flag/attribute used everywhere else (--refresh-models-list ->
+    # args.refresh_models_list, plural -- see em/em_parsing.py and
+    # gitlab.py's own main()). Confirmed: even with
+    # args.refresh_models_list=True set, this getattr always falls back
+    # to its False default, so this branch never actually triggers.
     if getattr(args, "refresh_model_list", False):
         refresh_models_list(args.svd_path)
 
@@ -30,15 +53,31 @@ def parsing_and_logging(parser_func, args=None):
         setup_logger(outdir=args.outdir, label=args.label)
         Path(args.outdir).mkdir(parents=True, exist_ok=True)
         print("Setting up logger and storage directory")
-    except Exception:
+    except Exception as e:
         pass
     return args
 
 
 def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
-    """Base parsing function for nmma.
-    Takes a parsing function as input and returns the corresponding namespace,
-    potentially inferred from a config file."""
+    """Build the full CLI parser (config-file-aware, plus the universal
+    --multi/--matrix sweep args) via ``parsing_func``, and parse
+    ``cli_args`` with it.
+
+    Parameters
+    ----------
+    parsing_func: callable | list of callable
+        Adds args to the parser; if a list, applied in order.
+    cli_args: None | str | list of str, optional
+        None uses sys.argv[1:]; a str is split on whitespace, so avoid
+        spaces inside YAML/dict-valued args in this form (pass a list
+        instead, or write e.g. "{a:1,b:2}" with no spaces).
+    return_parser: bool, default False
+        If True, return the built parser instead of parsing.
+
+    Returns
+    -------
+    argparse.Namespace | argparse.ArgumentParser
+    """
 
     # Determine if a config file is given and set up the parser accordingly
     if cli_args is None:
@@ -74,6 +113,26 @@ def nmma_base_parsing(parsing_func, cli_args=None, return_parser=False):
 
 
 def check_for_config(cli_args, parents=[], drop_config=True):
+    """If ``cli_args`` starts with a config file (via -c/--config/--ini,
+    or just as the first positional arg), build a configargparse parser
+    pre-loaded with it (YAML or INI/TOML/CFG, by extension) and drop it
+    from ``cli_args``; otherwise return a plain argparse parser.
+
+    Parameters
+    ----------
+    cli_args: list of str
+        CLI args, consumed from the front.
+    parents: list of ArgumentParser, optional
+        Parent parsers to inherit args from.
+    drop_config: bool, default True
+        Whether to remove the config file argument from the returned
+        ``cli_args``.
+
+    Returns
+    -------
+    parser: argparse.ArgumentParser | configargparse.ArgumentParser
+    cli_args: list of str
+    """
     if cli_args:
         first_arg = cli_args[0]
         if (
@@ -87,6 +146,17 @@ def check_for_config(cli_args, parents=[], drop_config=True):
         else:
             config_given = False
 
+        # FIX ME: when `config_given` is True (an explicit -c/--config/--ini
+        # flag) but `first_arg` doesn't exist at all, this whole block is
+        # skipped -- so the clear "tried to parse X as a config file, but
+        # failed" + sys.exit(1) below never runs here.
+        # Confirmed: --config /nonexistent.yaml silently falls through to
+        # a plain argparse.ArgumentParser, AND leaves the unresolved path
+        # sitting in cli_args (the cli_args.pop(0) below never runs
+        # either) -- so the user gets a confusing "unexpected argument"
+        # error from argparse later, with no hint that a typo'd --config
+        # path was the actual cause. Needs an explicit
+        # `if config_given: <error+exit>` when Path(first_arg).is_file() is False.
         if Path(first_arg).is_file():
             if first_arg.endswith((".yaml", ".yml")):
                 pc = configargparse.YAMLConfigFileParser
@@ -113,6 +183,18 @@ def check_for_config(cli_args, parents=[], drop_config=True):
 
 
 def base_analysis_parsing(parser):
+    """Add CLI args shared by all single-messenger analyses: Hubble/
+    cosmology sampling, sampling seed, sampler kwargs, checkpointing
+    cadence, and core run controls (dlogz, cpus, nlive, etc).
+
+    Parameters
+    ----------
+    parser: argparse.ArgumentParser
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
     parser.add_argument(
         "--Hubble",
         "--with-Hubble",
@@ -184,10 +266,26 @@ def base_analysis_parsing(parser):
         action="store_true",
         help="Whether to generate analytical check-point plots",
     )
+    parser.add_argument(
+        "--allow-data-cuts",
+        action="store_true",
+        help="Allow automatic cutting of data to workflow needs (default: False)",
+    )
     return parser
 
 
 def dynesty_parsing(parser):
+    """Add dynesty-specific sampler CLI args (walks, maxmcmc, nact,
+    naccept, min_eff, facc, enlarge, proposals, iteration/time limits).
+
+    Parameters
+    ----------
+    parser: argparse.ArgumentParser
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
     dynesty_group = parser.add_argument_group(title="Dynesty Settings")
     dynesty_group.add_argument(
         "--n-check-point",
@@ -261,6 +359,18 @@ def dynesty_parsing(parser):
 
 
 def single_messenger_analysis_parsing(parser):
+    """Add the CLI args for a standalone single-messenger analysis:
+    ``base_analysis_parsing`` + ``dynesty_parsing``, plus outdir/label/
+    plot/sampler/prior-file/result-format.
+
+    Parameters
+    ----------
+    parser: argparse.ArgumentParser
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
     parser = base_analysis_parsing(parser)
     parser = dynesty_parsing(parser)
 
@@ -343,6 +453,18 @@ def base_injection_parsing(parser):
 
 
 def pipe_inj_parsing(parser):
+    """Add bilby_pipe-style injection-generation CLI args: prior
+    file/dict, number of injections, and trigger-time/GPS-file timing
+    options.
+
+    Parameters
+    ----------
+    parser: argparse.ArgumentParser
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
     ### bilby-pipe injectionCreator parameters
     parser.add_argument(
         "--prior-file",
@@ -419,6 +541,18 @@ def pipe_inj_parsing(parser):
 
 
 def slurm_setup_parser(parser):
+    """Add CLI args for turning an NMMA injection file into a set of
+    per-injection SLURM job scripts: ``pipe_inj_parsing`` plus the
+    required injection/analysis files and jobs-per-batch count.
+
+    Parameters
+    ----------
+    parser: argparse.ArgumentParser
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
     parser.description = "Create files from nmma injection file"
     parser = pipe_inj_parsing(parser)
 
@@ -449,6 +583,17 @@ def slurm_setup_parser(parser):
 
 
 def slurm_analysis_parser(parser):
+    """Add CLI args describing the SLURM cluster/job to submit
+    light-curve analyses to (cores, partition, nodes, walltime, etc).
+
+    Parameters
+    ----------
+    parser: argparse.ArgumentParser
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
     slurm_args = parser.add_argument_group(
         title="Slurm arguments",
         description="Arguments for running the lightcurve analysis on a Slurm HPC cluster",
@@ -500,6 +645,27 @@ def slurm_analysis_parser(parser):
 
 
 def process_sampler_kwargs(args):
+    """Resolve the final dynesty init/run kwargs from ``args``, layering
+    user-supplied ``--sampler-kwargs`` overrides on top of built-in
+    defaults (some of which, like "sample"/"save_bounds", have no
+    dedicated CLI flag and can only be set this way).
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Must provide ``nlive``, ``sampler_kwargs`` (dict), and, if set
+        via CLI, ``dlogz``/``min_eff``/``bound``/``walks``/``facc``/``enlarge``.
+
+    Returns
+    -------
+    sampler_init_kwargs: dict
+        For ``dynesty.NestedSampler``'s constructor (with ``min_eff``
+        moved into a nested "first_update" dict alongside a computed
+        ``min_ncall``).
+    run_sampler_kwargs: dict
+        ``{"dlogz": ..., "save_bounds": ...}``, for the sampler's
+        ``sample()`` call.
+    """
     # Set defaults here to avoid inconsistent values
     default_kwargs = dict(
         dlogz=0.1,
@@ -532,6 +698,18 @@ def process_sampler_kwargs(args):
 
 ############# UTILS #############
 def process_multi_condition_string(multi_condition_string):
+    """Parse a comma-separated (or already-split) list of conditions
+    into a dict: "key>=1.5" -> {key: (operator.ge, 1.5)}, "key=value" ->
+    {key: value (as a string)}, or a bare "key" -> {key: True}.
+
+    Parameters
+    ----------
+    multi_condition_string: str | list of str
+
+    Returns
+    -------
+    dict
+    """
     # Supported operators
     operators = {
         "==": operator.eq,
