@@ -1,17 +1,32 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.3.0
+    rev: v6.0.0
     hooks:
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-toml
       - id: check-yaml
+      - id: check-json
+      - id: pretty-format-json
+        args: ["--autofix"]
+        exclude: \.ipynb$
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: debug-statements
+      - id: detect-private-key
       - id: end-of-file-fixer
       - id: trailing-whitespace
+      - id: mixed-line-ending
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.0
+    rev: v0.16.7
     hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff
-        name: ruff check (unfixable errors)
-        args: [--no-fix]
+      - id: ruff-check
+        args: ["--fix"]
+        files: ^(nmma|tests|docs)/
+        types_or: [python, pyi]
       - id: ruff-format
-        exclude: nb|.ipynb_checkpoints|data|dev|letsencrypt|logs|dask-worker-space|__init__.py
+        files: ^(nmma|tests|docs)/
+        types_or: [python, pyi]

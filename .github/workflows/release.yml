@@ -1,0 +1,152 @@
+name: Release
+
+# Releases are created manually on GitHub (Releases -> Draft a new release, with a
+# vX.Y.Z tag). This workflow only reacts to that -- there is no automatic tagging
+# or version-bumping. The published version comes from the tag itself, via
+# setuptools-scm (see pyproject.toml's [tool.setuptools_scm]).
+#
+# `released` (not `published`) deliberately excludes prereleases -- a
+# prerelease published here (manually, or by some future automation) must
+# not flow through to PyPI/Docker Hub.
+
+on:
+  release:
+    types: [released]
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY_IMAGE: nmma/nmma_api
+
+jobs:
+  test-pypi:
+    # Building always runs. The actual TestPyPI upload is inert until
+    # TEST_PYPI_API_TOKEN exists (account/secret setup is separate work) -- that
+    # step skips rather than failing, so it can't block the real `pypi` job below
+    # in the meantime.
+    if: github.repository_owner == 'nuclear-multimessenger-astronomy'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # setuptools-scm needs tag history to resolve the version
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: uv pip install --system build
+      - run: python -m build --sdist --wheel --outdir dist/
+      - name: Publish to TestPyPI
+        if: env.TEST_PYPI_API_TOKEN != ''
+        env:
+          TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
+
+  pypi:
+    needs: test-pypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: uv pip install --system build
+      - run: python -m build --sdist --wheel --outdir dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  # No conda job here on purpose: nmma is already published on conda-forge via
+  # conda-forge/nmma-feedstock, which auto-updates itself (regro-cf-autotick-bot
+  # opens a PR there on every new PyPI release). This repo publishing to conda
+  # directly would be a second, redundant distribution path -- see
+  # .github/MANUAL_SETUP.md for what (if anything) needs attention there.
+
+  container:
+    if: github.repository_owner == 'nuclear-multimessenger-astronomy'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ["linux/amd64"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+
+      - uses: docker/setup-qemu-action@v3
+      - id: buildx
+        uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./api/Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  container-merge:
+    if: github.repository_owner == 'nuclear-multimessenger-astronomy'
+    runs-on: ubuntu-latest
+    needs: container
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          name: digests
+          path: /tmp/digests
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}

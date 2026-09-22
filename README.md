@@ -19,7 +19,7 @@
 [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/nmma?label=conda%20downloads)](https://anaconda.org/conda-forge/nmma)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/nmma?label=PyPI%20downloads)](https://badge.fury.io/py/nmma)
 [![Coverage Status](https://coveralls.io/repos/github/nuclear-multimessenger-astronomy/nmma/badge.svg?branch=main)](https://coveralls.io/github/nuclear-multimessenger-astronomy/nmma?branch=main)
-[![CI](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/continous_integration.yml/badge.svg)](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/continous_integration.yml)
+[![CI](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/ci.yml/badge.svg)](https://github.com/nuclear-multimessenger-astronomy/nmma/actions/workflows/ci.yml)
 [![PyPI version](https://badge.fury.io/py/nmma.svg)](https://badge.fury.io/py/nmma)
 [![Python version](https://img.shields.io/pypi/pyversions/nmma.svg)](https://badge.fury.io/py/nmma)
 
