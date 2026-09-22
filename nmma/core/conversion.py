@@ -40,175 +40,294 @@ def val_to_scalar(val):
 
 
 # =================== distance conversions # ===================
-def distance_modulus_nmma(d_lum=1e-5):
-    # mag_app = mag_abs + 5* log10(dist/10pc) | NMMA-dist is in Mpc
-    #         = mag_abs + 5 * (log10(Mpc/10pc)+ log10(params["luminosity_distance"]))
-    # therefore: distance_modulus = mag_app - mag_abs =
-    """
-    Distance modulus for a luminosity distance in Mpc.
-
-    Parameters
-    ----------
-    d_lum : float or array_like, default=1e-5
-        Luminosity distance in Mpc.
-
-    Returns
-    -------
-    The distance modulus.
-    """
-    return 5.0 * (5 + np.log10(d_lum))
 
 
-def luminosity_distance_to_redshift(distance, cosmology=None):
-    """
-    Convert luminosity distance to redshift.
-
-    Parameters
-    ----------
-    distance : float, array_like or pandas.Series
-        Luminosity distance in Mpc. More than 50 values are interpolated
-        on the grids from :func:`get_cosmo_grids`.
-    cosmology : default=None
-        If None, :func:`nmma.core.constants.get_cosmology` is used.
-
-    Returns
-    -------
-    The redshift.
-    """
-    if cosmology is None:
-        cosmology = get_cosmology()
-    if isinstance(distance, pd.Series):
-        distance = distance.values
-
-    if hasattr(distance, "__len__") and len(distance) > 50:
-        d_min, d_max = distance.min(), distance.max()
-        dist_grid, z_grid = get_cosmo_grids(d_min, d_max, cosmology)
-        return np.interp(distance, dist_grid, z_grid).value
-    else:
-        return cosmo.z_at_value(
-            cosmology.luminosity_distance, distance * units.Mpc
-        ).value
-
-
-def get_cosmo_grids(distance_min, distance_max, cosmology):
-    # luminosity_distance_to_redshift gets really slow if too many distances are put in at once
-    """
-    Build matching luminosity distance and redshift grids.
-
-    Parameters
-    ----------
-    distance_min, distance_max : float
-        Grid endpoints in Mpc.
-    cosmology
-        Cosmology used for the conversion.
-
-    Returns
-    -------
-    numpy.ndarray
-        The distance grid.
-    numpy.ndarray
-        The redshift grid, 50 points from ``numpy.geomspace``.
-    """
-    zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance_min * units.Mpc)
-    zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance_max * units.Mpc)
-    z_grid = np.geomspace(zmin, zmax, 50)
-    dist_grid = cosmology.luminosity_distance(z_grid).value
-    return dist_grid, z_grid
-
-
-def get_redshift(parameters):
-    """
-    Return the redshift held in ``parameters``.
-
-    Uses ``redshift`` if present, otherwise converts
-    ``luminosity_distance``, otherwise returns zeros shaped like the first
-    value in ``parameters``.
-
-    Parameters
-    ----------
-    parameters : dict
-
-    Returns
-    -------
-    The redshift.
-    """
-    if "redshift" in parameters:
-        return parameters["redshift"]
-    elif "luminosity_distance" in parameters:
-        return luminosity_distance_to_redshift(parameters["luminosity_distance"])
-    else:
-        # zeros like the first input of parameters, independent of size and keys
-        return np.zeros_like(next(iter(parameters.values())))
-
-
-def cosmology_to_distance(parameters):
-    """
-    Fill in ``redshift`` or ``luminosity_distance`` from the other.
-
-    Clones the current cosmology with ``Hubble_constant`` and
-    ``Omega_matter`` from ``parameters`` where present. Array-valued
-    cosmology parameters are handled one entry at a time.
-
-    Parameters
-    ----------
-    parameters : dict
-
-    Returns
-    -------
-    dict
-        ``parameters``, updated.
-    """
-    cosmology = get_cosmology()
-    cosmo_parameters = {}
-    if "Hubble_constant" in parameters:
-        cosmo_parameters["H0"] = parameters["Hubble_constant"]
-    if "Omega_matter" in parameters:
-        cosmo_parameters["Om0"] = parameters["Omega_matter"]
+class CosmologyConverter:
+    nmma_to_astropy_cosmo_map = {
+        "Hubble_constant": "H0",
+        "Omega_matter": "Om0",
+    }
     # Maybe extend for an even wilder cosmology?
-    try:
-        alt_cosmo = cosmology.clone(**cosmo_parameters)
+
+    def __init__(self, cosmology=None):
+        """Initialize the CosmologyConverter with a given cosmology.
+
+        Parameters
+        ----------
+        cosmology : str or astropy.cosmology.Cosmology, optional
+            The cosmology to use for the conversion. If None, the default cosmology will be used.
+        """
+        self._set_conv_cosmology(cosmology)
+        self.conversion_function = self.convert
+
+    def __call__(self, parameters):
+        """Convert to luminosity distance and/or redshift based on cosmological assumptions.
+
+        Parameters
+        ----------
+        parameters : dict
+            Dictionary containing cosmological parameters.
+
+        Returns
+        -------
+        dict
+            Updated parameters with luminosity distance and redshift.
+        """
+        if "redshift" in parameters and "luminosity_distance" in parameters:
+            # if both are present, we assume they are consistent and do nothing
+            return parameters
+        return self.conversion_function(parameters)
+
+    def _set_conv_cosmology(self, cosmology=None):
+        if cosmology is None:
+            self.cosmology = get_cosmology()
+        else:
+            self.cosmology = set_cosmology(cosmology)
+
+    def convert(self, parameters):
+        """Convert to luminosity distance and/or redshift based on cosmological assumptions.
+
+        Parameters
+        ----------
+        parameters : dict
+            Dictionary containing cosmological parameters.
+
+        Returns
+        -------
+        dict
+            Updated parameters with luminosity distance and redshift.
+        """
+        if "redshift" in parameters:
+            parameters["luminosity_distance"] = self.luminosity_distance(
+                parameters["redshift"]
+            )
+        elif "luminosity_distance" in parameters:
+            parameters["redshift"] = self.redshift(parameters["luminosity_distance"])
+        else:
+            raise ValueError(
+                "Either redshift or luminosity_distance must be in parameters"
+            )
+        return parameters
+
+    def luminosity_distance(self, redshift, cosmology=None):
+        """Convert redshift to luminosity distance using the current cosmology.
+
+        Parameters
+        ----------
+        redshift : float or array-like
+            Redshift value(s) to convert.
+        cosmology : astropy.cosmology.Cosmology, optional
+            The cosmology to use for the conversion. If None, the default cosmology will be used.
+
+        Returns
+        -------
+        float or array-like
+            Corresponding luminosity distance(s) in Mpc.
+        """
+        if cosmology is None:
+            cosmology = self.cosmology
+        return cosmology.luminosity_distance(redshift).value
+
+    def redshift(self, luminosity_distance, cosmology=None):
+        """Convert luminosity distance to redshift using a given cosmology.
+
+        Parameters
+        ----------
+        luminosity_distance : float or array-like
+            Luminosity distance value(s) to convert.
+        cosmology : astropy.cosmology.Cosmology, optional
+            The cosmology to use for the conversion. If None, the default cosmology will be used.
+
+        Returns
+        -------
+        float or array-like
+            Corresponding redshift(s).
+        """
+        if isinstance(luminosity_distance, pd.Series):
+            luminosity_distance = luminosity_distance.values
+
+        if cosmology is None:
+            cosmology = self.cosmology
+
+        if hasattr(luminosity_distance, "__len__") and len(luminosity_distance) > 50:
+            d_min, d_max = luminosity_distance.min(), luminosity_distance.max()
+            dist_grid, z_grid = self.get_cosmo_grids(d_min, d_max)
+            return np.interp(luminosity_distance, dist_grid, z_grid)
+        else:
+            return cosmo.z_at_value(
+                cosmology.luminosity_distance, luminosity_distance * units.Mpc
+            ).value
+
+    def distmod(self, luminosity_distance=1e-5):
+        """Compute the distance modulus for a given luminosity distance in Mpc."""
+        # mag_app = mag_abs + 5* log10(dist/10pc) | NMMA-dist is in Mpc
+        #         = mag_abs + 5 * (log10(Mpc/10pc)+ log10(params["luminosity_distance"]))
+        # therefore: distance_modulus = mag_app - mag_abs =
+        return 5.0 * (5 + np.log10(luminosity_distance))
+
+    def get_cosmo_grids(self, distance_min, distance_max):
+        zmin = cosmo.z_at_value(
+            self.cosmology.luminosity_distance, distance_min * units.Mpc
+        )
+        zmax = cosmo.z_at_value(
+            self.cosmology.luminosity_distance, distance_max * units.Mpc
+        )
+        z_grid = np.geomspace(zmin, zmax, 50)
+        dist_grid = self.cosmology.luminosity_distance(z_grid)
+        return dist_grid.value, z_grid.value
+
+    def cosmology_to_distance(self, parameters):
+        """Convert cosmological parameters to luminosity distance and redshift.
+
+        Parameters
+        ----------
+        parameters : dict
+            Dictionary containing cosmological parameters. It may include 'Hubble_constant', 'Omega_matter',
+            'luminosity_distance', and/or 'redshift'.
+
+        Returns
+        -------
+        dict
+            Updated parameters with luminosity distance and redshift.
+        """
+        cosmo_parameters = {
+            v: parameters[k]
+            for k, v in self.nmma_to_astropy_cosmo_map.items()
+            if k in parameters
+        }
+        try:
+            missing_key, missing_val = self._single_cosmo(cosmo_parameters, parameters)
+        except ValueError:
+            # if H0 is an array, .clone raises a ValueError
+            # in that case we turn a dict with len-n values into a len-n list of dicts with single value
+            missing_key, missing_val = self._multiple_cosmo(
+                cosmo_parameters, parameters
+            )
+        parameters[missing_key] = missing_val
+        return parameters
+
+    def _single_cosmo(self, cosmo_parameters, parameters):
+        alt_cosmo = self.cosmology.clone(**cosmo_parameters)
         if "luminosity_distance" in parameters:
             # if luminosity distance is available, we assume it is in Mpc
-            parameters["redshift"] = luminosity_distance_to_redshift(
+            return "redshift", self.redshift(
                 parameters["luminosity_distance"], cosmology=alt_cosmo
             )
         elif "redshift" in parameters:
-            parameters["luminosity_distance"] = alt_cosmo.luminosity_distance(
-                parameters["redshift"]
-            ).value
+            return "luminosity_distance", self.luminosity_distance(
+                parameters["redshift"], cosmology=alt_cosmo
+            )
         else:
             raise KeyError(
                 "Either redshift or luminosity_distance must be in parameters"
             )
 
-    except ValueError:
-        # if H0 is an array, .clone raises a ValueError
-        # in that case we turn a dict with len-n values into a len-n list of dicts with single values
+    def _multiple_cosmo(self, cosmo_parameters, parameters):
+        """Convert cosmological parameters to luminosity distance and redshift
+        when the Hubble constant is array-valued.
+
+        Parameters
+        ----------
+        cosmo_parameters : dict
+            Dictionary containing the cosmological parameters.
+        parameters : dict
+            Dictionary containing the input parameters.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the missing key and its corresponding value.
+        """
         cosmo_dicts = [
             dict(zip(cosmo_parameters.keys(), vals))
             for vals in zip(*cosmo_parameters.values())
         ]
-        alt_cosmos = [cosmology.clone(**cosmo_dict) for cosmo_dict in cosmo_dicts]
-
+        output = []
         if "luminosity_distance" in parameters:
-            # if luminosity distance is available, we assume it is in Mpc
-            parameters["redshift"] = np.array(
-                [
-                    luminosity_distance_to_redshift(
-                        parameters["luminosity_distance"][i], cosmology=alt_cosmo
-                    )
-                    for i, alt_cosmo in enumerate(alt_cosmos)
-                ]
-            )
-
+            use_key = "luminosity_distance"
+            missing_key = "redshift"
         elif "redshift" in parameters:
-            parameters["luminosity_distance"] = np.array(
-                [
-                    alt_cosmo.luminosity_distance(parameters["redshift"][i]).value
-                    for i, alt_cosmo in enumerate(alt_cosmos)
-                ]
-            )
-    return parameters
+            use_key = "redshift"
+            missing_key = "luminosity_distance"
+
+        for i, alt_cosmo_dict in enumerate(cosmo_dicts):
+            use_param = {use_key: parameters[use_key][i]}
+            _, missing_val = self._single_cosmo(alt_cosmo_dict, use_param)
+            output.append(missing_val)
+        return missing_key, np.array(output)
+
+    def _constant_cosmo(self, parameters):
+        """Obtain d_L and z from fixed priors."""
+        parameters["luminosity_distance"] = self.fixed_luminosity_distance
+        parameters["redshift"] = self.fixed_redshift
+        return parameters
+
+    def _grid_cosmo(self, parameters):
+        """Build a redshift_func that interpolates redshift from
+        luminosity_distance on a precomputed, fixed-cosmology grid."""
+        dlum = parameters["luminosity_distance"]
+        parameters["redshift"] = np.interp(dlum, self.dist_grid, self.z_grid)
+        return parameters
+
+    @classmethod
+    def from_priors(cls, priors):
+        """Set up the cosmology conversion function based on the provided priors.
+
+        Parameters
+        ----------
+        priors : dict
+            Dictionary of priors for the model parameters.
+
+        """
+
+        has_redshift = "redshift" in priors
+        has_dlum = "luminosity_distance" in priors
+        has_H0 = "Hubble_constant" in priors
+        use_cosmo = None
+
+        if has_dlum:
+            use_cosmo = getattr(priors["luminosity_distance"], "cosmology", None)
+
+        converter = cls(cosmology=use_cosmo)
+
+        if not has_redshift and not has_dlum:
+            # fallback to absolute magnitudes
+            converter.fixed_redshift = 0.0
+            converter.fixed_luminosity_distance = 1e-5  # 10 pc in Mpc
+            converter.conversion_function = converter._constant_cosmo
+            if has_H0:
+                raise ValueError("Hubble_constant is sampled, but lacks z or d_L")
+
+        elif has_H0:
+            converter.conversion_function = converter.cosmology_to_distance
+
+        elif has_redshift:
+            if priors["redshift"].is_fixed:
+                converter.fixed_redshift = priors["redshift"].peak
+                converter.fixed_luminosity_distance = converter.luminosity_distance(
+                    converter.fixed_redshift
+                )
+                converter.conversion_function = converter._constant_cosmo
+            else:
+                # keep the default
+                pass
+
+        elif has_dlum:
+            dlum_prior = priors["luminosity_distance"]
+            if dlum_prior.is_fixed:
+                converter.fixed_luminosity_distance = dlum_prior.peak
+                converter.fixed_redshift = converter.redshift(
+                    converter.fixed_luminosity_distance
+                )
+                converter.conversion_function = converter._constant_cosmo
+            else:
+                # redshift inversion is hard, use precomputed grid
+                converter.dist_grid, converter.z_grid = converter.get_cosmo_grids(
+                    dlum_prior.minimum, dlum_prior.maximum
+                )
+                converter.conversion_function = converter._grid_cosmo
+
+        return converter
 
 
 def source_frame_masses(converted_parameters):
@@ -230,8 +349,9 @@ def source_frame_masses(converted_parameters):
     """
     converted_parameters = generate_mass_parameters(converted_parameters)
     if "redshift" not in converted_parameters:
+        cosmo_converter = CosmologyConverter()
         distance = converted_parameters["luminosity_distance"]
-        converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
+        converted_parameters["redshift"] = cosmo_converter.redshift(distance)
     z = converted_parameters["redshift"]
 
     if "mass_1_source" not in converted_parameters:
@@ -1560,8 +1680,11 @@ class MultimessengerConversion:
 
         # NOTE: Order matters!!!
         if "cosmo" in instruction_dict:
-            set_cosmology(instruction_dict["cosmo"])
-            conversions.append(cosmology_to_distance)
+            cosmo_converter = CosmologyConverter(instruction_dict["cosmo"])
+            cosmo_converter.conversion_function = cosmo_converter.cosmology_to_distance
+        else:
+            cosmo_converter = CosmologyConverter()
+        conversions.append(cosmo_converter)
 
         if "gw" in instruction_dict:
             conversions.append(instruction_dict["gw"])

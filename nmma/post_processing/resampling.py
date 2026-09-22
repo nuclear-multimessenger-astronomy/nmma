@@ -10,9 +10,9 @@ from bilby.gw.prior import PriorDict
 from ..core.constants import geom_msun_km
 from ..core.conversion import (
     BNSEjectaFitting,
+    CosmologyConverter,
     NSBHEjectaFitting,
     chirp_mass_and_eta_to_component_masses,
-    luminosity_distance_to_redshift,
 )
 from ..core.parsing import nmma_base_parsing
 from .parser import resampling_parser
@@ -224,9 +224,8 @@ class EjectaResamplerMixIn:
         EOS = self.GWsamples.EOS.to_numpy()
         self.EOSsamples = EOS.astype(int) + 1
 
-        z = luminosity_distance_to_redshift(
-            self.GWsamples.luminosity_distance.to_numpy()
-        )
+        cosmo_converter = CosmologyConverter()
+        z = cosmo_converter.redshift(self.GWsamples.luminosity_distance.to_numpy())
         mc = self.GWsamples.chirp_mass.to_numpy() / (1 + z)
         q = self.GWsamples.mass_ratio.to_numpy()
 

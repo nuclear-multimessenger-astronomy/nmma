@@ -12,7 +12,7 @@ from scipy.signal import savgol_filter
 from tqdm import tqdm
 
 from ..core import conversion as conv
-from ..core.constants import D, c_cgs, get_cosmology
+from ..core.constants import D, c_cgs
 from ..core.utils import read_injection_file, read_trigger_time, set_filename
 from . import em_parsing as emp
 from . import io, model, utils
@@ -505,15 +505,15 @@ class LightCurveHandler:
 
     def __init__(self, args):
         self.filters = utils.set_filters(args)
-        cosmology = get_cosmology()
+        cosmo_converter = conv.CosmologyConverter()
         # Use redshift or dMpc if z is not provided
         if args.redshift is None:
             self.dMpc = args.dMpc
-            self.redshift = conv.luminosity_distance_to_redshift(self.dMpc, cosmology)
+            self.redshift = cosmo_converter.redshift(self.dMpc)
             dist_filler = f"dMpc{int(self.dMpc)}"
         else:
             self.redshift = args.redshift
-            self.dMpc = cosmology.luminosity_distance(self.redshift).to("Mpc").value
+            self.dMpc = cosmo_converter.luminosity_distance(self.redshift)
             dist_filler = f"z{self.redshift}"
 
         if args.doAB:

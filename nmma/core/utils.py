@@ -60,6 +60,8 @@ def load_yaml(file_path):
 
 def read_trigger_time(parameters=None, args=None, out_format="mjd"):
     trigger_time = None
+
+    # get trigger time from parameters if available
     if parameters is not None:
         if "trigger_time" in parameters:
             trigger_time = time.Time(parameters["trigger_time"], format="mjd")
@@ -67,9 +69,15 @@ def read_trigger_time(parameters=None, args=None, out_format="mjd"):
             trigger_time = time.Time(parameters["geocent_time_x"], format="gps")
         elif "geocent_time" in parameters:
             trigger_time = time.Time(parameters["geocent_time"], format="gps")
+
+        # set the trigger time in args if available
+        if trigger_time and args is not None:
+            args.trigger_time = getattr(trigger_time, out_format)
+
+    # otherwise get trigger time from args if available
     if args is not None and trigger_time is None:
-        if hasattr(args, "gps") and args.gps:
-            return time.Time(args.gps, format="gps").mjd
+        if getattr(args, "gps", None):
+            trigger_time = time.Time(args.gps, format="gps")
         elif args.trigger_time:
             try:
                 trigger_time = time.Time(args.trigger_time, format="mjd")
@@ -80,21 +88,14 @@ def read_trigger_time(parameters=None, args=None, out_format="mjd"):
                     format = "gps"
                 trigger_time = time.Time(args.trigger_time, format=format)
                 trigger_time  # this fails if not a valid time
-    elif args is not None:
-        args.trigger_time = (
-            trigger_time.mjd if out_format == "mjd" else trigger_time.gps
-        )
+
     if trigger_time is None:
         logger.warning(
             "Neither trigger_time, geocent_time nor geocent_time_x provided. This is a required argument. If you don't know the exact trigger time, use a free timeshift prior."
         )
         return None
 
-    if out_format == "mjd":
-        return trigger_time.mjd
-
-    elif out_format == "gps":
-        return trigger_time.gps
+    return getattr(trigger_time, out_format)
 
 
 def read_injection_file(file):
@@ -179,7 +180,7 @@ def get_posteriors(posterior_samples, outdir=None):
     elif suffix == ".json":
         with open(posterior_samples, "r") as f:
             samples_dict = json.load(f, object_hook=decode_bilby_json)
-        posterior_samples = samples_dict["posterior"]
+        posterior_samples = pd.DataFrame(samples_dict["posterior"])
     elif suffix == ".hdf5":
         with h5py.File(posterior_samples, "r") as f:
             posterior_group = f["posterior"]

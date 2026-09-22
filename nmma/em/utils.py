@@ -26,11 +26,7 @@ from numpy.exceptions import VisibleDeprecationWarning
 
 # some frequently used constants:
 from ..core.constants import c_SI, eV_per_h_SI
-from ..core.conversion import (
-    cosmology_to_distance,
-    distance_modulus_nmma,
-    luminosity_distance_to_redshift,
-)
+from ..core.conversion import CosmologyConverter
 
 warnings.filterwarnings("ignore", category=VisibleDeprecationWarning)
 
@@ -430,14 +426,17 @@ def setup_filtered_lc_data(light_curve_data, trigger_time):
 
 
 def check_model_time_consistency(
-    light_curve_data, light_curve_model, priors, injection=None
+    light_curve_data,
+    light_curve_model,
+    priors,
+    injection=None,
+    allow_data_cuts=False,
 ):
     """Check the data fall inside the window the model can describe.
 
     Redshift and timeshift both move the model in time, and their priors
     bound how far. Beyond those bounds the model says nothing, so data
-    falling outside are either cut, for an injection, or reported as a
-    configuration error, for real observations.
+    falling outside are either cut or reported as a configuration error.
 
     Parameters
     ----------
@@ -450,6 +449,8 @@ def check_model_time_consistency(
     injection: dict or None, optional
         Injection parameters. When not None, the data are cut to the model
         range instead of being checked.
+    allow_data_cuts: bool, optional
+        Whether to cut data instead of raising an error, default: False
 
     Returns
     -------
@@ -466,27 +467,27 @@ def check_model_time_consistency(
     data_tmin, data_tmax = np.inf, -np.inf
     for key in lc_times.keys():
         detections = np.isfinite(lc_mags[key]) & np.isfinite(lc_uncertainties[key])
-        data_tmin = np.minimum(data_tmin, lc_times[key][detections].min())
-        data_tmax = np.maximum(data_tmax, lc_times[key][detections].max())
+        check_times = lc_times[key][detections]
+        if check_times.size == 0:
+            continue
+        data_tmin = np.minimum(data_tmin, check_times.min())
+        data_tmax = np.maximum(data_tmax, check_times.max())
 
     # get minimal / maximal redshift from prior
     if "redshift" in priors:
         zmin, zmax = priors["redshift"].minimum, priors["redshift"].maximum
     elif "luminosity_distance" in priors:
+        converter = CosmologyConverter()
         if "Hubble_constant" in priors:
             min_pars = {par: priors[par].minimum for par in priors}
-            min_pars = cosmology_to_distance(min_pars)
+            min_pars = converter(min_pars)
             zmin = min_pars["redshift"]
             max_pars = {par: priors[par].maximum for par in priors}
-            max_pars = cosmology_to_distance(max_pars)
+            max_pars = converter(max_pars)
             zmax = max_pars["redshift"]
         else:
-            zmin = luminosity_distance_to_redshift(
-                priors["luminosity_distance"].minimum
-            )
-            zmax = luminosity_distance_to_redshift(
-                priors["luminosity_distance"].maximum
-            )
+            zmin = converter.redshift(priors["luminosity_distance"].minimum)
+            zmax = converter.redshift(priors["luminosity_distance"].maximum)
 
     # get minimal / maximal timeshift from prior
     try:
@@ -499,7 +500,7 @@ def check_model_time_consistency(
     t_obs_start_max = (1 + zmax) * t_source_min + t0_max
     t_obs_end_min = (1 + zmin) * t_source_max + t0_min
 
-    if injection is not None:
+    if injection or allow_data_cuts:
         for key, time in lc_times.items():
             print(
                 f"Cutting light curve data for filter {key} to model time range {t_obs_start_max} - {t_obs_end_min}."
@@ -545,31 +546,6 @@ def setup_bolometric_lc_data(light_curve_data, trigger_time):
         light_curve_data["Lbb_unc"].to_numpy()[sort_ids],
         trigger_time,
     )
-
-
-def transform_to_app_mag_dict(mag_dict, params):
-    """Move absolute magnitudes out to the observer.
-
-    Parameters
-    ----------
-    mag_dict: dict
-        Absolute magnitude per filter, modified in place.
-    params: dict
-        Holds luminosity_distance, in Mpc. Ten parsecs are assumed when it
-        is missing, which leaves the magnitudes absolute.
-
-    Returns
-    -------
-    dict
-        The same magnitudes, now apparent.
-    """
-    d_lum = params.get(
-        "luminosity_distance", 1e-5
-    )  # assume 10 pc =1e-5 Mpc for abs_mag
-    distance_modulus = distance_modulus_nmma(d_lum)
-    for k in mag_dict.keys():
-        mag_dict[k] += distance_modulus
-    return mag_dict
 
 
 def get_extinction_model(ext_model=None, Rv=None):
@@ -638,7 +614,6 @@ def get_extinction_model(ext_model=None, Rv=None):
         if "host" in ext_model.lower() or "rest" in ext_model.lower():
             raise ValueError("G23 extinction model is only applicable to MW dust")
         frame = "obs"
-        return ext_model, frame
 
     if "host" in ext_model.lower() or "rest" in ext_model.lower():
         frame = "rest"

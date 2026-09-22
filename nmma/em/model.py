@@ -1,4 +1,3 @@
-from ast import literal_eval
 from copy import copy
 from pathlib import Path
 
@@ -6,17 +5,14 @@ import joblib
 import numpy as np
 import sncosmo
 from astropy import units as u
-from bilby.gw.cosmology import get_cosmology
-from fiesta.inference.lightcurve_model import FluxModel
+from fiesta.models import FluxSurrogate
 from scipy.special import logsumexp
 from sncosmo.models import _SOURCES
 
 from ..core.base import initialisation_args_from_signature_and_namespace
 from ..core.constants import c_SI
 from ..core.conversion import (
-    distance_modulus_nmma,
-    get_cosmo_grids,
-    get_redshift,
+    CosmologyConverter,
     observation_angle_conversion,
 )
 from ..core.gitlab import get_model, get_models_home
@@ -213,7 +209,6 @@ class LightCurveModelContainer:
     ):
         self.model = model
         self.identify_model_parameters(model_parameters)
-        self.redshift_func = get_redshift
         if isinstance(filters, str):
             filters = filters.split(",")
         self.filters = filters
@@ -222,6 +217,7 @@ class LightCurveModelContainer:
         self.good_parameters = True
         self.extinction_model = extinction_model
         self.extinction_frame = None
+        self.cosmo_converter = CosmologyConverter()
 
         # sample times are used as nodes to generate the light curve,
         # characterising the model's validity range and the resolution
@@ -278,9 +274,9 @@ class LightCurveModelContainer:
     def check_vs_priors(self, priors):
         """Warn about missing priors, and prepare what they imply.
 
-        Beyond warning, this sets up two things the priors decide: how a
-        redshift will be obtained when only a luminosity distance is
-        sampled, and which extinction model to apply when Ebv is.
+        Beyond warning, this sets up two things the priors decide: 
+        How to handle cosmology-aware conversion between redshift and distance,
+        and which extinction model to apply when Ebv is sampled.
 
         Parameters
         ----------
@@ -291,38 +287,45 @@ class LightCurveModelContainer:
             if key not in priors:
                 print(f"Parameter {key} not found in priors, might fail.")
 
-        if (
-            "redshift" not in priors
-            and "luminosity_distance" in priors
-            and "Hubble_constant" not in priors
-        ):
-            dlum_prior = priors["luminosity_distance"]
-            cosmo = getattr(dlum_prior, "cosmology", get_cosmology())
-            dist_grid, z_grid = get_cosmo_grids(
-                dlum_prior.minimum, dlum_prior.maximum, cosmo
-            )
-
-            def redshift_from_dlum(parameters):
-                if "redshift" in parameters:
-                    return parameters["redshift"]
-                return np.interp(
-                    parameters["luminosity_distance"], dist_grid, z_grid
-                ).value
-
-            self.redshift_func = redshift_from_dlum
+        self.cosmo_converter = CosmologyConverter.from_priors(priors)
 
         if "Ebv" in priors:
-            ext_model, frame = utils.get_extinction_model(self.extinction_model)
-            if self.extinction_frame is None:
-                # for efficient computation of extinction corrections
-                self.wavenumbers = 1.0 / (self.lambdas * u.meter.to(u.micron))
-                if frame == "rest":
-                    self.extinction_wavenumbers = self.rest_wavenumbers
-                elif frame == "obs":
-                    self.extinction_wavenumbers = self.obs_wavenumbers
-                self.extinction_frame = frame
-                self.extinction_model = ext_model
-                self.extinction_range = self.extinction_model.x_range
+            self.setup_extinction()
+
+    def setup_extinction(self):
+        ext_model, frame = utils.get_extinction_model(self.extinction_model)
+        if self.extinction_frame is None:
+            # for efficient computation of extinction corrections
+            self.wavenumbers = 1.0 / (self.lambdas * u.meter.to(u.micron))
+            if frame == "rest":
+                self.extinction_wavenumbers = self.rest_wavenumbers
+            elif frame == "obs":
+                self.extinction_wavenumbers = self.obs_wavenumbers
+            self.extinction_frame = frame
+            self.extinction_model = ext_model
+            self.extinction_range = self.extinction_model.x_range
+
+    def rest_wavenumbers(self):
+        """Filter wavenumbers as seen in the rest frame of the source.
+
+        Returns
+        -------
+        numpy.ndarray
+            Wavenumbers in 1/micron.
+        """
+        
+        return self.wavenumbers * (1 + self.redshift)
+
+    def obs_wavenumbers(self):
+        """Filter wavenumbers as seen by the observer.
+
+        Returns
+        -------
+        numpy.ndarray
+            Wavenumbers in 1/micron.
+        """
+        
+        return self.wavenumbers
 
     def sanity_checks(self, parameters):
         """Flag whether the model can be trusted for these parameters.
@@ -391,19 +394,29 @@ class LightCurveModelContainer:
 
         # read here, but used later for correction that is observation-dependent
         self.Ebv = parameters.get("Ebv", 0.0)
-        self.luminosity_distance = parameters.get(
-            "luminosity_distance", 1e-5
-        )  # default 10pc = 1e-5 Mpc
-        self.distmod = distance_modulus_nmma(
-            self.luminosity_distance
-        )  # default 10pc = 1e-5 Mpc
         self.timeshift = parameters.get("timeshift", 0.0)
-
-        # redshift computation can be expensive, so we only do it
-        # once and store it for conversion to detector frame
-        self.redshift = self.redshift_func(parameters)
+        parameters = self.set_distance_parameters(parameters)
         if combine_params:
             return self.combine_lc_params(parameters)
+
+    def set_distance_parameters(self, parameters):
+        """Set the distance parameters in the parameters dictionary.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Updated parameters with distance information.
+        """
+        parameters = self.cosmo_converter(parameters)
+        self.luminosity_distance = parameters["luminosity_distance"]
+        self.distmod = self.cosmo_converter.distmod(parameters["luminosity_distance"])
+        self.redshift = parameters["redshift"]
+        return parameters
 
     def combine_lc_params(self, parameters):
         """Extract the light curve parameters in the necessary format.
@@ -422,58 +435,6 @@ class LightCurveModelContainer:
             key: parameters[key] if key in parameters else getattr(self, key)
             for key in self.model_parameters
         }
-
-    def rest_wavenumbers(self):
-        """Filter wavenumbers as seen in the rest frame of the source.
-
-        Returns
-        -------
-        numpy.ndarray
-            Wavenumbers in 1/micron.
-        """
-
-        return self.wavenumbers * (1 + self.redshift)
-
-    def obs_wavenumbers(self):
-        """Filter wavenumbers as seen by the observer.
-
-        Returns
-        -------
-        numpy.ndarray
-            Wavenumbers in 1/micron.
-        """
-
-        return self.wavenumbers
-
-    def extinction_correction(self, model_mags):
-        """Dim the model magnitudes by interstellar extinction.
-
-        Filters whose wavenumber falls outside the range the extinction
-        model covers are left untouched rather than extrapolated.
-
-        Parameters
-        ----------
-        model_mags: dict
-            Magnitude per filter, modified in place.
-
-        Returns
-        -------
-        dict
-            The same magnitudes, extinguished.
-        """
-
-        ext_factor = np.ones_like(self.lambdas)
-        wavenumbers = self.extinction_wavenumbers()
-        k_min, k_max = self.extinction_range
-        covered = (wavenumbers >= k_min) & (wavenumbers <= k_max)
-        ext_factor[covered] = self.extinction_model.extinguish(
-            wavenumbers[covered], Ebv=self.Ebv
-        )
-        ext_mags = -2.5 * np.log10(ext_factor)
-        for ext_mag, filt in zip(ext_mags, self.default_filts):
-            if filt in model_mags:
-                model_mags[filt] += ext_mag
-        return model_mags
 
     def gen_detector_lc(self, parameters=None, sample_times=None):
         """Generate the light curve as it would be seen by a detector.
@@ -566,6 +527,35 @@ class LightCurveModelContainer:
 
         return (observable_times, lc_data)
 
+    def extinction_correction(self, model_mags):
+        """Dim the model magnitudes by interstellar extinction.
+
+        Filters whose wavenumber falls outside the range the extinction
+        model covers are left untouched rather than extrapolated.
+
+        Parameters
+        ----------
+        model_mags: dict
+            Magnitude per filter, modified in place.
+
+        Returns
+        -------
+        dict
+            The same magnitudes, extinguished.
+        """
+        ext_factor = np.ones_like(self.lambdas)
+        wavenumbers = self.extinction_wavenumbers()
+        k_min, k_max = self.extinction_range
+        covered = (wavenumbers >= k_min) & (wavenumbers <= k_max)
+        ext_factor[covered] = self.extinction_model.extinguish(
+            wavenumbers[covered], Ebv=self.Ebv
+        )
+        ext_mags = -2.5 * np.log10(ext_factor)
+        for ext_mag, filt in zip(ext_mags, self.default_filts):
+            if filt in model_mags:
+                model_mags[filt] += ext_mag
+        return model_mags
+
     @property
     def citation(self):
         """The reference to cite for this model.
@@ -633,12 +623,12 @@ class FiestaModel(LightCurveModelContainer):
             directory=surrogate_dir,
         )
         try:
-            self.fiesta_model = FluxModel(**fiesta_kwargs)
+            self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         except OSError:
             fiesta_kwargs["directory"] = Path(
                 surrogate_dir, self.load_dir_string, model, "model"
             )
-            self.fiesta_model = FluxModel(**fiesta_kwargs)
+            self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         if sample_times is not None:
             print("Warning: sample_times are not used in FiestaModel, ignoring.")
         kwargs["model_parameters"] = self.fiesta_model.parameter_names
@@ -1174,7 +1164,7 @@ class GRBMixin:
         super().__init__(*args, **kwargs)
 
     def parameter_conversion(self, parameters):
-        """Derive the jet angles and the total microphysical efficiency.
+        """Derive the jet angles and the total conversion efficiency.
 
         Sampling the ratio of the wing to the core angle rather than the
         wing angle itself keeps the jet resolvable by construction, so the
@@ -1565,12 +1555,11 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         return sample_times
 
     def check_vs_priors(self, priors):
-        """Explain how NMMA parametrises a supernova, then check the priors.
+        """Check the priors.
 
         sncosmo sources are normalised by an amplitude whose scale differs
         wildly between models. NMMA offers an alternative anchored on a
-        fiducial absolute magnitude, which is what the printed note is
-        about.
+        fiducial absolute magnitude.
 
         Parameters
         ----------
@@ -2170,7 +2159,7 @@ def single_model_from_args(
     """Build one model, taking its arguments from the command line.
 
     The constructor signature is inspected so that only the arguments the
-    model actually accepts are passed, which is what lets very different
+    model actually accepts are passed, which lets very different
     models share one command line.
 
     Parameters
@@ -2394,7 +2383,9 @@ def create_injection_model(args, filters=None):
             if val is None:
                 injection_dict = {}
             elif isinstance(val, str):
-                injection_dict = literal_eval(val)
+                raise ValueError(
+                    "injection_model_args should be a dictionary, not a string."
+                )
             else:
                 injection_dict = val
             for arg, val in injection_dict.items():

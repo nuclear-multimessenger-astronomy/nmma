@@ -50,7 +50,11 @@ def setup_em_kwargs(priors, data_dump, args, logger=None):
     #     light_curve_data, light_curve_model, priors, args.injection or None
     # )
     light_curve_data = utils.check_model_time_consistency(
-        light_curve_data, light_curve_model, priors, args.injection
+        light_curve_data,
+        light_curve_model,
+        priors,
+        args.injection,
+        args.allow_data_cuts,
     )
     sys_handler = systematics.FilterSystematicsHandler(
         filters,
