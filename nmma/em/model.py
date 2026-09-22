@@ -287,6 +287,40 @@ class LightCurveModelContainer:
             if key not in priors:
                 print(f"Parameter {key} not found in priors, might fail.")
 
+        if "KNtheta" in priors and "inclination_EM" in priors:
+            raise ValueError(
+                "Both KNtheta and inclination_EM are present in the priors. "
+                "Please remove one of them."
+            )
+        elif "KNtheta" in priors:
+            incl_prior = priors["KNtheta"]
+            if incl_prior.maximum <= 2 * np.pi:
+                try:
+                    inclination_unit = u.Unit(incl_prior.unit)
+                    assert inclination_unit == u.Unit("degree")
+                except (AssertionError, TypeError, ValueError):
+                    raise ValueError(
+                        "KNtheta is the inclination angle in degrees."
+                        "Your prior has a suspiciously low maximum of"
+                        " {incl_prior.maximum} and unit {incl_prior.unit}"
+                        "If this is intended, initialise the prior with unit='degree'."
+                        "Otherwise use inclination_EM instead, which is in radians."
+                    )
+        elif "inclination_EM" in priors:
+            incl_prior = priors["inclination_EM"]
+            if incl_prior.maximum > np.pi / 2.0:
+                try:
+                    inclination_unit = u.Unit(incl_prior.unit)
+                    assert inclination_unit == u.Unit("radian")
+                except (AssertionError, TypeError, ValueError):
+                    raise ValueError(
+                        "inclination_EM is the inclination angle in radian."
+                        "Your prior has a suspiciously high maximum of"
+                        " {incl_prior.maximum} and unit {incl_prior.unit}"
+                        "If this is intended, initialise the prior with unit='rad'."
+                        "Otherwise use KNtheta instead, which is in degree."
+                    )
+
         self.cosmo_converter = CosmologyConverter.from_priors(priors)
 
         if "Ebv" in priors:
@@ -626,7 +660,7 @@ class FiestaModel(LightCurveModelContainer):
             self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         except OSError:
             fiesta_kwargs["directory"] = Path(
-                surrogate_dir, self.load_dir_string, model, "model"
+                surrogate_dir, self.load_dir_string, model
             )
             self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         if sample_times is not None:
