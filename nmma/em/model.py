@@ -1,4 +1,3 @@
-from ast import literal_eval
 from copy import copy
 from pathlib import Path
 
@@ -6,7 +5,7 @@ import joblib
 import numpy as np
 import sncosmo
 from astropy import units as u
-from fiesta.inference.lightcurve_model import FluxModel
+from fiesta.models import FluxSurrogate
 from scipy.special import logsumexp
 from sncosmo.models import _SOURCES
 
@@ -470,12 +469,12 @@ class FiestaModel(LightCurveModelContainer):
             directory=surrogate_dir,
         )
         try:
-            self.fiesta_model = FluxModel(**fiesta_kwargs)
+            self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         except OSError:
             fiesta_kwargs["directory"] = Path(
                 surrogate_dir, self.load_dir_string, model, "model"
             )
-            self.fiesta_model = FluxModel(**fiesta_kwargs)
+            self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         if sample_times is not None:
             print("Warning: sample_times are not used in FiestaModel, ignoring.")
         kwargs["model_parameters"] = self.fiesta_model.parameter_names
@@ -1606,7 +1605,9 @@ def create_injection_model(args, filters=None):
             if val is None:
                 injection_dict = {}
             elif isinstance(val, str):
-                injection_dict = literal_eval(val)
+                raise ValueError(
+                    "injection_model_args should be a dictionary, not a string."
+                )
             else:
                 injection_dict = val
             for arg, val in injection_dict.items():
