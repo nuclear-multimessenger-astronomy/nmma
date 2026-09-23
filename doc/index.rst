@@ -473,16 +473,6 @@ User Guide
    observing-scenarios-light-curves
    changelog
 
-
-API Reference
---------------
-
-.. toctree::
-   :maxdepth: 2
-
-   API Reference <api/nmma>
-
-
 .. Indices and tables
 .. ==================
 
