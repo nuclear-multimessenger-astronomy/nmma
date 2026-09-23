@@ -7,7 +7,6 @@ nmma.egg-info/
 
 # development
 .vscode/
-.github/workflows/
 
 # models
 nmma_models/
