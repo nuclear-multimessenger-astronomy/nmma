@@ -5,6 +5,10 @@ __pycache__/
 nmma.egg-info/
 .DS_Store
 
+# tutorial outputs
+tutorials/.ipynb_checkpoints/
+tutorials/inference_results/
+
 # development
 .vscode/
 
@@ -19,3 +23,6 @@ slurm.sub
 nmma/eos/data
 min_install.zip
 doc/_build/
+_build/
+_templates
+doc/api/

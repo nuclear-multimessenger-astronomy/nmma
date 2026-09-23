@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 from bilby_pipe.create_injections import InjectionCreator
 
-from ..core.constants import get_cosmology, set_cosmology
 from ..core.conversion import (
     BNSEjectaFitting,
+    CosmologyConverter,
     KilonovaEjectaFitting,
     MultimessengerConversion,
     NSBHEjectaFitting,
@@ -31,13 +31,31 @@ class NMMAInjectionCreator(InjectionCreator):
     """A class to create NMMA injections, extending the bilby_pipe InjectionCreator."""
 
     def __init__(self, args, **kwargs):
+        """Build an NMMA injection creator from CLI args.
+
+        Delegates the core prior/trigger-time/cosmology setup to
+        bilby_pipe's InjectionCreator, then layers on NMMA-specific
+        machinery: EOS-aware parameter conversion, redraw-based
+        constraint testing (unless args.simple_setup), post-processing
+        (SNR/ejecta/lightcurve), and the legacy --binary-type/--eject
+        one-shot filter.
+
+        Parameters
+        ----------
+        args : argparse.Namespace
+            Parsed injection-generation CLI arguments (see
+            `joint_parsing.injection_parsing`).
+        **kwargs
+            Extra attributes to set on the instance after construction
+            (applied via setattr).
+        """
         self.args = args
         # can use a prior_dict or a prior_file
         if isinstance(args.prior_dict, str):
             # convert string to dict
             args.prior_file = args.prior_dict
 
-        set_cosmology(getattr(args, "cosmology", None))
+        self.cosmo_converter = CosmologyConverter(getattr(args, "cosmology", None))
         super().__init__(
             prior_file=args.prior_file,
             prior_dict=args.prior_dict,
@@ -49,7 +67,7 @@ class NMMAInjectionCreator(InjectionCreator):
             duration=args.duration,
             post_trigger_duration=args.post_trigger_duration,
             generation_seed=args.generation_seed,
-            cosmology=get_cosmology(),
+            cosmology=self.cosmo_converter.cosmology,
         )
         self.rng = np.random.default_rng(self.generation_seed)
         for key, value in kwargs.items():
@@ -86,11 +104,31 @@ class NMMAInjectionCreator(InjectionCreator):
             self.include_checks = True
 
         # legacy
+        # CHECKME:
         gw_injection_file = getattr(args, "gw_injection_file", self.filename)
         self.gw_injection_file = Path(gw_injection_file) if gw_injection_file else None
         self.reference_frequency = getattr(args, "reference_frequency", 20.0)
 
     def setup_test_routines(self, args):
+        """Build self.test_routines and self.conv_instructions from --tests.
+
+        Each requested test in `args.tests` contributes both a bound test
+        method (appended to `self.test_routines`, run by `test_wrap`) and
+        any parameter-conversion step it needs (added to
+        `self.conv_instructions`, consumed by `MultimessengerConversion`).
+        EOS conversion and the 'gw' (bbh_source_frame) conversion are
+        always added, since EOS conversion needs mass_1_source/
+        mass_2_source regardless of which tests were requested.
+
+        Parameters
+        ----------
+        args : argparse.Namespace
+            Must provide `tests` (multi-condition string, e.g.
+            "snr>8 peak_magnitude<20") and whatever each requested test
+            needs (detectors/waveform args for 'snr', light-curve model
+            args for 'peak_magnitude').
+        """
+
         self.conv_instructions = {}
         test_methods = []
         tests = process_multi_condition_string(args.tests)
@@ -123,6 +161,17 @@ class NMMAInjectionCreator(InjectionCreator):
         self.test_routines = test_methods
 
     def setup_post_processing(self, args):
+        """Build self.postprocessing from --post-processing.
+
+        Parameters
+        ----------
+        args : argparse.Namespace
+            Must provide `post_processing` (list of str, subset of
+            'snr'/'ejecta'/'lightcurve'). If empty, a no-op pass-through
+            is installed so `testing_and_postprocessing` can always call
+            every entry in `self.postprocessing` unconditionally.
+        """
+
         postprocess_methods = []
         if "snr" in args.post_processing and not hasattr(self, "snr_threshold"):
             self.initialise_ifos(args)
@@ -164,6 +213,21 @@ class NMMAInjectionCreator(InjectionCreator):
         self.write_injection_dataframe(dataframe, self.filename, self.extension)
 
     def generate_prelim_dataframe(self):
+        """Draw a preliminary injection dataframe, merging file + prior draws.
+
+        If `self.gw_injection_file` supplies existing injections, those
+        take priority; any prior columns already present in the file are
+        dropped from the fresh prior draw before merging (via
+        `adjusted_prior_draw`), and `self.n_injection` is updated to match
+        the file's row count. `simulation_id` is populated from the
+        dataframe's index if not already present.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Combined injection parameters, one row per injection.
+        """
+
         # step 1: Check: we may want to extend a preliminary injection file
         # if not, this will be an empty dataframe
         dataframe_from_file = self.handle_incomplete_injection_file(
@@ -203,6 +267,21 @@ class NMMAInjectionCreator(InjectionCreator):
         return dataframe
 
     def adjusted_prior_draw(self):
+        """Draw from self.priors and normalize for downstream use.
+
+        Enforces mass_1 >= mass_2 (swapping where needed) and drops any
+        columns already supplied by an external injection file
+        (`self.columns_to_remove`), so repeated calls (e.g. from
+        `refill_failed_tests`) return draws compatible with the original
+        dataframe's schema.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Fresh prior draw, `self.n_injection` rows (or however many
+            `get_injection_dataframe` returns).
+        """
+
         dataframe_from_prior = self.get_injection_dataframe()
         try:  # FIXME: This could be handled more gracefully...
             swap_mask = dataframe_from_prior["mass_1"] < dataframe_from_prior["mass_2"]
@@ -216,6 +295,23 @@ class NMMAInjectionCreator(InjectionCreator):
         return dataframe_from_prior
 
     def testing_and_postprocessing(self, dataframe):
+        """Run tests, redraw failures, convert parameters, and post-process.
+
+        Parameters
+        ----------
+        dataframe : pandas.DataFrame
+            Preliminary injection dataframe (from `generate_prelim_dataframe`).
+
+        Returns
+        -------
+        pandas.DataFrame
+            Dataframe with every row passing all configured tests (or
+            raises if `max_redraws` is exhausted -- see the redraw-loop
+            caveat on `refill_failed_tests`), converted to full parameters
+            (unless `args.original_parameters`), post-processed, and
+            filtered by `--binary-type` if set.
+        """
+
         # step 3: redraw if necessary until all injections passed the tests
         test_df = self.test_wrap(dataframe)
 
@@ -257,9 +353,11 @@ class NMMAInjectionCreator(InjectionCreator):
         uniformly, and drop those whose resulting ejecta mass isn't finite
         -- i.e. the assumed binary type isn't physically consistent with
         the chosen EOS for that injection's masses. Mirrors nmma 0.2.3's
-        --eject + --binary-type BNS/NSBH:
+        --eject + --binary-type BNS/NSBH::
+
             index_taken = np.where(isfinite(log10_mej_dyn) * isfinite(log10_mej_wind))[0]
             dataframe = dataframe.take(index_taken)
+
         applied once, not through the --tests redraw mechanism (which
         cannot work here: a mass read from --gw-injection-file is fixed and
         can never be redrawn away from failing a test).
@@ -296,6 +394,21 @@ class NMMAInjectionCreator(InjectionCreator):
         return dataframe[mask].reset_index(drop=True)
 
     def test_wrap(self, dataframe):
+        """Run parameter conversion, constraint evaluation, and all test routines.
+
+        Parameters
+        ----------
+        dataframe : pandas.DataFrame
+            Raw or partially-converted injection parameters.
+
+        Returns
+        -------
+        pandas.DataFrame
+            `dataframe` after `self.param_conversion.core_conversion`, with
+            a `'tests_passed'` boolean column (constraints AND every
+            registered test routine).
+        """
+
         test_df = dataframe.copy()
         test_df = self.param_conversion.core_conversion(test_df)
         # FIXME Weizmann: bilby's PriorDict.evaluate_constraints does `next(iter(sample.values()))`
@@ -312,7 +425,33 @@ class NMMAInjectionCreator(InjectionCreator):
         return test_df
 
     def refill_failed_tests(self, dataframe):
-        """Routine to redo tests until all conditions are fulfilled or max_redraws is reached."""
+        """Redraw and retest failing rows until all pass or max_redraws is hit.
+
+        Note: only the raw prior-sampled columns (`self.use_prior_columns`)
+        are overwritten on a failing row before retesting; any previously
+        computed derived/converted columns on that row are left as-is.
+        If the conversion step run inside `test_wrap` does not unconditionally
+        recompute those derived columns, a test built on a derived quantity
+        (e.g. 'ejecta') can never actually change outcome across redraws --
+        see the FIXME-worthy behavior confirmed in review.
+
+        Parameters
+        ----------
+        dataframe : pandas.DataFrame
+            Dataframe with a 'tests_passed' column from `test_wrap`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Dataframe with every row passing.
+
+        Raises
+        ------
+        ValueError
+            If `self.max_redraws` pool-replenishments are exhausted with
+            rows still failing.
+        """
+
         redraw_from_prior = self.adjusted_prior_draw()
         redraws = 1
         failed_tests = 0
@@ -355,7 +494,25 @@ class NMMAInjectionCreator(InjectionCreator):
         )
 
     def handle_incomplete_injection_file(self, gw_injection_file=None):
-        # check injection file format
+        """Load an existing (possibly partial) injection file, if given.
+
+        Parameters
+        ----------
+        gw_injection_file : pathlib.Path or None
+            Path to a '.json' (nmma-style), '.xml'/'.xml.gz'/'.dat' (legacy
+            bilby) injection file, or None.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Loaded injections, or an empty DataFrame if none was given.
+
+        Raises
+        ------
+        ValueError
+            If the file has an unrecognized suffix.
+        """
+
         if gw_injection_file:
             if gw_injection_file.suffix not in (".json", ".xml", ".xml.gz", ".dat"):
                 raise ValueError("Unknown injection file format")
@@ -381,6 +538,21 @@ class NMMAInjectionCreator(InjectionCreator):
         return dataframe_from_file
 
     def test_population(self, df):
+        """Test each injection against the BNS mass-ratio population model.
+
+        Applies rejection sampling on a uniform mass-ratio population
+        (via `BNS_distribution`) and a minimum secondary source-frame mass
+        of 1.0 solar mass. Only the uniform BNS population is currently
+        supported (see inline FIXME to extend to other distributions).
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Must contain `mass_1`, `mass_2`, `mass_2_source`, and an
+            existing `'tests_passed'` column, which is updated in place
+            (multiplicatively, not overwritten).
+        """
+
         # FIXME: Allow tests on other distributions
 
         # rejection sampling for uniform mass ratio
@@ -392,16 +564,60 @@ class NMMAInjectionCreator(InjectionCreator):
         df["tests_passed"] *= df["mass_2_source"] >= 1.0
 
     def test_ejecta(self, df):
+        """Test that both ejecta-mass components are physically defined.
+
+        Fails an injection if either dynamical or wind ejecta mass is
+        non-finite for the assumed EOS and sampled masses -- i.e. the
+        EOS/mass combination doesn't support the ejecta fit.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Must contain `log10_mej_dyn`, `log10_mej_wind` (from EOS/ejecta
+            conversion) and an existing `'tests_passed'` column, updated
+            in place (multiplicatively).
+        """
+
         df["tests_passed"] *= np.isfinite(df["log10_mej_dyn"])
         df["tests_passed"] *= np.isfinite(df["log10_mej_wind"])
 
     def test_snr(self, df):
-        """Test the SNR of the injections."""
+        """Test the network SNR of each injection against a threshold.
+
+        Computes `snr`/`duration` via `add_snrs`, then compares against
+        `self.snr_threshold` using `self.snr_op` -- both set in
+        `setup_test_routines` by parsing the "snr<op><threshold>" entry
+        (e.g. "snr>8") out of `--tests`.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Must contain the columns `compute_snr` needs (mass_1, mass_2,
+            chi_1, chi_2, luminosity_distance, dec, ra, theta_jn, phase,
+            psi, geocent_time, lambda_1, lambda_2) and an existing
+            `'tests_passed'` column, updated in place (multiplicatively).
+        """
+
         df = self.add_snrs(df)
         df["tests_passed"] *= self.snr_op(df["snr"], self.snr_threshold)
 
     def test_detectability(self, df):
-        """Test whether the injections are detectable in the light curve model."""
+        """Test whether each injection's light curve crosses a magnitude threshold.
+
+        For every row, generates the light curve via
+        `self.lc_model.gen_detector_lc` and passes if *any* simulated
+        filter satisfies `self.mag_op(mag, self.ref_mag)` at any epoch --
+        both set in `setup_test_routines` from the "peak_magnitude<op><value>"
+        entry in `--tests`. Currently checks across all simulated filters
+        rather than only known/observed ones (see inline FIXME).
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Must contain whatever `self.lc_model.gen_detector_lc` needs
+            per row, and an existing `'tests_passed'` column, updated in
+            place (multiplicatively).
+        """
 
         # FIXME: Extend to respect known systems / filters
         def row_check(data_row):
@@ -414,6 +630,22 @@ class NMMAInjectionCreator(InjectionCreator):
 
     # ------------- Messenger-specific methods-----------------------------#
     def initialise_ifos(self, args):
+        """Build a fiducial InterferometerList and waveform generator for SNR tests.
+
+        Uses a fixed 2048s duration and Gaussian-noise-free interferometers
+        at each of `args.gw_detectors`. Sets self.ifos, self.f_min
+        (max of per-detector minimum frequencies), self.sampling_frequency
+        (2x the min of per-detector maximum frequencies), and
+        self.waveform_gen (BNS waveform, IMRPhenomXAS_NRTidalv3 by default,
+        overridable via args.waveform_arguments).
+
+        Parameters
+        ----------
+        args : argparse.Namespace
+            Must provide `gw_detectors` (list or comma-separated str) and
+            `waveform_arguments` (dict, merged over the defaults).
+        """
+
         if isinstance(args.gw_detectors, str):
             detectors = args.gw_detectors.split(",")
         else:
@@ -453,7 +685,23 @@ class NMMAInjectionCreator(InjectionCreator):
         )
 
     def add_snrs(self, dataframe):
-        """Compute SNR and duration for each row in parallel using threads."""
+        """Compute SNR and duration for each row, sequentially.
+
+        Runs `compute_snr` row-by-row via `dataframe.apply`. A threaded
+        version was tried but is commented out above (`ifo.meta_data`
+        isn't thread-safe, so `self.ifos` can't be shared across threads).
+
+        Parameters
+        ----------
+        dataframe : pandas.DataFrame
+            Must contain the columns `compute_snr` needs (see its
+            docstring); `'snr'` and `'duration'` columns are added/overwritten.
+
+        Returns
+        -------
+        pandas.DataFrame
+            `dataframe` with `'snr'`/`'duration'` columns populated.
+        """
         # FIXME: preferable to parallelise, but ifo meta_data is not thread-safe
 
         # records = dataframe.to_dict("records")
@@ -470,6 +718,21 @@ class NMMAInjectionCreator(InjectionCreator):
         return dataframe
 
     def compute_snr(self, data):
+        """Inject one row's parameters into zero-noise data and compute network SNR.
+
+        Parameters
+        ----------
+        data : pandas.Series or Mapping
+            Must contain mass_1, mass_2, chi_1, chi_2, luminosity_distance,
+            dec, ra, theta_jn, phase, psi, geocent_time, lambda_1, lambda_2.
+
+        Returns
+        -------
+        tuple of (float, float)
+            (network optimal SNR, rounded time-to-merger from self.f_min
+            + 1s, used as the injection's duration estimate).
+        """
+
         injection_parameters = {"fiducial": 1.0}
         injection_keys = (
             "mass_1",
@@ -516,17 +779,53 @@ class NMMAInjectionCreator(InjectionCreator):
         )
 
     def initialise_lc_model(self, args):
+        """Build the light-curve model used by peak_magnitude tests / lightcurve post-processing.
+
+        Also sets self.args.label (from args.lc_label, falling back to
+        self.filename) and self.detection_limit.
+
+        Parameters
+        ----------
+        args : argparse.Namespace
+            Passed through to `create_injection_model` and
+            `em.utils.create_detection_limit`.
+        """
+
         self.lc_model = create_injection_model(args)
         self.args.label = args.lc_label if args.lc_label else self.filename
         self.detection_limit = utils.create_detection_limit(args, self.lc_model.filters)
 
     def prepare_lightcurves(self, dataframe):
+        """Generate and store a light curve for each injection row.
+
+        Parameters
+        ----------
+        dataframe : pandas.DataFrame
+            Injection parameters to simulate light curves for; forwarded
+            to `lightcurve_handling.create_multiple_injections` along with
+            `self.args` and `self.lc_model`.
+        """
+
         lch.create_multiple_injections(
             dataframe, self.args, self.lc_model, format="standard"
         )
 
     def compute_ejecta(self, dataframe):
-        """Compute the ejecta parameters for the injections."""
+        """Compute and attach ejecta parameters for each injection, in place.
+
+        Parameters
+        ----------
+        dataframe : pandas.DataFrame
+            Must contain whatever `KilonovaEjectaFitting.__call__` needs
+            (EOS-derived mass/radius/tidal columns from `core_conversion`).
+
+        Returns
+        -------
+        pandas.DataFrame
+            `dataframe` with ejecta columns (log10_mej_dyn, log10_mej_wind,
+            etc.) added.
+        """
+
         # FIXME Weizmann: KilonovaEjectaFitting has no __init__ taking a
         # dataframe argument (only __call__); this raised
         # TypeError: KilonovaEjectaFitting() takes no arguments.
@@ -535,8 +834,46 @@ class NMMAInjectionCreator(InjectionCreator):
 
     # ------------- Legacy functions ----------------#
     def file_to_dataframe(self, injection_file, reference_frequency, trigger_time=0.0):
-        """legacy function to convert a bilby- injection file to a dataframe.
-        Consider doing a complete nmma-injection instead"""
+        """Legacy: convert a bilby injection file to an nmma-style dataframe.
+
+        Consider doing a complete nmma-injection instead. Reads a '.xml'
+        (ligolw sim_inspiral table), '.dat' (tab-separated), or '.ecsv'
+        file and derives spin-frame/precession parameters via
+        lalsimulation's SimInspiralTransformPrecessingWvf2PE.
+
+        Note: '.xml.gz' is listed as a supported suffix here and in
+        `handle_incomplete_injection_file`, but `Path.suffix` only ever
+        returns the last extension component ('.gz'), so that branch is
+        currently unreachable -- a real .xml.gz file raises ValueError
+        instead of being read. Also, the ligo.lw import check below runs
+        unconditionally, so it raises ImportError even for '.dat'/'.ecsv'
+        files that never touch ligo.lw.
+
+        Parameters
+        ----------
+        injection_file : pathlib.Path
+            Path to the legacy injection file (suffix picks the reader).
+        reference_frequency : float
+            Reference frequency for the precessing-spin conversion.
+        trigger_time : float, optional
+            Fallback geocent_time when a row has no `geocent_end_time`
+            (default 0.0).
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per table entry, with mass_1 >= mass_2 enforced.
+
+        Raises
+        ------
+        ImportError
+            If `ligo.lw` isn't installed -- raised regardless of the
+            file's actual suffix (see note above).
+        ValueError
+            If `injection_file`'s suffix isn't recognized -- in practice
+            only '.xml', '.dat', and '.ecsv' ever match (see note above).
+        """
+
         # legacy imports
         from astropy.table import Table as AstroTable
         from gwpy.table import Table
@@ -637,6 +974,15 @@ class NMMAInjectionCreator(InjectionCreator):
 
 
 def multi_run_setup():
+    """CLI entrypoint: expand an injection file into one SLURM run dir per injection.
+
+    Parses via `slurm_setup_parser`, builds an `NMMAInjectionCreator`
+    from an existing --injection-file, and for each row writes
+    outdir/<index>/injection.prior, a copy of --analysis-file with
+    PRIOR/OUTDIR/INJOUT/INJNUM placeholders substituted, saved as
+    outdir/<index>/inference.sh.
+    """
+
     args = parsing_and_logging(slurm_setup_parser)
     injection_creator = NMMAInjectionCreator(args)
     dataframe = injection_creator.generate_prelim_dataframe()
@@ -667,6 +1013,8 @@ def multi_run_setup():
 
 
 def BNS_distribution(m1, m2):
+    """Population weight for a BNS mass-ratio test: symmetric q = min(m2/m1, m1/m2)."""
+
     q = m2 / m1
     return np.where(q <= 1.0, q, 1 / q)
 
@@ -675,6 +1023,14 @@ def BNS_distribution(m1, m2):
 
 
 def generate_injection(args=None):
+    """CLI entrypoint: parse args (if not given) and write an injection file.
+
+    Parameters
+    ----------
+    args : argparse.Namespace, optional
+        Pre-parsed args; if None, parsed via
+        `nmma_base_parsing(injection_parsing)`.
+    """
     # step 0: parse the arguments
     # handle parsing similar to bilby-pipe and parse from config file
     if args is None:
@@ -685,6 +1041,14 @@ def generate_injection(args=None):
 
 
 def main(args=None):
+    """Alias for `generate_injection`; the `nmma-create-injection` CLI entrypoint.
+
+    Parameters
+    ----------
+    args : argparse.Namespace, optional
+        Forwarded to `generate_injection`.
+    """
+
     generate_injection(args)
 
 

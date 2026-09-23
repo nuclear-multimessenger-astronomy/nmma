@@ -19,6 +19,8 @@ pytest.importorskip(
 )
 
 FIESTA_SURROGATES = os.environ.get("NMMA_FIESTA_SURROGATES")
+if FIESTA_SURROGATES is not None:
+    os.environ["FIESTA_BUILT_IN_SURROGATE_DIR"] = FIESTA_SURROGATES
 
 
 @pytest.mark.skipif(

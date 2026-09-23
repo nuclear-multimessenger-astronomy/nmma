@@ -18,7 +18,18 @@ from .constants import geom_msun_km, get_cosmology, msun_s, msun_to_ergs, set_co
 
 
 def val_to_scalar(val):
-    """Convert single-value quantities to scalars for easier handling"""
+    """
+    Convert single-value quantities to scalars for easier handling
+
+    Parameters
+    ----------
+    val : scalar or array_like
+
+    Returns
+    -------
+    ``val`` if it is already a scalar, ``val.item()`` if it has size 1,
+    and ``numpy.asarray(val)`` otherwise.
+    """
     if np.isscalar(val):
         return val
     else:
@@ -29,107 +40,318 @@ def val_to_scalar(val):
 
 
 # =================== distance conversions # ===================
-def distance_modulus_nmma(d_lum=1e-5):
-    # mag_app = mag_abs + 5* log10(dist/10pc) | NMMA-dist is in Mpc
-    #         = mag_abs + 5 * (log10(Mpc/10pc)+ log10(params["luminosity_distance"]))
-    # therefore: distance_modulus = mag_app - mag_abs =
-    return 5.0 * (5 + np.log10(d_lum))
 
 
-def luminosity_distance_to_redshift(distance, cosmology=None):
-    if cosmology is None:
-        cosmology = get_cosmology()
-    if isinstance(distance, pd.Series):
-        distance = distance.values
-
-    if hasattr(distance, "__len__") and len(distance) > 50:
-        d_min, d_max = distance.min(), distance.max()
-        dist_grid, z_grid = get_cosmo_grids(d_min, d_max, cosmology)
-        return np.interp(distance, dist_grid, z_grid).value
-    else:
-        return cosmo.z_at_value(
-            cosmology.luminosity_distance, distance * units.Mpc
-        ).value
-
-
-def get_cosmo_grids(distance_min, distance_max, cosmology):
-    # luminosity_distance_to_redshift gets really slow if too many distances are put in at once
-    zmin = cosmo.z_at_value(cosmology.luminosity_distance, distance_min * units.Mpc)
-    zmax = cosmo.z_at_value(cosmology.luminosity_distance, distance_max * units.Mpc)
-    z_grid = np.geomspace(zmin, zmax, 50)
-    dist_grid = cosmology.luminosity_distance(z_grid).value
-    return dist_grid, z_grid
-
-
-def get_redshift(parameters):
-    if "redshift" in parameters:
-        return parameters["redshift"]
-    elif "luminosity_distance" in parameters:
-        return luminosity_distance_to_redshift(parameters["luminosity_distance"])
-    else:
-        # zeros like the first input of parameters, independent of size and keys
-        return np.zeros_like(next(iter(parameters.values())))
-
-
-def cosmology_to_distance(parameters):
-    cosmology = get_cosmology()
-    cosmo_parameters = {}
-    if "Hubble_constant" in parameters:
-        cosmo_parameters["H0"] = parameters["Hubble_constant"]
-    if "Omega_matter" in parameters:
-        cosmo_parameters["Om0"] = parameters["Omega_matter"]
+class CosmologyConverter:
+    nmma_to_astropy_cosmo_map = {
+        "Hubble_constant": "H0",
+        "Omega_matter": "Om0",
+    }
     # Maybe extend for an even wilder cosmology?
-    try:
-        alt_cosmo = cosmology.clone(**cosmo_parameters)
+
+    def __init__(self, cosmology=None):
+        """Initialize the CosmologyConverter with a given cosmology.
+
+        Parameters
+        ----------
+        cosmology : str or astropy.cosmology.Cosmology, optional
+            The cosmology to use for the conversion. If None, the default cosmology will be used.
+        """
+        self._set_conv_cosmology(cosmology)
+        self.conversion_function = self.convert
+
+    def __call__(self, parameters):
+        """Convert to luminosity distance and/or redshift based on cosmological assumptions.
+
+        Parameters
+        ----------
+        parameters : dict
+            Dictionary containing cosmological parameters.
+
+        Returns
+        -------
+        dict
+            Updated parameters with luminosity distance and redshift.
+        """
+        if "redshift" in parameters and "luminosity_distance" in parameters:
+            # if both are present, we assume they are consistent and do nothing
+            return parameters
+        return self.conversion_function(parameters)
+
+    def _set_conv_cosmology(self, cosmology=None):
+        if cosmology is None:
+            self.cosmology = get_cosmology()
+        else:
+            self.cosmology = set_cosmology(cosmology)
+
+    def convert(self, parameters):
+        """Convert to luminosity distance and/or redshift based on cosmological assumptions.
+
+        Parameters
+        ----------
+        parameters : dict
+            Dictionary containing cosmological parameters.
+
+        Returns
+        -------
+        dict
+            Updated parameters with luminosity distance and redshift.
+        """
+        if "redshift" in parameters:
+            parameters["luminosity_distance"] = self.luminosity_distance(
+                parameters["redshift"]
+            )
+        elif "luminosity_distance" in parameters:
+            parameters["redshift"] = self.redshift(parameters["luminosity_distance"])
+        else:
+            raise ValueError(
+                "Either redshift or luminosity_distance must be in parameters"
+            )
+        return parameters
+
+    def luminosity_distance(self, redshift, cosmology=None):
+        """Convert redshift to luminosity distance using the current cosmology.
+
+        Parameters
+        ----------
+        redshift : float or array-like
+            Redshift value(s) to convert.
+        cosmology : astropy.cosmology.Cosmology, optional
+            The cosmology to use for the conversion. If None, the default cosmology will be used.
+
+        Returns
+        -------
+        float or array-like
+            Corresponding luminosity distance(s) in Mpc.
+        """
+        if cosmology is None:
+            cosmology = self.cosmology
+        return cosmology.luminosity_distance(redshift).value
+
+    def redshift(self, luminosity_distance, cosmology=None):
+        """Convert luminosity distance to redshift using a given cosmology.
+
+        Parameters
+        ----------
+        luminosity_distance : float or array-like
+            Luminosity distance value(s) to convert.
+        cosmology : astropy.cosmology.Cosmology, optional
+            The cosmology to use for the conversion. If None, the default cosmology will be used.
+
+        Returns
+        -------
+        float or array-like
+            Corresponding redshift(s).
+        """
+        if isinstance(luminosity_distance, pd.Series):
+            luminosity_distance = luminosity_distance.values
+
+        if cosmology is None:
+            cosmology = self.cosmology
+
+        if hasattr(luminosity_distance, "__len__") and len(luminosity_distance) > 50:
+            d_min, d_max = luminosity_distance.min(), luminosity_distance.max()
+            dist_grid, z_grid = self.get_cosmo_grids(d_min, d_max)
+            return np.interp(luminosity_distance, dist_grid, z_grid)
+        else:
+            return cosmo.z_at_value(
+                cosmology.luminosity_distance, luminosity_distance * units.Mpc
+            ).value
+
+    def distmod(self, luminosity_distance=1e-5):
+        """Compute the distance modulus for a given luminosity distance in Mpc."""
+        # mag_app = mag_abs + 5* log10(dist/10pc) | NMMA-dist is in Mpc
+        #         = mag_abs + 5 * (log10(Mpc/10pc)+ log10(params["luminosity_distance"]))
+        # therefore: distance_modulus = mag_app - mag_abs =
+        return 5.0 * (5 + np.log10(luminosity_distance))
+
+    def get_cosmo_grids(self, distance_min, distance_max):
+        zmin = cosmo.z_at_value(
+            self.cosmology.luminosity_distance, distance_min * units.Mpc
+        )
+        zmax = cosmo.z_at_value(
+            self.cosmology.luminosity_distance, distance_max * units.Mpc
+        )
+        z_grid = np.geomspace(zmin, zmax, 50)
+        dist_grid = self.cosmology.luminosity_distance(z_grid)
+        return dist_grid.value, z_grid.value
+
+    def cosmology_to_distance(self, parameters):
+        """Convert cosmological parameters to luminosity distance and redshift.
+
+        Parameters
+        ----------
+        parameters : dict
+            Dictionary containing cosmological parameters. It may include 'Hubble_constant', 'Omega_matter',
+            'luminosity_distance', and/or 'redshift'.
+
+        Returns
+        -------
+        dict
+            Updated parameters with luminosity distance and redshift.
+        """
+        cosmo_parameters = {
+            v: parameters[k]
+            for k, v in self.nmma_to_astropy_cosmo_map.items()
+            if k in parameters
+        }
+        try:
+            missing_key, missing_val = self._single_cosmo(cosmo_parameters, parameters)
+        except ValueError:
+            # if H0 is an array, .clone raises a ValueError
+            # in that case we turn a dict with len-n values into a len-n list of dicts with single value
+            missing_key, missing_val = self._multiple_cosmo(
+                cosmo_parameters, parameters
+            )
+        parameters[missing_key] = missing_val
+        return parameters
+
+    def _single_cosmo(self, cosmo_parameters, parameters):
+        alt_cosmo = self.cosmology.clone(**cosmo_parameters)
         if "luminosity_distance" in parameters:
             # if luminosity distance is available, we assume it is in Mpc
-            parameters["redshift"] = luminosity_distance_to_redshift(
+            return "redshift", self.redshift(
                 parameters["luminosity_distance"], cosmology=alt_cosmo
             )
         elif "redshift" in parameters:
-            parameters["luminosity_distance"] = alt_cosmo.luminosity_distance(
-                parameters["redshift"]
-            ).value
+            return "luminosity_distance", self.luminosity_distance(
+                parameters["redshift"], cosmology=alt_cosmo
+            )
         else:
             raise KeyError(
                 "Either redshift or luminosity_distance must be in parameters"
             )
 
-    except ValueError:
-        # if H0 is an array, .clone raises a ValueError
-        # in that case we turn a dict with len-n values into a len-n list of dicts with single values
+    def _multiple_cosmo(self, cosmo_parameters, parameters):
+        """Convert cosmological parameters to luminosity distance and redshift
+        when the Hubble constant is array-valued.
+
+        Parameters
+        ----------
+        cosmo_parameters : dict
+            Dictionary containing the cosmological parameters.
+        parameters : dict
+            Dictionary containing the input parameters.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the missing key and its corresponding value.
+        """
         cosmo_dicts = [
             dict(zip(cosmo_parameters.keys(), vals))
             for vals in zip(*cosmo_parameters.values())
         ]
-        alt_cosmos = [cosmology.clone(**cosmo_dict) for cosmo_dict in cosmo_dicts]
-
+        output = []
         if "luminosity_distance" in parameters:
-            # if luminosity distance is available, we assume it is in Mpc
-            parameters["redshift"] = np.array(
-                [
-                    luminosity_distance_to_redshift(
-                        parameters["luminosity_distance"][i], cosmology=alt_cosmo
-                    )
-                    for i, alt_cosmo in enumerate(alt_cosmos)
-                ]
-            )
-
+            use_key = "luminosity_distance"
+            missing_key = "redshift"
         elif "redshift" in parameters:
-            parameters["luminosity_distance"] = np.array(
-                [
-                    alt_cosmo.luminosity_distance(parameters["redshift"][i]).value
-                    for i, alt_cosmo in enumerate(alt_cosmos)
-                ]
-            )
-    return parameters
+            use_key = "redshift"
+            missing_key = "luminosity_distance"
+
+        for i, alt_cosmo_dict in enumerate(cosmo_dicts):
+            use_param = {use_key: parameters[use_key][i]}
+            _, missing_val = self._single_cosmo(alt_cosmo_dict, use_param)
+            output.append(missing_val)
+        return missing_key, np.array(output)
+
+    def _constant_cosmo(self, parameters):
+        """Obtain d_L and z from fixed priors."""
+        parameters["luminosity_distance"] = self.fixed_luminosity_distance
+        parameters["redshift"] = self.fixed_redshift
+        return parameters
+
+    def _grid_cosmo(self, parameters):
+        """Build a redshift_func that interpolates redshift from
+        luminosity_distance on a precomputed, fixed-cosmology grid."""
+        dlum = parameters["luminosity_distance"]
+        parameters["redshift"] = np.interp(dlum, self.dist_grid, self.z_grid)
+        return parameters
+
+    @classmethod
+    def from_priors(cls, priors):
+        """Set up the cosmology conversion function based on the provided priors.
+
+        Parameters
+        ----------
+        priors : dict
+            Dictionary of priors for the model parameters.
+
+        """
+
+        has_redshift = "redshift" in priors
+        has_dlum = "luminosity_distance" in priors
+        has_H0 = "Hubble_constant" in priors
+        use_cosmo = None
+
+        if has_dlum:
+            use_cosmo = getattr(priors["luminosity_distance"], "cosmology", None)
+
+        converter = cls(cosmology=use_cosmo)
+
+        if not has_redshift and not has_dlum:
+            # fallback to absolute magnitudes
+            converter.fixed_redshift = 0.0
+            converter.fixed_luminosity_distance = 1e-5  # 10 pc in Mpc
+            converter.conversion_function = converter._constant_cosmo
+            if has_H0:
+                raise ValueError("Hubble_constant is sampled, but lacks z or d_L")
+
+        elif has_H0:
+            converter.conversion_function = converter.cosmology_to_distance
+
+        elif has_redshift:
+            if priors["redshift"].is_fixed:
+                converter.fixed_redshift = priors["redshift"].peak
+                converter.fixed_luminosity_distance = converter.luminosity_distance(
+                    converter.fixed_redshift
+                )
+                converter.conversion_function = converter._constant_cosmo
+            else:
+                # keep the default
+                pass
+
+        elif has_dlum:
+            dlum_prior = priors["luminosity_distance"]
+            if dlum_prior.is_fixed:
+                converter.fixed_luminosity_distance = dlum_prior.peak
+                converter.fixed_redshift = converter.redshift(
+                    converter.fixed_luminosity_distance
+                )
+                converter.conversion_function = converter._constant_cosmo
+            else:
+                # redshift inversion is hard, use precomputed grid
+                converter.dist_grid, converter.z_grid = converter.get_cosmo_grids(
+                    dlum_prior.minimum, dlum_prior.maximum
+                )
+                converter.conversion_function = converter._grid_cosmo
+
+        return converter
 
 
 def source_frame_masses(converted_parameters):
+    """
+    Add ``mass_1_source`` and ``mass_2_source`` to the parameters.
+
+    Applies ``generate_mass_parameters`` first, and fills in ``redshift``
+    from ``luminosity_distance`` when it is missing. Source-frame masses
+    already present are left as they are.
+
+    Parameters
+    ----------
+    converted_parameters : dict
+
+    Returns
+    -------
+    dict
+        ``converted_parameters``, updated.
+    """
     converted_parameters = generate_mass_parameters(converted_parameters)
     if "redshift" not in converted_parameters:
+        cosmo_converter = CosmologyConverter()
         distance = converted_parameters["luminosity_distance"]
-        converted_parameters["redshift"] = luminosity_distance_to_redshift(distance)
+        converted_parameters["redshift"] = cosmo_converter.redshift(distance)
     z = converted_parameters["redshift"]
 
     if "mass_1_source" not in converted_parameters:
@@ -146,6 +368,22 @@ def source_frame_masses(converted_parameters):
 
 
 def observation_angle_conversion(parameters):
+    """
+    Add ``KNtheta`` and ``inclination_EM`` to the parameters.
+
+    ``KNtheta`` is in degrees and ``inclination_EM`` in radians; each is
+    filled from the other, or from ``theta_jn``/``cos_theta_jn`` after
+    ``numpy.minimum(theta_jn, pi - theta_jn)``.
+
+    Parameters
+    ----------
+    parameters : dict
+
+    Returns
+    -------
+    dict
+        ``parameters``, updated.
+    """
     theta_jn = parameters.get(
         "theta_jn", np.arccos(parameters.get("cos_theta_jn", 1.0))
     )
@@ -165,22 +403,70 @@ def observation_angle_conversion(parameters):
 
 
 def bbh_source_frame(params):
-    """Convert parameters to BBH parameters using bilby function."""
+    """
+    Convert parameters to BBH parameters using bilby function.
+
+    Parameters
+    ----------
+    params : dict
+
+    Returns
+    -------
+    dict
+        :func:`source_frame_masses` of the output of
+        ``convert_to_lal_binary_black_hole_parameters``.
+    """
     params, _ = convert_to_lal_binary_black_hole_parameters(params)
     return source_frame_masses(params)
 
 
 def bns_source_frame(params):
-    """Convert parameters to BNS parameters using bilby function."""
+    """
+    Convert parameters to BNS parameters using bilby function.
+
+    Parameters
+    ----------
+    params : dict
+
+    Returns
+    -------
+    dict
+        :func:`source_frame_masses` of the output of
+        ``convert_to_lal_binary_neutron_star_parameters``.
+    """
     params, _ = convert_to_lal_binary_neutron_star_parameters(params)
     return source_frame_masses(params)
 
 
 def mass_ratio_to_eta(q):
+    """
+    Convert mass ratio ``q`` to ``q / (1 + q) ** 2``.
+
+    Parameters
+    ----------
+    q : float or array_like
+
+    Returns
+    -------
+    The symmetric mass ratio.
+    """
     return q / (1 + q) ** 2
 
 
 def component_masses_to_mass_quantities(m1, m2):
+    """
+    Convert component masses to chirp mass, symmetric mass ratio and
+    mass ratio.
+
+    Parameters
+    ----------
+    m1, m2 : float or array_like
+
+    Returns
+    -------
+    tuple
+        ``(mchirp, eta, q)``, with ``q = m2 / m1``.
+    """
     eta = m1 * m2 / ((m1 + m2) * (m1 + m2))
     mchirp = ((m1 * m2) ** (3.0 / 5.0)) * ((m1 + m2) ** (-1.0 / 5.0))
     q = m2 / m1
@@ -192,6 +478,15 @@ def chirp_mass_and_eta_to_component_masses(mc, eta):
     """
     Utility function for converting mchirp,eta to component masses. The
     masses are defined so that m1>m2. The rvalue is a tuple (m1,m2).
+
+    Parameters
+    ----------
+    mc, eta : float or array_like
+
+    Returns
+    -------
+    tuple
+        ``(m1, m2)``.
     """
     M = mc / np.power(eta, 3.0 / 5.0)
     q = (1 - np.sqrt(1.0 - 4.0 * eta) - 2 * eta) / (2.0 * eta)
@@ -205,6 +500,19 @@ def chirp_mass_and_eta_to_component_masses(mc, eta):
 def tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(
     lambda1, lambda2, q
 ):
+    """
+    Convert component tidal deformabilities and mass ratio to the
+    effective tidal deformabilities.
+
+    Parameters
+    ----------
+    lambda1, lambda2, q : float or array_like
+
+    Returns
+    -------
+    tuple
+        ``(lambdaT, dlambdaT)``.
+    """
     eta = q / np.power(1.0 + q, 2.0)
     eta2 = eta * eta
     eta3 = eta2 * eta
@@ -231,6 +539,19 @@ def tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(
 
 
 def reweight_to_flat_mass_prior(df):
+    """
+    Resample ``df`` weighted by ``mass_1 ** 2 / chirp_mass``.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Must contain ``chirp_mass`` and ``mass_ratio``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A sample of 30% of the rows.
+    """
     total_mass = chirp_mass_and_mass_ratio_to_total_mass(df.chirp_mass, df.mass_ratio)
     m1 = total_mass / (1.0 + df.mass_ratio)
     jacobian = m1 * m1 / df.chirp_mass
@@ -239,7 +560,21 @@ def reweight_to_flat_mass_prior(df):
 
 
 def convert_mtot_mni(params):
+    """
+    Add ``mni``, ``mtot``, ``mrp``, ``mni_c`` and ``mrp_c`` to ``params``.
 
+    Each of ``mni``, ``mtot`` and ``mrp`` is filled from its ``log10_``
+    counterpart when absent; ``mrp_c`` also reads ``xmix``.
+
+    Parameters
+    ----------
+    params : dict
+
+    Returns
+    -------
+    dict
+        ``params``, updated.
+    """
     for par in ["mni", "mtot", "mrp"]:
         if par not in params:
             params[par] = 10 ** params[f"log10_{par}"]
@@ -251,34 +586,99 @@ def convert_mtot_mni(params):
 
 # =================== pulsar timing conversions ===================
 def binary_mass_function(m_obs, m_comp, sin_i):
+    """
+    Binary mass function ``(m_comp * sin_i) ** 3 / (m_obs + m_comp) ** 2``.
+
+    Parameters
+    ----------
+    m_obs, m_comp, sin_i : float or array_like
+
+    Returns
+    -------
+    The binary mass function.
+    """
     return (m_comp * sin_i) ** 3 / (m_obs + m_comp) ** 2
 
 
 def shapiro_delay(m_comp, sin_i):
-    "see https://arxiv.org/pdf/1007.0933.pdf"
+    """
+    see https://arxiv.org/pdf/1007.0933.pdf
+
+    Parameters
+    ----------
+    m_comp, sin_i : float or array_like
+
+    Returns
+    -------
+    The delay in microseconds.
+    """
     shapiro_range = msun_s * 1.0e6 * m_comp  # in microseconds
     orthometric_ratio = sin_i / (1 + np.sqrt(1 - sin_i**2))
     return shapiro_range * orthometric_ratio**3
 
 
 def einstein_delay_orbital_factor(orbital_period, eccentricity):
-    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12"
+    """
+    see, e.g., 10.1007/978-3-662-62110-3_1, p.12
+
+    Parameters
+    ----------
+    orbital_period, eccentricity : float or array_like
+
+    Returns
+    -------
+    The factor taken by :func:`simplified_einstein_delay` as
+    ``einstein_factor``.
+    """
     return msun_s ** (2 / 3) * eccentricity * (orbital_period / 2 / np.pi) ** (1 / 3)
 
 
 def simplified_einstein_delay(m_psr, m_comp, einstein_factor):
-    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12"
+    """
+    see, e.g., 10.1007/978-3-662-62110-3_1, p.12
+
+    Parameters
+    ----------
+    m_psr, m_comp : float or array_like
+    einstein_factor : float or array_like
+        As returned by :func:`einstein_delay_orbital_factor`.
+
+    Returns
+    -------
+    The Einstein delay.
+    """
     return einstein_factor * m_comp * (m_psr + 2 * m_comp) / (m_psr + m_comp) ** (4 / 3)
 
 
 def einstein_delay(m_psr, m_comp, orbital_period, eccentricity):
-    "see, e.g., 10.1007/978-3-662-62110-3_1, p.12"
+    """
+    see, e.g., 10.1007/978-3-662-62110-3_1, p.12
+
+    Parameters
+    ----------
+    m_psr, m_comp, orbital_period, eccentricity : float or array_like
+
+    Returns
+    -------
+    :func:`simplified_einstein_delay` evaluated with the factor from
+    :func:`einstein_delay_orbital_factor`.
+    """
     einstein_delay_factor = einstein_delay_orbital_factor(orbital_period, eccentricity)
     return simplified_einstein_delay(m_psr, m_comp, einstein_delay_factor)
 
 
 def mass_parameters_to_sini(total_mass, mass_function, m_comp):
-    "Invert the binary mass function to get sin(i) for a given total mass and mass function"
+    """
+    Invert the binary mass function to get sin(i) for a given total mass and mass function
+
+    Parameters
+    ----------
+    total_mass, mass_function, m_comp : float or array_like
+
+    Returns
+    -------
+    ``sin(i)``.
+    """
     return np.cbrt(mass_function * total_mass**2) / m_comp
 
 
@@ -286,6 +686,21 @@ def mass_parameters_to_sini(total_mass, mass_function, m_comp):
 
 
 def EOS_to_ns_parameters(radii, masses, lambdas):
+    """
+    Extract ``TOV_mass``, ``TOV_radius``, ``R_14`` and ``R_16`` from a
+    tabulated EOS.
+
+    Parameters
+    ----------
+    radii, masses, lambdas : array_like
+        Tabulated EOS columns. ``lambdas`` is accepted but not used.
+
+    Returns
+    -------
+    tuple
+        ``(TOV_mass, TOV_radius, R_14, R_16)``. The radii at 1.4 and 1.6
+        are interpolated, and are 0 outside the tabulated mass range.
+    """
     TOV_mass = masses.max(axis=-1)
     TOV_radius = radii[np.argmax(masses)]
     R_14, R_16 = np.interp(x=[1.4, 1.6], xp=masses, fp=radii, left=0, right=0)
@@ -294,6 +709,23 @@ def EOS_to_ns_parameters(radii, masses, lambdas):
 
 
 def EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source):
+    """
+    Interpolate a tabulated EOS at the two component masses.
+
+    Parameters
+    ----------
+    radii, masses, lambdas : array_like
+        Tabulated EOS columns.
+    m1_source, m2_source : float or array_like
+        Source-frame component masses.
+
+    Returns
+    -------
+    tuple
+        ``(lambda_1, lambda_2, radius_1, radius_2)``. The deformabilities
+        are interpolated in ``log``; both they and the radii come out as 0
+        outside the tabulated mass range.
+    """
     (log_lambda_1, log_lambda_2) = np.interp(
         x=[m1_source, m2_source],
         xp=masses,
@@ -311,6 +743,22 @@ def EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source):
 
 
 def radii_from_qur(parameters):
+    """
+    Add ``radius_1``, ``radius_2`` and ``R_16`` to ``parameters``.
+
+    Reads ``mass_1_source``, ``mass_2_source``, ``lambda_1`` and
+    ``lambda_2``, and converts each deformability with
+    :func:`lambda_to_compactness`.
+
+    Parameters
+    ----------
+    parameters : dict
+
+    Returns
+    -------
+    dict
+        ``parameters``, updated.
+    """
     mass_1_source = parameters["mass_1_source"]
     mass_2_source = parameters["mass_2_source"]
     lambda_1 = parameters["lambda_1"]
@@ -338,13 +786,34 @@ def radii_from_qur(parameters):
 
 
 def lambda_to_compactness(lambda_i):
-    "Function to link tidal deformability to compactness based on quasi-universal relation"
+    """
+    Function to link tidal deformability to compactness based on quasi-universal relation
+
+    Parameters
+    ----------
+    lambda_i : float or array_like
+
+    Returns
+    -------
+    The compactness.
+    """
     loglam = np.log(lambda_i)
     return 0.371 - 0.0391 * loglam + 0.001056 * loglam * loglam
 
 
 def mass_and_compactness_to_radius(mass, comp):
     # returns 0 if compactness is greater than 0.5, i.e. black hole
+    """
+    Convert mass and compactness to radius, returning 0 where ``comp >= 0.5``.
+
+    Parameters
+    ----------
+    mass, comp : float or array_like
+
+    Returns
+    -------
+    The radius.
+    """
     return np.where(comp < 0.5, mass / comp * geom_msun_km, 0.0)
 
 
@@ -362,6 +831,7 @@ def gaussian_jet_energy_to_central_isotropic_energy_equivalent(
     :param Ejet: Total jet energy in ergs
     :param thetaCore: Core angle in rad
     :param alphaWing: Ratio of the wing angle and core angle.
+    :return: The on-axis isotropic-energy equivalent.
     """
 
     # this is the analytical expression for int_{0}^{alphaWing*thetaCore} sin(x) *exp(-1/2 (x/thetac)^2) dx
@@ -392,6 +862,7 @@ def powerlaw_jet_energy_to_central_isotropic_energy_equivalent(
     :param thetaCore: Core angle in rad
     :param alphaWing: Ratio of the wing angle and core angle.
     :param b: Power law tail of the jet.
+    :return: The on-axis isotropic-energy equivalent.
     """
     x = np.linspace(0, alphaWing * thetaCore, 100)
     y = np.sin(x) * (1 + 1 / b * (x / thetaCore) ** 2) ** (-b / 2)
@@ -404,9 +875,33 @@ def powerlaw_jet_energy_to_central_isotropic_energy_equivalent(
 
 
 class EjectaFitting:
+    """
+    Base class for the ejecta fitting conversions.
+
+    Attributes
+    ----------
+    mass_fitting_keys : list of str
+        The keys :meth:`__call__` writes, in the order
+        :meth:`ejecta_parameter_conversion` returns them.
+    """
+
     mass_fitting_keys = ["log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"]
 
     def __call__(self, parameters):
+        """
+        Add the fitted ejecta parameters to ``parameters``.
+
+        Keys already present in ``parameters`` are kept.
+
+        Parameters
+        ----------
+        parameters : dict
+
+        Returns
+        -------
+        dict
+            ``parameters``, updated.
+        """
         conv_parameters = self.ejecta_parameter_conversion(parameters)
         for key, val in zip(self.mass_fitting_keys, conv_parameters):
             # We always prefer explicitly sampled ejecta parameters
@@ -414,13 +909,34 @@ class EjectaFitting:
         return parameters
 
     def ejecta_parameter_conversion(self, parameters):
+        """
+        Return ``-inf`` for each of :attr:`mass_fitting_keys`.
+
+        Parameters
+        ----------
+        parameters : dict
+
+        Returns
+        -------
+        list
+        """
         return [-np.inf for _ in self.mass_fitting_keys]
 
 
 class NSBHEjectaFitting(EjectaFitting):
+    """Ejecta fitting for an NSBH system."""
+
     def chibh2risco(self, chi_bh):
         """see, e.g., https://arxiv.org/pdf/2011.08948.pdf, eq. 2-4.
         This expression gives the innermost stable circular orbit (ISCO) in units of the black hole mass as a function of the dimensionless spin parameter chi_bh.
+
+        Parameters
+        ----------
+        chi_bh : float or array_like
+
+        Returns
+        -------
+        The ISCO radius in units of the black hole mass.
         """
         Z1 = 1.0 + (1.0 - chi_bh**2) ** (1.0 / 3) * (
             (1 + chi_bh) ** (1.0 / 3) + (1 - chi_bh) ** (1.0 / 3)
@@ -432,6 +948,14 @@ class NSBHEjectaFitting(EjectaFitting):
     def baryon_mass_NS(self, source_mass, compactness):
         """
         equation (7) in https://arxiv.org/abs/2002.07728
+
+        Parameters
+        ----------
+        source_mass, compactness : float or array_like
+
+        Returns
+        -------
+        The baryon mass.
         """
 
         return source_mass * (1.0 + 0.6 * compactness / (1.0 - 0.5 * compactness))
@@ -449,6 +973,17 @@ class NSBHEjectaFitting(EjectaFitting):
     ):
         """
         equation (4) in https://arxiv.org/pdf/1807.00011
+
+        Parameters
+        ----------
+        mass_1_source, mass_2_source, compactness_2, chi_bh : float or array_like
+        a, b, c, d : float, optional
+            Fitting coefficients. Defaults:
+            ``a=0.40642158``, ``b=0.13885773``, ``c=0.25512517``, ``d=0.761250847``.
+
+        Returns
+        -------
+        The remnant disk mass.
         """
 
         mass_ratio = mass_2_source / mass_1_source
@@ -485,6 +1020,19 @@ class NSBHEjectaFitting(EjectaFitting):
     ):
         """
         equation (9) in https://arxiv.org/abs/2002.07728
+
+        Parameters
+        ----------
+        mass_1_source, mass_2_source, compactness_2, chi_bh : float or array_like
+        a1, a2, a4, n1, n2 : float, optional
+            Fitting coefficients. Defaults:
+            ``a1=7.11595154e-03``, ``a2=1.43636803e-03``,
+            ``a4=-2.76202990e-02``, ``n1=-8.63604211e-01``,
+            ``n2=-1.68399507``.
+
+        Returns
+        -------
+        The dynamical ejecta mass.
         """
 
         mass_ratio = mass_2_source / mass_1_source
@@ -502,7 +1050,22 @@ class NSBHEjectaFitting(EjectaFitting):
         return mdyn
 
     def nsbh_parameter_conversion(self, converted_parameters):
+        """
+        Fit the ejecta parameters for an NSBH system.
 
+        Parameters
+        ----------
+        converted_parameters : dict
+            Reads ``mass_1_source``, ``mass_2_source``, ``radius_2``, ``alpha``
+            and ``ratio_zeta``, plus either ``chi_1`` or ``a_1`` with
+            ``cos_tilt_1``/``tilt_1``.
+
+        Returns
+        -------
+        numpy.ndarray
+            The four values of :attr:`mass_fitting_keys`, stacked. The
+            last, ``log10_E0``, is ``-inf``.
+        """
         mass_1_source = converted_parameters["mass_1_source"]
         mass_2_source = converted_parameters["mass_2_source"]
 
@@ -551,10 +1114,23 @@ class NSBHEjectaFitting(EjectaFitting):
         )
 
     def ejecta_parameter_conversion(self, parameters):
+        """
+        Call :meth:`nsbh_parameter_conversion`.
+
+        Parameters
+        ----------
+        parameters : dict
+
+        Returns
+        -------
+        As :meth:`nsbh_parameter_conversion`.
+        """
         return self.nsbh_parameter_conversion(parameters)
 
 
 class BNSEjectaFitting(EjectaFitting):
+    """Ejecta fitting for a BNS system."""
+
     def log10_disk_mass_fitting(
         self,
         total_mass,
@@ -575,6 +1151,19 @@ class BNSEjectaFitting(EjectaFitting):
         The coefficients a0, delta_a etc. have been updated since then,
         the ones here are the correct ones.
         The threshold mass is from https://arxiv.org/pdf/1908.05442.pdf.
+
+        Parameters
+        ----------
+        total_mass, mass_ratio, MTOV, R16 : float or array_like
+        a0, delta_a, b0, delta_b, c, d, beta, q_trans : float, optional
+            Fitting coefficients. Defaults:
+            ``a0=-1.725``, ``delta_a=-2.337``, ``b0=-0.564``,
+            ``delta_b=-0.437``, ``c=0.958``, ``d=0.057``, ``beta=5.879``,
+            ``q_trans=0.886``.
+
+        Returns
+        -------
+        ``log10`` of the disk mass.
         """
         k = -3.606 * MTOV / R16 + 2.38
         threshold_mass = k * MTOV
@@ -602,6 +1191,17 @@ class BNSEjectaFitting(EjectaFitting):
     ):
         """
         See https://arxiv.org/pdf/1812.04803.pdf
+
+        Parameters
+        ----------
+        mass_1, mass_2, compactness_1, compactness_2 : float or array_like
+        a, b, d, n : float, optional
+            Fitting coefficients. Defaults:
+            ``a=-0.0719``, ``b=0.2116``, ``d=-2.42``, ``n=-2.905``.
+
+        Returns
+        -------
+        ``log10`` of the dynamical ejecta mass.
         """
 
         log10_mdyn = (
@@ -631,6 +1231,17 @@ class BNSEjectaFitting(EjectaFitting):
     ):
         """
         See https://arxiv.org/pdf/2002.07728.pdf
+
+        Parameters
+        ----------
+        mass_1, mass_2, compactness_1, compactness_2 : float or array_like
+        a, b, c, n : float, optional
+            Fitting coefficients. Defaults:
+            ``a=-9.3335``, ``b=114.17``, ``c=-337.56``, ``n=1.5465``.
+
+        Returns
+        -------
+        The dynamical ejecta mass.
         """
 
         mdyn = mass_1 * (
@@ -650,6 +1261,17 @@ class BNSEjectaFitting(EjectaFitting):
     ):
         """
         See https://arxiv.org/pdf/1809.11161 Eq. (22)
+
+        Parameters
+        ----------
+        mass_1, mass_2, compactness_1, compactness_2 : float or array_like
+        a, b, c : float, optional
+            Fitting coefficients. Defaults:
+            ``a=-0.287``, ``b=0.494``, ``c=-3.000``.
+
+        Returns
+        -------
+        The dynamical ejecta velocity.
         """
 
         vej_dyn = a * mass_1 / mass_2 * (1 + c * compactness_1)
@@ -670,6 +1292,17 @@ class BNSEjectaFitting(EjectaFitting):
     ):
         """
         See https://arxiv.org/pdf/2411.02342, Eq. (9)
+
+        Parameters
+        ----------
+        mass_1, mass_2, lambda_1, lambda_2 : float or array_like
+        a, b, c : float, optional
+            Fitting coefficients. Defaults:
+            ``a=1.25e-4``, ``b=9.82e-1``, ``c=-2.44``.
+
+        Returns
+        -------
+        The dynamical ejecta mass.
         """
         q = mass_2 / mass_1
         lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(
@@ -686,6 +1319,17 @@ class BNSEjectaFitting(EjectaFitting):
     ):
         """
         See https://arxiv.org/pdf/2411.02342, Eq. (10)
+
+        Parameters
+        ----------
+        mass_1, mass_2, compactness_1, compactness_2 : float or array_like
+        a, b, c : float, optional
+            Fitting coefficients. Defaults:
+            ``a=-0.395``, ``b=0.798``, ``c=-1.627``.
+
+        Returns
+        -------
+        The dynamical ejecta velocity.
         """
         vdyn = a * mass_1 / mass_2 * (1 + c * compactness_1)
         vdyn += a * mass_2 / mass_1 * (1 + c * compactness_2)
@@ -699,6 +1343,17 @@ class BNSEjectaFitting(EjectaFitting):
         """
         See https://arxiv.org/pdf/2411.02342, Eq. (11)
         Typo for b, b=-13.4 confirmed through author correspondence
+
+        Parameters
+        ----------
+        mass_1, mass_2, lambda_1, lambda_2 : float or array_like
+        a, b, c : float, optional
+            Fitting coefficients. Defaults:
+            ``a=7.70``, ``b=-13.4``, ``c=8.16e-3``.
+
+        Returns
+        -------
+        ``log10`` of the disk mass.
         """
         q = mass_2 / mass_1
         lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(
@@ -716,6 +1371,17 @@ class BNSEjectaFitting(EjectaFitting):
         """
         See https://arxiv.org/pdf/1812.04803, Eq. (D7)
         nu needs to be divided by 0.25 and lambda_tilde by 400, confirmed through author correspondence
+
+        Parameters
+        ----------
+        mass_1, mass_2, lambda_1, lambda_2 : float or array_like
+        a, b, c : float, optional
+            Fitting coefficients. Defaults:
+            ``a=0.537``, ``b=-0.185``, ``c=-0.514``.
+
+        Returns
+        -------
+        The black hole spin.
         """
 
         lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(
@@ -729,8 +1395,22 @@ class BNSEjectaFitting(EjectaFitting):
         return chi_BH
 
     def bns_ejecta_conversion(self, converted_parameters):
-
         # prevent the output message flooded by these warning messages
+        """
+        Fit the ejecta masses for a BNS system.
+
+        Parameters
+        ----------
+        converted_parameters : dict
+            Reads ``mass_1_source``, ``mass_2_source``, ``radius_1``,
+            ``radius_2``, ``TOV_mass``, ``R_16``, ``alpha`` and ``ratio_zeta``.
+
+        Returns
+        -------
+        tuple
+            ``(log10_mej_dyn, log10_mej_wind, log10_mej_total,
+            log10_mdisk_fit)``.
+        """
         old = np.seterr()
         np.seterr(invalid="ignore")
         np.seterr(divide="ignore")
@@ -787,8 +1467,26 @@ class BNSEjectaFitting(EjectaFitting):
         return log10_mej_dyn, log10_mej_wind, log10_mej_total, log10_mdisk_fit
 
     def grb_energy_conversion(self, converted_parameters, log10_mdisk_fit):
-
         # GRB afterglow energy
+        """
+        Fit ``log10_E0`` from the disk mass.
+
+        A power-law jet is used when ``b`` is present, otherwise a gaussian
+        jet; if none of ``thetaWing``, ``alphaWing`` and ``b`` is present,
+        neither is used.
+
+        Parameters
+        ----------
+        converted_parameters : dict
+            Reads ``ratio_zeta``, ``ratio_epsilon``, ``thetaCore``,
+            ``thetaWing``, ``alphaWing`` and ``b``.
+        log10_mdisk_fit : array_like
+            As returned by :meth:`bns_ejecta_conversion`.
+
+        Returns
+        -------
+        ``log10_E0``.
+        """
         log10_Ejet = np.log10(converted_parameters.get("ratio_epsilon", 2e-4))
         log10_Ejet += np.log10(1.0 - converted_parameters["ratio_zeta"])
         log10_Ejet += log10_mdisk_fit + np.log10(msun_to_ergs)
@@ -823,6 +1521,20 @@ class BNSEjectaFitting(EjectaFitting):
         return np.squeeze(out)
 
     def bns_parameter_conversion(self, parameters):
+        """
+        Fit the ejecta parameters for a BNS system.
+
+        Parameters
+        ----------
+        parameters : dict
+
+        Returns
+        -------
+        numpy.ndarray
+            The four values of :attr:`mass_fitting_keys`, with non-finite
+            entries replaced by ``-inf``. ``log10_E0`` is taken from
+            ``parameters`` when present.
+        """
         (
             log10_mej_dyn,
             log10_mej_wind,
@@ -840,10 +1552,23 @@ class BNSEjectaFitting(EjectaFitting):
         return np.where(np.isfinite(converted_ejecta), converted_ejecta, -np.inf)
 
     def ejecta_parameter_conversion(self, parameters):
+        """
+        Call :meth:`bns_parameter_conversion`.
+
+        Parameters
+        ----------
+        parameters : dict
+
+        Returns
+        -------
+        As :meth:`bns_parameter_conversion`.
+        """
         return self.bns_parameter_conversion(parameters)
 
 
 class KilonovaEjectaFitting(BNSEjectaFitting, NSBHEjectaFitting):
+    """Ejecta fitting that selects the BNS or NSBH conversion per system."""
+
     def ejecta_parameter_conversion(self, parameters):
         # FIXME Weizmann: routing used to check radius_1>0 alone for BNS,
         # not radius_2>0 too. mass_1 >= mass_2 by convention, so in the
@@ -860,6 +1585,23 @@ class KilonovaEjectaFitting(BNSEjectaFitting, NSBHEjectaFitting):
         # that isn't actually a BNS under this EOS. Requiring radius_2>0
         # too keeps bns_parameter_conversion from ever seeing that case;
         # it now correctly falls through to nsbh/BBH instead.
+        """
+        Fit the ejecta parameters, choosing the conversion per system.
+
+        ``radius_1`` and ``radius_2`` both positive selects
+        :meth:`bns_parameter_conversion`, ``radius_2`` positive alone selects
+        :meth:`nsbh_parameter_conversion`, and otherwise all four values are
+        ``-inf``.
+
+        Parameters
+        ----------
+        parameters : dict
+
+        Returns
+        -------
+        numpy.ndarray
+            Four values, ordered as :attr:`mass_fitting_keys`.
+        """
         try:
             # both objects are NS
             if (parameters["radius_1"] > 0.0) and (parameters["radius_2"] > 0.0):
@@ -888,22 +1630,61 @@ class KilonovaEjectaFitting(BNSEjectaFitting, NSBHEjectaFitting):
 
 
 class MultimessengerConversion:
+    """
+    An ordered chain of parameter conversions.
+
+    Parameters
+    ----------
+    *conversions
+        Callables applied in order by :meth:`core_conversion`.
+    """
+
     def __init__(self, *conversions):
         self._conversions = conversions
 
     @classmethod
     def from_args(cls, args):
         # FIXME: implement argument parsing to select conversions
+        """
+        Not implemented.
+
+        Parameters
+        ----------
+        args
+
+        Raises
+        ------
+        NotImplementedError
+            Always.
+        """
         raise NotImplementedError("from_args not yet implemented")
 
     @classmethod
     def from_dict(cls, instruction_dict):
+        """
+        Build a conversion chain from an instruction dict.
+
+        The keys read are ``cosmo``, ``gw``, ``eos``, ``ejecta``, ``em`` and
+        ``custom``. ``cosmo`` also calls
+        :func:`nmma.core.constants.set_cosmology`.
+
+        Parameters
+        ----------
+        instruction_dict : dict
+
+        Returns
+        -------
+        MultimessengerConversion
+        """
         conversions = []
 
         # NOTE: Order matters!!!
         if "cosmo" in instruction_dict:
-            set_cosmology(instruction_dict["cosmo"])
-            conversions.append(cosmology_to_distance)
+            cosmo_converter = CosmologyConverter(instruction_dict["cosmo"])
+            cosmo_converter.conversion_function = cosmo_converter.cosmology_to_distance
+        else:
+            cosmo_converter = CosmologyConverter()
+        conversions.append(cosmo_converter)
 
         if "gw" in instruction_dict:
             conversions.append(instruction_dict["gw"])
@@ -924,11 +1705,40 @@ class MultimessengerConversion:
 
     @classmethod
     def basic_cbc(cls, eos_conversion, em_conversion):
+        """
+        Build a chain of :func:`bbh_source_frame`, ``eos_conversion``,
+        :class:`KilonovaEjectaFitting` and ``em_conversion``.
+
+        Parameters
+        ----------
+        eos_conversion, em_conversion : callable
+
+        Returns
+        -------
+        MultimessengerConversion
+        """
         return cls(
             bbh_source_frame, eos_conversion, KilonovaEjectaFitting(), em_conversion
         )
 
     def convert_to_multimessenger_parameters(self, parameters, add_new_keys=False):
+        """
+        Run the conversion chain over ``parameters``.
+
+        Values pass through :func:`val_to_scalar` before and after
+        :meth:`core_conversion`.
+
+        Parameters
+        ----------
+        parameters : dict
+        add_new_keys : bool, default=False
+            If True, also return the keys that were not in ``parameters``.
+
+        Returns
+        -------
+        The converted parameters, or ``(converted_parameters, added_keys)``
+        when ``add_new_keys`` is True.
+        """
         original_keys = list(parameters.keys())
         converted_parameters = {k: val_to_scalar(v) for k, v in parameters.items()}
 
@@ -947,11 +1757,33 @@ class MultimessengerConversion:
             return converted_parameters
 
     def core_conversion(self, parameters):
+        """
+        Apply each conversion in turn.
+
+        Parameters
+        ----------
+        parameters : dict
+
+        Returns
+        -------
+        The output of the last conversion.
+        """
         for conv in self._conversions:
             parameters = conv(parameters)
         return parameters
 
     def identity_conversion(self, parameters):
+        """
+        Return ``parameters`` unchanged.
+
+        Parameters
+        ----------
+        parameters
+
+        Returns
+        -------
+        ``parameters``.
+        """
         return parameters
 
 

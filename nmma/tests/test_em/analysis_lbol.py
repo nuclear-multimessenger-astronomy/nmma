@@ -26,7 +26,6 @@ def cleanup_outdir(args):
 
 @pytest.fixture(scope="module")
 def args():
-
     non_default_args = dict(
         em_model="Arnett_modified",
         outdir="outdir",
@@ -51,5 +50,4 @@ def args():
 
 
 def test_analysis_lbol(args):
-
     analysis.lbol_main(args)

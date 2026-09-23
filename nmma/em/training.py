@@ -114,7 +114,6 @@ class BaseTrainingModel:
         start_training=True,
         continue_training=False,
     ):
-
         self.model = model
         self.svd_path = get_models_home(svd_path)
         self.modelfile = self.svd_path / f"{self.model}.joblib"
@@ -170,6 +169,13 @@ class BaseTrainingModel:
         self.load_model()
 
     def interpolate_data(self):
+        """Put every grid point on the same time grid.
+
+        Radiative-transfer runs do not share a time sampling, and the SVD
+        needs them aligned. Spectra are interpolated in log space, where
+        the flux varies far more gently. The source columns are dropped as
+        they are consumed, to keep a large grid in memory.
+        """
         if self.univariate_spline:
             extension_mode = "spline"
             ref_value = self.univariate_spline_s
@@ -179,7 +185,7 @@ class BaseTrainingModel:
 
         for key in self.data.keys():
             # initialise data array for all filters and sample times
-            ##FIXME should better use nans!
+            # FIXME should better use nans!
             self.data[key]["data"] = np.zeros(
                 (len(self.sample_times), len(self.filters))
             )
@@ -276,6 +282,11 @@ class BaseTrainingModel:
         return svd_model
 
     def train_model(self):
+        """Fit one emulator per filter on the SVD coefficients.
+
+        Filters are independent: each gets its own emulator, trained on the
+        coefficients the decomposition produced for it.
+        """
         # Loop through filters
         for filt in self.filters:
             print("Computing Model for filter %s..." % filt)
@@ -286,6 +297,14 @@ class BaseTrainingModel:
             self.training_func(param_array_postprocess, cAmat, filt)
 
     def check_model(self):
+        """Say whether this model still needs to be trained.
+
+        Returns
+        -------
+        bool
+            False if the model file already exists, or if any filter is
+            missing its emulator. True when everything is in place.
+        """
         if self.modelfile.is_file():
             return False
         try:
@@ -293,13 +312,18 @@ class BaseTrainingModel:
                 outfile = self.outdir / f"{filt}.{self.file_ending}"
                 if not outfile.is_file():
                     return False
-            ## we do not do this for api_gp-model and will fail as it has no file_ending
+            # we do not do this for api_gp-model and will fail as it has no file_ending
         except AttributeError:
             pass
 
         return True
 
     def save_model(self):
+        """Write the emulators and the decomposition to disk.
+
+        Each filter's emulator goes to its own file, in whatever format its
+        backend uses; the decomposition itself is pickled alongside them.
+        """
         self.outdir.mkdir(parents=True, exist_ok=True)
 
         for filt in self.filters:
@@ -309,6 +333,11 @@ class BaseTrainingModel:
         joblib.dump(self.svd_model, self.modelfile, compress=9)
 
     def load_model(self):
+        """Fetch a trained model and attach its emulators.
+
+        The pickled file carries only the decomposition; the emulator of
+        each filter is loaded separately and attached to it.
+        """
         get_model(self.svd_path, f"{self.model}{self.model_specifier}", self.filters)
         self.svd_model = joblib.load(self.modelfile)
 
@@ -316,18 +345,65 @@ class BaseTrainingModel:
             self.load_routine(filt)
 
     def load_routine(self, filt):
+        """Load one filter's emulator. Subclasses must define it.
+
+        Parameters
+        ----------
+        filt: str
+            Filter whose emulator to load.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, on the base class.
+        """
         raise NotImplementedError("This method should be implemented by subclasses.")
 
     def save_routine(self, filt, outfile):
+        """Write one filter's emulator. Subclasses must define it.
+
+        Parameters
+        ----------
+        filt: str
+            Filter whose emulator to write.
+        outfile: pathlib.Path
+            Destination file.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, on the base class.
+        """
         raise NotImplementedError("This method should be implemented by subclasses.")
 
     def training_func(self, param_array_postprocess, cAmat, filt):
+        """Fit one filter's emulator. Subclasses must define it.
+
+        Parameters
+        ----------
+        param_array_postprocess: numpy.ndarray
+            Grid parameters, rescaled to the unit cube.
+        cAmat: numpy.ndarray
+            SVD coefficients to predict, one row per component.
+        filt: str
+            Filter being trained.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, on the base class.
+        """
         raise NotImplementedError("This method should be implemented by subclasses.")
 
 
 class KerasTrainingModel(BaseTrainingModel):
-    def __init__(self, *args, **kwargs):
+    """Emulate the SVD coefficients with a Keras neural network.
 
+    The usual choice: fast to evaluate once trained, which matters when a
+    sampler calls it hundreds of thousands of times.
+    """
+
+    def __init__(self, *args, **kwargs):
         self.model_specifier = ""
         self.file_ending = "keras"
         super().__init__(*args, **kwargs)
@@ -335,17 +411,47 @@ class KerasTrainingModel(BaseTrainingModel):
             self.plotdir.mkdir(parents=True, exist_ok=True)
 
     def load_routine(self, filt):
+        """Load one filter's network and make it ready to evaluate.
+
+        Parameters
+        ----------
+        filt: str
+            Filter whose network to load.
+        """
         outfile = self.outdir / f"{filt}.{self.file_ending}"
         self.svd_model[filt]["model"] = k.saving.load_model(outfile, compile=False)
         self.svd_model[filt]["model"].compile(optimizer="adam", loss="mse")
 
     def save_routine(self, filt, outfile):
+        """Write one filter's network, then drop it from memory.
+
+        The network is removed from the decomposition once written, so that
+        pickling the decomposition does not carry it a second time.
+
+        Parameters
+        ----------
+        filt: str
+            Filter whose network to write.
+        outfile: pathlib.Path
+            Destination file.
+        """
         self.svd_model[filt]["model"].save(outfile)
         del self.svd_model[filt]["model"]
 
     def training_func(self, param_array_postprocess, cAmat, filt, dropout_rate=0.6):
-        """
-        Train a tensorflow model to emulate the KN model.
+        """Train a network to predict one filter's SVD coefficients.
+
+        Parameters
+        ----------
+        param_array_postprocess: numpy.ndarray
+            Grid parameters, rescaled to the unit cube.
+        cAmat: numpy.ndarray
+            SVD coefficients to predict.
+        filt: str
+            Filter being trained.
+        dropout_rate: float, optional
+            Fraction of units dropped during training, which keeps the
+            network from memorising a grid that is often small.
         """
         train_X, val_X, train_y, val_y = train_test_split(
             param_array_postprocess,
@@ -406,7 +512,11 @@ class KerasTrainingModel(BaseTrainingModel):
 
 
 class TensorflowTrainingModel(KerasTrainingModel):
-    """legacy class for compatibility with older tensorflow.keras-calls"""
+    """Train with the older tensorflow.keras interface.
+
+    Kept so that models saved before the move to standalone Keras keep
+    loading. New models should use KerasTrainingModel.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -415,28 +525,75 @@ class TensorflowTrainingModel(KerasTrainingModel):
         self.file_ending = "h5"
 
     def save_routine(self, filt, outfile):
+        """Write one filter's network in the older HDF5 format.
+
+        Parameters
+        ----------
+        filt: str
+            Filter whose network to write.
+        outfile: pathlib.Path
+            Destination file.
+        """
         self.svd_model[filt]["model"].save(outfile, save_format=self.file_ending)
         del self.svd_model[filt]["model"]
 
 
 class SklearnGPTrainingModel(BaseTrainingModel):
-    def __init__(self, *args, **kwargs):
+    """Emulate the SVD coefficients with scikit-learn Gaussian processes.
 
+    Slower to evaluate than a network, but it gives an uncertainty with
+    every prediction and copes better with a small grid.
+    """
+
+    def __init__(self, *args, **kwargs):
         self.model_specifier = ""
         self.file_ending = "joblib"
         super().__init__(*args, **kwargs)
 
     def load_routine(self, filt):
+        """Load one filter's processes, if they were ever written.
+
+        A missing file is passed over silently: not every filter of a grid
+        necessarily has a trained emulator.
+
+        Parameters
+        ----------
+        filt: str
+            Filter whose processes to load.
+        """
         outfile = self.outdir / f"{filt}.{self.file_ending}"
         if not outfile.is_file():
             return
         self.svd_model[filt]["gps"] = joblib.load(outfile)
 
     def save_routine(self, filt, outfile):
+        """Write one filter's processes, then drop them from memory.
+
+        Parameters
+        ----------
+        filt: str
+            Filter whose processes to write.
+        outfile: pathlib.Path
+            Destination file.
+        """
         joblib.dump(self.svd_model[filt]["gps"], outfile, compress=9)
         del self.svd_model[filt]["gps"]
 
     def training_func(self, param_array_postprocess, cAmat, filt):
+        """Fit one Gaussian process per SVD coefficient.
+
+        The coefficients are independent, so the fits are too, and they are
+        spread over the available cores when there are several.
+
+        Parameters
+        ----------
+        param_array_postprocess: numpy.ndarray
+            Grid parameters, rescaled to the unit cube.
+        cAmat: numpy.ndarray
+            SVD coefficients to predict.
+        filt: str
+            Filter being trained.
+        """
         # Set of Gaussian Process
         kernel = 1.0 * RationalQuadratic(
             length_scale=1.0,
@@ -464,19 +621,48 @@ class SklearnGPTrainingModel(BaseTrainingModel):
 
 
 class GPAPITrainingModel(BaseTrainingModel):
+    """Emulate the SVD coefficients with the gaussian-process-api package.
+
+    Uses compact kernels, which keep the fit tractable on a grid far larger
+    than a plain Gaussian process could handle.
+    """
+
     def __init__(self, *args, **kwargs):
         self.model_specifier = "_api"
         super().__init__(*args, **kwargs)
 
     def load_routine(self, filt):
+        """Rebuild one filter's processes from their stored description.
+
+        Parameters
+        ----------
+        filt: str
+            Filter whose processes to rebuild.
+        """
         for i, sub_model in enumerate(self.svd_model[filt]["gps"]):
             self.svd_model[filt]["gps"][i] = load_api_gp_model(sub_model)
 
     def save_model(self):
+        """Write the whole model in one file.
+
+        Unlike the other backends, the processes serialise along with the
+        decomposition, so there is nothing to write per filter.
+        """
         get_model(self.svd_path, f"{self.model}_api", self.svd_model.keys())
         joblib.dump(self.svd_model, self.modelfile, compress=9)
 
     def training_func(self, param_array_postprocess, cAmat, filt):
+        """Fit one compact-kernel process per SVD coefficient.
+
+        Parameters
+        ----------
+        param_array_postprocess: numpy.ndarray
+            Grid parameters, rescaled to the unit cube.
+        cAmat: numpy.ndarray
+            SVD coefficients to predict.
+        filt: str
+            Filter being trained.
+        """
         nd = 1
         # Construct hyperparamters
         coeffs = [0.5] * nd
@@ -528,6 +714,32 @@ class GPAPITrainingModel(BaseTrainingModel):
 
 
 def SVDTrainingModel(*args, interpolation_type="keras", **kwargs):
+    """Build the training model matching the requested backend.
+
+    Kept for backwards compatibility: new code should instantiate the
+    backend class it wants directly.
+
+    Parameters
+    ----------
+    *args
+        Passed on to the chosen class.
+    interpolation_type: str, optional
+        Backend: keras, tensorflow, jax and torch all go through Keras,
+        falling back on the older tensorflow interface if that fails;
+        sklearn_gp and api_gp use Gaussian processes.
+    **kwargs
+        Passed on to the chosen class.
+
+    Returns
+    -------
+    BaseTrainingModel
+        The training model.
+
+    Raises
+    ------
+    ValueError
+        If the backend is not recognised.
+    """
     # NOTE: This function is implemented for backwards compatibility.
     # Directly initiating a KerasTrainingModel, SklearnGPTrainingModel,
     # GPAPITrainingModel should be preferred.
@@ -535,9 +747,9 @@ def SVDTrainingModel(*args, interpolation_type="keras", **kwargs):
     keras_backends = ["keras", "tensorflow", "jax", "torch"]
     if interpolation_type in keras_backends:
         try:
-            ## We prefer keras over tensorflow, but can try the older fashion
+            # We prefer keras over tensorflow, but can try the older fashion
             return KerasTrainingModel(*args, **kwargs)
-        except:
+        except Exception:
             return TensorflowTrainingModel(*args, **kwargs)
     elif interpolation_type == "sklearn_gp":
         return SklearnGPTrainingModel(*args, **kwargs)
@@ -550,7 +762,11 @@ def SVDTrainingModel(*args, interpolation_type="keras", **kwargs):
 
 
 def create_svdmodel():
-    """Create a SVD model from command line arguments."""
+    """Entry point of the ``create-svdmodel`` command.
+
+    Reads a grid of light curves, decomposes it, trains an emulator per
+    filter, and writes the result. A model already trained is not redone.
+    """
 
     args = parsing_and_logging(svd_training_parser)
     svd_filenames = find_svd_files(args.data_path, args.ignore_bolometric)
@@ -589,7 +805,7 @@ def create_svdmodel():
     )
     try:
         training_model = KerasTrainingModel(*training_args, **training_kwargs)
-    except:
+    except Exception:
         print(
             "Your settings are not compatible with a keras training model.\n \
               Please consider adjusting your setup.\n \
@@ -614,7 +830,11 @@ def create_svdmodel():
 
 
 def benchmark():
-    """Create a SVD model benchmark from command line arguments."""
+    """Entry point of the ``svdmodel-benchmark`` command.
+
+    Measures how faithfully a trained surrogate reproduces the grid it came
+    from.
+    """
     parser = svd_model_benchmark_parser()
     args = parser.parse_args()
     create_benchmark(**vars(args))
@@ -638,6 +858,7 @@ def create_benchmark(
     plot=True,
 ):
     """Create a benchmark for the SVD model.
+
     Parameters
     ----------
     em_model : str
@@ -671,7 +892,7 @@ def create_benchmark(
     plot : bool, optional
         Whether to plot the benchmark results. Default is True.
     """
-    #### get the grid data file path
+    # get the grid data file path
     # Implicitly set default ignore_bolometric as True for backward compatibility
 
     svd_filenames = find_svd_files(data_path, ignore_bolometric)
@@ -710,7 +931,7 @@ def create_benchmark(
         # calculate chi2
         return {
             filt: np.nanmean(
-                (np.array(grid_entry[filt])[use_times] - estimate_mAB[filt])  ##grid_mAB
+                (np.array(grid_entry[filt])[use_times] - estimate_mAB[filt])  # grid_mAB
                 ** 2
             )
             for filt in filts
@@ -762,12 +983,18 @@ def create_benchmark(
 
 
 def plot_many_benchmarks(outdir, search_pattern):
-    """
-    make barplots of 25th, 50th and 75th percentiles of reduced chi2 distributions for trained models
+    """Draw the benchmark results of every model found on disk.
 
-    :param outdir: Path to the output directory (str)
-    :param search_pattern: indicate a common pattern of targets in the outdir, default is "*"
+    Each model gets a bar chart of the 25th, 50th and 75th percentiles of
+    its reduced chi-square distribution, which shows at a glance the filters
+    the surrogate reproduces poorly.
 
+    Parameters
+    ----------
+    outdir: str
+        Directory holding the benchmark results, and where the figures go.
+    search_pattern: str
+        Glob restricting which results to draw.
     """
     search_path = Path(outdir, search_pattern)
     json_files = search_path.glob("*.json")
@@ -780,11 +1007,36 @@ def plot_many_benchmarks(outdir, search_pattern):
 
 
 def plot_benchmarks_cli():
+    """Entry point of the ``plot-svdmodel-benchmarks`` command.
+
+    Draws the benchmark results already computed and left on disk.
+    """
     args = benchmark_plots_parser()
     plot_many_benchmarks(args.outdir, args.search_pattern)
 
 
 def axial_symmetry(training_data):
+    """Triple the grid by exploiting the symmetry of the ejecta.
+
+    A kilonova seen from above and from below looks the same, and so does
+    one seen at an angle and at its supplement. Each grid point therefore
+    yields two more without any extra radiative transfer.
+
+    Parameters
+    ----------
+    training_data: dict
+        The training grid, modified in place.
+
+    Returns
+    -------
+    dict
+        The grid, with the mirrored points added.
+
+    Raises
+    ------
+    ValueError
+        If a grid point carries no viewing angle to mirror.
+    """
 
     modelkeys = list(training_data.keys())
     if any(["KNtheta" not in training_data[key] for key in modelkeys]):
@@ -803,8 +1055,25 @@ def axial_symmetry(training_data):
 
 
 def find_svd_files(data_path, ignore_bolometric):
-    """
-    Set up the SVD data by finding all relevant files in the given data path.
+    """Collect the files making up a training grid.
+
+    Parameters
+    ----------
+    data_path: str
+        Directory holding the grid.
+    ignore_bolometric: bool
+        If True, skip the bolometric files, which have a different layout
+        and would otherwise break the photometry reader.
+
+    Returns
+    -------
+    list of str
+        Paths of the grid files.
+
+    Raises
+    ------
+    ValueError
+        If no file was found.
     """
 
     link_string = "/*[!_Lbol]." if ignore_bolometric else "/*."
@@ -820,11 +1089,52 @@ def find_svd_files(data_path, ignore_bolometric):
 
 
 def prepare_training_data(data_path, format="bulla", data_type="photometry", args=None):
+    """Read a training grid and fill the gaps left by missing values.
+
+    Parameters
+    ----------
+    data_path: list of str
+        Files making up the grid.
+    format: str, optional
+        Layout of the files.
+    data_type: str, optional
+        Either photometry or spectroscopy.
+    args: argparse.Namespace, optional
+        Parsed command-line arguments, read for the wavelength range of
+        spectroscopy.
+
+    Returns
+    -------
+    dict
+        The grid, interpolated over its gaps.
+    """
     prelim_data = read_training_data(data_path, format, data_type, args)
     return interpolate_nans(prelim_data)
 
 
 def create_svd_data(em_model, data):
+    """Extract each grid point's parameters from its file name.
+
+    Which extractor to use is decided by the model name, every supported
+    model having its own naming convention.
+
+    Parameters
+    ----------
+    em_model: str
+        Name of the model the grid belongs to.
+    data: dict
+        The training grid.
+
+    Returns
+    -------
+    tuple
+        The grid with its parameters attached, and the parameter names.
+
+    Raises
+    ------
+    ValueError
+        If no extractor is registered for that model.
+    """
     # create the SVD training data
     MODEL_FUNCTIONS = {
         k: v for k, v in model_parameters.__dict__.items() if inspect.isfunction(v)
@@ -836,6 +1146,30 @@ def create_svd_data(em_model, data):
 
 
 def setup_filters(filters, training_data, parameters):
+    """Work out which filters to train on.
+
+    When nothing is requested, every column of the grid that is neither a
+    time nor a model parameter is taken to be a filter.
+
+    Parameters
+    ----------
+    filters: str or list of str or None
+        Filters requested, comma-separated or already a list.
+    training_data: dict
+        The training grid.
+    parameters: list of str
+        Model parameter names, excluded from the filter guess.
+
+    Returns
+    -------
+    list of str
+        Filters to train.
+
+    Raises
+    ------
+    ValueError
+        If no usable filter is left.
+    """
 
     # get the filts
     if isinstance(filters, str):
@@ -855,7 +1189,23 @@ def setup_filters(filters, training_data, parameters):
 
 
 def setup_time_conversion(data_time_unit="days"):
-    """Set up the time conversion factor based on the data_time_unit."""
+    """Give the factor converting the grid's time unit into days.
+
+    Parameters
+    ----------
+    data_time_unit: str, optional
+        Unit the grid records time in, spelled in full or abbreviated.
+
+    Returns
+    -------
+    float
+        Number of grid time units in one day.
+
+    Raises
+    ------
+    ValueError
+        If the unit is not recognised.
+    """
     if data_time_unit in ["days", "day", "d"]:
         time_scale_factor = 1.0
     elif data_time_unit in ["hours", "hour", "hr", "h"]:
@@ -872,8 +1222,21 @@ def setup_time_conversion(data_time_unit="days"):
 
 
 def min_max_scaling(data):
-    """
-    row_wise Min-max scaling of data to [0, 1] range, assuming a 2d array as input
+    """Rescale each column of a grid into the unit interval.
+
+    Emulators train far better on parameters of comparable magnitude, and a
+    grid mixes masses, velocities and angles. The bounds are returned so
+    that the scaling can be undone at evaluation time.
+
+    Parameters
+    ----------
+    data: numpy.ndarray
+        Grid parameters, one row per grid point.
+
+    Returns
+    -------
+    tuple
+        The rescaled grid, and the minimum and maximum of each column.
     """
     data = np.array(data)
     param_mins, param_maxs = np.min(data, axis=0), np.max(data, axis=0)
@@ -882,11 +1245,13 @@ def min_max_scaling(data):
 
 
 def load_api_gp_model(gp):
-    """Load a gaussian-process-api GaussianProcess model
+    """Load a gaussian-process-api GaussianProcess model.
+
     Parameters
     ----------
     gp : dict
-        Dictionary representation of gaussian-process-api GaussianProcess model
+        Dictionary representation of gaussian-process-api GaussianProcess model.
+
     Returns
     -------
     gp_api.gaussian_process.GaussianProcess

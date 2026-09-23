@@ -10,9 +10,9 @@ from bilby.gw.prior import PriorDict
 from ..core.constants import geom_msun_km
 from ..core.conversion import (
     BNSEjectaFitting,
+    CosmologyConverter,
     NSBHEjectaFitting,
     chirp_mass_and_eta_to_component_masses,
-    luminosity_distance_to_redshift,
 )
 from ..core.parsing import nmma_base_parsing
 from .parser import resampling_parser
@@ -22,8 +22,37 @@ from .plotting_routines import resampling_corner_plot
 def find_spread_from_resampling(
     resampling_method, cumprod, prior_dist, post_samplesize, cred_interval
 ):
+    """
+    Summarise a resampled distribution for each set of weights.
+
+    Parameters
+    ----------
+    resampling_method : callable
+        Called as ``resampling_method(prior_dist, weight, post_samplesize)``;
+        its return value is passed to ``numpy.median`` and ``arviz.hdi``.
+    cumprod : iterable
+        Iterated over, each entry passed to ``resampling_method`` as
+        ``weight``.
+    prior_dist : array_like
+        Passed to ``resampling_method`` unchanged.
+    post_samplesize
+        Passed to ``resampling_method`` unchanged.
+    cred_interval : float
+        Passed to ``arviz.hdi`` as ``hdi_prob``.
+
+    Returns
+    -------
+    numpy.ndarray
+        Median of each resampled distribution.
+    numpy.ndarray
+        Element 1 of each ``arviz.hdi`` result, named ``uplim`` here.
+    numpy.ndarray
+        Element 0 of each ``arviz.hdi`` result, named ``lowlim`` here.
+    """
     med, uplim, lowlim = [], [], []
     for weight in cumprod:
+        # FIXME: Duplicate resampling_method call; first result overwritten and
+        # discarded
         samples = resampling_method(prior_dist, weight, post_samplesize)
         # calculate the posterior distribution using the prior samples
         # and the weighting that we previously calculated
@@ -40,6 +69,30 @@ def find_spread_from_resampling(
 
 
 def construct_EM_KDE(EMsamples, combine_ejecta_mass):
+    """
+    Build a Gaussian KDE of the ejecta mass from EM posterior samples.
+
+    Parameters
+    ----------
+    EMsamples : pandas.DataFrame
+        EM posterior samples. Must contain either ``log10_mej``, or both
+        ``log10_mej_dyn`` and ``log10_mej_wind``.
+    combine_ejecta_mass : bool
+        True sums the dynamical and wind masses into a one-dimensional KDE;
+        False builds a two-dimensional KDE over the pair. Only consulted on
+        the ``log10_mej_dyn``/``log10_mej_wind`` branch.
+
+    Returns
+    -------
+    scipy.stats.gaussian_kde
+        KDE built on ``10 ** column``, not on the logarithms themselves.
+
+    Raises
+    ------
+    ValueError
+        If neither ``log10_mej`` nor the pair ``log10_mej_dyn`` and
+        ``log10_mej_wind`` is present.
+    """
     if "log10_mej" in EMsamples.columns:
         return scipy.stats.gaussian_kde(10 ** EMsamples.log10_mej.to_numpy())
 
@@ -66,6 +119,29 @@ def construct_EM_KDE(EMsamples, combine_ejecta_mass):
 
 
 class EjectaResamplerMixIn:
+    """
+    Mix-in supplying ``Prior`` and ``LogLikelihood`` for the ejecta resampling.
+
+    Combined with ``pymultinest.solve.Solver`` in :func:`main_resampling`.
+
+    Attributes
+    ----------
+    priors : bilby.gw.prior.PriorDict
+        Priors over ``chirp_mass``, ``mass_ratio``, ``EOS``, ``alpha`` and
+        ``zeta``, plus ``chi_1`` and ``chi_2`` when ``withNSBH`` is True.
+    EOS_radius_dict, EOS_masses_dict, EOS_lambda_dict : dict
+        Tabulated radius, mass and tidal deformability per EOS, keyed by EOS
+        index from 1 to ``Neos``.
+    EOSsamples : numpy.ndarray
+        ``GWsamples.EOS`` cast to int and shifted up by one.
+    mcKDE, invqKDE, EMKDE : scipy.stats.gaussian_kde
+        KDEs of the chirp mass divided by ``1 + z``, of ``1 / mass_ratio``,
+        and of the ejecta mass.
+    chi_1KDE, chi_2KDE : scipy.stats.gaussian_kde
+        KDEs of ``GWsamples.chi_1`` and ``GWsamples.chi_2``. Only set when
+        ``withNSBH`` is True.
+    """
+
     def __init__(
         self,
         GWsamples,
@@ -78,6 +154,36 @@ class EjectaResamplerMixIn:
         combine_ejecta_mass=False,
         **kwargs,
     ):
+        """
+        Build the priors, the EOS tables and the KDEs used by
+        :meth:`LogLikelihood`.
+
+        Parameters
+        ----------
+        GWsamples : pandas.DataFrame
+            GW posterior samples. Reads ``EOS``, ``luminosity_distance``,
+            ``chirp_mass`` and ``mass_ratio``, plus ``chi_1`` and ``chi_2``
+            when ``withNSBH`` is True.
+        EMsamples : pandas.DataFrame
+            EM posterior samples, passed to :func:`construct_EM_KDE`.
+        GWprior : bilby.gw.prior.PriorDict
+            Source of the ``chirp_mass`` and ``mass_ratio`` priors, and of
+            ``chi_1`` and ``chi_2`` when ``withNSBH`` is True.
+        EMprior : bilby.gw.prior.PriorDict
+            Source of the ``alpha`` and ``zeta`` priors.
+        Neos : int
+            Number of EOS files.
+        EOSpath : str
+            Directory of EOS files, read as ``{EOSpath}/{i}.dat`` for ``i``
+            from 1 to ``Neos``, with columns 0, 1 and 2 taken as radius, mass
+            and tidal deformability.
+        withNSBH : bool
+            True adds ``chi_1`` and ``chi_2`` to the priors.
+        combine_ejecta_mass : bool, default=False
+            Passed to :func:`construct_EM_KDE`.
+        **kwargs
+            Forwarded via ``super().__init__``.
+        """
         self.GWsamples = GWsamples
         self.EMsamples = EMsamples
         self.withNSBH = withNSBH
@@ -118,9 +224,8 @@ class EjectaResamplerMixIn:
         EOS = self.GWsamples.EOS.to_numpy()
         self.EOSsamples = EOS.astype(int) + 1
 
-        z = luminosity_distance_to_redshift(
-            self.GWsamples.luminosity_distance.to_numpy()
-        )
+        cosmo_converter = CosmologyConverter()
+        z = cosmo_converter.redshift(self.GWsamples.luminosity_distance.to_numpy())
         mc = self.GWsamples.chirp_mass.to_numpy() / (1 + z)
         q = self.GWsamples.mass_ratio.to_numpy()
 
@@ -141,9 +246,36 @@ class EjectaResamplerMixIn:
         super().__init__(**kwargs)
 
     def Prior(self, x):
+        """
+        Rescale a point through the priors.
+
+        Parameters
+        ----------
+        x : array_like
+            One value per sampled parameter, in the order of
+            ``self._search_parameter_keys``.
+
+        Returns
+        -------
+        The result of ``self.priors.rescale``.
+        """
         return self.priors.rescale(self._search_parameter_keys, x)
 
     def LogLikelihood(self, x):
+        """
+        Evaluate the log likelihood of one point in parameter space.
+
+        Parameters
+        ----------
+        x : sequence
+            ``(chirp_mass, mass_ratio, EOS, alpha, zeta)``, with ``chi_1`` and
+            ``chi_2`` appended when ``withNSBH`` is True.
+
+        Returns
+        -------
+        float
+            ``numpy.nan_to_num`` of the log likelihood plus the log prior.
+        """
         if self.withNSBH:
             mc, q, EOS, alpha, zeta, chi_1, chi_2 = x
             chi_eff = (chi_1 + q * chi_2) / (1 + q)
@@ -164,6 +296,8 @@ class EjectaResamplerMixIn:
             C2 = (
                 m2 / r2 * geom_msun_km
             )  ### disfavour EOS if secondary cannot be supported as NS
+        # FIXME: Unreachable except ZeroDivisionError: numpy float division yields inf,
+        # not exception
         except ZeroDivisionError:
             return np.nan_to_num(-np.inf)
         if not self.withNSBH:
@@ -222,6 +356,17 @@ class EjectaResamplerMixIn:
 
 
 def main_resampling():
+    """
+    Run the GW-EM resampling from the parsed arguments.
+
+    Reads the GW and EM samples and the two prior files, samples with
+    ``pymultinest``, writes ``{outdir}/posterior_samples.dat`` and calls
+    :func:`nmma.post_processing.plotting_routines.resampling_corner_plot`.
+
+    Returns
+    -------
+    None
+    """
     args = nmma_base_parsing(resampling_parser)
 
     # read the GW samples
@@ -229,6 +374,8 @@ def main_resampling():
     # down sample
     weights = np.ones(len(GWsamples))
     weights /= np.sum(weights)
+    # FIXME: sample(frac=30000/len) raises ValueError when GW samples file has under
+    # 30000 rows
     GWsamples = GWsamples.sample(
         frac=30000 / len(GWsamples), weights=weights, random_state=42
     )

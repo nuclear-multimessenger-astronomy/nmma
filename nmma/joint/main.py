@@ -35,8 +35,33 @@ def analysis_runner(
     **kwargs,
 ):
     """
-    API for running the analysis from Python instead of the command line.
-    It takes all the same options as the CLI, specified as keyword arguments.
+    Run the analysis described by a data dump.
+
+    Loads the data dump, rebuilds the priors and the likelihood from it, and
+    samples with ``pbilby_sampling`` when ``args.sampler`` is ``"dynesty"``
+    and ``bilby_sampling`` otherwise.
+
+    Parameters
+    ----------
+    data_dump : str
+        Path to the pickled data dump. If it does not end in
+        ``_dump.pickle``, the first ``*_dump.pickle`` found under
+        ``{data_dump}/data`` is used instead.
+    outdir : str, default=None
+        If truthy, overwrites ``outdir`` on the arguments taken from the
+        data dump.
+    label : str, default=None
+        If truthy, overwrites ``label`` on the arguments taken from the
+        data dump.
+    plot : bool, default=False
+        Assigned to ``args.plot``, and passed on to ``pbilby_sampling``.
+    **kwargs
+        Passed to ``pbilby_sampling``; not forwarded on the
+        ``bilby_sampling`` branch.
+
+    Returns
+    -------
+    The return value of ``pbilby_sampling`` or ``bilby_sampling``.
     """
 
     ## Load the data dump
@@ -94,10 +119,12 @@ def analysis_runner(
 
 def nmma_analysis():
     """
-    nmma_analysis entrypoint.
+    Entry point for ``nmma-analysis``.
 
-    This function is a wrapper around analysis_runner(),
-    giving it a command line interface.
+    Builds the parser with :func:`nmma.joint.multi_parsing.create_nmma_analysis_parser`,
+    parses the command line with
+    :func:`nmma.joint.multi_parsing.parse_analysis_args`, and calls
+    :func:`analysis_runner` with the parsed arguments as keyword arguments.
     """
     # Parse command line arguments
     analysis_parser = create_nmma_analysis_parser(sampler="dynesty")

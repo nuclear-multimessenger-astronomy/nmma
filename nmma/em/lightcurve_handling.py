@@ -12,7 +12,7 @@ from scipy.signal import savgol_filter
 from tqdm import tqdm
 
 from ..core import conversion as conv
-from ..core.constants import D, c_cgs, get_cosmology
+from ..core.constants import D, c_cgs
 from ..core.utils import read_injection_file, read_trigger_time, set_filename
 from . import em_parsing as emp
 from . import io, model, utils
@@ -21,6 +21,29 @@ from .plotting_utils import basic_em_analysis_plot, lc_plot_with_histogram
 
 
 def post_process_bestfit(transient, bestfit_params, args, result=None):
+    """Score and draw the best fit once the sampling is over.
+
+    The best-fit light curve is regenerated, compared to the data both with
+    and without the systematics budget, and the whole thing is drawn. The
+    chi-square is reported twice on purpose: including the budget says how
+    well the fit did, excluding it says how much the budget was carrying.
+
+    Parameters
+    ----------
+    transient: nmma.em.em_likelihood.MultiFilterTransient
+        Holds the observations and the model.
+    bestfit_params: dict
+        Best-fit parameters.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    result: bilby.core.result.Result, optional
+        Sampling result, used to name the output files.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The figure that was saved.
+    """
 
     lc_model = transient.light_curve_model
     lc_model.good_parameters = True  # to avoid sanity check issues
@@ -146,6 +169,34 @@ def post_process_bestfit(transient, bestfit_params, args, result=None):
 def compute_chisquare_dict(
     transient, model_data, model_time, model_error, verbose=False
 ):
+    """Compare a model to the data, filter by filter.
+
+    Only detections count: a non-detection has an infinite uncertainty and
+    carries no constraint. The model is interpolated onto the observing
+    epochs, and each filter gets its own reduced chi-square.
+
+    Parameters
+    ----------
+    transient: nmma.em.em_likelihood.MultiFilterTransient
+        Holds the observations.
+    model_data: dict
+        Model magnitude per filter.
+    model_time: numpy.ndarray
+        Times the model was evaluated on, in days.
+    model_error: dict
+        Systematics budget per filter.
+    verbose: bool, optional
+        If True, print the data being compared.
+
+    Returns
+    -------
+    chi2_dict: dict
+        Reduced chi-square per filter, plus the total and the degrees of
+        freedom.
+    mismatches: dict
+        Per filter, the squared residual, the total variance and the signed
+        residual, the last one being what the residual panels draw.
+    """
     chi2 = 0.0
     dof = 0.0
     chi2_dict = {}
@@ -198,6 +249,16 @@ def compute_chisquare_dict(
 
 
 def lcs_from_injection_parameters(args=None):
+    """Entry point of the ``lightcurve-generation`` command.
+
+    Simulate one light curve per row of an injection file, and optionally
+    draw the whole population as a density plot.
+
+    Parameters
+    ----------
+    args: argparse.Namespace or list of str or None, optional
+        Command-line arguments. Read from the command line when omitted.
+    """
     args = emp.parsing_and_logging(emp.lightcurve_parser, args)
 
     # initialize light curve model
@@ -234,6 +295,27 @@ def lcs_from_injection_parameters(args=None):
 def create_multiple_injections(
     injection_df, args, light_curve_model=None, format="model"
 ):
+    """Simulate one light curve per injection, sharing a single generator.
+
+    The random generator is created once and passed along, so that the whole
+    set is reproducible from the seed alone.
+
+    Parameters
+    ----------
+    injection_df: pandas.DataFrame
+        One row per injection.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    light_curve_model: nmma.em.model.LightCurveModelContainer, optional
+        Model to simulate with.
+    format: str, optional
+        Layout the light curves are written in.
+
+    Returns
+    -------
+    dict
+        One light curve per injection, keyed by its row index.
+    """
     mag_ds = {}
 
     rng = np.random.default_rng(args.generation_seed)
@@ -247,6 +329,35 @@ def create_multiple_injections(
 def make_injection_lightcurve_from_parameters(
     injection_parameters, args, light_curve_model=None, rng=None, format="model"
 ):
+    """Simulate one injection, or read it back if it was already written.
+
+    Results are cached on disk, so that an interrupted run resumes rather
+    than starting over. The freshly written file is read back immediately,
+    which catches a layout that could not be reloaded.
+
+    Parameters
+    ----------
+    injection_parameters: dict
+        Parameters of this injection, including its simulation_id.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    light_curve_model: nmma.em.model.LightCurveModelContainer, optional
+        Model to simulate with.
+    rng: numpy.random.Generator, optional
+        Source of the measurement noise.
+    format: str, optional
+        Layout the light curve is written in.
+
+    Returns
+    -------
+    dict
+        Photometry per filter.
+
+    Raises
+    ------
+    ValueError
+        If a cached file exists but cannot be read back.
+    """
     injection_outfile = set_filename(
         args.label, args, f"_{int(injection_parameters['simulation_id'])}_lc"
     )
@@ -276,6 +387,28 @@ def make_injection_lightcurve_from_parameters(
 def make_injection(
     injection_params, args, injection_model, rng=None, keep_infinite_data=False
 ):
+    """Simulate the light curve of one transient.
+
+    Parameters
+    ----------
+    injection_params: dict
+        Parameters of the transient.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    injection_model: nmma.em.model.LightCurveModelContainer
+        Model to simulate with.
+    rng: numpy.random.Generator, optional
+        Source of the measurement noise.
+    keep_infinite_data: bool, optional
+        If True, keep the non-detections.
+
+    Returns
+    -------
+    data: dict
+        Photometry per filter.
+    injection_params: dict
+        The parameters actually used, after adjustment.
+    """
 
     injection_params = adjust_injection_parameters(
         injection_params, args, injection_model
@@ -293,6 +426,26 @@ def make_injection(
 
 
 def adjust_injection_parameters(injection_parameters, args, injection_model):
+    """Settle the trigger time and the ejecta masses before simulating.
+
+    A timeshift is folded into the trigger time rather than kept apart, and
+    an ejecta mass that is not finite, which a prompt collapse produces, is
+    floored to a negligible value rather than left to break the model.
+
+    Parameters
+    ----------
+    injection_parameters: dict
+        Parameters of the injection, modified in place.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    injection_model: nmma.em.model.LightCurveModelContainer
+        Model whose own conversions are applied last.
+
+    Returns
+    -------
+    dict
+        The parameters, ready for the model.
+    """
 
     trigger_time = read_trigger_time(injection_parameters, args)
     injection_parameters["trigger_time"] = trigger_time or 0.0
@@ -311,6 +464,21 @@ def adjust_injection_parameters(injection_parameters, args, injection_model):
 
 
 def make_lcs(args=None):
+    """Convert a grid of radiative-transfer outputs into NMMA light curves.
+
+    The file type decides which handler reads the grid; the rest of the
+    pipeline is shared.
+
+    Parameters
+    ----------
+    args: argparse.Namespace or list of str or None, optional
+        Command-line arguments. Read from the command line when omitted.
+
+    Raises
+    ------
+    ValueError
+        If the file type is not one of the supported grid formats.
+    """
     args = emp.parsing_and_logging(emp.multi_lc_parser, args)
     if args.file_type is None:
         lc_handler = LightCurveHandler(args)
@@ -327,18 +495,25 @@ def make_lcs(args=None):
 
 
 class LightCurveHandler:
-    def __init__(self, args):
+    """Turn spectra from a radiative-transfer grid into light curves.
 
+    Reading a grid is the same work every time -- walk the files, iterate
+    over viewing angles, write one light curve each -- but every code writes
+    its spectra differently. This holds the shared pipeline; subclasses
+    override only how a file is opened and read.
+    """
+
+    def __init__(self, args):
         self.filters = utils.set_filters(args)
-        cosmology = get_cosmology()
+        cosmo_converter = conv.CosmologyConverter()
         # Use redshift or dMpc if z is not provided
         if args.redshift is None:
             self.dMpc = args.dMpc
-            self.redshift = conv.luminosity_distance_to_redshift(self.dMpc, cosmology)
+            self.redshift = cosmo_converter.redshift(self.dMpc)
             dist_filler = f"dMpc{int(self.dMpc)}"
         else:
             self.redshift = args.redshift
-            self.dMpc = cosmology.luminosity_distance(self.redshift).to("Mpc").value
+            self.dMpc = cosmo_converter.luminosity_distance(self.redshift)
             dist_filler = f"z{self.redshift}"
 
         if args.doAB:
@@ -361,6 +536,18 @@ class LightCurveHandler:
         self.extensions = [".dat", ".csv", ".txt"]  # to be overwritten in subclass
 
     def generate_nmma_lcs_from_files(self, directory=None, target_extensions=None):
+        """Walk a directory and write one light curve per viewing angle.
+
+        Files already converted are skipped, so an interrupted run resumes
+        where it stopped.
+
+        Parameters
+        ----------
+        directory: str or pathlib.Path, optional
+            Directory to walk. Defaults to the model directory.
+        target_extensions: list of str, optional
+            Extensions to consider. Defaults to those of the handler.
+        """
         if directory is None:
             directory = self.modeldir
         directory = Path(directory)
@@ -383,6 +570,22 @@ class LightCurveHandler:
                 io.write_lc_to_csv(out_file, lc_data, format=self.format)
 
     def open_source(self, in_file):
+        """Read the header and the spectra of one grid file.
+
+        The first three lines give the number of viewing angles, the number
+        of wavelengths, and the time grid. Times are shifted to the middle
+        of their bin.
+
+        Parameters
+        ----------
+        in_file: pathlib.Path
+            File to read.
+
+        Returns
+        -------
+        tuple
+            The viewing angles to iterate over, and the raw spectra.
+        """
         # Read header values from the first three lines
         with open(in_file) as f:
             Nobs = int(f.readline().strip())
@@ -399,11 +602,42 @@ class LightCurveHandler:
         return range(Nobs), data
 
     def set_filename(self, base, index):
+        """Name the output file after its viewing angle and distance.
+
+        Parameters
+        ----------
+        base: str
+            Stem of the source file.
+        index: int
+            Index of the viewing angle.
+
+        Returns
+        -------
+        pathlib.Path
+            Destination file.
+        """
         return (
             self.lcdir / f"{base}_theta{self.thetas[index]:.2f}_{self.dist_filler}.dat"
         )
 
     def process_source(self, i, data):
+        """Extract one viewing angle and move it to the observer.
+
+        Wavelengths are redshifted, and the flux is scaled from the ten
+        parsecs of the grid to the requested distance.
+
+        Parameters
+        ----------
+        i: int
+            Index of the viewing angle.
+        data: numpy.ndarray
+            Raw spectra of the file.
+
+        Returns
+        -------
+        tuple
+            Wavelengths in angstroms, and the flux density.
+        """
         wave = data[self.Nwave * i : self.Nwave * (i + 1), 0] * (1 + self.redshift)
         Istokes = data[self.Nwave * i : self.Nwave * (i + 1), 1 : len(self.time) + 1]
         fl = Istokes.T * (1e-5 / self.dMpc) ** 2 / (1 + self.redshift)
@@ -411,9 +645,34 @@ class LightCurveHandler:
         return (wave, fl)
 
     def compose_data(self, processed_data):
+        """Turn a spectrum into the requested output. Overridden per format.
+
+        Parameters
+        ----------
+        processed_data: tuple
+            Wavelengths and flux density.
+
+        Returns
+        -------
+        tuple
+            The input, unchanged.
+        """
         return processed_data  # Dummy, to be overwritten
 
     def compose_filter_data(self, processed_data):
+        """Integrate a spectrum through each filter.
+
+        Parameters
+        ----------
+        processed_data: tuple
+            Wavelengths and flux density.
+
+        Returns
+        -------
+        dict
+            Photometry per filter, with uncertainties left as NaN, the grid
+            being noiseless.
+        """
         wave, fl = processed_data
         source = sncosmo.TimeSeriesSource(self.time, wave, fl)
         data = {}
@@ -432,12 +691,30 @@ class LightCurveHandler:
         return data
 
     def compose_lbol_data(self, processed_data):
+        """Integrate a spectrum over wavelength into a bolometric luminosity.
+
+        Parameters
+        ----------
+        processed_data: tuple
+            Wavelengths and flux density.
+
+        Returns
+        -------
+        dict
+            The time grid and the bolometric luminosity, in erg/s.
+        """
         wave, fl = processed_data
         Lbol = np.trapezoid(fl * (4 * np.pi * D**2), x=wave)
         return {"time": self.time, "lbol": Lbol}
 
 
 class LANLLightCurveHandler(LightCurveHandler):
+    """Read grids written by the LANL radiative-transfer code.
+
+    Relies on the external ``cocteau`` reader, and covers the full sphere
+    rather than one hemisphere.
+    """
+
     def __init__(self, args):
         # Initiate a LANL filereader object
         from cocteau import filereaders
@@ -446,6 +723,18 @@ class LANLLightCurveHandler(LightCurveHandler):
         super().__init__(args)
 
     def open_source(self, in_file):
+        """Read the spectra of one LANL file, over 54 viewing angles.
+
+        Parameters
+        ----------
+        in_file: pathlib.Path
+            File to read.
+
+        Returns
+        -------
+        tuple
+            The viewing angles to iterate over, and the spectra.
+        """
         spectra = self.filereader.read_spectra(
             in_file, angles=np.arange(54), remove_zero=False
         )
@@ -455,6 +744,20 @@ class LANLLightCurveHandler(LightCurveHandler):
         return (range(Nfiles), spectra)
 
     def process_source(self, i, data):
+        """Extract one viewing angle, converting units as we go.
+
+        Parameters
+        ----------
+        i: int
+            Index of the viewing angle.
+        data: list
+            Spectra of the file.
+
+        Returns
+        -------
+        tuple
+            Wavelengths in angstroms, and the flux density in cgs.
+        """
         spectrum = data[i]
         wave = spectrum.spectra[0].wavelength_arr.to(u.angstrom).value
         self.time = spectrum.timesteps.value
@@ -468,6 +771,13 @@ class LANLLightCurveHandler(LightCurveHandler):
 
 
 class H5LightCurveHandler(LightCurveHandler):
+    """Read grids stored as HDF5, where the bolometric curve is precomputed.
+
+    Because the file already carries a bolometric luminosity, the
+    bolometric path reads it straight off instead of integrating the
+    spectra.
+    """
+
     def __init__(self, args):
         super().__init__(args)
         self.extensions = [".h5", ".hdf5"]
@@ -478,6 +788,21 @@ class H5LightCurveHandler(LightCurveHandler):
             self.process_source = self.process_filter_source
 
     def open_source(self, in_file):
+        """Read one HDF5 grid file into memory.
+
+        Only the first Stokes parameter is kept: the others carry the
+        polarisation, which NMMA does not model.
+
+        Parameters
+        ----------
+        in_file: pathlib.Path
+            File to read.
+
+        Returns
+        -------
+        tuple
+            The viewing angles to iterate over, and the intensities.
+        """
         with h5py.File(in_file) as f:
             data = f["observables"]
             stokes = np.array(data["stokes"])
@@ -495,23 +820,81 @@ class H5LightCurveHandler(LightCurveHandler):
         return range(Nobs), Istokes
 
     def process_filter_source(self, i, data):
+        """Extract one viewing angle and move it to the observer.
+
+        Parameters
+        ----------
+        i: int
+            Index of the viewing angle.
+        data: numpy.ndarray
+            Intensities of the file.
+
+        Returns
+        -------
+        tuple
+            Wavelengths and flux density.
+        """
         fl = data[i] * (1.0 / self.dMpc) ** 2 / (1 + self.redshift)
         return (self.wave, fl)
 
     def process_lbol_source(self, i, data):
+        """Read the precomputed bolometric curve of one viewing angle.
+
+        Parameters
+        ----------
+        i: int
+            Index of the viewing angle.
+        data: numpy.ndarray
+            Unused; the luminosity was read when the file was opened.
+
+        Returns
+        -------
+        numpy.ndarray
+            Bolometric luminosity, in erg/s.
+        """
         return self.Lbol[i]
 
     def compose_lbol_data(self, processed_data):
+        """Pair the precomputed luminosity with its time grid.
+
+        Parameters
+        ----------
+        processed_data: numpy.ndarray
+            Bolometric luminosity, in erg/s.
+
+        Returns
+        -------
+        dict
+            The time grid and the luminosity.
+        """
         return {"time": self.time, "lbol": processed_data}
 
 
 class KasenLightCurveHandler(LightCurveHandler):
+    """Read grids written by the Kasen code, in spectral luminosity.
+
+    These grids are sparse in wavelength and noisy, so the resulting light
+    curves can optionally be smoothed.
+    """
+
     def __init__(self, args):
         super().__init__(args)
         self.extensions = [".h5", ".hdf5"]
         self.smoothing = args.doSmoothing
 
     def open_source(self, in_file):
+        """Read one Kasen file and turn frequencies into wavelengths.
+
+        Parameters
+        ----------
+        in_file: pathlib.Path
+            File to read.
+
+        Returns
+        -------
+        tuple
+            The viewing angles to iterate over, and the luminosities.
+        """
         with h5py.File(in_file, "r") as f:
             nu = np.array(f["nu"], dtype="d")
             time = np.array(f["time"])
@@ -537,12 +920,54 @@ class KasenLightCurveHandler(LightCurveHandler):
         return iterator, (wave, Llam)
 
     def set_filename(self, base, index):
+        """Name the output file without a viewing angle.
+
+        Kasen grids are angle-averaged, so there is no angle to record.
+
+        Parameters
+        ----------
+        base: str
+            Stem of the source file.
+        index: int
+            Unused; kept for compatibility with the other handlers.
+
+        Returns
+        -------
+        pathlib.Path
+            Destination file.
+        """
         return self.lcdir / f"{base}_{self.dist_filler}.dat"
 
     def process_source(self, i, data):  # dummy for conformity
+        """Pass the data through unchanged.
+
+        Parameters
+        ----------
+        i: int
+            Unused.
+        data: tuple
+            Wavelengths and luminosity.
+
+        Returns
+        -------
+        tuple
+            The input, unchanged.
+        """
         return data
 
     def compose_filter_data(self, processed_data):
+        """Integrate through the filters, then optionally smooth.
+
+        Parameters
+        ----------
+        processed_data: tuple
+            Wavelengths and flux density.
+
+        Returns
+        -------
+        dict
+            Photometry per filter, smoothed when --do-smoothing is set.
+        """
         data = super().compose_filter_data(processed_data)
         if self.smoothing:
             for filt in self.filters:
@@ -555,6 +980,23 @@ class KasenLightCurveHandler(LightCurveHandler):
         return data
 
     def compose_lbol_data(self, processed_data):
+        """Integrate the spectral luminosity into a bolometric one.
+
+        Kasen grids store a luminosity per unit frequency, so the conversion
+        to a wavelength integral carries the extra frequency factors.
+        Smoothing is done in log space, the luminosity spanning orders of
+        magnitude.
+
+        Parameters
+        ----------
+        processed_data: tuple
+            Wavelengths and, unused here, the flux density.
+
+        Returns
+        -------
+        dict
+            The time grid and the bolometric luminosity, in erg/s.
+        """
         wave, _ = processed_data
         lbol = np.trapezoid(
             self.Lnu * self.nu**2.0 / c_cgs / 1e8 * (4 * np.pi * D**2), x=wave
@@ -566,6 +1008,22 @@ class KasenLightCurveHandler(LightCurveHandler):
 
 
 def resample_lightcurve_grid(args=None):
+    """Entry point of the ``resample-grid`` command.
+
+    A full training grid can be too large to work with. This writes smaller
+    copies of it, either by keeping one light curve out of N, or by cutting
+    it into several files.
+
+    Parameters
+    ----------
+    args: argparse.Namespace or list of str or None, optional
+        Command-line arguments. Read from the command line when omitted.
+
+    Raises
+    ------
+    ValueError
+        If the grid is not an HDF5 file.
+    """
     args = emp.parsing_and_logging(emp.lc_grid_parser, args)
     gridpath = Path(args.gridpath)
     if gridpath.suffix not in [".h5", ".hdf5"]:
@@ -584,6 +1042,20 @@ def resample_lightcurve_grid(args=None):
 
 
 class Grid:
+    """A training grid stored as HDF5, that can be cut down in size.
+
+    Parameters
+    ----------
+    gridpath: str or pathlib.Path
+        The grid file.
+    base_dirname: str, optional
+        Directory the reduced copies are written under.
+    base_filename: str, optional
+        Stem of the files that are written.
+    random_seed: int, optional
+        Seed of the shuffling, so that a reduction is reproducible.
+    """
+
     def __init__(
         self, gridpath, base_dirname="lcs_grid", base_filename="lcs", random_seed=21
     ):
@@ -594,6 +1066,16 @@ class Grid:
         self.rng = np.random.default_rng(random_seed)
 
     def downsample(self, factor=10, shuffle=False):
+        """Keep one light curve out of every ``factor``.
+
+        Parameters
+        ----------
+        factor: int, optional
+            Keep one entry out of this many.
+        shuffle: bool, optional
+            If True, shuffle before thinning, so that the sample is not tied
+            to the order the grid happens to be stored in.
+        """
         save_dir, keys, tag = self._setup(f"downsampled_{factor}x", shuffle)
         keys = keys[::factor]
         save_file = save_dir / f"{self.base_filename}_{tag}.h5"
@@ -601,6 +1083,18 @@ class Grid:
         print("Downsampling done.")
 
     def fragment(self, factor=10, shuffle=False):
+        """Split the grid into ``factor`` files of roughly equal size.
+
+        Unlike downsampling, nothing is thrown away: the whole grid is kept,
+        spread over several files.
+
+        Parameters
+        ----------
+        factor: int, optional
+            Number of files to produce.
+        shuffle: bool, optional
+            If True, shuffle before splitting.
+        """
         save_dir, keys, tag = self._setup("fragmented", shuffle)
         chunks = np.array_split(keys, factor)
         for i, chunk in enumerate(chunks):
@@ -625,10 +1119,27 @@ class Grid:
                 new_file.copy(self.file[key], key)
 
     def remove(self):
+        """Delete every reduced copy written so far.
+
+        Removes the whole output directory, not just the files of the last
+        run.
+        """
         shutil.rmtree(self.base_dirname)
 
 
 def call_lc_validation(args=None):
+    """Check from the command line that a light curve is worth analysing.
+
+    Parameters
+    ----------
+    args: argparse.Namespace or list of str or None, optional
+        Command-line arguments. Read from the command line when omitted.
+
+    Returns
+    -------
+    bool
+        True when the light curve has enough detections.
+    """
     args = emp.parsing_and_logging(emp.lc_validation_parser, args)
     filters = utils.set_filters(args)
     return validate_lightcurve(

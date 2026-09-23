@@ -1,4 +1,3 @@
-from ast import literal_eval
 from copy import copy
 from pathlib import Path
 
@@ -6,17 +5,14 @@ import joblib
 import numpy as np
 import sncosmo
 from astropy import units as u
-from bilby.gw.cosmology import get_cosmology
-from fiesta.inference.lightcurve_model import FluxModel
+from fiesta.models import FluxSurrogate
 from scipy.special import logsumexp
 from sncosmo.models import _SOURCES
 
 from ..core.base import initialisation_args_from_signature_and_namespace
 from ..core.constants import c_SI
 from ..core.conversion import (
-    distance_modulus_nmma,
-    get_cosmo_grids,
-    get_redshift,
+    CosmologyConverter,
     observation_angle_conversion,
 )
 from ..core.gitlab import get_model, get_models_home
@@ -211,10 +207,8 @@ class LightCurveModelContainer:
         extinction_model=None,
         **kwargs,
     ):
-
         self.model = model
         self.identify_model_parameters(model_parameters)
-        self.redshift_func = get_redshift
         if isinstance(filters, str):
             filters = filters.split(",")
         self.filters = filters
@@ -223,6 +217,7 @@ class LightCurveModelContainer:
         self.good_parameters = True
         self.extinction_model = extinction_model
         self.extinction_frame = None
+        self.cosmo_converter = CosmologyConverter()
 
         # sample times are used as nodes to generate the light curve,
         # characterising the model's validity range and the resolution
@@ -254,61 +249,115 @@ class LightCurveModelContainer:
             self.model_parameters = model_parameters
 
     def setup_model_times(self, tmin=0.01, tmax=14.0, nsteps=150):
-        """Set up default model sample times if not provided.
-        Parameters:
-        tmin: float
-            Minimum time in days. Default is 0.01 days.
-        tmax: float
-            Maximum time in days. Default is 14.0 days.
-        nsteps: int
-            Number of time steps. Default is 150.
+        """Build the time grid the model is evaluated on.
+
+        These times define both the range over which the model is trusted
+        and the resolution below which interpolating it makes no sense.
+        Subclasses override this to follow whatever their own model covers.
+
+        Parameters
+        ----------
+        tmin: float, optional
+            First time, in days.
+        tmax: float, optional
+            Last time, in days.
+        nsteps: int, optional
+            Number of steps, spaced geometrically.
+
+        Returns
+        -------
+        numpy.ndarray
+            The time grid, in days.
         """
         return np.geomspace(tmin, tmax, nsteps)
 
     def check_vs_priors(self, priors):
-        """Check if the parameters are in the priors of the model."""
+        """Warn about missing priors, and prepare what they imply.
+
+        Beyond warning, this sets up two things the priors decide:
+        How to handle cosmology-aware conversion between redshift and distance,
+        and which extinction model to apply when Ebv is sampled.
+
+        Parameters
+        ----------
+        priors: bilby.core.prior.PriorDict
+            Priors the analysis will sample.
+        """
         for key in self.model_parameters:
             if key not in priors:
                 print(f"Parameter {key} not found in priors, might fail.")
 
-        if (
-            "redshift" not in priors
-            and "luminosity_distance" in priors
-            and "Hubble_constant" not in priors
-        ):
-            dlum_prior = priors["luminosity_distance"]
-            cosmo = getattr(dlum_prior, "cosmology", get_cosmology())
-            dist_grid, z_grid = get_cosmo_grids(
-                dlum_prior.minimum, dlum_prior.maximum, cosmo
-            )
-
-            def redshift_from_dlum(parameters):
-                if "redshift" in parameters:
-                    return parameters["redshift"]
-                return np.interp(
-                    parameters["luminosity_distance"], dist_grid, z_grid
-                ).value
-
-            self.redshift_func = redshift_from_dlum
+        self.cosmo_converter = CosmologyConverter.from_priors(priors)
 
         if "Ebv" in priors:
-            ext_model, frame = utils.get_extinction_model(self.extinction_model)
-            if self.extinction_frame is None:
-                # for efficient computation of extinction corrections
-                self.wavenumbers = 1.0 / (self.lambdas * u.meter.to(u.micron))
-                if frame == "rest":
-                    self.extinction_wavenumbers = self.rest_wavenumbers
-                elif frame == "obs":
-                    self.extinction_wavenumbers = self.obs_wavenumbers
-                self.extinction_frame = frame
-                self.extinction_model = ext_model
-                self.extinction_range = self.extinction_model.x_range
+            self.setup_extinction()
+
+    def setup_extinction(self):
+        ext_model, frame = utils.get_extinction_model(self.extinction_model)
+        if self.extinction_frame is None:
+            # for efficient computation of extinction corrections
+            self.wavenumbers = 1.0 / (self.lambdas * u.meter.to(u.micron))
+            if frame == "rest":
+                self.extinction_wavenumbers = self.rest_wavenumbers
+            elif frame == "obs":
+                self.extinction_wavenumbers = self.obs_wavenumbers
+            self.extinction_frame = frame
+            self.extinction_model = ext_model
+            self.extinction_range = self.extinction_model.x_range
+
+    def rest_wavenumbers(self):
+        """Filter wavenumbers as seen in the rest frame of the source.
+
+        Returns
+        -------
+        numpy.ndarray
+            Wavenumbers in 1/micron.
+        """
+
+        return self.wavenumbers * (1 + self.redshift)
+
+    def obs_wavenumbers(self):
+        """Filter wavenumbers as seen by the observer.
+
+        Returns
+        -------
+        numpy.ndarray
+            Wavenumbers in 1/micron.
+        """
+
+        return self.wavenumbers
 
     def sanity_checks(self, parameters):
+        """Flag whether the model can be trusted for these parameters.
+
+        Always passes here; subclasses that have unphysical corners
+        override it.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters about to be evaluated.
+        """
         self.good_parameters = True
 
     def parameter_conversion(self, parameters):
-        """Do necessary parameter conversions for the EM model."""
+        """Fill in the parameters the model wants from those sampled.
+
+        A model may ask for a quantity in log space while the sampler works
+        in linear space, or the other way round; both are derived here.
+        Missing parameters are left alone, so that a later stage can still
+        supply them.
+
+        Parameters
+        ----------
+        parameters: dict
+            Sampled parameters.
+
+        Returns
+        -------
+        dict
+            The parameters, with the model's own ones added.
+        """
 
         new_parameters = observation_angle_conversion(parameters)
         for key in self.model_parameters:
@@ -324,21 +373,50 @@ class LightCurveModelContainer:
         return new_parameters
 
     def em_parameter_setup(self, parameters, combine_params=True):
+        """Cache the quantities every filter evaluation will need.
+
+        Distance, extinction, timeshift and redshift are the same for all
+        filters and all times, and the redshift in particular is expensive,
+        so they are computed once here and stored on the object.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+        combine_params: bool, optional
+            If True, also return the parameters the model itself expects.
+
+        Returns
+        -------
+        dict or None
+            The model parameters, when combine_params is set.
+        """
+
         # read here, but used later for correction that is observation-dependent
         self.Ebv = parameters.get("Ebv", 0.0)
-        self.luminosity_distance = parameters.get(
-            "luminosity_distance", 1e-5
-        )  # default 10pc = 1e-5 Mpc
-        self.distmod = distance_modulus_nmma(
-            self.luminosity_distance
-        )  # default 10pc = 1e-5 Mpc
         self.timeshift = parameters.get("timeshift", 0.0)
-
-        # redshift computation can be expensive, so we only do it
-        # once and store it for conversion to detector frame
-        self.redshift = self.redshift_func(parameters)
+        parameters = self.set_distance_parameters(parameters)
         if combine_params:
             return self.combine_lc_params(parameters)
+
+    def set_distance_parameters(self, parameters):
+        """Set the distance parameters in the parameters dictionary.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Updated parameters with distance information.
+        """
+        parameters = self.cosmo_converter(parameters)
+        self.luminosity_distance = parameters["luminosity_distance"]
+        self.distmod = self.cosmo_converter.distmod(parameters["luminosity_distance"])
+        self.redshift = parameters["redshift"]
+        return parameters
 
     def combine_lc_params(self, parameters):
         """Extract the light curve parameters in the necessary format.
@@ -358,40 +436,25 @@ class LightCurveModelContainer:
             for key in self.model_parameters
         }
 
-    def rest_wavenumbers(self):
-        return self.wavenumbers * (1 + self.redshift)
-
-    def obs_wavenumbers(self):
-        return self.wavenumbers
-
-    def extinction_correction(self, model_mags):
-        ext_factor = np.ones_like(self.lambdas)
-        wavenumbers = self.extinction_wavenumbers()
-        k_min, k_max = self.extinction_range
-        covered = (wavenumbers >= k_min) & (wavenumbers <= k_max)
-        ext_factor[covered] = self.extinction_model.extinguish(
-            wavenumbers[covered], Ebv=self.Ebv
-        )
-        ext_mags = -2.5 * np.log10(ext_factor)
-        for ext_mag, filt in zip(ext_mags, self.default_filts):
-            if filt in model_mags:
-                model_mags[filt] += ext_mag
-        return model_mags
-
     def gen_detector_lc(self, parameters=None, sample_times=None):
-        """Generate a light curve for given parameter as observable in detector frame.
+        """Generate the light curve as it would be seen by a detector.
+
+        The model works in the source frame. Its times are stretched by the
+        redshift and offset by the timeshift, and its magnitudes are moved
+        to the observer by the distance modulus and the extinction.
 
         Parameters
         ----------
-        parameters: dict
+        parameters: dict, optional
             Parameters of the light curve model.
-        filters: str or list of str, optional
-            Filters to use for the light curve. Defaults to 'all'.
+        sample_times: numpy.ndarray, optional
+            Source-frame times to evaluate. Defaults to the model's grid.
 
         Returns
         -------
-        dict
-            Light curve magnitudes across the specified filters.
+        tuple
+            Observer-frame times in days, and the apparent magnitude per
+            filter.
         """
         if sample_times is None:
             sample_times = self.model_times
@@ -405,9 +468,47 @@ class LightCurveModelContainer:
         return self.combine_detector_data(model_lc, observable_times)
 
     def generate_lightcurve(self, sample_times, parameters):
+        """Evaluate the model in the source frame. Subclasses must define it.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Absolute magnitude per filter.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, on the base class.
+        """
         raise NotImplementedError("This method should be implemented in subclasses.")
 
     def combine_detector_data(self, model_lc, observable_times):
+        """Turn source-frame magnitudes into what a detector would record.
+
+        Applies extinction, the distance modulus, and the correction for the
+        fact that a redshifted source is integrated over a shifted
+        luminosity window. Filters the model could not evaluate anywhere are
+        returned as non-detections.
+
+        Parameters
+        ----------
+        model_lc: dict
+            Absolute magnitude per filter, in the source frame.
+        observable_times: numpy.ndarray
+            Observer-frame times, in days.
+
+        Returns
+        -------
+        tuple
+            The times, and the apparent magnitude per filter.
+        """
 
         if self.extinction_frame:
             model_lc = self.extinction_correction(model_lc)
@@ -426,12 +527,54 @@ class LightCurveModelContainer:
 
         return (observable_times, lc_data)
 
+    def extinction_correction(self, model_mags):
+        """Dim the model magnitudes by interstellar extinction.
+
+        Filters whose wavenumber falls outside the range the extinction
+        model covers are left untouched rather than extrapolated.
+
+        Parameters
+        ----------
+        model_mags: dict
+            Magnitude per filter, modified in place.
+
+        Returns
+        -------
+        dict
+            The same magnitudes, extinguished.
+        """
+        ext_factor = np.ones_like(self.lambdas)
+        wavenumbers = self.extinction_wavenumbers()
+        k_min, k_max = self.extinction_range
+        covered = (wavenumbers >= k_min) & (wavenumbers <= k_max)
+        ext_factor[covered] = self.extinction_model.extinguish(
+            wavenumbers[covered], Ebv=self.Ebv
+        )
+        ext_mags = -2.5 * np.log10(ext_factor)
+        for ext_mag, filt in zip(ext_mags, self.default_filts):
+            if filt in model_mags:
+                model_mags[filt] += ext_mag
+        return model_mags
+
     @property
     def citation(self):
+        """The reference to cite for this model.
+
+        Returns
+        -------
+        dict
+            The model name, mapped to its references.
+        """
         return {self.model: citation_dict[self.model]}
 
 
 class FiestaModel(LightCurveModelContainer):
+    """Wrap a fiesta surrogate as an NMMA light curve model.
+
+    fiesta returns light curves already in the observer frame, so this class
+    short-circuits most of the frame handling the base class does.
+    """
+
     load_dir_string = None
 
     def __init__(
@@ -480,21 +623,40 @@ class FiestaModel(LightCurveModelContainer):
             directory=surrogate_dir,
         )
         try:
-            self.fiesta_model = FluxModel(**fiesta_kwargs)
+            self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         except OSError:
             fiesta_kwargs["directory"] = Path(
                 surrogate_dir, self.load_dir_string, model, "model"
             )
-            self.fiesta_model = FluxModel(**fiesta_kwargs)
+            self.fiesta_model = FluxSurrogate(**fiesta_kwargs)
         if sample_times is not None:
             print("Warning: sample_times are not used in FiestaModel, ignoring.")
         kwargs["model_parameters"] = self.fiesta_model.parameter_names
         super().__init__(self.fiesta_model.name, filters, **kwargs)
 
     def setup_model_times(self):
+        """Use the time grid the fiesta surrogate was trained on.
+
+        Returns
+        -------
+        numpy.ndarray
+            The surrogate's own times, in days.
+        """
         return self.fiesta_model.times  # default sample times for fiesta model
 
     def check_vs_priors(self, priors):
+        """Refuse priors that reach outside what the surrogate was trained on.
+
+        Parameters
+        ----------
+        priors: bilby.core.prior.PriorDict
+            Priors the analysis will sample.
+
+        Raises
+        ------
+        ValueError
+            If a prior extends beyond the range of the training data.
+        """
         super().check_vs_priors(priors)
         for key in self.model_parameters:
             try:
@@ -509,18 +671,42 @@ class FiestaModel(LightCurveModelContainer):
                 print(f"Parameter {key} not found in priors, might fail.")
 
     def combine_lc_params(self, parameters):
+        """Hand fiesta the frame parameters it expects to handle itself.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model, modified in place.
+
+        Returns
+        -------
+        dict
+            The same parameters, with redshift, distance and timeshift added.
+        """
         parameters["redshift"] = self.redshift
         parameters["luminosity_distance"] = self.luminosity_distance
         parameters["timeshift"] = self.timeshift
         return parameters
 
     def gen_detector_lc(self, parameters=None, sample_times=None):
-        """Generate a light curve for given parameter as observable in detector frame.
+        """Generate the observer-frame light curve, straight from fiesta.
+
+        Unlike the base class, no redshift stretching is applied: fiesta
+        already returns observer-frame times. Only the timeshift is added.
+
         Parameters
         ----------
-        parameters: dict
+        parameters: dict, optional
             Parameters of the light curve model.
-        sample_times: Unused, included for compatibility with other Models."""
+        sample_times: numpy.ndarray, optional
+            Unused, kept for compatibility with the other models.
+
+        Returns
+        -------
+        tuple
+            Observer-frame times in days, and the magnitude per filter. The
+            magnitudes are empty if the parameters were rejected.
+        """
         # convert the parameters to the fiesta model parameters
         parameters = self.em_parameter_setup(parameters)
         if self.good_parameters:
@@ -537,8 +723,24 @@ class FiestaModel(LightCurveModelContainer):
             return self.fiesta_model.times, {}
 
     def generate_lightcurve(self, sample_times, parameters):
-        """Generate a light curve for given parameter as observable in detector frame.
-        NOTE: You should almost always prefer gen_detector_lc!"""
+        """Recover the source-frame light curve from the observer-frame one.
+
+        fiesta works in the observer frame, so this undoes the redshift and
+        the distance modulus to satisfy the base class interface. Prefer
+        gen_detector_lc, which skips the round trip.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Absolute magnitude per filter.
+        """
 
         obs_times, obs_mags = self.gen_detector_lc(parameters)
 
@@ -577,6 +779,13 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
             self.lc_func = lc_gen.arnett_modified_lc
 
     def setup_model_times(self):
+        """Use a linear grid stopping where the integrals start to diverge.
+
+        Returns
+        -------
+        numpy.ndarray
+            Times from 0.005 to 20 days.
+        """
         tmin = 0.005  # minimum time in days, arbitrary
         tmax = 20.0  # NOTE: The underlying integrals tend to diverge at later times
         nsteps = 40  # number of time steps
@@ -584,11 +793,42 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
         return np.linspace(tmin, tmax, nsteps)
 
     def combine_detector_data(self, model_lc, observable_times):
+        """Redshift a bolometric luminosity rather than a magnitude.
+
+        A luminosity is energy per unit time, and both the energy and the
+        time bin are stretched, hence the squared factor.
+
+        Parameters
+        ----------
+        model_lc: numpy.ndarray
+            Source-frame bolometric luminosity, in erg/s.
+        observable_times: numpy.ndarray
+            Observer-frame times, in days.
+
+        Returns
+        -------
+        tuple
+            The times, and the observed luminosity.
+        """
         # lBol is essentially energy per time bin, both quantities
         #  get a redshift correction in detector frame
         return (observable_times, model_lc / (1 + self.redshift) ** 2)
 
     def generate_lightcurve(self, sample_times, parameters):
+        """Evaluate the bolometric model.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        numpy.ndarray
+            Bolometric luminosity, in erg/s.
+        """
         new_parameters = self.em_parameter_setup(parameters)
         return self.lc_func(sample_times, new_parameters)
 
@@ -714,6 +954,13 @@ class SVDLightCurveModel(LightCurveModelContainer):
             )
 
     def setup_model_times(self):
+        """Use the time grid the surrogate was trained on, if it has one.
+
+        Returns
+        -------
+        numpy.ndarray
+            The surrogate's times, or the base class default.
+        """
         # reset model_times to the model's training times if possible
         try:
             return next(iter(self.svd_mag_model.values()))["tt"]
@@ -721,6 +968,23 @@ class SVDLightCurveModel(LightCurveModelContainer):
             return super().setup_model_times()
 
     def get_model_data(self, model, filters):
+        """Fetch the surrogate from the model repository.
+
+        Filter names are translated on the way out and back: the repository
+        stores ``ps1_g`` where NMMA writes ``ps1::g``.
+
+        Parameters
+        ----------
+        model: str
+            Name of the model to download.
+        filters: str or list of str or None
+            Filters to fetch. All available ones when None.
+
+        Returns
+        -------
+        list of str
+            Filters the surrogate actually provides.
+        """
         # we need to map the filter names to repo names!
         search_filters = None
         if isinstance(filters, str):
@@ -735,10 +999,28 @@ class SVDLightCurveModel(LightCurveModelContainer):
         return filters
 
     def load_filt_model(self, model, load_method, fn_ext="joblib", target_name="gps"):
-        """Subroutine to load the filter models from the SVD path.
-        While svd_mag_model as loaded from the corresponding model file is only
-        a dictionary with some model metadata, this step includes the actual
-        ml-model and makes it available in the filter-specific sub-dictionary."""
+        """Load the trained predictor of every filter into the surrogate.
+
+        The model file alone carries only metadata. This attaches the actual
+        estimator, one per filter, so the surrogate can be evaluated.
+
+        Parameters
+        ----------
+        model: str
+            Name of the model whose files to load.
+        load_method: callable
+            Loader matching the file type, joblib or keras.
+        fn_ext: str, optional
+            Extension of the files to look for.
+        target_name: str, optional
+            Key the estimator is stored under, per filter.
+
+        Raises
+        ------
+        ValueError
+            If no file was found for any filter at all. Missing individual
+            filters only produce a warning.
+        """
         outdir = self.svd_path / f"{model}{self.model_specifier}"
         found_any_model = False
         not_found = []
@@ -760,12 +1042,44 @@ class SVDLightCurveModel(LightCurveModelContainer):
         return super().__repr__() + f"(model={self.model}, svd_path={self.svd_path})"
 
     def combine_lc_params(self, parameters):
+        """Order the parameters as the surrogate expects them.
+
+        The surrogate takes a positional list rather than a mapping, so the
+        order of model_parameters is what matters here.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        list
+            Parameter values, in the surrogate's own order.
+        """
         return [
             parameters[key] if key in parameters else getattr(self, key)
             for key in self.model_parameters
         ]
 
     def generate_lightcurve(self, sample_times, parameters, filters="all"):
+        """Evaluate the surrogate, in magnitudes or bolometrically.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+        filters: list of str or str or None, optional
+            Filters to evaluate. ``all`` uses the model's own list; None
+            asks for the bolometric luminosity instead of magnitudes.
+
+        Returns
+        -------
+        dict or numpy.ndarray
+            Absolute magnitude per filter, or the bolometric luminosity.
+        """
         parameters_list = self.em_parameter_setup(parameters)
         # parameters_list.append(param_dict["redshift"])
 
@@ -789,6 +1103,22 @@ class SVDLightCurveModel(LightCurveModelContainer):
         )
 
     def generate_spectra(self, sample_times, wavelengths, parameters):
+        """Evaluate the surrogate on wavelengths rather than on filters.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        wavelengths: list
+            Wavelengths to evaluate, used in place of filter names.
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Flux per wavelength.
+        """
         return self.generate_lightcurve(sample_times, parameters, filters=wavelengths)
 
 
@@ -823,11 +1153,33 @@ class FiestaKilonovaModel(FiestaModel):
 
 
 class GRBMixin:
+    """Shared GRB behaviour, mixed into both the fiesta and afterglowpy models.
+
+    Carries the jet geometry conversions and the checks that keep the
+    afterglow physically meaningful.
+    """
+
     def __init__(self, *args, resolution=12, **kwargs):
         self.resolution = resolution
         super().__init__(*args, **kwargs)
 
     def parameter_conversion(self, parameters):
+        """Derive the jet angles and the total conversion efficiency.
+
+        Sampling the ratio of the wing to the core angle rather than the
+        wing angle itself keeps the jet resolvable by construction, so the
+        wing angle is reconstructed here when that ratio was sampled.
+
+        Parameters
+        ----------
+        parameters: dict
+            Sampled parameters, modified in place.
+
+        Returns
+        -------
+        dict
+            The parameters, with thetaWing and epsilon_tot added.
+        """
 
         # it is beneficial to sample the ratio of angles alpha instead of checking later whether this can be resolved
         try:
@@ -852,7 +1204,17 @@ class GRBMixin:
         return new_parameters
 
     def sanity_checks(self, parameters):
-        """Perform sanity checks on the GRB parameters."""
+        """Reject jet geometries the afterglow model cannot describe.
+
+        A jet must fit in a hemisphere, must be wide enough to be resolved
+        on the angular grid, must have a core large enough to be meaningful,
+        and cannot put more energy into the microphysics than it has.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters about to be evaluated.
+        """
         # FIXME if ratio zeta and ratio epsilon are given,
         # we should check that the GRB energy does not
         # exceed the energy equivalent of the disk mass!
@@ -946,12 +1308,34 @@ class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
         self.flux_func = None  # flux function to be set later, if needed
 
     def setup_model_times(self):
+        """Use a grid spanning the whole afterglow, from seconds to months.
+
+        Returns
+        -------
+        numpy.ndarray
+            Times from 1e-5 to 200 days.
+        """
         tmin = 1.0e-5  # minimum time in days
         tmax = 200  # maximum time in days
         nsteps = 201  # number of time steps
         return np.geomspace(tmin, tmax, nsteps)
 
     def em_parameter_setup(self, parameters):
+        """Pick the afterglow evaluator, then cache the frame quantities.
+
+        Whether the jet is energised over time or carries a fixed energy is
+        decided once, on the first call, from the parameters present.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Parameters in the form afterglowpy expects.
+        """
 
         # set on first call
         if self.flux_func is None:
@@ -992,6 +1376,21 @@ class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
         return grb_param_dict
 
     def generate_lightcurve(self, sample_times, parameters):
+        """Evaluate the GRB afterglow.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Absolute magnitude per filter, or an empty dict when the jet
+            geometry was rejected.
+        """
         grb_param_dict = self.em_parameter_setup(parameters)
 
         # sanity checks
@@ -1037,6 +1436,18 @@ class HostGalaxyLightCurveModel(LightCurveModelContainer):
         self.host_mag = host_mag
 
     def check_vs_priors(self, priors):
+        """Refuse an extinction prior, the host model carrying its own.
+
+        Parameters
+        ----------
+        priors: bilby.core.prior.PriorDict
+            Priors the analysis will sample.
+
+        Raises
+        ------
+        ValueError
+            If Ebv is among the priors.
+        """
         super().check_vs_priors(priors)
         if "Ebv" in priors:
             raise ValueError(
@@ -1045,6 +1456,20 @@ class HostGalaxyLightCurveModel(LightCurveModelContainer):
             )
 
     def generate_lightcurve(self, sample_times, parameters):
+        """Evaluate the host galaxy and its fading afterglow.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Absolute magnitude per filter.
+        """
         parameters = self.em_parameter_setup(parameters)
         return lc_gen.host_lc(sample_times, parameters, self.filters, self.host_mag)
 
@@ -1086,7 +1511,18 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         self.model_parameters = self.sn_model.param_names
 
     def identify_model_parameters(self, model_parameters):
-        "Identify the model parameters for a supernova light curve model."
+        """Take the parameter names from sncosmo rather than from NMMA.
+
+        Parameters
+        ----------
+        model_parameters: None
+            Must be None; sncosmo owns the parameter list here.
+
+        Raises
+        ------
+        ValueError
+            If model parameters are supplied anyway.
+        """
 
         if model_parameters is not None:
             raise ValueError(
@@ -1094,6 +1530,18 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
             )
 
     def setup_model_times(self):
+        """Use the phase range the sncosmo source covers.
+
+        Some sncosmo models are defined relative to peak brightness and some
+        relative to the explosion. NMMA always counts from the explosion, so
+        a model starting at negative phase is shifted and the user warned,
+        their t0 prior needing to follow.
+
+        Returns
+        -------
+        numpy.ndarray
+            Source-frame times, in days.
+        """
         # NOTE:we want these in source frame:
         sample_times = np.linspace(self.source.minphase(), self.source.maxphase(), 200)
 
@@ -1107,7 +1555,19 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         return sample_times
 
     def check_vs_priors(self, priors):
-        print("""
+        """Check the priors.
+
+        sncosmo sources are normalised by an amplitude whose scale differs
+        wildly between models. NMMA offers an alternative anchored on a
+        fiducial absolute magnitude.
+
+        Parameters
+        ----------
+        priors: bilby.core.prior.PriorDict
+            Priors the analysis will sample.
+        """
+        print(
+            """
             Note: Most source models in sncosmo use an 'amplitude' parameter,
             that can differ drastically from model to model and requires a carefully chosen prior.
             NMMA allows an alternative approach that anchors the peak magnitude
@@ -1115,7 +1575,8 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
             'supernova_mag_boost' and 'supernova_mag_stretch' instead to allow a more
             direct phyiscal interpretation.
             Your sampling priors should be set accordingly. See the NMMA documentation for more details.
-        """)
+        """
+        )
 
         if "supernova_mag_boost" in priors or "supernova_mag_stretch" in priors:
             self._anchor_amplitude()
@@ -1161,10 +1622,32 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         )
 
     def em_parameter_setup(self, parameters):
+        """Push the parameters into the sncosmo model itself.
+
+        sncosmo keeps its own state, so there is nothing to return: the
+        model is configured in place.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+        """
         lc_pars = super().em_parameter_setup(parameters)
         self.sn_model.set(**lc_pars)
 
     def combine_lc_params(self, parameters):
+        """Fill in the parameters sncosmo needs, keeping its own defaults.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model, modified in place.
+
+        Returns
+        -------
+        dict
+            Parameters in sncosmo's own naming, redshift included.
+        """
         parameters["t0"] = parameters.get("t0", 0.0)
         parameters["z"] = self.redshift
         return {
@@ -1172,12 +1655,20 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         }
 
     def gen_detector_lc(self, parameters=None, sample_times=None):
-        """Generate a light curve for given parameters as observable in detector frame.
+        """Generate the observer-frame light curve of the supernova.
+
         Parameters
         ----------
-        parameters: dict
-            Parameters of the Supernova model.
-        sample_times: rest-frame times at which to explore the light curve. If None, uses the default times for the model.
+        parameters: dict, optional
+            Parameters of the supernova model.
+        sample_times: numpy.ndarray, optional
+            Source-frame times to evaluate. Defaults to the model's grid.
+
+        Returns
+        -------
+        tuple
+            Observer-frame times in days, and the apparent magnitude per
+            filter.
         """
 
         self.em_parameter_setup(parameters)
@@ -1193,9 +1684,40 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         return (sample_times_obs + self.timeshift, mags)
 
     def get_lc(self, sample_times_obs, parameters):
+        """Evaluate the supernova, through NMMA's own parametrisation.
+
+        Parameters
+        ----------
+        sample_times_obs: numpy.ndarray
+            Observer-frame times, in days.
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Apparent magnitude per filter.
+        """
         return self.nmma_lc(sample_times_obs, parameters)
 
     def nmma_lc(self, sample_times_obs, parameters):
+        """Evaluate the supernova with a stretched and shifted light curve.
+
+        Rather than sncosmo's amplitude, this scales the timescale and
+        offsets the magnitude, which have a more direct physical reading.
+
+        Parameters
+        ----------
+        sample_times_obs: numpy.ndarray
+            Observer-frame times, in days.
+        parameters: dict
+            Holds supernova_mag_stretch and supernova_mag_boost.
+
+        Returns
+        -------
+        dict
+            Apparent magnitude per filter.
+        """
         stretch = (parameters.get("supernova_mag_stretch", 1.0),)
         mags = self.sncosmo_lc(sample_times_obs / stretch)
 
@@ -1205,6 +1727,20 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         return mags
 
     def sncosmo_lc(self, sample_times_obs, parameters=None):
+        """Read magnitudes straight off the sncosmo model.
+
+        Parameters
+        ----------
+        sample_times_obs: numpy.ndarray
+            Observer-frame times, in days.
+        parameters: dict, optional
+            Unused; the model has already been configured.
+
+        Returns
+        -------
+        dict
+            Absolute magnitude per filter.
+        """
         return lc_gen.sn_lc(
             sample_times_obs,
             self.sn_model,
@@ -1214,6 +1750,12 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
 
 
 class ShockCoolingLightCurveModel(LightCurveModelContainer):
+    """Light curve of an envelope cooling after the shock breaks out.
+
+    Describes the first hours to days of a transient, before any
+    radioactive heating takes over.
+    """
+
     def __init__(self, model="Piro2021", **kwargs):
         """A light curve model object
 
@@ -1235,14 +1777,38 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
         super().__init__(model, **kwargs)
 
     def setup_model_times(self):
+        """Use a grid covering the hours-to-days window the model describes.
+
+        Returns
+        -------
+        numpy.ndarray
+            Times from one hour to 3.5 days.
+        """
         # model is suitable on the order of hours to a few days
         # this limit is somewhat arbitrary, but should be sufficient for most cases
         return np.geomspace(1.0 / 24.0, 3.5, 100)
 
     def generate_lightcurve(self, sample_times, parameters, filters="all"):
-        """Generate an absolute-magnitude light curve for given parameters on sample times.
-        Contrary to earlier behaviour of this function, we asume sample_times
-        to be measured in source frame"""
+        """Evaluate the shock cooling model.
+
+        The bolometric luminosity and the photospheric radius are computed
+        together, then turned into magnitudes through a blackbody.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+        filters: list of str or str, optional
+            Filters to evaluate. ``all`` uses the model's own list; None
+            asks for the bolometric luminosity instead.
+
+        Returns
+        -------
+        dict or numpy.ndarray
+            Absolute magnitude per filter, or the bolometric luminosity.
+        """
         lc_param_dict = self.em_parameter_setup(parameters)
 
         if filters is None:
@@ -1279,6 +1845,9 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
     """
 
     lc_dict = {
+        # FIXME weizmann: to be activated separately, after the NMMA
+        # documentation work.
+        # "HoNa2020": lc_gen.HoNa_lc,
         "HoHa2020": lc_gen.HoNa_lc,
         "Me2017": lc_gen.eff_metzger_lc,
         "PL_BB_fixedT": lc_gen.powerlaw_blackbody_constant_temperature_lc,
@@ -1296,9 +1865,20 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
             self.model_times = self.model_times[self.model_times >= 5e-2]
 
     def generate_lightcurve(self, sample_times, parameters):
-        """Generate an absolute-magnitude light curve for given parameters on sample times.
-        Contrary to earlier behaviour of this function, we asume sample_times
-        to be measured in source frame"""
+        """Evaluate the chosen semi-analytical kilonova model.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+
+        Returns
+        -------
+        dict
+            Absolute magnitude per filter.
+        """
         param_dict = self.em_parameter_setup(parameters)
         param_dict["distance_modulus"] = self.distmod
 
@@ -1358,11 +1938,25 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
         return f"Combination of {sub_str}"
 
     def check_vs_priors(self, priors):
+        """Let every component check the priors in turn.
+
+        Parameters
+        ----------
+        priors: bilby.core.prior.PriorDict
+            Priors the analysis will sample.
+        """
         for model in self.lc_models:
             model.check_vs_priors(priors)
 
     @property
     def citation(self):
+        """The references of every component model.
+
+        Returns
+        -------
+        dict
+            Each model name, mapped to its references.
+        """
         citations = {}
         for lc_model in self.lc_models:
             citations.update(lc_model.citation)
@@ -1370,23 +1964,70 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
 
     @property
     def good_parameters(self):
+        """Whether every component accepted the current parameters.
+
+        Returns
+        -------
+        bool
+            False as soon as one component rejected them.
+        """
         return np.prod([lc_model.good_parameters for lc_model in self.lc_models])
 
     @good_parameters.setter
     def good_parameters(self, value):
+        """Set the flag on every component at once.
+
+        Parameters
+        ----------
+        value: bool
+            Value to propagate.
+        """
         for lc_model in self.lc_models:
             lc_model.good_parameters = value
 
     def parameter_conversion(self, parameters):
+        """Chain the conversions of every component.
+
+        Each model sees what the previous ones added, so a quantity derived
+        by one is available to the next.
+
+        Parameters
+        ----------
+        parameters: dict
+            Sampled parameters.
+
+        Returns
+        -------
+        dict
+            The parameters, after every component has had its turn.
+        """
         for lc_model in self.lc_models:
             parameters = lc_model.parameter_conversion(parameters)
         return parameters
 
     def gen_detector_lc(self, parameters, sample_times=None, return_all=False):
-        """
-        Generate the detector light curve for the combined model.
-        This is a convenience function that calls the generate_lightcurve
-        method of each submodel and combines the results.
+        """Generate the observer-frame light curve of every component.
+
+        Each component handles its own frame conversion, then the results
+        are interpolated onto a common time grid and stacked. If any one
+        component rejects the parameters, its empty result is returned
+        straight away.
+
+        Parameters
+        ----------
+        parameters: dict
+            Parameters of the light curve model.
+        sample_times: numpy.ndarray, optional
+            Source-frame times to evaluate. Each model uses its own grid
+            when omitted.
+        return_all: bool, optional
+            If True, return the components separately instead of stacked.
+
+        Returns
+        -------
+        tuple
+            Observer-frame times in days, and the apparent magnitude per
+            filter.
         """
 
         lc_per_model = []
@@ -1433,6 +2074,22 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
         return connected_times, total_lc
 
     def generate_lightcurve(self, sample_times, parameters, return_all=False):
+        """Evaluate every component and add up their fluxes.
+
+        Parameters
+        ----------
+        sample_times: numpy.ndarray
+            Source-frame times to evaluate, in days.
+        parameters: dict
+            Parameters of the light curve model.
+        return_all: bool, optional
+            If True, return the components separately instead of stacked.
+
+        Returns
+        -------
+        dict or list
+            The combined magnitude per filter, or one dict per component.
+        """
 
         lc_per_model = []
         for model in self.lc_models:
@@ -1458,9 +2115,21 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
         return total_lc
 
     def stack_magnitudes(self, mags_per_model):
-        """
-        Stack the magnitudes from the light curves of each model.
-        This is a helper function to combine the magnitudes from different models.
+        """Add up several models into one light curve.
+
+        Magnitudes are logarithmic, so they cannot simply be summed: each is
+        converted to a flux, the fluxes are added, and the total is turned
+        back into a magnitude.
+
+        Parameters
+        ----------
+        mags_per_model: list of dict
+            Magnitude per filter, one dict per component model.
+
+        Returns
+        -------
+        dict
+            Combined magnitude per filter.
         """
         stacked_mags = {}
         for filt in self.all_filters:
@@ -1487,6 +2156,30 @@ class CombinedLightCurveModelContainer(LightCurveModelContainer):
 def single_model_from_args(
     model_class, model_name, args, filters, prefixes=["grb_", "em_"]
 ):
+    """Build one model, taking its arguments from the command line.
+
+    The constructor signature is inspected so that only the arguments the
+    model actually accepts are passed, which lets very different
+    models share one command line.
+
+    Parameters
+    ----------
+    model_class: type
+        Class to instantiate.
+    model_name: str or None
+        Name of the model, stripped of surrounding whitespace.
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    filters: list of str
+        Filters the model is built for.
+    prefixes: list of str, optional
+        Argument prefixes to strip when matching names.
+
+    Returns
+    -------
+    LightCurveModelContainer
+        The instantiated model.
+    """
 
     # populate model-args from default and parsed args
     model_args = initialisation_args_from_signature_and_namespace(
@@ -1509,6 +2202,23 @@ def single_model_from_args(
 
 
 def create_light_curve_model_from_args(args, filters=None):
+    """Build the light curve model an analysis will use.
+
+    Several transient classes can be requested at once, in which case they
+    are combined into a single model.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    filters: list of str, optional
+        Filters to build for. Derived from args when omitted.
+
+    Returns
+    -------
+    LightCurveModelContainer
+        One model, or a combined container when several were requested.
+    """
     if filters is None:
         filters = utils.set_filters(args)
     if getattr(args, "em_transient_class", None):
@@ -1540,6 +2250,29 @@ def create_light_curve_model_from_args(args, filters=None):
 
 
 def lc_model_from_transient_class(transient_class, em_model):
+    """Pair each requested transient class with the model name it should use.
+
+    Classes and names are given as two separate lists on the command line
+    and are matched by position. A class left without a name falls back to
+    its own default model.
+
+    Parameters
+    ----------
+    transient_class: list of str
+        Transient classes requested.
+    em_model: str or list or None
+        Model names, comma-separated or already a list.
+
+    Returns
+    -------
+    tuple
+        The model classes, and the model name for each of them.
+
+    Raises
+    ------
+    ValueError
+        If em_model is neither a string, a list, nor None.
+    """
     model_classes = [
         single_model_from_mapping(tc, enfore_class=True) for tc in transient_class
     ]
@@ -1566,7 +2299,22 @@ def lc_model_from_transient_class(transient_class, em_model):
 
 
 def single_model_from_mapping(identifier, enfore_class=False):
-    """Routine to identify what kind of transient we are dealing with"""
+    """Resolve a transient class name into the class that implements it.
+
+    Parameters
+    ----------
+    identifier: str or LightCurveModelContainer
+        Name of the transient class, or an already-built model, which is
+        returned unchanged.
+    enfore_class: bool, optional
+        If True, require the name to be a known transient class rather than
+        falling back on the surrogate model.
+
+    Returns
+    -------
+    type or LightCurveModelContainer
+        The model class, or the model that was passed in.
+    """
     if isinstance(identifier, LightCurveModelContainer):
         return identifier
 
@@ -1608,7 +2356,24 @@ def single_model_from_mapping(identifier, enfore_class=False):
 
 
 def create_injection_model(args, filters=None):
-    """Routine to create an injection LightCurveModelContainer from args"""
+    """Build the model used to simulate an injection.
+
+    The injection reuses the analysis arguments, except where an
+    injection-specific one was given: those override their counterparts, so
+    that an injection can deliberately differ from the model being fitted.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+        Parsed command-line arguments.
+    filters: list of str, optional
+        Filters to build for.
+
+    Returns
+    -------
+    LightCurveModelContainer
+        The model to generate the injection with.
+    """
     # By default, injection takes same args as the main model
     injection_args = copy(args)
 
@@ -1618,7 +2383,9 @@ def create_injection_model(args, filters=None):
             if val is None:
                 injection_dict = {}
             elif isinstance(val, str):
-                injection_dict = literal_eval(val)
+                raise ValueError(
+                    "injection_model_args should be a dictionary, not a string."
+                )
             else:
                 injection_dict = val
             for arg, val in injection_dict.items():
