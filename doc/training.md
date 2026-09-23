@@ -1,5 +1,5 @@
 
-## Training
+# Training
 
 It is common to have light curves on "grids", for which you have a discrete set of parameters for which the lightcurves were simulated. For example, we may know the lightcurves to expect for specific masses m_1 and m_2, but not for any masses between the two.
 
@@ -9,7 +9,7 @@ At this point, you can model this grid as either a Gaussian process or Neural Ne
 
 For a list of example training calls on various model grids using tensorflow, see `tools/tf_training_calls.sh`.
 
-### Training details
+## Training details
 
 There are helper functions within NMMA to support this. In particular, `nmma.em.training.SVDTrainingModel` is designed to take in a grid of models and return an interpolation class.
 
@@ -84,13 +84,13 @@ For the HDF5 file format, the `resample-grid` script enables downsampling and fr
 
 	resample-grid --gridpath nmma/tests/data/lowmass_collapsar_updated.h5 --factor 5 --do-downsample
 
-### Evaluating training results
+## Evaluating training results
 
 While the neural network training output includes diagnostic plots like loss functions, we recommend using `svdmodel-benchmark` to perform a more thorough evaluation. This code uses the trained NN to re-generate each light curve in the grid used for training and computes a reduced chi-squared value between the two. The distribution of these reduced chi-squared values are plotted filter-by-filter and saved in a json file.
 
 The `plot-svdmodel-benchmarks` script reads the json file associated with each model in a directory and creates a single bar plot per model showing the 25th, 50th and 75th percentiles of the reduced chi-squared distributions for each filter. The plots also list the maximum chi-squared value across all filters. This output provides a useful summary of training for each model, and these plots are included on the gitlab repo that contains the latest trained models.
 
-### Spectral grids
+## Spectral grids
 
 Often, the simulations come on spectral grids rather than as light curves, and it could be useful to create surrogate models for these spectral grids instead. In this case, the software expects files of the form:
 

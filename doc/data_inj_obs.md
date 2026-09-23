@@ -1,7 +1,7 @@
-## Injections & observational data
+# Injections & observational data
 
 
-### Injections
+## Injections
 
 For a parameter estimation run on simulated data (i.e., when no observational data is available), an injection-file line is required in your config.ini-file
 pointing a `dat` or `json` injection file. The injection file itself contains a list of values for each source parameter (such as masses, distance etc.) and
@@ -36,7 +36,7 @@ where it is necessary. Taking the Petrov et al. 2022 samples and the Bu2019lm pr
 
     nmma-create-injection --injection-file example_files/sim_events/injections.dat --prior-file priors/Bu2019lm.prior --eos-file example_files/eos/ALF2.dat --binary-type BNS --n-injection 100 --original-parameters --extension json --aligned-spin
 
-### Observational data
+## Observational data
 
 In contrast to synthetic data, NMMA can make use of observational data both from electromagnetic and gravitational-wave observations. In order to make sure that
 the NMMA framework can smoothly read in and interpret observed signals, a short description of the data structure can be found below.

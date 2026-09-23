@@ -1,4 +1,4 @@
-## Inference of gravitational-wave signals
+# Inference of gravitational-wave signals
 
 A Bayesian analysis of a gravitational-wave signal which is not accompanied by electromagnetic signals can be performed within nmma following two main steps:
 
@@ -12,7 +12,7 @@ Perform the analysis or parameter estimation using:
 
 Below, we provide an example of a gravitational-wave inference setup using observational data of GW170817 and another example for an injection based analysis.
 
-### Observed GW signals
+## Observed GW signals
 
 In this example, we use GW170817 as an example. First of all, a `config.ini` file needs to be created and adapted it to this specific observation.
 An example is shown below:
@@ -108,7 +108,7 @@ Once the `config.ini` file is set, the genertation can be run with `nmma_gw_gene
 The final posterior samples for the observed event GW170817 can be found under `outdir/result/`. Note that settings might differ from cluster to cluster and also the installation of NMMA might be changed (conda vs. python installation).
 
 
-### Injected GW signals
+## Injected GW signals
 
 For synthetic signals, the `config.ini` file needs to be slightly adapted. First of all, some injection specific flags need to be provided which are listed below:
 
@@ -121,6 +121,6 @@ For synthetic signals, the `config.ini` file needs to be slightly adapted. First
 	injection-file = ./O4_injections_mdyninj_1e-5.json
 	injection_numbers=[0]
 
-The `injection = True` flag enables parameter estimation with injected signals and `n-simulation = 1` initiates inference for one synthetic signal. An `injection-file` needs to be provided in order to specify for which system the inference should be run. The creation of injected signals is shown [here](./data_inj_obs.html). The `injection_numbers= [0]` uses in this case only the first signal in the injection file.
+The `injection = True` flag enables parameter estimation with injected signals and `n-simulation = 1` initiates inference for one synthetic signal. An `injection-file` needs to be provided in order to specify for which system the inference should be run. The creation of injected signals is shown [here](data_inj_obs). The `injection_numbers= [0]` uses in this case only the first signal in the injection file.
 
 Moreover, other flags which are related to an observed event should be commented out such as trigger time and provided observational data. The rest remains the same as shown above for the case of an observed GW event.
