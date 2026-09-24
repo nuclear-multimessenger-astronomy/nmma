@@ -15,7 +15,6 @@ import bilby_pipe
 import bilby_pipe.data_generation
 import dynesty
 import lalsimulation
-import matplotlib  ### FIXME: better to handle on a general level, jointly with fiesta
 import numpy as np
 
 from .. import __version__
@@ -38,8 +37,6 @@ from ..eos.eos_likelihood import (
 from ..gw.gw_inputs import NMMAGravitationalWaveInput
 from .joint_likelihood import MultiMessengerLikelihood
 from .multi_parsing import parse_generation_args
-
-matplotlib.rcParams["text.usetex"] = False
 
 
 def get_version_info():
