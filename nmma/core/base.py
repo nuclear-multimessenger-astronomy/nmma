@@ -26,7 +26,9 @@ from .parsing import nmma_base_parsing, single_messenger_analysis_parsing
 from .utils import input_obj_to_str, read_bestfit_from_posterior
 
 
-def initialisation_args_from_signature_and_namespace(_callable, namespace, prefixes=[]):
+def initialisation_args_from_signature_and_namespace(
+    _callable, namespace, prefixes=None
+):
     """Build kwargs for ``_callable`` from ``namespace``, matching each of
     its signature parameters (with or without a default) against a
     same-named (optionally prefixed) attribute on ``namespace``.
@@ -48,15 +50,10 @@ def initialisation_args_from_signature_and_namespace(_callable, namespace, prefi
         kwargs for ``_callable``: signature defaults, overridden by
         matching namespace attributes that aren't None.
     """
-    # FIX ME: mutable default argument -- `prefixes` is created once at
-    # function-definition time and shared across every call that omits
-    # it, so this .append('') grows the SAME list on every such call
-    # (confirmed: ['', '', ''] after 3 calls). Currently harmless output
-    # -wise (the loop below always matches and breaks on the first ''
-    # entry), but it's unbounded accumulating state for the life of the
-    # process. Should default to `prefixes=None` and do
-    # `prefixes = list(prefixes) if prefixes else ['']` instead.
-    prefixes.append("")
+    if prefixes is None:
+        prefixes = [""]
+    elif isinstance(prefixes, str):
+        prefixes = prefixes.split(",")
     signature = inspect.signature(_callable)
     # step 1: get all default kwargs from the signature
     default_kwargs = {
@@ -109,7 +106,7 @@ class NMMALikelihoodMixin:
 
     @constraints.setter
     def constraints(self, value):
-        """Normalize ``value`` -- a PriorDict (filtered to its
+        """Normalise ``value`` -- a PriorDict (filtered to its
         Constraint entries), a single Constraint, or a dict of
         Constraints -- into ``self._constraints``."""
         if isinstance(value, PriorDict):
@@ -121,11 +118,8 @@ class NMMALikelihoodMixin:
             assert all(isinstance(v, Constraint) for v in value.values()), (
                 "All entries in constraints dict must be of type Constraint"
             )
-        # FIX ME: no else/final branch -- assigning `.constraints` to
-        # anything other than a PriorDict, Constraint, or dict leaves
-        # `constr` unset, so this raises a confusing UnboundLocalError
-        # instead of a clear TypeError. Confirmed: `d.constraints = 5`
-        # -> "UnboundLocalError: cannot access local variable 'constr'".
+        else:
+            raise TypeError(f"{value} is not a valid type for constraints")
         self._constraints = constr
 
     def evaluate_constraints(self, out_sample):
@@ -315,7 +309,7 @@ class NMMADummyPrior(Prior):
         self.setup_props = setup_props
 
     @classmethod
-    def from_repr(cls, repr_str):
+    def from_repr(cls, repr_str: str):
         """Reconstruct from a saved prior file, e.g.
         ``key = nmma.core.base.NMMADummyPrior(setup_props={...})``.
 
@@ -328,14 +322,7 @@ class NMMADummyPrior(Prior):
         -------
         NMMADummyPrior
         """
-        # FIX ME: bilby's PriorDict.from_dictionary passes the args
-        # portion WITH the "setup_props=" prefix still attached (e.g.
-        # "setup_props={'Hubble_weight': 'x.dat'}"), but literal_eval
-        # can't parse a key=value string -- only bare literals. Confirmed
-        # this crashes with a SyntaxError on exactly the round-trip this
-        # class exists for (write to a prior file, read it back). Needs
-        # either stripping the "setup_props=" prefix first, or using
-        # bilby's own Prior._from_repr/_split_repr kwarg parsing instead.
+        repr_str = repr_str.replace("setup_props", "").strip().lstrip("=")
         setup_props = literal_eval(repr_str)
         return cls(setup_props)
 
@@ -426,7 +413,7 @@ def adjust_hubble_prior(priors, args, logger=None):
     return priors
 
 
-def h5_to_multivar_prior(h5_file_path, priors={}):
+def h5_to_multivar_prior(h5_file_path, priors=None):
     """Build a MultivariateGaussian prior over each dataset in an HDF5
     file (mean/covariance estimated from the stored samples), merged
     into ``priors`` (upgraded to a ConditionalPriorDict if it wasn't one
@@ -444,22 +431,17 @@ def h5_to_multivar_prior(h5_file_path, priors={}):
     -------
     ConditionalPriorDict
     """
-    # FIX ME: mutable default argument -- `priors={}` is shared across
-    # every call that omits it, and this function mutates it in place
-    # (.update below). Confirmed: two calls without passing priors=
-    # leak keys from the first call into the second's result. Currently
-    # dormant since the only call site (adjust_priors_for_nmma) always
-    # passes priors explicitly, but a landmine for any other caller.
+    if priors is None:
+        priors = ConditionalPriorDict()
+
     h5_file_path = input_obj_to_str(h5_file_path, "h5 file path")
     with h5py.File(h5_file_path, "r") as f:
         # Load the data from the HDF5 file
         keys = list(f.keys())
+        if len(keys) < 2:
+            raise ValueError(f"Require at least 2 datasets in {h5_file_path}")
         data_array = np.column_stack([f[key][:] for key in keys])
     mean = np.mean(data_array, axis=0)
-    # FIX ME: np.cov returns a 0-d scalar (not a (1,1) array) when
-    # data_array has only one column (one HDF5 key) -- MultivariateGaussianDist
-    # rejects that shape ("List of covariances the wrong shape"), so a
-    # single-parameter HDF5 prior file crashes this function entirely.
     cov = np.cov(data_array, rowvar=False)
 
     eos_dist = MultivariateGaussianDist(keys, mus=[mean], covs=[cov])
@@ -472,10 +454,7 @@ def h5_to_multivar_prior(h5_file_path, priors={}):
 
 
 def check_priors_and_likelihood_for_nmma(priors, likelihood):
-    """Final pre-sampling touch-up: move any stray ``Constraint`` priors
-    into ``likelihood.constraints``, guard against a ``priors``
-    conversion function that produces duplicate-named parameters (see
-    FIX ME below), and call ``likelihood.setup_parameter_conversion()``.
+    """Final pre-sampling adjustments to priors and likelihood.
 
     Parameters
     ----------
@@ -636,8 +615,7 @@ def multi_analysis_loop(args, analysis_setup):
     args: argparse.Namespace
         May provide ``multi`` (sweep one parameter across a list of
         values, or run several named variants each with their own
-        parameter changes -- see the FIX ME below for the
-        single-named-run edge case) or ``matrix`` (cartesian product of
+        parameter changes) or ``matrix`` (cartesian product of
         parameter lists, each combination its own run).
     analysis_setup: callable
         Builds one run's priors, likelihood, and injection parameters
@@ -666,19 +644,6 @@ def multi_analysis_loop(args, analysis_setup):
 
     if getattr(args, "multi", None):
         sub_runs = []
-        # FIX ME: `len(args.multi) == 1` is meant to distinguish "sweep
-        # one parameter across a list of values" (this branch) from
-        # "named sub-runs, each with their own changes" (the `else`
-        # below) -- but it can't actually tell these apart, since a
-        # single NAMED run (e.g. --multi '{"myrun": {"mass_1": 5.0}}',
-        # a reasonable "run one variant" use case) also has length 1.
-        # Confirmed: that case gets misrouted here, where `vals` is
-        # actually the changes dict {"mass_1": 5.0} -- enumerate(vals)
-        # iterates its KEYS, so the intended change is silently dropped
-        # and a bogus attribute (run_args.myrun = "mass_1") gets set
-        # instead, with no error. Needs to check whether the single value
-        # is a dict (named-run form) vs a list (sweep form), not just
-        # count keys.
         if len(args.multi) == 1:
             arg, vals = list(args.multi.items())[0]
             for i, val in enumerate(vals):
@@ -697,24 +662,14 @@ def multi_analysis_loop(args, analysis_setup):
                 sub_runs.append(run_args)
     elif getattr(args, "matrix", None):
         sub_runs = []
-        keys = args.matrix.keys()
-        vals = args.matrix.values()
+        keys, vals = args.matrix.items()
         for arg_variation in product(*vals):
             run_args = deepcopy(args)
             run_name = args.label
-            for i, var in enumerate(arg_variation):
+            for key, var in zip(keys, arg_variation):
                 rep = f"_{var}"
                 if len(rep) > 20:
-                    # FIX ME: keys/vals are dict_keys/dict_values views
-                    # (from args.matrix.keys()/.values() above), which
-                    # aren't subscriptable -- confirmed this raises
-                    # "TypeError: 'dict_keys' object is not subscriptable"
-                    # whenever a variation value's label exceeds 20 chars.
-                    # This fallback (meant to shorten an over-long label)
-                    # is dead: it always crashes instead of running.
-                    # Needs `keys = list(args.matrix.keys())` etc. above.
-                    key = keys[i]
-                    var_idx = vals[i].index(var)
+                    var_idx = args.matrix[key].index(var)
                     rep = f"_{key}_{var_idx}"
                 run_name += rep
             setattr(run_args, "label", run_name)

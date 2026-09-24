@@ -1,4 +1,3 @@
-import os
 import pickle
 import signal
 import sys
@@ -141,29 +140,10 @@ class Worker(bs.NestedSampler):
 
     def checkpointing(self, checkpoint_plot=False, message=None):
         """
-        Checkpointing function to be called periodically during sampling.
-
-        Parameters
-        ==========
-        checkpoint_plot: bool
-            Whether to create checkpoint plots
-        message: str
-            Message to log after checkpointing
+        Do-Nothing function for graceful checkpointing at termination.
+        All steps are handled by parent.
         """
-        # FIX ME: os.wait() waits for a CHILD OS PROCESS to terminate --
-        # confirmed it raises ChildProcessError ("No child processes")
-        # when there are none, which is the normal case here. This is
-        # the graceful-shutdown handler for non-rank-0 workers
-        # (pbilby_sampling's handle_sigterm calls worker.checkpointing),
-        # and that call site wraps it in a bare `except Exception: pass`
-        # -- so the error is silently swallowed, but that also means the
-        # `sys.exit()` right after it never runs. Net effect: graceful
-        # shutdown for worker processes does nothing and doesn't even
-        # exit. Present unchanged since this file was introduced (across
-        # two refactors) -- looks like either a copy-paste leftover or a
-        # misunderstanding of what os.wait() does.
-        os.wait()
-        pass  # only to be executed in main process
+        pass
 
 
 class Dynesty(Worker):

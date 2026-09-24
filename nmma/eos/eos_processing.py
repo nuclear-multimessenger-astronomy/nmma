@@ -657,11 +657,6 @@ def load_macro_characteristics_from_tabulated_eos_set(
         The TOV masses, plus (if requested) the characteristic radii
         and/or tidal deformabilities, one array each.
     """
-    # FIX ME: currently broken -- crashes immediately (see below) even before
-    # reaching the missing `return output` at the end of the function, which
-    # would make it return None regardless. This backs the `combine-EOS`
-    # console script (nmma.post_processing.ns_characteristics.main), which
-    # is therefore also broken; no test currently covers it.
     # SETUP
     do_rads = False
     do_lams = False
@@ -669,16 +664,11 @@ def load_macro_characteristics_from_tabulated_eos_set(
     if masses_for_char_radii is not None:
         do_rads = True
         masses_for_char_radii = np.atleast_1d(masses_for_char_radii)
-        # FIX ME: np.empty_like's 2nd positional arg is `dtype`, not `shape`
-        # (that's np.empty's signature) -- this raises
-        # "TypeError: Cannot interpret '<N>' as a data type" immediately.
-        # Probably meant `np.empty((Neos, len(masses_for_char_radii)))`.
-        radii = np.empty_like(Neos, len(masses_for_char_radii))
+        radii = np.empty((Neos, len(masses_for_char_radii)))
     if masses_for_char_lambdas is not None:
         do_lams = True
         masses_for_char_lambdas = np.atleast_1d(masses_for_char_lambdas)
-        # FIX ME: same np.empty_like misuse as `radii` above.
-        lambdas = np.empty_like(Neos, len(masses_for_char_lambdas))
+        lambdas = np.empty((Neos, len(masses_for_char_lambdas)))
     eos_data, Neos = load_eos_files(eos_data, Neos)
 
     # Main Loop
@@ -695,10 +685,7 @@ def load_macro_characteristics_from_tabulated_eos_set(
         output.append(np.squeeze(radii))
     if do_lams:
         output.append(np.squeeze(lambdas))
-    # FIX ME: missing `return output` here -- the function falls off the
-    # end and implicitly returns None, so the caller's tuple-unpacking
-    # (e.g. `Mmax_prior, R14_prior = load_macro_characteristics_from...`)
-    # would fail even if the np.empty_like crash above were fixed.
+    return output
 
 
 def load_tabulated_macro_eos_set_to_dict(eos_data, weights=None, Neos=None):

@@ -40,21 +40,12 @@ def parsing_and_logging(parser_func, args=None):
         if len(args.outdir) > 64:
             raise ValueError("output directory name is longer than 64 characters")
 
-    # FIX ME: singular "refresh_model_list" doesn't match the real CLI
-    # flag/attribute used everywhere else (--refresh-models-list ->
-    # args.refresh_models_list, plural -- see em/em_parsing.py and
-    # gitlab.py's own main()). Confirmed: even with
-    # args.refresh_models_list=True set, this getattr always falls back
-    # to its False default, so this branch never actually triggers.
-    if getattr(args, "refresh_model_list", False):
+    if getattr(args, "refresh_models_list", False):
         refresh_models_list(args.svd_path)
 
-    try:
-        setup_logger(outdir=args.outdir, label=args.label)
-        Path(args.outdir).mkdir(parents=True, exist_ok=True)
-        print("Setting up logger and storage directory")
-    except Exception as e:
-        pass
+    setup_logger(outdir=args.outdir, label=args.label)
+    Path(args.outdir).mkdir(parents=True, exist_ok=True)
+    print("Setting up logger and storage directory")
     return args
 
 
@@ -146,17 +137,6 @@ def check_for_config(cli_args, parents=[], drop_config=True):
         else:
             config_given = False
 
-        # FIX ME: when `config_given` is True (an explicit -c/--config/--ini
-        # flag) but `first_arg` doesn't exist at all, this whole block is
-        # skipped -- so the clear "tried to parse X as a config file, but
-        # failed" + sys.exit(1) below never runs here.
-        # Confirmed: --config /nonexistent.yaml silently falls through to
-        # a plain argparse.ArgumentParser, AND leaves the unresolved path
-        # sitting in cli_args (the cli_args.pop(0) below never runs
-        # either) -- so the user gets a confusing "unexpected argument"
-        # error from argparse later, with no hint that a typo'd --config
-        # path was the actual cause. Needs an explicit
-        # `if config_given: <error+exit>` when Path(first_arg).is_file() is False.
         if Path(first_arg).is_file():
             if first_arg.endswith((".yaml", ".yml")):
                 pc = configargparse.YAMLConfigFileParser
@@ -177,6 +157,11 @@ def check_for_config(cli_args, parents=[], drop_config=True):
                     print(f"Tried to parse {first_arg} as a config file, but failed.")
                     print("Please check the file format and try again.")
                     sys.exit(1)
+        elif config_given:
+            print(
+                f"Tried to parse {first_arg} as a config file, but it does not exist."
+            )
+            sys.exit(1)
     if parents:
         return configargparse.ArgumentParser(add_help=False, parents=parents), cli_args
     return argparse.ArgumentParser(), cli_args
