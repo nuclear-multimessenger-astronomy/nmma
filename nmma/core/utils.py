@@ -71,23 +71,23 @@ def read_trigger_time(parameters=None, args=None, out_format="mjd"):
             trigger_time = time.Time(parameters["geocent_time"], format="gps")
 
         # set the trigger time in args if available
-        if trigger_time and args is not None:
+        if trigger_time is not None and args is not None:
             args.trigger_time = getattr(trigger_time, out_format)
 
     # otherwise get trigger time from args if available
     if args is not None and trigger_time is None:
         if getattr(args, "gps", None):
             trigger_time = time.Time(args.gps, format="gps")
-        elif args.trigger_time:
-            try:
-                trigger_time = time.Time(args.trigger_time, format="mjd")
-                trigger_time.datetime  # this fails if not a valid time
-            except ValueError:
-                format = getattr(args, "time_format", None)
-                if format is None:
-                    format = "gps"
-                trigger_time = time.Time(args.trigger_time, format=format)
-                trigger_time  # this fails if not a valid time
+        elif args.trigger_time is not None:
+            if getattr(args, "time_format", None) is not None:
+                trigger_time = time.Time(args.trigger_time, format=args.time_format)
+            else:
+                try:
+                    trigger_time = time.Time(args.trigger_time, format="mjd")
+                    # this fails if not a valid time
+                    trigger_time.datetime
+                except ValueError:
+                    trigger_time = time.Time(args.trigger_time, format="gps")
 
     if trigger_time is None:
         logger.warning(
