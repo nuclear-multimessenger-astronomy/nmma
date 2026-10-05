@@ -1,5 +1,5 @@
 import json
-import shutil
+import os
 from ast import literal_eval
 from pathlib import Path
 
@@ -380,9 +380,7 @@ class EoSConverter:
         "tabulated" (a single ``eos_file``, or a directory/glob
         ``eos_data`` of files -- preloaded to RAM if ``eos_to_ram``, else
         loaded from disk on demand, renaming files to a canonical
-        ``{1..N}.dat`` scheme first (see FIX ME comments below: this
-        renaming step can currently crash or silently misassign files if
-        ``eos_data`` isn't already named that way), or "qur" (skip EOS
+        ``{1..N}.dat`` scheme first, or "qur" (skip EOS
         entirely, use quasi-universal relations via ``radii_from_qur``).
     """
 
@@ -409,53 +407,31 @@ class EoSConverter:
             # case 3 : we use multiple eos
             eos_path = Path(args.eos_data)
             if eos_path.is_dir():
-                if getattr(args, "Neos", None) is None:
-                    # FIX ME: Path.iterdir()'s order is arbitrary/OS-dependent,
-                    # not sorted. Two distinct consequences from the same
-                    # root cause, confirmed directly (os.listdir returned
-                    # ['2.dat','3.dat','1.dat'] for 3 correctly-named files):
-                    #  - Case 3b (eos_to_ram=False, below): combined with
-                    #    the rename loop, this silently scrambles file
-                    #    contents (each copied into the wrong {i+1}.dat
-                    #    slot) -- confirmed all 3 files ended up holding
-                    #    shuffled data.
-                    #  - Case 3a (eos_to_ram=True): self.eos_data is built
-                    #    directly in this order, so "EOS index i" doesn't
-                    #    reliably mean the file actually named "{i+1}.dat"
-                    #    -- confirmed a 2-EOS batch came back reversed.
-                    # Needs `sorted(...)` here.
-                    eos_files = list(eos_path.iterdir())
-                else:
-                    eos_files = [eos_path / f"{j + 1}.dat" for j in range(args.Neos)]
+                self.ini_str = ""
+                self.end_str = ".dat"
+                eos_pattern = "*.dat"
             else:
-                # FIX ME: glob() order is also not guaranteed sorted --
-                # same risk as Path.iterdir() above.
-                eos_files = list(Path().glob(args.eos_data))
-                if getattr(args, "Neos", None):
-                    assert args.Neos == len(eos_files), (
-                        "Number of EOS files found does not match Neos"
-                    )
+                eos_path, eos_pattern = eos_path.parent, eos_path.name
+                eos_files = sorted(eos_path.glob(eos_pattern))
+                if not eos_files:
+                    raise ValueError(f"No files match {eos_path}/{eos_pattern}")
+                eos_names = [f.name for f in eos_files]
+                flipped_names = [n[::-1] for n in eos_names]
+                self.ini_str = os.path.commonprefix(eos_names)
+                self.end_str = os.path.commonprefix(flipped_names)[::-1]
 
+            Neos = getattr(args, "Neos", len(list(eos_path.glob(eos_pattern))))
+            self.eos_path = eos_path
+            eos_files = [self._get_eos_filename(j + 1) for j in range(Neos)]
             self.Neos = len(eos_files)
+
             # Case 3a: precomputed eos data is loaded to ram
             if args.eos_to_ram:
-                self.eos_data = [np.loadtxt(f, usecols=[0, 1, 2]).T for f in eos_files]
+                self.eos_data = [self._read_eos_file(f) for f in eos_files]
                 self.macro_conversion = self.eos_from_ram
 
             # Case 3b: eos are loaded directly from file
             else:
-                eos_dir = eos_files[0].parent
-                for i, f in enumerate(eos_files):
-                    # FIX ME: Path.samefile requires BOTH paths to
-                    # already exist -- but that's precisely false when a
-                    # file actually needs renaming (the canonical target
-                    # doesn't exist yet), so this raises FileNotFoundError
-                    # instead of returning False. Crashes by default
-                    # (eos_to_ram=False) whenever eos_data isn't already
-                    # named 1.dat, 2.dat, ...
-                    if not f.samefile(eos_dir / f"{i + 1}.dat"):
-                        shutil.copy(f, eos_dir / f"{i + 1}.dat")
-                self.eos_data = eos_dir
                 self.macro_conversion = self.eos_direct_load
 
         # case 4: no eos conversion, just QURs
@@ -467,6 +443,12 @@ class EoSConverter:
     def __call__(self, parameters):
         """Forward to ``self.parameter_conversion``."""
         return self.parameter_conversion(parameters)
+
+    def _get_eos_filename(self, eos_idx):
+        return self.eos_path / f"{self.ini_str}{eos_idx}{self.end_str}"
+
+    def _read_eos_file(self, file_path):
+        return np.loadtxt(file_path, usecols=[0, 1, 2]).T
 
     def eos_direct_load(self, converted_parameters):
         """Load the requested EOS index/indices from disk, as
@@ -483,10 +465,8 @@ class EoSConverter:
             One (radius, mass, lambda) array per requested EOS.
         """
         EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
-        return [
-            np.loadtxt(self.eos_data / f"{j + 1}.dat", usecols=[0, 1, 2]).T
-            for j in EOSID
-        ]
+        files = [self._get_eos_filename(j + 1) for j in EOSID]
+        return [self._read_eos_file(f) for f in files]
 
     def eos_from_ram(self, converted_parameters):
         """Look up the requested EOS index/indices in ``self.eos_data``
@@ -720,8 +700,6 @@ def load_tabulated_macro_eos_set_to_dict(eos_data, weights=None, Neos=None):
     return EOS_data, weights, Neos
 
 
-# FIXME this should be used by conversion!
-# CHECK ME: Can this be removed? It is not used anywhere.
 def load_tabulated_macro_eos_set_to_list(eos_data, weights=None, Neos=None):
     eos_files, Neos = load_eos_files(eos_data, Neos)
     weights = load_weights(weights)
