@@ -316,7 +316,6 @@ def calc_svd_lc(
             svd_mag_model[filt], mag_ncoeff, param_list
         )
 
-        # FIXME quick-fix to not trust lightcurve after outside training time range
         mAB[filt] = utils.autocomplete_data(
             sample_times, tt_interp, mag_back, extrapolate=np.inf
         )

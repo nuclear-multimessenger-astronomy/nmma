@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
-from astropy import cosmology as cosmo
-from astropy import units
+from astropy import cosmology as cosmo, units
 from bilby.gw.conversion import (
     chirp_mass_and_mass_ratio_to_total_mass,
     component_masses_to_chirp_mass,
@@ -37,6 +36,38 @@ def val_to_scalar(val):
         if val.size == 1:
             return val.item()
         return val
+
+
+def observation_angle_conversion(parameters):
+    """
+    Add ``KNtheta`` and ``inclination_EM`` to the parameters.
+
+    ``KNtheta`` is in degrees and ``inclination_EM`` in radians; each is
+    filled from the other, or from ``theta_jn``/``cos_theta_jn`` after
+    ``numpy.minimum(theta_jn, pi - theta_jn)``.
+
+    Parameters
+    ----------
+    parameters : dict
+
+    Returns
+    -------
+    dict
+        ``parameters``, updated.
+    """
+    theta_jn = parameters.get(
+        "theta_jn", np.arccos(parameters.get("cos_theta_jn", 1.0))
+    )
+    theta_jn = np.minimum(
+        theta_jn, np.pi - theta_jn
+    )  # default effective 0 if neither is given
+    if "KNtheta" not in parameters:
+        parameters["KNtheta"] = (
+            parameters.get("inclination_EM", theta_jn) * 180.0 / np.pi
+        )
+    if "inclination_EM" not in parameters:
+        parameters["inclination_EM"] = parameters["KNtheta"] / 180.0 * np.pi
+    return parameters
 
 
 # =================== distance conversions # ===================
@@ -164,6 +195,75 @@ class CosmologyConverter:
         #         = mag_abs + 5 * (log10(Mpc/10pc)+ log10(params["luminosity_distance"]))
         # therefore: distance_modulus = mag_app - mag_abs =
         return 5.0 * (5 + np.log10(luminosity_distance))
+
+    def source_frame_masses(self, converted_parameters):
+        """
+        Add ``mass_1_source`` and ``mass_2_source`` to the parameters.
+
+        Applies ``generate_mass_parameters`` first, and fills in ``redshift``
+        from ``luminosity_distance`` when it is missing. Source-frame masses
+        already present are left as they are.
+
+        Parameters
+        ----------
+        converted_parameters : dict
+
+        Returns
+        -------
+        dict
+            ``converted_parameters``, updated.
+        """
+        converted_parameters = generate_mass_parameters(converted_parameters)
+        if "redshift" not in converted_parameters:
+            distance = converted_parameters["luminosity_distance"]
+            converted_parameters["redshift"] = self.redshift(distance)
+        z = converted_parameters["redshift"]
+
+        if "mass_1_source" not in converted_parameters:
+            converted_parameters["mass_1_source"] = np.array(
+                converted_parameters["mass_1"] / (1 + z)
+            )
+
+        if "mass_2_source" not in converted_parameters:
+            converted_parameters["mass_2_source"] = np.array(
+                converted_parameters["mass_2"] / (1 + z)
+            )
+
+        return converted_parameters
+
+    def bbh_source_frame(self, params):
+        """
+        Convert parameters to BBH parameters using bilby function.
+
+        Parameters
+        ----------
+        params : dict
+
+        Returns
+        -------
+        dict
+            :func:`source_frame_masses` of the output of
+            ``convert_to_lal_binary_black_hole_parameters``.
+        """
+        params, _ = convert_to_lal_binary_black_hole_parameters(params)
+        return self.source_frame_masses(params)
+
+    def bns_source_frame(self, params):
+        """
+        Convert parameters to BNS parameters using bilby function.
+
+        Parameters
+        ----------
+        params : dict
+
+        Returns
+        -------
+        dict
+            :func:`source_frame_masses` of the output of
+            ``convert_to_lal_binary_neutron_star_parameters``.
+        """
+        params, _ = convert_to_lal_binary_neutron_star_parameters(params)
+        return self.source_frame_masses(params)
 
     def get_cosmo_grids(self, distance_min, distance_max):
         zmin = cosmo.z_at_value(
@@ -330,114 +430,7 @@ class CosmologyConverter:
         return converter
 
 
-def source_frame_masses(converted_parameters):
-    """
-    Add ``mass_1_source`` and ``mass_2_source`` to the parameters.
-
-    Applies ``generate_mass_parameters`` first, and fills in ``redshift``
-    from ``luminosity_distance`` when it is missing. Source-frame masses
-    already present are left as they are.
-
-    Parameters
-    ----------
-    converted_parameters : dict
-
-    Returns
-    -------
-    dict
-        ``converted_parameters``, updated.
-    """
-    converted_parameters = generate_mass_parameters(converted_parameters)
-    if "redshift" not in converted_parameters:
-        cosmo_converter = CosmologyConverter()
-        distance = converted_parameters["luminosity_distance"]
-        converted_parameters["redshift"] = cosmo_converter.redshift(distance)
-    z = converted_parameters["redshift"]
-
-    if "mass_1_source" not in converted_parameters:
-        converted_parameters["mass_1_source"] = np.array(
-            converted_parameters["mass_1"] / (1 + z)
-        )
-
-    if "mass_2_source" not in converted_parameters:
-        converted_parameters["mass_2_source"] = np.array(
-            converted_parameters["mass_2"] / (1 + z)
-        )
-
-    return converted_parameters
-
-
-def observation_angle_conversion(parameters):
-    """
-    Add ``KNtheta`` and ``inclination_EM`` to the parameters.
-
-    ``KNtheta`` is in degrees and ``inclination_EM`` in radians; each is
-    filled from the other, or from ``theta_jn``/``cos_theta_jn`` after
-    ``numpy.minimum(theta_jn, pi - theta_jn)``.
-
-    Parameters
-    ----------
-    parameters : dict
-
-    Returns
-    -------
-    dict
-        ``parameters``, updated.
-    """
-    theta_jn = parameters.get(
-        "theta_jn", np.arccos(parameters.get("cos_theta_jn", 1.0))
-    )
-    theta_jn = np.minimum(
-        theta_jn, np.pi - theta_jn
-    )  # default effective 0 if neither is given
-    if "KNtheta" not in parameters:
-        parameters["KNtheta"] = (
-            parameters.get("inclination_EM", theta_jn) * 180.0 / np.pi
-        )
-    if "inclination_EM" not in parameters:
-        parameters["inclination_EM"] = parameters["KNtheta"] / 180.0 * np.pi
-    return parameters
-
-
-# =================== mass conversions  ===================
-
-
-def bbh_source_frame(params):
-    """
-    Convert parameters to BBH parameters using bilby function.
-
-    Parameters
-    ----------
-    params : dict
-
-    Returns
-    -------
-    dict
-        :func:`source_frame_masses` of the output of
-        ``convert_to_lal_binary_black_hole_parameters``.
-    """
-    params, _ = convert_to_lal_binary_black_hole_parameters(params)
-    return source_frame_masses(params)
-
-
-def bns_source_frame(params):
-    """
-    Convert parameters to BNS parameters using bilby function.
-
-    Parameters
-    ----------
-    params : dict
-
-    Returns
-    -------
-    dict
-        :func:`source_frame_masses` of the output of
-        ``convert_to_lal_binary_neutron_star_parameters``.
-    """
-    params, _ = convert_to_lal_binary_neutron_star_parameters(params)
-    return source_frame_masses(params)
-
-
+# =================== mass parameter conversions ===================
 def mass_ratio_to_eta(q):
     """
     Convert mass ratio ``q`` to ``q / (1 + q) ** 2``.
@@ -1717,9 +1710,8 @@ class MultimessengerConversion:
         -------
         MultimessengerConversion
         """
-        return cls(
-            bbh_source_frame, eos_conversion, KilonovaEjectaFitting(), em_conversion
-        )
+        gw_conv = CosmologyConverter().bbh_source_frame
+        return cls(gw_conv, eos_conversion, KilonovaEjectaFitting(), em_conversion)
 
     def convert_to_multimessenger_parameters(self, parameters, add_new_keys=False):
         """

@@ -184,7 +184,7 @@ class NMMALikelihoodMixin:
 
     def check_parameter_equivalencies(self, parameter_names):
         """Check for equivalent parameters and terminate if found"""
-        # FIXME: to be extended
+        # NOTE: to be extended
         single_equivalency_groups = [
             ["inclination_EM", "KNtheta", "theta_jn", "cos_theta_jn", "thetaObs"],
         ]
@@ -251,10 +251,10 @@ class NMMALikelihood(NMMALikelihoodMixin, Likelihood):
         return self.__class__.__name__ + " with " + self.sub_model.__repr__()
 
     def setup_parameter_conversion(self):
-        """Register ``cosmology_to_distance`` into ``conv_functions`` if
-        sampling over ``Hubble_constant``. Called from
-        ``check_priors_and_likelihood_for_nmma``, after all messenger
-        likelihoods are set up."""
+        """Register base conversion methods to be evaluated first.
+        Called from ``check_priors_and_likelihood_for_nmma``,
+        after all messenger likelihoods are set up.
+        """
         # FUTURE: add more standard conversions here
         if "Hubble_constant" in self.priors:
             cosmo_converter = CosmologyConverter.from_priors(self.priors)
@@ -475,20 +475,10 @@ def check_priors_and_likelihood_for_nmma(priors, likelihood):
 
     test_draw = priors.sample(1)
     test_conversion = priors.conversion_function(test_draw)
-    if len(set(test_conversion.keys())) != len(test_conversion.keys()):
-        # FIX ME: intent looks like it's meant to preserve the original
-        # (duplicate-key-producing) conversion_function by moving it into
-        # likelihood.conv_functions, while swapping priors.conversion_function
-        # to the safe default. But likelihood.priors IS priors (same
-        # object), and this reads likelihood.priors.conversion_function
-        # AFTER already overwriting it on the line above -- so it appends
-        # default_conversion_function again, not the original custom one.
-        # Confirmed: the custom conversion_function is silently discarded
-        # entirely, and default_conversion_function ends up both as
-        # priors.conversion_function and in conv_functions (likely runs
-        # twice). Needs the old function captured before the overwrite.
-        priors.conversion_function = priors.default_conversion_function
-        likelihood.conv_functions.append(likelihood.priors.conversion_function)
+    if len(test_draw) != len(test_conversion):
+        # make sure any conversions are only done by likelihood
+        prior_conv = priors.conversion_function
+        likelihood.conv_functions.append(prior_conv)
 
     # add final conversions
     likelihood.setup_parameter_conversion()

@@ -14,8 +14,7 @@ from tqdm import tqdm
 from ..core import conversion as conv
 from ..core.constants import D, c_cgs
 from ..core.utils import read_injection_file, read_trigger_time, set_filename
-from . import em_parsing as emp
-from . import io, model, utils
+from . import em_parsing as emp, io, model, utils
 from .lightcurve_generation import create_light_curve_data
 from .plotting_utils import basic_em_analysis_plot, lc_plot_with_histogram
 
@@ -1182,9 +1181,9 @@ def validate_lightcurve(
 
     # Validate each filter
     for filt in filters:
-        # FIXME this seems an unpractical restriction
-        if filt not in utils.DEFAULT_FILTERS:
-            raise ValueError(f"Unsupported filter: {filt}")
+        # this seems an unpractical restriction in the fiesta-era
+        # if filt not in utils.DEFAULT_FILTERS:
+        #     raise ValueError(f"Unsupported filter: {filt}")
         if filt not in data:
             if verbose:
                 print(f"{filt} not in data file")

@@ -44,11 +44,6 @@ def setup_em_kwargs(priors, data_dump, args, logger=None):
     light_curve_model = model.create_light_curve_model_from_args(args, filters)
     trigger_time = read_trigger_time(None, args)
     light_curve_data = utils.setup_filtered_lc_data(light_curve_data, trigger_time)
-    # FIXME weizmann: to be activated separately, after the NMMA
-    # documentation work.
-    # light_curve_data = utils.check_model_time_consistency(
-    #     light_curve_data, light_curve_model, priors, args.injection or None
-    # )
     light_curve_data = utils.check_model_time_consistency(
         light_curve_data,
         light_curve_model,
@@ -182,6 +177,10 @@ class EMTransientLikelihood(NMMALikelihood):
         ----------
         bestfit_params: dict
             Dictionary of best-fit parameters
+        args: argparse.Namespace
+            Parsed command-line arguments
+        result: bilby.core.result.Result or None
+            The result object from the sampling, if available
 
         Returns
         -------
@@ -528,15 +527,10 @@ class BasicEMTransient:
             The figure that was saved.
         """
         obs_times, obs_lc = self.light_curve_model.gen_detector_lc(bestfit_params)
-        # FIXME weizmann: to be activated separately, after the NMMA
-        # documentation work.
-        # if result is None:
-        #     save_path = f"{args.outdir}/{args.label}_bol_lightcurve.png"
-        # else:
-        #     save_path = f"{result.outdir}/{result.label}_bol_lightcurve.png"
         if result is None:
             save_path = f"{args.outdir}/{args.label}_bol_lightcurve.png"
-        save_path = f"{result.outdir}/{result.label}_bol_lightcurve.png"
+        else:
+            save_path = f"{result.outdir}/{result.label}_bol_lightcurve.png"
         return bolometric_lc_plot(self, obs_times, obs_lc, save_path=save_path)
 
 

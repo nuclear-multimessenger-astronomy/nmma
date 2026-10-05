@@ -577,12 +577,12 @@ def get_extinction_model(ext_model=None, Rv=None):
     -------
     tuple
         The extinction model, and the frame it must be evaluated in,
-        ``obs`` or ``host``.
+        ``obs`` or ``rest``.
     """
     # FIXME: Handle more cases
 
     if isinstance(ext_model, BaseExtModel):
-        return ext_model, "host"
+        return ext_model, "rest"
     elif ext_model is None:
         ext_model = "P92_SMC_host"
     # case P92_SMC
@@ -686,11 +686,6 @@ def get_filter_name_mapping(observed_filters):
     ]
     unprocessed_filts.extend([val["name"] for val in get_all_bandpass_metadata()])
     filter_maps = {name: name for name in unprocessed_filts}
-
-    # FIXME: Left here as a reminder, to be removed
-    # sncosmo_filts = [val["name"] for val in get_all_bandpass_metadata()]
-    # filter_maps.update({name.replace(":", "_"): name.replace(":", "_") for name in sncosmo_filts})
-    # filter_maps.update({name: name.replace(":", "_") for name in sncosmo_filts})
 
     # hardcoded filter names
     filter_maps.update(

@@ -11,6 +11,5 @@ from . import (
     plotting_utils,
     prior,
     systematics,
-    training,
     utils,
 )

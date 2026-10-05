@@ -528,7 +528,7 @@ def bolometric_parser(parser):
     parser = em_time_parsing(parser)
     parser = basic_em_only_analysis_parsing(parser)
     parser = modified_em_prior_parsing(parser)
-    # FIXME: add injection to bol_ analysis, this currently does not work
+    # FIXME: add injection to bol_analysis, this currently does not work
     # parser = injection_parsing(parser)
 
     # specific arguments

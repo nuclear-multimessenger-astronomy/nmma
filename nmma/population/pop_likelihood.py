@@ -33,7 +33,8 @@ class NeutronStarPopulation:
             trunc_low = (m_min - loc) / scale
             trunc_high = (m_max - loc) / scale
             self.distribution = truncnorm(trunc_low, trunc_high, loc=loc, scale=scale)
-        ### FIXME: Unrecognized model_name fails silently at construction, then crashes unhelpfully later: there's no else branch, so passing e.g. NeutronStarPopulation('gaussian') succeeds without error and produces an object with no self.distribution at all.
+        else:
+            raise ValueError("Unrecognized model_name. Must be 'flat' or 'peak'.")
 
     def log_likelihood(self, parameters):
         """

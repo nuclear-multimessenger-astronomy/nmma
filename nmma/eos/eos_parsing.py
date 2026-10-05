@@ -66,7 +66,7 @@ def eos_parsing(parser):
     )
     eos_input_parser.add(
         "--micro-eos-model", default="nep-5", help="The micro EOS model to use."
-    )  ## FIXME: add model_selection
+    )
 
     ### args to set up eos likelihood evaluation based on constraints
     eos_input_parser.add(

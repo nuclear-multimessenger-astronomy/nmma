@@ -1,4 +1,4 @@
-# FIXME: This is a hacky subclass to adapt the bilby_pipe data generation to
+# NOTE: This is a hacky subclass to adapt the bilby_pipe data generation to
 # our needs. We should at some point get rid of bilby pipe
 
 from bilby_pipe.data_generation import DataGenerationInput as DataInput
