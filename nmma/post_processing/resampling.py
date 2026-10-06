@@ -357,10 +357,13 @@ def main_resampling():
     # read the prior files
     GWprior = PriorDict(args.GWprior)
     EMprior = PriorDict(args.EMprior)
-    Path(args.outdir, "pm").mkdir(parents=True, exist_ok=True)
+
+    outdir = Path(args.outdir)
+    basename = outdir / "pm"
+    basename.mkdir(parents=True, exist_ok=True)
 
     pymulti_kwargs = dict(
-        outputfiles_basename=args.outdir + "/pm/",
+        outputfiles_basename=str(basename),
         n_dims=5,
         n_live_points=args.nlive,
         verbose=True,
@@ -402,11 +405,9 @@ def main_resampling():
         posterior_samples["chi_2"] = samples[6]
 
     posterior_samples = pd.DataFrame.from_dict(posterior_samples)
-    posterior_samples.to_csv(
-        f"{args.outdir}/posterior_samples.dat", sep=" ", index=False
-    )
-
-    resampling_corner_plot(posterior_samples, solution, args.outdir, args.withNSBH)
+    posterior_samples.to_csv(outdir / "posterior_samples.dat", sep=" ", index=False)
+    save = outdir / "resampling_corner.png"
+    fig = resampling_corner_plot(posterior_samples, solution, args.withNSBH, save)
 
 
 if __name__ == "__main__":

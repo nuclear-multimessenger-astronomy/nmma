@@ -1,5 +1,3 @@
-from ast import literal_eval
-
 import bilby
 import corner
 import numpy as np
@@ -8,13 +6,12 @@ import seaborn
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from ..core import parsing, plotting_utils as corepu, utils
+from ..core import plotting_utils as corepu, utils
 from ..core.conversion import (
     chirp_mass_and_eta_to_component_masses,
     label_mapping,
     tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities,
 )
-from .parser import corner_plot_parser
 
 nmma_colors = corepu.fig_setup()
 
@@ -312,93 +309,6 @@ def plot_histograms_only(
     return fig, plot_quantities["limits"]
 
 
-def plot_multi_corner(args, key_selection=None, save=False):
-    """
-    Draw a corner plot for each entry of ``args.posterior_files``, each
-    into the same figure.
-
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Parsed arguments. Reads ``posterior_files``, ``label_name``,
-        ``kwargs`` (a string evaluated with :func:`ast.literal_eval` and
-        forwarded to ``corner.corner``), ``prior``, ``injection_json``,
-        ``injection_num``, ``bestfit_params``, ``bestfit_json`` and
-        ``verbose``.
-    key_selection : list of str, default=None
-        Restrict the plotted parameters to this subset of the prior, passed
-        to
-        :func:`nmma.core.plotting_utils.plotting_parameters_from_priors`.
-    save : str or bool, default=False
-        Path to write the figure to. If falsy, nothing is written.
-
-    Returns
-    -------
-    The value returned by the last :func:`setup_corner_plot` call.
-
-    Notes
-    -----
-    Truths are taken from ``injection_json`` at row ``injection_num`` if
-    given, otherwise from ``bestfit_params``. Quantiles are fixed at
-    ``[0.16, 0.5, 0.84]``.
-    """
-    plot_kwargs = literal_eval(args.kwargs)
-    quantiles = [0.16, 0.5, 0.84]
-    fig = None
-    labels = (
-        [lab for lab in args.label_name]
-        if args.label_name is not None
-        else [f for f in args.posterior_files]
-    )
-    for i, f in enumerate(args.posterior_files):
-        # FIXME: Unpacking dict .items() into plot_keys/plot_labels yields tuples,
-        # usually raises ValueError
-        # FIXME: plot_multi_corner reads args.prior; parser defines prior_filename,
-        # causing AttributeError
-        plot_keys, plot_labels = corepu.plotting_parameters_from_priors(
-            args.prior, keys=key_selection
-        ).items()
-        if args.injection_json is not None:
-            truths = utils.read_injection_file(args.injection_json)
-            truths = truths.iloc[args.injection_num].to_dict()
-            truths = np.array([truths[k] for k in plot_keys])
-            # FIXME: args.verbose read; corner_plot_parser defines no --verbose, causing
-            # AttributeError
-            if args.verbose:
-                print("\nLoaded Injection:")
-                print(f"Truths from injection: {truths}")
-        elif args.bestfit_params is not None:
-            # FIXME: args.bestfit_json read; parser only defines bestfit_params.
-            # AttributeError.
-            truths = utils.read_bestfit_from_json(
-                args.bestfit_json, plot_keys, args.verbose
-            )
-        else:
-            truths = None
-
-        # FIXME: Tuple from setup_corner_plot assigned to fig; fig.savefig raises
-        # AttributeError
-        fig = setup_corner_plot(
-            f,
-            # FIXME: Empty list passed as limits; setup_plot_quantities indexes
-            # limits[i], raising IndexError
-            [],
-            label=labels[i],
-            # FIXME: truths lands in plot_kwargs, duplicating explicit truths at
-            # corner_plot call
-            truths=truths,
-            fig=fig,
-            quantiles=quantiles,
-            plot_keys=plot_keys,
-            default_labels=plot_labels,
-            **plot_kwargs,
-        )
-    if save:
-        fig.savefig(save, bbox_inches="tight", dpi=300)
-        print("\nSaved corner plot:", save)
-    return fig
-
-
 def setup_corner_plot(
     posterior_samples,
     limits=None,
@@ -650,7 +560,7 @@ def corner_plot(plot_samples, labels, limits, fig=None, save=False, **kwargs):
     return fig
 
 
-def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
+def resampling_corner_plot(posterior_samples, solution, withNSBH, save=False):
     r"""
     Draw the corner plot summarising a GW-EM resampling run.
 
@@ -667,12 +577,12 @@ def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
     solution : EjectaResamplerMixIn
         The resampling solver, read for its ``EOS_masses_dict`` and
         ``EOS_lambda_dict`` tables.
-    outdir : str
-        Output directory, passed through to :func:`corner_plot`.
     withNSBH : bool
         True plots the NSBH parameters
         (:math:`\mathcal{M}_c, q, \alpha, \zeta`); False adds the
         effective tidal deformability and the maximum mass for a BNS.
+    save : str or bool, default=False
+        Path to write the figure to. If falsy, nothing is written.
 
     Returns
     -------
@@ -753,8 +663,7 @@ def resampling_corner_plot(posterior_samples, solution, outdir, withNSBH):
             (np.amin(zeta), np.amax(zeta)),
             (np.amin(MTOV), 2.7),
         )
-    # FIXME: outdir passed positionally as corner_plot's fig argument; nothing is saved
-    corner_plot(plot_samples.T, labels, limits, outdir)
+    return corner_plot(plot_samples.T, labels, limits, save=save)
 
 
 def plot_R14_trend(args):
@@ -828,8 +737,3 @@ def plot_R14_trend(args):
     fig.tight_layout()
     # fig.subplots_adjust(hspace=0.1)
     plt.savefig(f"{args.outdir}/R14_trend_GW_EM_{args.label}.pdf", bbox_inches="tight")
-
-
-if __name__ == "__main__":
-    args = parsing.nmma_base_parsing(corner_plot_parser)
-    plot_multi_corner(args)
