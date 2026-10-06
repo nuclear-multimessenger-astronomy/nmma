@@ -129,9 +129,6 @@ def read_lc_from_csv(filename, args, format):
             return generous_read_csv(filename)
 
     elif "model" in format:
-        # FIXME
-        # For model lightcurves, the format is a simple text file with columns:
-        # time, filter1, filter2, ..., filterN. filter1_error, ..., filterN_error are optional
         try:
             data = pd.read_csv(filename, delim_whitespace=True)
         except Exception:
@@ -713,36 +710,3 @@ def read_photometry_files(
                 del data[name][filt]
 
     return data
-
-
-# FIXME Legacy??? seems unused
-def loadEventSpec(filename):
-    """Read a single spectrum and give it a crude uncertainty.
-
-    The uncertainty is estimated from the difference between neighbouring
-    points, floored at half the flux.
-
-    Parameters
-    ----------
-    filename: str
-        Path to a two-column file: wavelength in angstroms, flux in
-        erg/s/cm2/angstrom.
-
-    Returns
-    -------
-    dict
-        The wavelength grid, the flux and its estimated uncertainty.
-    """
-
-    data_out = np.loadtxt(filename)
-    spec = {}
-
-    spec["lambda"] = data_out[:, 0]  # Angstroms
-    spec["data"] = np.abs(data_out[:, 1])  # ergs/s/cm2./Angs
-    spec["error"] = np.zeros(spec["data"].shape)  # ergs/s/cm2./Angs
-    spec["error"][:-1] = np.abs(np.diff(spec["data"]))
-    spec["error"][-1] = spec["error"][-2]
-    idx = np.where(spec["error"] <= 0.5 * spec["data"])[0]
-    spec["error"][idx] = 0.5 * spec["data"][idx]
-
-    return spec

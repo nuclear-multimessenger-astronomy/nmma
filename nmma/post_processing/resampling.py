@@ -51,9 +51,6 @@ def find_spread_from_resampling(
     """
     med, uplim, lowlim = [], [], []
     for weight in cumprod:
-        # FIXME: Duplicate resampling_method call; first result overwritten and
-        # discarded
-        samples = resampling_method(prior_dist, weight, post_samplesize)
         # calculate the posterior distribution using the prior samples
         # and the weighting that we previously calculated
         samples = resampling_method(prior_dist, weight, post_samplesize)
@@ -240,8 +237,8 @@ class EjectaResamplerMixIn:
         self.invqKDE = scipy.stats.gaussian_kde(1.0 / q)
         self.EMKDE = construct_EM_KDE(self.EMsamples, self.combine_ejecta_mass)
 
-        self.NSBHEjectaFitting = NSBHEjectaFitting()
-        self.BNSEjectaFitting = BNSEjectaFitting()
+        self.NSBHEjecta = NSBHEjectaFitting()
+        self.BNSEjecta = BNSEjectaFitting()
 
         super().__init__(**kwargs)
 
@@ -291,57 +288,31 @@ class EjectaResamplerMixIn:
         r1, r2, R16 = np.interp(
             (m1, m2, 1.6), self.EOS_masses_dict[EOS], self.EOS_radius_dict[EOS], right=0
         )
-        R16 /= geom_msun_km  ###needed in geo units for BNSEjectaFitting
-        try:
-            C2 = (
-                m2 / r2 * geom_msun_km
-            )  ### disfavour EOS if secondary cannot be supported as NS
-        # FIXME: Unreachable except ZeroDivisionError: numpy float division yields inf,
-        # not exception
-        except ZeroDivisionError:
+        C2 = m2 / r2 * geom_msun_km
+        eos_share = np.sum(self.EOSsamples == EOS)
+        if r1 == 0 or (r2 == 0 and not self.withNSBH) or eos_share == 0:
             return np.nan_to_num(-np.inf)
-        if not self.withNSBH:
-            try:
-                C1 = (
-                    m1 / r1 * geom_msun_km
-                )  ### disfavour EOS if primary cannot be supported as NS
-            except ZeroDivisionError:
-                return np.nan_to_num(-np.inf)
-        MTOV = self.EOS_masses_dict[EOS][-1]
 
-        if len(np.where(self.EOSsamples == EOS)[0]) == 0:
-            return np.nan_to_num(-np.inf)
+        logprior = (
+            self.mcKDE.logpdf(mc) + self.invqKDE.logpdf(m1 / m2) + np.log(eos_share)
+        )
 
         if self.withNSBH:
-            logprior = (
-                self.chi_1KDE.logpdf(chi_1)
-                + self.chi_2KDE.logpdf(chi_2)
-                + self.mcKDE.logpdf(mc)
-                + self.invqKDE.logpdf(m1 / m2)
-                + np.log(len(np.where(self.EOSsamples == EOS)[0]))
-            )
-            mdyn = (
-                self.NSBHEjectaFitting.dynamic_mass_fitting(m1, m2, C2, chi_eff) + alpha
-            )
+            logprior += self.chi_1KDE.logpdf(chi_1) + self.chi_2KDE.logpdf(chi_2)
+            mdyn = self.NSBHEjecta.dynamic_mass_fitting(m1, m2, C2, chi_eff) + alpha
             if mdyn < 0.0:
                 return np.nan_to_num(-np.inf)
-            mdisk = self.NSBHEjectaFitting.remnant_disk_mass_fitting(
-                m1, m2, C2, chi_eff
-            )
+            mdisk = self.NSBHEjecta.remnant_disk_mass_fitting(m1, m2, C2, chi_eff)
             log10_mwind = np.log10(zeta) + np.log10(mdisk)
 
         else:
-            logprior = (
-                self.mcKDE.logpdf(mc)
-                + self.invqKDE.logpdf(m1 / m2)
-                + np.log(len(np.where(self.EOSsamples == EOS)[0]))
-            )
-            mdyn = (
-                self.BNSEjectaFitting.dynamic_mass_fitting_KrFo(m1, m2, C1, C2) + alpha
-            )
+            C1 = m1 / r1 * geom_msun_km  # inf if nsbh
+            MTOV = self.EOS_masses_dict[EOS][-1]
+            R16 /= geom_msun_km  # needed in geo units for BNSEjectaFitting
+            mdyn = self.BNSEjecta.dynamic_mass_fitting_KrFo(m1, m2, C1, C2) + alpha
             if mdyn < 0.0:
                 return np.nan_to_num(-np.inf)
-            log10_mdisk = self.BNSEjectaFitting.log10_disk_mass_fitting(
+            log10_mdisk = self.BNSEjecta.log10_disk_mass_fitting(
                 total_mass, mass_ratio, MTOV, R16
             )
             log10_mwind = np.log10(zeta) + log10_mdisk
@@ -371,14 +342,14 @@ def main_resampling():
 
     # read the GW samples
     GWsamples = pd.read_csv(args.GWsamples, header=0, delimiter=" ")
-    # down sample
-    weights = np.ones(len(GWsamples))
-    weights /= np.sum(weights)
-    # FIXME: sample(frac=30000/len) raises ValueError when GW samples file has under
-    # 30000 rows
-    GWsamples = GWsamples.sample(
-        frac=30000 / len(GWsamples), weights=weights, random_state=42
-    )
+    n_gw_samples = len(GWsamples)
+    ref_size = 30000
+    if n_gw_samples > ref_size:
+        # down sample
+        weights = np.full(n_gw_samples, 1.0 / n_gw_samples)
+        GWsamples = GWsamples.sample(
+            frac=ref_size / n_gw_samples, weights=weights, random_state=42
+        )
 
     # read the EM samples
     EMsamples = pd.read_csv(args.EMsamples, header=0, delimiter=" ")

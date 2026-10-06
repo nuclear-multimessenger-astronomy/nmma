@@ -15,7 +15,6 @@ import bilby_pipe
 import bilby_pipe.data_generation
 import dynesty
 import lalsimulation
-import matplotlib  ### FIXME: better to handle on a general level, jointly with fiesta
 import numpy as np
 
 from .. import __version__
@@ -38,8 +37,6 @@ from ..eos.eos_likelihood import (
 from ..gw.gw_inputs import NMMAGravitationalWaveInput
 from .joint_likelihood import MultiMessengerLikelihood
 from .multi_parsing import parse_generation_args
-
-matplotlib.rcParams["text.usetex"] = False
 
 
 def get_version_info():
@@ -79,10 +76,9 @@ def remove_expandable_args(parser, required_arg_groups):
         The same parser, with unneeded argument groups removed.
     """
 
-    for ag in parser._action_groups:
-        if ag.title not in required_arg_groups:
-            parser._action_groups.remove(ag)
-    ### CHECKME OR FIXME: removing an element from a list while iterating over it with a plain for loop shifts every later index, so the loop skips whatever comes right after each removal. Given groups [A, B, C, D, E] with only A, D required, it should strip B, C, E but actually only strips B and E — C silently survives. Consequence: write_complete_config_file's "cleaned" complete-ini can retain argument groups that don't belong to the run's actual messenger combination, whenever two or more unwanted groups happen to be adjacent in parser._action_groups.
+    parser._action_groups[:] = [
+        ag for ag in parser._action_groups if ag.title in required_arg_groups
+    ]
 
     return parser
 

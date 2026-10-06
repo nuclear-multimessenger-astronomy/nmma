@@ -2,8 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 
 try:
-    from yaml import CLoader as Loader
-    from yaml import load
+    from yaml import CLoader as Loader, load
 except ImportError:
     from yaml import Loader, load
 import argparse

@@ -1,3 +1,4 @@
+import warnings
 from copy import copy
 from pathlib import Path
 
@@ -16,8 +17,7 @@ from ..core.conversion import (
     observation_angle_conversion,
 )
 from ..core.gitlab import get_model, get_models_home
-from . import lightcurve_generation as lc_gen
-from . import utils
+from . import lightcurve_generation as lc_gen, utils
 
 ln10 = np.log(10)
 
@@ -895,7 +895,6 @@ class SVDLightCurveModel(LightCurveModelContainer):
         else:
             self.model_specifier = ""
         if not local_only:
-            # FIXME Does this make sense for api_gp, too?
             filters = self.get_model_data(core_model_name, filters)
 
         super().__init__(core_model_name, filters, **kwargs)
@@ -905,7 +904,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
             self.svd_mag_model = {
                 k.replace("_", ":"): v for k, v in svd_mag_model.items()
             }
-            self.svd_lbol_model = None  # FIXME: this is not yet implemented
+            self.svd_lbol_model = None  # not yet implemented
 
             # reset necessary after loading the model
             self.model_times = self.setup_model_times()
@@ -1184,9 +1183,8 @@ class GRBMixin:
         # it is beneficial to sample the ratio of angles alpha instead of checking later whether this can be resolved
         try:
             # FIXME We should get rid of the resolution attribute and only use alphaWing
-            self.resolution = (
-                parameters["alphaWing"] + 1e-10
-            )  # to avoid precision issues
+            # to avoid precision issues
+            self.resolution = parameters["alphaWing"] + 1e-10
             parameters["thetaWing"] = parameters["alphaWing"] * parameters["thetaCore"]
         except KeyError:
             parameters["thetaWing"] = parameters["thetaWing"]
@@ -1845,10 +1843,7 @@ class SimpleKilonovaLightCurveModel(LightCurveModelContainer):
     """
 
     lc_dict = {
-        # FIXME weizmann: to be activated separately, after the NMMA
-        # documentation work.
-        # "HoNa2020": lc_gen.HoNa_lc,
-        "HoHa2020": lc_gen.HoNa_lc,
+        "HoNa2020": lc_gen.HoNa_lc,
         "Me2017": lc_gen.eff_metzger_lc,
         "PL_BB_fixedT": lc_gen.powerlaw_blackbody_constant_temperature_lc,
         "blackbody_fixedT": lc_gen.blackbody_constant_temperature,
@@ -2337,7 +2332,11 @@ def single_model_from_mapping(identifier, enfore_class=False):
             f"Transient class {identifier} not recognized. Please choose from {list(transient_class_map.keys())}"
         )
 
-    # FIXME This is incomplete, but identical to handling in NMMA 0.2.2
+    warnings.warn(
+        "Implicit transient-type identification  is deprecated, please pass an "
+        "explicit em_transient_class, eg. FiestaKilonovaModel",
+        DeprecationWarning,
+    )
     model_name_map = {
         "TrPi2018": GRBLightCurveModel,
         "Piro2021": ShockCoolingLightCurveModel,
@@ -2351,7 +2350,6 @@ def single_model_from_mapping(identifier, enfore_class=False):
     elif identifier in [val["name"] for val in _SOURCES.get_loaders_metadata()]:
         return SupernovaLightCurveModel
     else:
-        # FIXME This is an unclean default, should be more explicit!
         return SVDLightCurveModel
 
 

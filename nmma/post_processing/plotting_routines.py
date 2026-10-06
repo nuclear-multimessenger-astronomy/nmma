@@ -8,8 +8,7 @@ import seaborn
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from ..core import parsing, utils
-from ..core import plotting_utils as corepu
+from ..core import parsing, plotting_utils as corepu, utils
 from ..core.conversion import (
     chirp_mass_and_eta_to_component_masses,
     label_mapping,

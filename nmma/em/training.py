@@ -11,8 +11,7 @@ import numpy as np
 from tqdm.contrib.concurrent import process_map
 
 from ..core.gitlab import get_model, get_models_home
-from . import model_parameters
-from . import plotting_utils as pu
+from . import model_parameters, plotting_utils as pu
 from .em_parsing import (
     benchmark_plots_parser,
     parsing_and_logging,
@@ -22,6 +21,11 @@ from .em_parsing import (
 from .io import read_training_data
 from .model import SVDLightCurveModel
 from .utils import autocomplete_data, interpolate_nans, setup_sample_times
+
+warnings.warn(
+    "The training module is deprecated and will be removed in a future version. Please use the new training capacities of fiestaEM instead.",
+    DeprecationWarning,
+)
 
 try:
     import keras as k
@@ -185,7 +189,6 @@ class BaseTrainingModel:
 
         for key in self.data.keys():
             # initialise data array for all filters and sample times
-            # FIXME should better use nans!
             self.data[key]["data"] = np.zeros(
                 (len(self.sample_times), len(self.filters))
             )

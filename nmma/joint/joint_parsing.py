@@ -31,8 +31,6 @@ def injection_parsing(parser):
     parser = eos_parsing(parser)
     parser = em_analysis_parsing(parser)
     parser = gw_injection_parsing(parser)
-    # FIXME: joint_likelihood_parsing overwrites injection_parsing's parser.description;
-    # --help shows wrong text
     parser = joint_likelihood_parsing(parser)
 
     # NMMA-added options
@@ -106,7 +104,6 @@ def injection_parsing(parser):
         "is not finite (i.e. the assumed binary type isn't physically consistent with this EOS) "
         "is dropped -- a one-shot filter, applied once, not a redraw.",
     )
-    # FIXME this is potentially misleading when used in conjunction with full analysis
     parser.add_argument(
         "--cosmology",
         help="Name of the cosmology to be used, see astropy.cosmology for available cosmologies (implicit default: Planck18)",
@@ -146,9 +143,6 @@ def joint_likelihood_parsing(parser):
     argparse.ArgumentParser
         The same parser, with the argument added.
     """
-    parser.description = (
-        "Set up a joint NMMA likelihood from provided messengers and analysis modifiers"
-    )
     parser.add_argument(
         "--ejecta-conversion",
         action="store_true",
