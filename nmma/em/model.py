@@ -168,6 +168,7 @@ citation_dict = {
     "Sr2023": ["https://arxiv.org/pdf/2303.12849"],
     # GRB model
     "TrPi2018": ["https://arxiv.org/abs/1909.11691"],
+    "nocite": ["No citation currently available, please suggest one to the devs"],
 }
 
 
@@ -198,6 +199,10 @@ class LightCurveModelContainer:
         from a set of parameters
     """
 
+    tmin = 0.01
+    tmax = 14.0
+    nsteps = 150
+
     def __init__(
         self,
         model,
@@ -222,9 +227,7 @@ class LightCurveModelContainer:
         # sample times are used as nodes to generate the light curve,
         # characterising the model's validity range and the resolution
         # below which interpolation should not be performed.
-        self.model_times = (
-            sample_times if sample_times is not None else self.setup_model_times()
-        )
+        self.setup_model_times(sample_times)
         self.kwargs = kwargs
 
     def __repr__(self):
@@ -248,28 +251,24 @@ class LightCurveModelContainer:
         else:
             self.model_parameters = model_parameters
 
-    def setup_model_times(self, tmin=0.01, tmax=14.0, nsteps=150):
+    def setup_model_times(self, sample_times=None):
         """Build the time grid the model is evaluated on.
-
-        These times define both the range over which the model is trusted
-        and the resolution below which interpolating it makes no sense.
-        Subclasses override this to follow whatever their own model covers.
-
-        Parameters
-        ----------
-        tmin: float, optional
-            First time, in days.
-        tmax: float, optional
-            Last time, in days.
-        nsteps: int, optional
-            Number of steps, spaced geometrically.
+        Defaults to n``np.geomspace(self.tmin, self.tmax, self.nsteps)``
+        Subclasses override these values or the whole method to follow
+        whatever their own model covers.
 
         Returns
         -------
         numpy.ndarray
             The time grid, in days.
         """
-        return np.geomspace(tmin, tmax, nsteps)
+        if sample_times is None:
+            sample_times = self._default_model_times()
+        self.tmin, self.tmax = sample_times[0], sample_times[-1]
+        self.model_times = sample_times
+
+    def _default_model_times(self):
+        return np.geomspace(self.tmin, self.tmax, self.nsteps)
 
     def check_vs_priors(self, priors):
         """Warn about missing priors, and prepare what they imply.
@@ -379,8 +378,7 @@ class LightCurveModelContainer:
 
         A model may ask for a quantity in log space while the sampler works
         in linear space, or the other way round; both are derived here.
-        Missing parameters are left alone, so that a later stage can still
-        supply them.
+        Missing parameters are handled based on the model's own policy.
 
         Parameters
         ----------
@@ -394,6 +392,7 @@ class LightCurveModelContainer:
         """
 
         new_parameters = observation_angle_conversion(parameters)
+        missing = []
         for key in self.model_parameters:
             if key not in new_parameters:
                 if key.lstrip("log10_") in new_parameters.keys():
@@ -401,10 +400,19 @@ class LightCurveModelContainer:
                 elif "log10_" + key in new_parameters.keys():
                     new_parameters[key] = 10 ** new_parameters["log10_" + key]
                 else:
-                    pass  # Unclean fix, allows later addition of required params
+                    missing.append(key)
+        if missing:
+            self.handle_missing_parameters(missing)
 
         self.sanity_checks(new_parameters)
         return new_parameters
+
+    def handle_missing_parameters(self, parameters):
+        """Decide how to deal with model parameters that are not available"""
+        raise ValueError(
+            f"Missing model parameters: {parameters}. "
+            "Please provide them in the priors or as fixed values."
+        )
 
     def em_parameter_setup(self, parameters, combine_params=True):
         """Cache the quantities every filter evaluation will need.
@@ -550,15 +558,10 @@ class LightCurveModelContainer:
         # abs_mags consider source frame fluxes, so we have to correct
         # for the fact that we integrate over the 'wrong' luminosity window
         redshift_correction = -2.5 * np.log10(1.0 + self.redshift)
-
-        lc_data = {}
-        for filt, mags in model_lc.items():
-            if np.isfinite(mags).any():
-                apparent_magnitude = mags + self.distmod + redshift_correction
-            else:  # no meaningful inter-/extrapolation possible
-                apparent_magnitude = np.full_like(observable_times, np.inf)
-            lc_data[filt] = apparent_magnitude
-
+        corr = self.distmod + redshift_correction
+        lc_data = {
+            f: np.nan_to_num(mag, nan=np.inf) + corr for f, mag in model_lc.items()
+        }
         return (observable_times, lc_data)
 
     def extinction_correction(self, model_mags):
@@ -599,7 +602,14 @@ class LightCurveModelContainer:
         dict
             The model name, mapped to its references.
         """
-        return {self.model: citation_dict[self.model]}
+        if self.model in citation_dict:
+            return {self.model: citation_dict[self.model]}
+        else:
+            warnings.warn(
+                f"Model {self.model} has no citation in the code. "
+                "Please suggest one to the developers."
+            )
+            return {self.model: citation_dict["nocite"]}
 
 
 class FiestaModel(LightCurveModelContainer):
@@ -668,7 +678,7 @@ class FiestaModel(LightCurveModelContainer):
         kwargs["model_parameters"] = self.fiesta_model.parameter_names
         super().__init__(self.fiesta_model.name, filters, **kwargs)
 
-    def setup_model_times(self):
+    def _default_model_times(self):
         """Use the time grid the fiesta surrogate was trained on.
 
         Returns
@@ -805,26 +815,16 @@ class SimpleBolometricLightCurveModel(LightCurveModelContainer):
         from a set of parameters
     """
 
+    tmin = 0.005  # minimum time in days, arbitrary
+    tmax = 20.0  # NOTE: The underlying integrals tend to diverge at later times
+    nsteps = 40  # number of time steps
+
     def __init__(self, model="Arnett", **kwargs):
         super().__init__(model, **kwargs)
         if model == "Arnett":
             self.lc_func = lc_gen.arnett_lc
         elif model == "Arnett_modified":
             self.lc_func = lc_gen.arnett_modified_lc
-
-    def setup_model_times(self):
-        """Use a linear grid stopping where the integrals start to diverge.
-
-        Returns
-        -------
-        numpy.ndarray
-            Times from 0.005 to 20 days.
-        """
-        tmin = 0.005  # minimum time in days, arbitrary
-        tmax = 20.0  # NOTE: The underlying integrals tend to diverge at later times
-        nsteps = 40  # number of time steps
-
-        return np.linspace(tmin, tmax, nsteps)
 
     def combine_detector_data(self, model_lc, observable_times):
         """Redshift a bolometric luminosity rather than a magnitude.
@@ -941,7 +941,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
             self.svd_lbol_model = None  # not yet implemented
 
             # reset necessary after loading the model
-            self.model_times = self.setup_model_times()
+            self.model_times = self.setup_model_times(kwargs.get("sample_times", None))
 
         except ValueError:
             raise ValueError(
@@ -986,7 +986,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
                 "--interpolation-type must be sklearn_gp, api_gp or tensorflow"
             )
 
-    def setup_model_times(self):
+    def _default_model_times(self):
         """Use the time grid the surrogate was trained on, if it has one.
 
         Returns
@@ -998,7 +998,7 @@ class SVDLightCurveModel(LightCurveModelContainer):
         try:
             return next(iter(self.svd_mag_model.values()))["tt"]
         except Exception:
-            return super().setup_model_times()
+            return super()._default_model_times()
 
     def get_model_data(self, model, filters):
         """Fetch the surrogate from the model repository.
@@ -1312,6 +1312,10 @@ class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
         from a set of parameters.
     """
 
+    tmin = 1.0e-5  # minimum time in days
+    tmax = 200  # maximum time in days
+    nsteps = 201  # number of time steps
+
     def __init__(
         self,
         model="TrPi2018",
@@ -1339,18 +1343,9 @@ class GRBLightCurveModel(GRBMixin, LightCurveModelContainer):
         ]
         self.flux_func = None  # flux function to be set later, if needed
 
-    def setup_model_times(self):
-        """Use a grid spanning the whole afterglow, from seconds to months.
-
-        Returns
-        -------
-        numpy.ndarray
-            Times from 1e-5 to 200 days.
-        """
-        tmin = 1.0e-5  # minimum time in days
-        tmax = 200  # maximum time in days
-        nsteps = 201  # number of time steps
-        return np.geomspace(tmin, tmax, nsteps)
+    def handle_missing_parameters(self, parameters):
+        """Missing GRB parameters can be filled later"""
+        pass
 
     def em_parameter_setup(self, parameters):
         """Pick the afterglow evaluator, then cache the frame quantities.
@@ -1561,7 +1556,7 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
                 "Model_parameters are ignored for SupernovaLightCurveModel, using sncosmo defaults."
             )
 
-    def setup_model_times(self):
+    def _default_model_times(self):
         """Use the phase range the sncosmo source covers.
 
         Some sncosmo models are defined relative to peak brightness and some
@@ -1580,8 +1575,8 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         if (sample_times < 0).any():
             # NOTE: We assume this means the sncosmo model is relative to peak time.
             sample_times -= sample_times[0]
-            print(
-                "Warning: Some supernova models are relative to the peak, some relative to the explosion time, "
+            warnings.warn(
+                "Some supernova models are relative to the peak, some relative to the explosion time, "
                 "but nmma always expects times relative to the explosion time. Adjust your t0 prior accordingly."
             )
         return sample_times
@@ -1598,7 +1593,7 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         priors: bilby.core.prior.PriorDict
             Priors the analysis will sample.
         """
-        print(
+        warnings.warn(
             """
             Note: Most source models in sncosmo use an 'amplitude' parameter,
             that can differ drastically from model to model and requires a carefully chosen prior.
@@ -1666,6 +1661,11 @@ class SupernovaLightCurveModel(LightCurveModelContainer):
         """
         lc_pars = super().em_parameter_setup(parameters)
         self.sn_model.set(**lc_pars)
+
+    def handle_missing_parameters(self, parameters):
+        """Missing supernova parameters are assumed to take their default
+        values in the sncosmo model."""
+        pass
 
     def combine_lc_params(self, parameters):
         """Fill in the parameters sncosmo needs, keeping its own defaults.
@@ -1788,6 +1788,10 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
     radioactive heating takes over.
     """
 
+    tmin = 1.0 / 24.0  # minimum time in days
+    tmax = 3.5  # maximum time in days
+    nsteps = 100  # number of time steps
+
     def __init__(self, model="Piro2021", **kwargs):
         """A light curve model object
 
@@ -1807,18 +1811,6 @@ class ShockCoolingLightCurveModel(LightCurveModelContainer):
                     from a set of parameters
         """
         super().__init__(model, **kwargs)
-
-    def setup_model_times(self):
-        """Use a grid covering the hours-to-days window the model describes.
-
-        Returns
-        -------
-        numpy.ndarray
-            Times from one hour to 3.5 days.
-        """
-        # model is suitable on the order of hours to a few days
-        # this limit is somewhat arbitrary, but should be sufficient for most cases
-        return np.geomspace(1.0 / 24.0, 3.5, 100)
 
     def generate_lightcurve(self, sample_times, parameters, filters="all"):
         """Evaluate the shock cooling model.

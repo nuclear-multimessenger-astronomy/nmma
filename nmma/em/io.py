@@ -10,7 +10,12 @@ from astropy.table import Table
 from astropy.time import Time
 from bilby.core.utils import decode_bilby_json
 
-# from sncosmo.bandpasses import _BANDPASSES
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 
 def load_em_observations(filename, args=None, format="observations"):
@@ -281,7 +286,7 @@ def write_lc_to_json(injection_outfile, data):
     """
     out = {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in data.items()}
     with open(injection_outfile, "w") as f:
-        json.dump(out, f, indent=2)
+        json.dump(out, f, indent=2, cls=NumpyEncoder)
 
 
 def write_lc_to_csv(outfile, data, format="observations"):
