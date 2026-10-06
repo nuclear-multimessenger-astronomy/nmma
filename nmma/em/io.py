@@ -10,8 +10,6 @@ from astropy.table import Table
 from astropy.time import Time
 from bilby.core.utils import decode_bilby_json
 
-from ..core.utils import NumpyEncoder
-
 # from sncosmo.bandpasses import _BANDPASSES
 
 
@@ -281,9 +279,9 @@ def write_lc_to_json(injection_outfile, data):
     data: dict
         Photometry per filter.
     """
-
+    out = {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in data.items()}
     with open(injection_outfile, "w") as f:
-        json.dump(data, f, cls=NumpyEncoder, indent=2)
+        json.dump(out, f, indent=2)
 
 
 def write_lc_to_csv(outfile, data, format="observations"):

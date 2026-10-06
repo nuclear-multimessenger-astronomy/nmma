@@ -479,6 +479,8 @@ def make_lcs(args=None):
         If the file type is not one of the supported grid formats.
     """
     args = emp.parsing_and_logging(emp.multi_lc_parser, args)
+    if args.filters is None:
+        args.filters = utils.DEFAULT_FILTERS
     if args.file_type is None:
         lc_handler = LightCurveHandler(args)
     elif "lanl" in args.file_type.lower():
