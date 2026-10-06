@@ -1,4 +1,4 @@
-## Connecting Electromagnetic signals to Binary Source Properties
+# Connecting Electromagnetic signals to Binary Source Properties
 
 In NMMA, it is possible to use the results from GW inferences together with kilonova inferences or joint KN+GRB afterglow inferences to get estimates on the binary properties.
 A binary system can be a binary neutron star (BNS) merger or a neutron-star-black-hole (NSBH) merger. We can connect observed electromagnetic signals to potential

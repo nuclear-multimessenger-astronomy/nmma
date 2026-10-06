@@ -4,13 +4,13 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..core import conversion as conv
+from ..core import conversion as conv, parsing as cparse
 from ..core.utils import read_trigger_time
-from ..em import em_parsing as emp
 from ..em import io, model, utils
 from ..em.lightcurve_generation import create_light_curve_data
 from ..em.plotting_utils import lc_plot_with_histogram
 from ..eos.eos_processing import EoSConverter, load_tabulated_macro_eos_set_to_dict
+from .parser import lc_marginalisation_parser
 
 
 def marginalised_lightcurve_expectation_from_gw_samples(args=None):
@@ -27,21 +27,9 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     and `create_light_curve_data`, and optionally plots the ejecta-mass
     distribution and the light-curve envelope across draws.
 
-    Note: this currently cannot run -- `emp.lc_marginalisation_parser`
-    doesn't exist (`lc_marginalisation_parser` is defined in
-    `post_processing.parser`, not `em.em_parsing`); see review notes.
-
     Parameters
     ----------
     args : list of str or argparse.Namespace, optional
-        CLI-style arguments (or None to parse from sys.argv), handled
-        via `emp.lc_marginalisation_parser` -- needs exactly one of
-        `--template-file` (ascii table with SNRdiff/erf/weight/m1/m2/
-        [a1/a2/]dist columns), `--hdf5-file` (LALInference posterior),
-        or `--coinc-file` (+ `--skymap`, ligolw sngl_inspiral table);
-        plus `eos_data`/`eos_weights`, `Nmarg`, `outdir`, and the usual
-        light-curve-model/sample-time arguments.
-
     Returns
     -------
     None
@@ -53,10 +41,7 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     # gwpy is nasty in overwriting matplotlib, so we should only load it if truly needed
     from gwpy.table import Table
 
-    # FIXME: emp.lc_marginalisation_parser undefined; parser lives in
-    # post_processing/parser.py
-    args = emp.parsing_and_logging(emp.lc_marginalisation_parser, args)
-    ### FIXME: lc_marginalisation_parser is defined in nmma/post_processing/parser.py, not nmma/em/em_parsing.py. Since emp is bound to the em_parsing module, emp.lc_marginalisation_parser doesn't exist.
+    args = cparse.nmma_base_parsing(lc_marginalisation_parser, args)
 
     rng = np.random.default_rng(args.generation_seed)
     args.mag_error_scale = 0
@@ -89,8 +74,7 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         args.gps = np.median(data_out["t0"])
 
     elif args.coinc_file is not None:
-        from ligo.skymap import bayestar, distance
-        from ligo.skymap import io as lio
+        from ligo.skymap import bayestar, distance, io as lio
 
         data_out = Table.read(
             args.coinc_file, format="ligolw", tablename="sngl_inspiral"
@@ -240,12 +224,6 @@ def get_all_gw_quantities(data_out):
     back from a1/a2 to spin1z/spin2z if the table doesn't already
     have a1/a2 (defaulting missing a1/a2/theta_jn/tilt1/tilt2 to 0.0).
 
-    Note: as currently ordered, chi_eff is computed *before* the
-    a1/a2 defaults and the spin1z/spin2z fallback run, so a table
-    with spin1z/spin2z but no a1/a2 raises KeyError instead of using
-    the fallback (see review notes) -- only tables that already have
-    a1/a2 columns work correctly today.
-
     Parameters
     ----------
     data_out : astropy.table.Table or gwpy.table.Table
@@ -275,16 +253,14 @@ def get_all_gw_quantities(data_out):
 
     data_out["weight"] = 1.0 / len(data_out["m1"])
 
-    ### FIXME: get_all_gw_quantities computes chi_eff before its own fallback logic can supply the values it needs. The chi_eff line requires a1/a2 to already exist, but the two mechanisms that would supply them — the 0.0-default loop and the spin1z/spin2z fallback — both run after it.
+    data_out["a1"] = data_out.get("a1", data_out.get("spin1z", 0.0))
+    data_out["a2"] = data_out.get("a2", data_out.get("spin2z", 0.0))
+    for key in ["theta_jn", "tilt1", "tilt2"]:
+        if key not in data_out.keys():
+            data_out[key] = 0.0
+
     data_out["chi_eff"] = (
         data_out["m1"] * data_out["a1"] + data_out["m2"] * data_out["a2"]
     ) / (data_out["m1"] + data_out["m2"])
 
-    for key in ["a1", "a2", "theta_jn", "tilt1", "tilt2"]:
-        if key not in data_out.keys():
-            data_out[key] = 0.0
-    try:
-        data_out["a1"], data_out["a2"] = data_out["spin1z"], data_out["spin2z"]
-    except KeyError:
-        pass
     return data_out

@@ -46,7 +46,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           brew install openmpi hdf5
-          conda install ligo-segments python-ligo-lw
+          conda install ligo-segments
           pip install --upgrade pip setuptools wheel
 
 

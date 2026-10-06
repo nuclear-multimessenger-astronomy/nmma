@@ -12,8 +12,7 @@ from bilby.core.prior import (
     Prior,
     PriorDict,
 )
-from ligo.skymap import io as skymap_io
-from ligo.skymap import moc
+from ligo.skymap import io as skymap_io, moc
 from scipy.interpolate import PchipInterpolator
 from scipy.stats import norm
 

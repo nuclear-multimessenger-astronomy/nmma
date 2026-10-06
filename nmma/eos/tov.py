@@ -1,4 +1,3 @@
-# CHECK ME: Can this file be removed?
 import numpy as np
 import scipy.constants
 from scipy.integrate import solve_ivp

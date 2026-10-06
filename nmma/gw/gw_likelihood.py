@@ -11,10 +11,6 @@ from bilby.gw.likelihood import (
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
 from ..core.conversion import (
     CosmologyConverter,
-    bbh_source_frame,
-    bns_source_frame,
-)
-from ..core.conversion import (
     tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities as tidal_conversion,
 )
 
@@ -287,23 +283,27 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
         elif gw_likelihood_type == "MBGravitationalWaveTransient":
             gw_transient = MBGravitationalWaveTransient(**gw_likelihood_kwargs)
         else:
-            ### FIXME: Not an f-string and no .format() call, so {} is never substituted.
-            raise ValueError("Unknown GW Likelihood class {}")
+            raise ValueError(f"Unknown GW Likelihood class {gw_likelihood_type}")
+
+        self.cosmo_converter = CosmologyConverter.from_priors(priors)
 
         super().__init__(gw_transient, priors)
 
     def setup_submodel_conversion(self):
+        """Register submodel conversion methods to be evaluated after the base conversions.
+        This decides the source-frame conversion and possible tidal conversions.
+        """
         if (
             "neutron_star"
             in self.sub_model.waveform_generator.frequency_domain_source_model.__name__
         ):
-            self.conv_functions.append(bns_source_frame)
+            self.conv_functions.append(self.cosmo_converter.bns_source_frame)
         else:
-            self.conv_functions.append(bbh_source_frame)
+            self.conv_functions.append(self.cosmo_converter.bbh_source_frame)
 
     def setup_parameter_conversion(self):
-        cosmo_converter = CosmologyConverter().from_priors(self.priors)
-        self.conv_functions.append(cosmo_converter)
+        """Also takes care of basic distance conversions in stand-alone GW runs"""
+        self.conv_functions.append(self.cosmo_converter)
 
     def posterior_conversion(self, posterior_samples):
         """Add derived spin/tidal summary parameters to posterior samples, in place.
@@ -326,10 +326,17 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
 
         if "chi_eff" not in posterior_samples:
             try:
-                ### FIXME: Python evaluates dict.get's default argument eagerly, before checking whether the key exists. So posterior_samples['spin_1z'] is evaluated unconditionally — if spin_1z/spin_2z aren't in the samples (the normal case when a run uses chi_1/chi_2 instead), this raises KeyError, which gets caught by the surrounding except KeyError: pass and chi_eff is silently never added — even though chi_1/chi_2 were present. I confirmed this directly: a sample dict with chi_1/chi_2 (no spin_1z/spin_2z) produced no chi_eff key at all, while a dict with only spin_1z/spin_2z worked correctly. In practice, only the spin_1z/spin_2z path in the docstring actually works.
                 q = posterior_samples["mass_ratio"]
-                chi_1 = posterior_samples.get("chi_1", posterior_samples["spin_1z"])
-                chi_2 = posterior_samples.get("chi_2", posterior_samples["spin_2z"])
+                chi_1 = (
+                    posterior_samples["chi_1"]
+                    if "chi_1" in posterior_samples
+                    else posterior_samples["spin_1z"]
+                )
+                chi_2 = (
+                    posterior_samples["chi_2"]
+                    if "chi_2" in posterior_samples
+                    else posterior_samples["spin_2z"]
+                )
                 posterior_samples["chi_eff"] = (chi_1 + q * chi_2) / (1 + q)
             except KeyError:
                 pass
@@ -346,8 +353,6 @@ class GravitationalWaveTransientLikelihood(NMMALikelihood):
                 pass
 
         return posterior_samples
-
-    ### CHECKME: Check all functions below if they are needed or if they can be removed.
 
     def sanity_checks(self):
         """Validate the sub-likelihood configuration.

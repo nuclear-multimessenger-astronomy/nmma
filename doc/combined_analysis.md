@@ -1,8 +1,8 @@
-## Perform combined analyses
+# Perform combined analyses
 
 NMMA is capable of performing combined analyses to constrain the neutron star equation of state (EOS) and Hubble Constant. In the following, we will take as an example the EOS analysis.
 
-### Generate a simulation set
+## Generate a simulation set
 
 First of all, you need to create an output directory, this output will host all the data that will be used to constrain the EOS.
 
@@ -13,7 +13,7 @@ Running the following command line will generate a json file (injection.json)  w
 	nmma_create_injection --prior-file ./priors/Bu2019lm.prior --eos-file ./example_files/eos/ALF2.dat --binary-type BNS -f ./output/injection --n-injection 100 --original-parameters --extension json
 
 
-### lightcurve posterior
+## lightcurve posterior
 
 EMdata will house the posteriors of the electromagnetic data you will produce: in particular the lc.csv (./example_files/csv_lightcurve/outdir/macroeventID, where macroeventID in range(0, 100)) lightcurves. We now compute posteriors using NMMA on this simulated set of 100 events, of which we assume a fraction is detectable by ZTF. The result can be find at  ./output/EMdata
 
@@ -25,7 +25,7 @@ EMdata will house the posteriors of the electromagnetic data you will produce: i
 	done
 
 
-### Download GW posteriors
+## Download GW posteriors
 
 The gravitational wave samples can be can be downloaded at https://zenodo.org/record/6045029#.YgZzwITMKV5. At this link there are simulated posteriors for a number of gravitational-wave waveform models, here, we take the PhenDNRTv2 files.
 This only  concern  the PhenDNRTv2 files on this link. These we can directly download by using this command line:
@@ -54,7 +54,7 @@ The gw_posteriors.txt contains a list of all links to the PhenDNRTv2 files. When
 
         cd ../../..
 
-### Download the EOS repository
+## Download the EOS repository
 
 All of the NMMA EOS simulation sets are kept in a separate github repository here:
 https://github.com/diettim/NMMA
@@ -62,7 +62,7 @@ https://github.com/diettim/NMMA
 For this particular example, we have put the simulation set in Zenodo here:
 https://zenodo.org/record/6094691#.YgwA8YTMI5k
 
-### EoS from GW + EM
+## EoS from GW + EM
 
 This command line combines the EOS measurements for each simulation. As stated above, we assume only a fraction is detectable by ZTF (based on simulations of the associated kilonova brightnesses). The indices of the 26 detectable events are {0,  3,  5,  7,  8, 10, 12, 13, 14, 15, 17, 19, 21, 22, 23, 24, 26, 27, 28, 31, 32,34, 36, 37, 38, 39}.
 
@@ -75,7 +75,7 @@ This command line combines the EOS measurements for each simulation. As stated a
 	done
 
 
-### A combined EOS analysis
+## A combined EOS analysis
 
 We provide a helper function to combine the EOS results.
 

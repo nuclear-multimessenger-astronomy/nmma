@@ -88,9 +88,8 @@ def main():
     # load the EOS prior
     EOS_prior = np.loadtxt(args.EOS_prior)
     # get the R14, Mmax prior samples
-    # FIXME: args.EOSPath misspelled; parser defines --EOSpath, so AttributeError
     Mmax_prior, R14_prior = load_macro_characteristics_from_tabulated_eos_set(
-        args.EOSPath, args.Neos, 1.4
+        args.EOSpath, args.Neos, 1.4
     )
 
     # load the pdet

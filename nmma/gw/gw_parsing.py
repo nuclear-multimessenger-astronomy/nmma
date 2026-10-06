@@ -56,12 +56,11 @@ def gw_injection_parsing(parser):
         The same parser, with `--gw-detectors` and `--waveform-arguments`
         added.
     """
-    ### FIXME: The help text says "comma-separated," but nargs="*" actually means space-separated tokens. I tested both: --gw-detectors ET,CE (comma-separated, as the help text instructs) produces ['ET,CE'] — a single bogus string containing a literal comma, not two detector names — while --gw-detectors ET CE H1 (space-separated) correctly produces ['ET', 'CE', 'H1']. Anyone following the help text as written will silently get a broken one-element detector list with no error raised.
     parser.add_argument(
         "--gw-detectors",
         default=["ET", "CE"],
         nargs="*",
-        help="Comma-separated list of GW detectors to use (default: ET,CE)",
+        help="GW detectors to use (default: ['ET', 'CE'])",
     )
     parser.add_argument(
         "--waveform-arguments",

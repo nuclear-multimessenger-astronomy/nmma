@@ -1,4 +1,4 @@
-## Cluster Resources (Expanse)
+# Cluster Resources (Expanse)
 
 One might also want to submit bulk jobs while using NMMA. Here, we have
 included an example script for job submission (called as jobscript.sh) in SLURM. This job was submitted on SDSC's
@@ -36,7 +36,7 @@ To check the job allotment, you can run:
 
 Test runs on other clusters are currently in progress. Further examples on other cluster resources will be subsequently added.
 
-### Generating a slurm script
+## Generating a slurm script
 
 The `analysis_slurm.py` code in the `tools` directory can be used to generate a slurm script for Expanse. This code takes all arguments accepted by `em/anaysis.py`. Some of these arguments can be defined as wildcards in the generated slurm script so that different values can be provided for unique script runs.
 

@@ -27,7 +27,7 @@ You can add ``--tests ejecta``, which is better as it removes events that do not
 
 ## 2. Simulating Light Curve Posteriors : Run the [lightcurve-analysis]
 
-#### Run this command to simulate the light curves for the ZTF telescope:
+### Run this command to simulate the light curves for the ZTF telescope:
 
 
     lightcurve-analysis --model Bu2019lm --svd-path ./svdmodels --interpolation-type sklearn_gp --outdir ./outdir/BNS/0 --label injection_Bu2019lm_0 --prior ./Bu2019lm.prior --tmin 0 --tmax 20 --dt 0.5 --error-budget 1 --nlive 2048  --injection ./outdir/injection_Bu2019lm.json --injection-num 0 --injection-detection-limit 21.7,21.4,20.9 --generation-seed 42 --filters ztfg,ztfr,ztfi --plot --remove-nondetections --local-only --ztf-ToO 300 --ztf-uncertainties --ztf-sampling --ztf-ToO 300

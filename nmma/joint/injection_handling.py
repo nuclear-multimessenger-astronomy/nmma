@@ -11,7 +11,6 @@ from ..core.conversion import (
     KilonovaEjectaFitting,
     MultimessengerConversion,
     NSBHEjectaFitting,
-    bbh_source_frame,
 )
 from ..core.parsing import (
     nmma_base_parsing,
@@ -20,8 +19,7 @@ from ..core.parsing import (
     slurm_setup_parser,
 )
 from ..core.utils import read_injection_file, rejection_sample, set_filename
-from ..em import lightcurve_handling as lch
-from ..em import utils
+from ..em import lightcurve_handling as lch, utils
 from ..em.model import create_injection_model
 from ..eos.eos_processing import EoSConverter
 from .joint_parsing import injection_parsing
@@ -104,7 +102,6 @@ class NMMAInjectionCreator(InjectionCreator):
             self.include_checks = True
 
         # legacy
-        # CHECKME:
         gw_injection_file = getattr(args, "gw_injection_file", self.filename)
         self.gw_injection_file = Path(gw_injection_file) if gw_injection_file else None
         self.reference_frequency = getattr(args, "reference_frequency", 20.0)
@@ -136,7 +133,7 @@ class NMMAInjectionCreator(InjectionCreator):
         for test, val in tests.items():
             if "snr" in test:
                 self.initialise_ifos(args)
-                self.conv_instructions["gw"] = bbh_source_frame
+                self.conv_instructions["gw"] = self.cosmo_converter.bbh_source_frame
                 self.snr_op, self.snr_threshold = val
                 test_methods.append(self.test_snr)
             elif "population" in test:
@@ -155,7 +152,7 @@ class NMMAInjectionCreator(InjectionCreator):
         # computed by the 'gw' step (bbh_source_frame). That step is normally
         # only added above for an 'snr' test, so make sure it is present
         # whenever eos conversion is used, regardless of --tests.
-        self.conv_instructions.setdefault("gw", bbh_source_frame)
+        self.conv_instructions.setdefault("gw", self.cosmo_converter.bbh_source_frame)
         if "Hubble_constant" in self.priors:
             self.conv_instructions["cosmo"] = self.cosmology
         self.test_routines = test_methods
@@ -175,7 +172,7 @@ class NMMAInjectionCreator(InjectionCreator):
         postprocess_methods = []
         if "snr" in args.post_processing and not hasattr(self, "snr_threshold"):
             self.initialise_ifos(args)
-            self.conv_instructions["gw"] = bbh_source_frame
+            self.conv_instructions["gw"] = self.cosmo_converter.bbh_source_frame
             postprocess_methods.append(self.add_snrs)
         if "ejecta" in args.post_processing:
             postprocess_methods.append(self.compute_ejecta)
@@ -881,17 +878,8 @@ class NMMAInjectionCreator(InjectionCreator):
             SimInspiralTransformPrecessingWvf2PE as lalsim_conversion,
         )
 
-        try:
-            import ligo.lw  # noqa F401
-        except ImportError:
-            raise ImportError(
-                "You do not have ligo.lw installed: $ pip install python-ligo-lw"
-            )
-
         if injection_file.suffix in (".xml", ".xml.gz"):
-            table = Table.read(
-                injection_file, format="ligolw", tablename="sim_inspiral"
-            )
+            table = Table.read(injection_file, tablename="sim_inspiral")
         elif injection_file.suffix == ".dat":
             table = Table.read(injection_file, format="csv", delimiter="\t")
         elif injection_file.suffix == ".ecsv":

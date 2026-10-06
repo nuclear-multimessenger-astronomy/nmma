@@ -1,8 +1,7 @@
 from argparse import Namespace
 
 import pytest
-from astropy import cosmology
-from astropy import units as u
+from astropy import cosmology, units as u
 from bilby.gw import cosmology as bilby_cosmo
 
 from nmma.core import constants

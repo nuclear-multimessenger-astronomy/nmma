@@ -66,7 +66,7 @@ def eos_parsing(parser):
     )
     eos_input_parser.add(
         "--micro-eos-model", default="nep-5", help="The micro EOS model to use."
-    )  ## FIXME: add model_selection
+    )
 
     ### args to set up eos likelihood evaluation based on constraints
     eos_input_parser.add(
@@ -85,19 +85,16 @@ def eos_parsing(parser):
         nargs="*",
         help="list of identifiers for further lower-mtov-values to consider",
     )
-    # FIX ME: missing type=float (cf. --Neos's type=int above) -- values
-    # come through as strings, which crashes at likelihood-evaluation time
-    # (LowerMTOVConstraint.log_likelihood -> norm.logcdf(loc=str, scale=str))
-    # rather than at parse time. --lower-mtov (the single dict flag) is
-    # unaffected since yaml_parse already returns real floats.
     eos_input_parser.add(
         "--lower-mtov-mass",
         nargs="*",
+        type=float,
         help="list of additional lower mtov limits to consider",
     )
     eos_input_parser.add(
         "--lower-mtov-error",
         nargs="*",
+        type=float,
         help="list of additional mtov limit errors to consider",
     )
     eos_input_parser.add(
@@ -122,14 +119,15 @@ def eos_parsing(parser):
         nargs="*",
         help="list of identifiers for further upper-mtov-values to consider",
     )
-    # FIX ME: same missing type=float as --lower-mtov-mass/-error above.
     eos_input_parser.add(
         "--upper-mtov-mass",
+        type=float,
         nargs="*",
         help="list of additional upper mtov limits to consider",
     )
     eos_input_parser.add(
         "--upper-mtov-error",
+        type=float,
         nargs="*",
         help="list of additional mtov limit errors to consider",
     )

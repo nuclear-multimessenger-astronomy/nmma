@@ -570,10 +570,7 @@ class EoSConstraint:
         self.type = "macro"
         if name is None:
             self.name = self.__class__.__name__
-            # FIX ME: this should probably be `self.base_repr = self.name`
-            # (the class name) -- as written, base_repr is literally None,
-            # so repr() below renders as the string "None " when name is omitted.
-            self.base_repr = name
+            self.base_repr = self.name
         else:
             self.name = name
             self.base_repr = f"{self.__class__.__name__} based on {name}"
@@ -836,13 +833,7 @@ class MassRadiusConstraint(EoSConstraint):
             radius = data_1
             masses = data_2
 
-        # FIX ME: operator precedence makes this `(not (masses > 0).all())
-        # and (masses < 5).all() and (radius > 3).all()`, not
-        # `not ((masses > 0).all() and (masses < 5).all() and (radius > 3).all())`
-        # as the error message below implies -- so an out-of-range value
-        # (e.g. a mass of 6 M_sun mixed with plausible radii) currently
-        # slips through without raising.
-        if not (masses > 0).all() and (masses < 5).all() and (radius > 3).all():
+        if not ((masses > 0).all() and (masses < 5).all() and (radius > 3).all()):
             min_mass = np.min(masses)
             max_mass = np.max(masses)
             median_mass = np.median(masses)
@@ -941,13 +932,6 @@ class MassRadiusConstraint(EoSConstraint):
                 tov_mass, local_parameters["masses"], local_parameters["radii"]
             )
         except (ValueError, IndexError):
-            # FIX ME: this re-runs the exact same call that just raised,
-            # so it raises again here and the batch fallback below is
-            # never actually reached -- this path currently crashes
-            # instead of returning a per-EOS list.
-            self.single_logl(
-                tov_mass, local_parameters["masses"], local_parameters["radii"]
-            )
             return [
                 self.single_logl(masses[-1], masses, local_parameters["radii"][i])
                 for i, masses in enumerate(local_parameters["masses"])

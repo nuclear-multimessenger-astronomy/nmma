@@ -8,18 +8,7 @@ import pytest
 from nmma.core import utils
 from nmma.core.base import multi_analysis_loop
 from nmma.core.parsing import parsing_and_logging
-from nmma.em import (
-    analysis as ema,
-)
-from nmma.em import (
-    em_parsing as emp,
-)
-from nmma.em import (
-    lightcurve_handling as lch,
-)
-from nmma.em import (
-    model,
-)
+from nmma.em import analysis, em_parsing, lightcurve_handling, model
 from nmma.eos.eos_likelihood import tabulated_eos_setup
 from nmma.eos.eos_parsing import tabulated_eos_parsing
 from nmma.joint import generation
@@ -39,7 +28,7 @@ def merge_namespaces(*namespaces):
 
 
 em_args = parsing_and_logging(
-    (emp.multi_wavelength_analysis_parser, tabulated_eos_parsing), []
+    (em_parsing.multi_wavelength_analysis_parser, tabulated_eos_parsing), []
 )
 main_args = Namespace(
     label="injection",
@@ -104,7 +93,7 @@ def cleanup_outdir(args):
 def test_injection_creation(args):
     inj_model = model.create_light_curve_model_from_args(args)
     injection_parameters = utils.injection_from_args(args)
-    data, injection_parameters = lch.make_injection(
+    data, injection_parameters = lightcurve_handling.make_injection(
         injection_parameters, args, injection_model=inj_model
     )
 
@@ -116,11 +105,11 @@ def test_injection_creation(args):
 
 def test_single_thread_setup(args):
     def setup(args):
-        priors, em_lhood, injection_parameters = ema.analysis_setup(args)
+        priors, em_lhood, injection_parameters = analysis.analysis_setup(args)
         eos_priors, eos_lhood, _ = tabulated_eos_setup(args)
         injection_parameters["EOS"] = 7  # set EOS used in injection
         priors.update(eos_priors)
-        # priors = ConditionalPriorDict(priors) # FIXME: this will only work in bilby 2.8+
+        # priors = ConditionalPriorDict(priors)
         combined_likelihood = MultiMessengerLikelihood([em_lhood, eos_lhood], priors)
         return priors, combined_likelihood, injection_parameters
 

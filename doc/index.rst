@@ -176,7 +176,6 @@ requirements.txt file which are necessary for NMMA:
    pip install dill
    pip install multiprocess
    pip install lalsuite
-   pip install python-ligo-lw
    pip install sncosmo
    pip install scikit-learn
    pip install joblib
@@ -250,6 +249,7 @@ Install C compiler and cmake:
          conda install -c conda-forge fftw
          DYLD_LIBRARY_PATH=$HOME/anaconda3/envs/nmma_env
          pip install pyfftw
+
       Replace ``DYLD_LIBRARY`` path by your NMMA virtual environment path if it is not same as give here
 
 #. The ``osx-arm64`` conda-forge channel does not include
@@ -468,17 +468,9 @@ User Guide
    combined_analysis
    Cluster_Resources
    contributing
+   gwemopt_light_curves_detection
+   observing-scenarios-light-curves
    changelog
-
-
-API Reference
---------------
-
-.. toctree::
-   :maxdepth: 2
-
-   API Reference <api/nmma>
-
 
 .. Indices and tables
 .. ==================

@@ -126,10 +126,8 @@ def check_detections(data, remove_nondetections=False):
                 data[filt] = {k: v[detections] for k, v in filt_dict.items()}
             else:
                 data.pop(filt)
-        # FIXME weizmann: to be activated separately, after the NMMA
-        # documentation work.
-        # if not data:
-        #     raise ValueError("No filter left after removing non-detections.")
+        if not data:
+            raise ValueError("No filter left after removing non-detections.")
 
     if not any(np.isfinite(data[filt]["mag_error"]).any() for filt in data):
         print("No detection available, fits only on non-detections.")
