@@ -11,9 +11,8 @@ from time import time
 
 import dynesty
 import numpy as np
-from bilby.core.sampler import base_sampler as bs
-from bilby.core.sampler import dynesty3_utils as dy_utils
-from bilby.core.sampler.dynesty import dynesty_stats_plot
+from bilby.core.sampler import base_sampler as bs, dynesty3_utils as dy_utils
+from bilby.core.sampler.dynesty import dynesty_stats_plot as stats_plot
 from dynesty.plotting import runplot, traceplot
 from matplotlib import pyplot as plt
 from numpy.random import PCG64, Generator, SeedSequence
@@ -559,7 +558,7 @@ class Dynesty(Worker):
         # labels = [label.replace("_", " ") for label in search_parameter_keys]
         for name, func, obj in zip(
             ["trace", "run", "stats"],
-            [traceplot, runplot, dynesty_stats_plot],
+            [traceplot, runplot, stats_plot],
             [self.sampler.results, self.sampler.results, self.sampler],
         ):
             try:

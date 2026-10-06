@@ -11,8 +11,7 @@ import yaml
 from astropy import time
 from bilby.core.prior import PriorDict
 from bilby.core.result import read_in_result
-from bilby.core.utils import decode_bilby_json
-from bilby.core.utils import random as bilby_random
+from bilby.core.utils import decode_bilby_json, random as bilby_random
 
 logger = logging.getLogger("nmma")
 
