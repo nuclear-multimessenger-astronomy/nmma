@@ -179,6 +179,7 @@ class TestInjectionHandling:
         )
 
     def test_injection_from_file(self):
+        self.args.injection_file = str(self.injection_path)
         assert utils.injection_from_file(self.args) == self.injection.iloc[0].to_dict()
 
     def test_injection_from_prior(self):

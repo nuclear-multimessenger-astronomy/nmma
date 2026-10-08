@@ -1438,9 +1438,7 @@ def create_light_curve_data(
 
     injection_parameters = light_curve_model.parameter_conversion(injection_parameters)
     filters = utils.set_filters(args)
-    trigger_time = read_trigger_time(injection_parameters, args, "mjd")
-    if trigger_time is None:
-        trigger_time = 0.0
+    trigger_time = read_trigger_time(injection_parameters, args, "mjd") or 0.0
     if rng is None:
         rng = np.random.default_rng(args.generation_seed)
     if getattr(args, "absolute", False):
