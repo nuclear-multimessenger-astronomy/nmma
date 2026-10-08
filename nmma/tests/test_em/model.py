@@ -608,11 +608,17 @@ class TestSVDLightCurveModel(LightCurveModelTestContainer):
     init_kwargs = {
         "svd_path": MODELS_DIR / "svdmodels",
         "interpolation_type": "tensorflow",
-        "local_only": True,
+        "local_only": False,
     }
     estimator_key = "model"  # where the trained predictor sits, per filter
     unknown_interpolation = "spline"
     missing_extension = "missing"
+
+    @classmethod
+    def setup_class(cls):
+        if not cls.init_kwargs["svd_path"].exists():
+            pytest.skip("SVD models are not available in the repo.")
+        super().setup_class()
 
     def setup_method(self):
         super().setup_method()
@@ -694,7 +700,7 @@ class TestSVDLightCurveModelWithGP(TestSVDLightCurveModel):
     init_kwargs = {
         "svd_path": MODELS_DIR,
         "interpolation_type": "sklearn_gp",
-        "local_only": True,
+        "local_only": False,
     }
     estimator_key = "gps"
 
