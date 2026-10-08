@@ -53,6 +53,8 @@ def data_from_injection(args, filters):
             injection_params, args, inj_model, keep_infinite_data=True
         )
         io.write_em_observations(inj_outfile, full_data, format="model")
+
+    # FIXME : What is the purpose of this? We could drop non-detections later
     data = {
         filt: {
             key: val[

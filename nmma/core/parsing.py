@@ -5,9 +5,9 @@ from pathlib import Path
 
 import configargparse
 import yaml
-from bilby.core.utils import setup_logger
 
 from .gitlab import refresh_models_list
+from .utils import setup_logger
 
 
 def yaml_parse(s):
@@ -44,8 +44,7 @@ def parsing_and_logging(parser_func, args=None):
         refresh_models_list(args.svd_path)
     if getattr(args, "outdir", None) is not None:
         setup_logger(outdir=args.outdir, label=args.label)
-        Path(args.outdir).mkdir(parents=True, exist_ok=True)
-    print("Setting up logger and storage directory")
+        print("Setting up logger and storage directory")
     return args
 
 

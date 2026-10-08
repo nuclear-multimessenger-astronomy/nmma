@@ -11,12 +11,14 @@ import yaml
 from astropy import time
 from bilby.core.prior import PriorDict
 from bilby.core.result import read_in_result
-from bilby.core.utils import decode_bilby_json, random as bilby_random
+from bilby.core.utils import (
+    decode_bilby_json,
+    random as bilby_random,
+    setup_logger as bilby_setup_logger,
+)
 
-logger = logging.getLogger("nmma")
 
-
-def setup_logger(log_level="INFO"):
+def setup_logger(log_level="INFO", outdir=Path.cwd(), label=None):
     try:
         level = getattr(logging, log_level.upper())
     except:
@@ -24,7 +26,10 @@ def setup_logger(log_level="INFO"):
             f"log_level {log_level} not understood. Must either bei 'debug', 'info', or 'warning'."
         )
 
+    logger = logging.getLogger("nmma")
     logger.setLevel(level)
+
+    bilby_setup_logger(log_level=level)
 
     if not any([isinstance(h, logging.StreamHandler) for h in logger.handlers]):
         stream_handler = logging.StreamHandler()
@@ -35,19 +40,28 @@ def setup_logger(log_level="INFO"):
         )
         stream_handler.setLevel(level)
         logger.addHandler(stream_handler)
+    if not any([isinstance(h, logging.FileHandler) for h in logger.handlers]):
+        outdir = Path(outdir)
+        outdir.mkdir(parents=True, exist_ok=True)
+        if label:
+            log_file = outdir / f"{label}.log"
+            file_handler = logging.FileHandler(str(log_file))
+            file_handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s %(levelname)-8s: %(message)s", datefmt="%H:%M"
+                )
+            )
+
+            file_handler.setLevel(level)
+            logger.addHandler(file_handler)
+        bilby_setup_logger(outdir=str(outdir), label=label, log_level=level)
 
     for handler in logger.handlers:
         handler.setLevel(level)
+    return logger
 
 
-setup_logger()
-
-
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
+logger = setup_logger()
 
 
 def load_yaml(file_path):
@@ -136,6 +150,23 @@ def injection_from_prior(args):
     return prior.sample()
 
 
+def set_filename(basename, args, identifier=""):
+    outdir = Path(args.outdir)
+    path = Path(basename)
+    if not path.suffix:
+        ext = getattr(args, "extension", "json")
+        return outdir / f"{path.name}{identifier}.{ext}"
+
+    elif path.suffix not in [".json", ".csv", ".dat"]:
+        raise ValueError(f"Unsupported output file type: {path.suffix}")
+
+    if path.parent == Path("."):
+        outdir.mkdir(parents=True, exist_ok=True)
+        return outdir / f"{path.stem}{identifier}{path.suffix}"
+
+    return path.parent / f"{path.stem}{identifier}{path.suffix}"
+
+
 def get_posteriors(posterior_samples, outdir=None):
     """
     Load posterior samples from a file or DataFrame.
@@ -189,23 +220,6 @@ def get_posteriors(posterior_samples, outdir=None):
     else:
         raise ValueError("Unsupported file format, must be csv, txt, dat, json or hdf5")
     return posterior_samples
-
-
-def set_filename(basename, args, identifier=""):
-    outdir = Path(args.outdir)
-    path = Path(basename)
-    if not path.suffix:
-        ext = getattr(args, "extension", "json")
-        return outdir / f"{path.name}{identifier}.{ext}"
-
-    elif path.suffix not in [".json", ".csv", ".dat"]:
-        raise ValueError(f"Unsupported output file type: {path.suffix}")
-
-    if path.parent == Path("."):
-        outdir.mkdir(parents=True, exist_ok=True)
-        return outdir / f"{path.stem}{identifier}{path.suffix}"
-
-    return path.parent / f"{path.stem}{identifier}{path.suffix}"
 
 
 def read_bestfit_from_posterior(args, mode="max_likelihood", return_posterior=False):

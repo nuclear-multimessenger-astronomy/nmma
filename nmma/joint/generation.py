@@ -21,7 +21,7 @@ from .. import __version__
 from ..core.base import adjust_hubble_prior, adjust_priors_for_nmma
 from ..core.constants import set_cosmology
 from ..core.conversion import KilonovaEjectaFitting
-from ..core.utils import read_trigger_time
+from ..core.utils import read_trigger_time, setup_logger
 from ..em import utils as em_utils
 from ..em.io import load_em_observations
 from ..em.lightcurve_generation import create_light_curve_data
@@ -203,8 +203,8 @@ def create_generation_logger(outdir, label):
         The configured logger.
     """
 
-    logger = bilby.core.utils.logger
-    bilby.core.utils.setup_logger(outdir=str(Path(outdir, "data")), label=label)
+    logger = setup_logger(outdir=outdir, label=label)
+    bilby.core.utils.logger = logger
     bilby_pipe.data_generation.logger = logger
     return logger
 

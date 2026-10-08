@@ -261,66 +261,6 @@ def maximum_mass_parser(parser):
     return parser
 
 
-def corner_plot_parser(parser):
-    """
-    Add the arguments for generating a corner plot from posterior files.
-
-    Parameters
-    ----------
-    parser : argparse.ArgumentParser
-        Parser to add the arguments to.
-
-    Returns
-    -------
-    argparse.ArgumentParser
-        The same parser, with the corner plot arguments added.
-    """
-    parser.description = "Generate corner plot"
-
-    parser.add_argument(
-        "-f",
-        "--posterior-files",
-        nargs="+",
-        required=True,
-        help="CSV file path for posteriors",
-    )
-    parser.add_argument(
-        "-p", "--prior-filename", help="Prior file path for axes labels"
-    )
-    parser.add_argument(
-        "-l",
-        "--label-name",
-        nargs="+",
-        help="Legend labels (if in latex, use '$label$') or else just use the posterior file names",
-    )
-    parser.add_argument(
-        "-i",
-        "--injection-json",
-        help="Injection JSON file path to be used as truth values",
-    )
-    parser.add_argument(
-        "-n",
-        "--injection-num",
-        type=int,
-        help="Injection number to be used as truth values, only used if injection JSON is provided; equivalent to simulation ID",
-    )
-
-    parser.add_argument(
-        "--bestfit-params",
-        help="Use the values from the bestfit_params.json file to plot the truth on the corner plot; Either use injection JSON or bestfit_params.json, not both",
-    )
-
-    # FIXME: -o/--output parsed but never read by plot_multi_corner; figure never saved
-    parser.add_argument("-o", "--output", help="output file name.")
-    parser.add_argument(
-        "--kwargs",
-        default="{}",
-        help="kwargs to be passed to corner.corner. Eg: {'plot_datapoints': False}, enclose {} in double quotes",
-    )
-
-    return parser
-
-
 def lc_marginalisation_parser(parser):
     """
     Add the arguments for the light curve marginalisation.

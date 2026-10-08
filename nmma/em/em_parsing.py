@@ -13,7 +13,6 @@ from ..core.parsing import (
     single_messenger_analysis_parsing,
     yaml_parse,
 )
-from .utils import DEFAULT_FILTERS
 
 
 def em_time_parsing(parser):
@@ -662,7 +661,6 @@ def multi_lc_parser(parser):
     parser.add_argument(
         "--filters",
         nargs="*",
-        default=DEFAULT_FILTERS,
         help="filters for photometric lcs; must be from the bandpasses listed at"
         " https://sncosmo.readthedocs.io/en/stable/bandpass-list.html",
     )
