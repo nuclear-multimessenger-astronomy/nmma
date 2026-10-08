@@ -235,6 +235,11 @@ class TestAnalysisSetup(AnalysisTestsContainer):
         assert np.isfinite(logl_loose)
         assert logl_tight > logl_loose
 
+    def integration_test(self):
+        self.args.sampler = "dynesty"
+        self.args.maxiter = 10
+        analysis.multi_analysis_loop(self.args, analysis.analysis_setup)
+
 
 class TestBolometricSetup(AnalysisTestsContainer):
     """Tests for bolometric_setup, the assembly logic behind
