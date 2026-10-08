@@ -266,9 +266,17 @@ class CosmologyConverter:
         return self.source_frame_masses(params)
 
     def get_cosmo_grids(self, distance_min, distance_max):
-        zmin = cosmo.z_at_value(
-            self.cosmology.luminosity_distance, distance_min * units.Mpc
-        )
+        if distance_min < 0:
+            raise ValueError("Luminosity distances must be positive.")
+        elif distance_min > distance_max:
+            raise ValueError("distance_min must be less than distance_max.")
+
+        elif distance_min < 5e-5:
+            zmin = 1e-8  # lower limit of astropy's cosmology.z_at_value
+        else:
+            zmin = cosmo.z_at_value(
+                self.cosmology.luminosity_distance, distance_min * units.Mpc
+            )
         zmax = cosmo.z_at_value(
             self.cosmology.luminosity_distance, distance_max * units.Mpc
         )
