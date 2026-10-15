@@ -578,9 +578,11 @@ class EoSConverter:
 
         if self.force_nsbh:
             # lambda_1 = radius_1 = 0 also routes KilonovaEjectaFitting to the NSBH fit
+            # (keep scalars as float: np.zeros_like gives a 0-d array, which lalsimulation rejects)
             for key in ["lambda_1", "radius_1"]:
-                converted_parameters[key] = np.zeros_like(
-                    converted_parameters[key], dtype=float
+                value = converted_parameters[key]
+                converted_parameters[key] = (
+                    np.zeros(np.shape(value)) if np.ndim(value) else 0.0
                 )
 
         return converted_parameters

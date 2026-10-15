@@ -52,6 +52,21 @@ def test_force_nsbh_zeroes_primary_only(eos_file, m1):
     assert out["lambda_2"] > 0
 
 
+@pytest.mark.parametrize("force", [False, True])
+def test_scalar_inputs_give_python_scalars(eos_file, force):
+    """lalsimulation's SWIG setters reject 0-d arrays (TypeError ... REAL8): the
+    single-messenger (GW only) path does not run val_to_scalar after the conversion"""
+    out = converted(eos_file, 1.4, 1.2, force_nsbh=force)
+    for key in ["lambda_1", "lambda_2", "radius_1", "radius_2"]:
+        assert isinstance(out[key], float), (key, type(out[key]))
+    import lalsimulation
+    import lal
+
+    lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(
+        lal.CreateDict(), out["lambda_1"]
+    )
+
+
 def test_force_nsbh_false_is_default(eos_file):
     default = converted(eos_file, 1.4, 1.2)
     explicit = converted(eos_file, 1.4, 1.2, force_nsbh=False)
