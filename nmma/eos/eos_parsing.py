@@ -26,6 +26,13 @@ def tabulated_eos_parsing(parser):
         action="store_true",
         help="Depending on cluster architecture, it can be faster to load all EOS files directly to RAM",
     )
+    tab_eos_input_parser.add(
+        "--force-nsbh",
+        action="store_true",
+        help="Treat the heavier component as a black hole for every sample: set lambda_1 = radius_1 = 0 "
+        "after the EOS lookup, even for mass_1 below the TOV mass, so the NSBH ejecta fit is used "
+        "(requires chi_1 or a_1/cos_tilt_1 as BH spin)",
+    )
     tab_eos_input_parser.add("--eos-data", help="Path to the EOS directory")
     tab_eos_input_parser.add("--Neos", type=int, help="Number of EOSs to be used")
     tab_eos_input_parser.add(

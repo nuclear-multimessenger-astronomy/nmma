@@ -392,6 +392,8 @@ class EoSConverter:
                 method = "emulated"
 
         self.parameter_conversion = self.full_eos_conversion
+        # treat the heavier component as a BH (lambda_1 = radius_1 = 0), whatever its mass
+        self.force_nsbh = getattr(args, "force_nsbh", False)
         # Case 1: eos is generated from emulator on the fly
         if method == "emulated":
             self.tov_emulator = setup_eos_generator(args)
@@ -573,6 +575,13 @@ class EoSConverter:
                 [lambda_1_list, lambda_2_list, radius_1_list, radius_2_list],
             ):
                 converted_parameters[key] = np.array(_list)
+
+        if self.force_nsbh:
+            # lambda_1 = radius_1 = 0 also routes KilonovaEjectaFitting to the NSBH fit
+            for key in ["lambda_1", "radius_1"]:
+                converted_parameters[key] = np.zeros_like(
+                    converted_parameters[key], dtype=float
+                )
 
         return converted_parameters
 
