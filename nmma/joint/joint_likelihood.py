@@ -286,7 +286,9 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin, JointLikelihood):
         elif len(messenger_lhoods) == 1:
             lhood = messenger_lhoods[0]
             if "eos" in conversion_instructions:
-                lhood.conv_functions.append(conversion_instructions["eos"])
+                # conv_functions run in reverse: index 0 runs last, i.e. after the
+                # sub-model's source-frame conversion that the EOS conversion needs
+                lhood.conv_functions.insert(0, conversion_instructions["eos"])
             lhood.setup_parameter_conversion()
             logger.info(f"Only {lhood} is used. Using this instead.")
         else:
