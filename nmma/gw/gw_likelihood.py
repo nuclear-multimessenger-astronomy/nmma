@@ -64,7 +64,7 @@ def setup_gw_kwargs(data_dump, args, logger, **kwargs):
     """
 
     default_gw_kwargs = initialisation_args_from_signature_and_namespace(
-        GravitationalWaveTransientLikelihood, args, prefixes=["gw_"]
+        GravitationalWaveTransientLikelihood, args, prefixes=["gw_", ""]
     )
     gw_kwargs = default_gw_kwargs | dict(
         interferometers=data_dump["ifo_list"],
