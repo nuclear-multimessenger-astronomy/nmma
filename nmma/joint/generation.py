@@ -373,8 +373,9 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
         elif args.eos_data:
             analysis_modifiers.append("tabulated_eos")
             eos_constraint_dict = compose_eos_constraints(args)
+            # also needed without constraints, to convert the injection
+            eos_converter = EoSConverter(args, "tabulated")
             if eos_constraint_dict:
-                eos_converter = EoSConverter(args, "tabulated")
                 constraint = JointEoSConstraint(
                     eos_constraint_dict, eos_converter=eos_converter
                 )
