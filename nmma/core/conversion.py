@@ -743,6 +743,81 @@ def EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source):
     return lambda_1, lambda_2, radius_1, radius_2
 
 
+# Breu & Rezzolla (2016), https://arxiv.org/abs/1601.06083, Eq. (3): the maximum mass
+# supported by uniform rotation is a universal function of chi / chi_Kep,
+#   M_max / M_TOV = 1 + a2 (chi / chi_Kep)^2 + a4 (chi / chi_Kep)^4,
+# i.e. 1.203 M_TOV at the mass-shedding spin chi_Kep.
+MMAX_SPIN_A2 = 1.316e-1
+MMAX_SPIN_A4 = 7.111e-2
+CHI_KEPLER = 0.7
+
+
+def max_mass_ratio_from_spin(chi, chi_kep=CHI_KEPLER):
+    """
+    Ratio ``M_max / M_TOV`` of the maximum mass of a uniformly rotating neutron
+    star with dimensionless spin ``chi`` to the non-rotating maximum mass.
+
+    This is the universal relation of Breu & Rezzolla (2016), Eq. (3), valid for
+    ``0 <= chi <= chi_kep``. It also is the stability condition for a star of mass
+    ``m`` and spin ``chi``: the star lies below the turning-point line at its
+    angular momentum ``J = chi m^2`` exactly when ``m <= M_TOV * ratio``.
+
+    Never raises. Where the relation does not apply (``chi`` negative, above
+    ``chi_kep``, or non-finite) the ratio is 1, i.e. ``M_max = M_TOV``, so that a
+    sampler carries on with the conservative non-rotating limit.
+
+    Parameters
+    ----------
+    chi : float or array_like
+        Dimensionless spin magnitude.
+    chi_kep : float, default=0.7
+        Dimensionless spin at the mass-shedding limit.
+
+    Returns
+    -------
+    numpy.ndarray or float
+        ``M_max / M_TOV``, with the shape of ``chi``.
+    """
+    chi = np.asarray(chi, dtype=float)
+    with np.errstate(invalid="ignore"):
+        valid = (chi >= 0.0) & (chi <= chi_kep * (1 + 1e-12))
+    x = np.where(valid, chi, 0.0) / chi_kep
+    ratio = 1.0 + MMAX_SPIN_A2 * x**2 + MMAX_SPIN_A4 * x**4
+    return ratio if ratio.ndim else float(ratio)
+
+
+def mtov_to_mmax_spin(mtov, chi, chi_kep=CHI_KEPLER):
+    """
+    Maximum mass ``M_max = M_TOV * max_mass_ratio_from_spin(chi)``.
+
+    Parameters
+    ----------
+    mtov : float or array_like
+        Non-rotating maximum mass of the EOS.
+    chi : float or array_like
+        Dimensionless spin magnitude; see :func:`max_mass_ratio_from_spin`
+        (``M_max = M_TOV`` where it does not apply).
+    chi_kep : float, default=0.7
+
+    Returns
+    -------
+    numpy.ndarray or float
+    """
+    return mtov * max_mass_ratio_from_spin(chi, chi_kep)
+
+
+def spin_magnitude(parameters, index):
+    """
+    Dimensionless spin magnitude of component ``index`` (1 or 2) from the GW
+    parameters: ``a_<i>``, else ``|chi_<i>|``, else ``|spin_<i>z|``, else 0
+    (non-spinning, the conservative choice for the maximum mass).
+    """
+    for key in (f"a_{index}", f"chi_{index}", f"spin_{index}z"):
+        if key in parameters:
+            return np.abs(parameters[key])
+    return 0.0
+
+
 def radii_from_qur(parameters):
     """
     Add ``radius_1``, ``radius_2`` and ``R_16`` to ``parameters``.

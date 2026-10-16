@@ -10,7 +10,9 @@ import numpy as np
 from ..core.conversion import (
     EOS_to_ns_parameters,
     EOS_to_system_parameters,
+    mtov_to_mmax_spin,
     radii_from_qur,
+    spin_magnitude,
 )
 
 
@@ -394,6 +396,10 @@ class EoSConverter:
         self.parameter_conversion = self.full_eos_conversion
         # treat the heavier component as a BH (lambda_1 = radius_1 = 0), whatever its mass
         self.force_nsbh = getattr(args, "force_nsbh", False)
+        # only accept samples consistent with a BNS, with spin-supported masses up to M_max
+        self.force_bns = getattr(args, "force_bns", False)
+        if self.force_nsbh and self.force_bns:
+            raise ValueError("--force-nsbh and --force-bns are mutually exclusive")
         # Case 1: eos is generated from emulator on the fly
         if method == "emulated":
             self.tov_emulator = setup_eos_generator(args)
@@ -552,17 +558,31 @@ class EoSConverter:
         m2_source = converted_parameters["mass_2_source"]
         radii, masses, lambdas = self.macro_parameters.values()
 
+        tov_mass = None
+        if self.force_bns:
+            # a component between M_TOV and M_max (spin-supported) is looked up at the top
+            # of the table, so that radius > 0 and the BNS ejecta fit is used
+            tov_mass = (
+                np.max(masses)
+                if isinstance(radii, np.ndarray)
+                else np.array([np.max(m) for m in masses])
+            )
+            lookup_m1 = np.minimum(m1_source, tov_mass)
+            lookup_m2 = np.minimum(m2_source, tov_mass)
+        else:
+            lookup_m1, lookup_m2 = m1_source, m2_source
+
         if isinstance(radii, np.ndarray):  # single eos case
             for key, val_array in zip(
                 system_keys,
-                EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source),
+                EOS_to_system_parameters(radii, masses, lambdas, lookup_m1, lookup_m2),
             ):
                 converted_parameters[key] = val_array
         else:
             lambda_1_list, lambda_2_list, radius_1_list, radius_2_list = [], [], [], []
             for i, rad in enumerate(radii):
                 lambda_1, lambda_2, radius_1, radius_2 = EOS_to_system_parameters(
-                    rad, masses[i], lambdas[i], m1_source[i], m2_source[i]
+                    rad, masses[i], lambdas[i], lookup_m1[i], lookup_m2[i]
                 )
 
                 lambda_1_list.append(lambda_1)
@@ -585,6 +605,33 @@ class EoSConverter:
                     np.zeros(np.shape(value)) if np.ndim(value) else 0.0
                 )
 
+        if self.force_bns:
+            converted_parameters = self.apply_force_bns(
+                converted_parameters, tov_mass, m1_source, m2_source
+            )
+
+        return converted_parameters
+
+    def apply_force_bns(self, converted_parameters, tov_mass, m1_source, m2_source):
+        """Add the spin-dependent maximum masses and the BNS-consistency flag.
+
+        For each component ``i`` the maximum mass ``mmax_spin_i`` is ``M_TOV`` of the
+        EOS times the Breu & Rezzolla spin relation (:func:`mtov_to_mmax_spin`), using the
+        spin from ``a_i``, ``chi_i`` or ``spin_iz`` (0 if absent). A sample is flagged with
+        ``force_bns_rejected = 1`` (else 0) if a component is heavier than its ``mmax_spin_i``
+        or lies below the tabulated mass range (radius 0): ``log_likelihood`` then returns
+        -inf. Never raises on invalid spins (``M_max = M_TOV`` there).
+        """
+        rejected = np.zeros(np.shape(m1_source), dtype=bool)
+        for i, mass in ((1, m1_source), (2, m2_source)):
+            mmax = mtov_to_mmax_spin(tov_mass, spin_magnitude(converted_parameters, i))
+            converted_parameters[f"mmax_spin_{i}"] = mmax
+            radius = np.asarray(converted_parameters[f"radius_{i}"])
+            # NaNs (e.g. from nan masses) compare False, so reject them explicitly
+            rejected = rejected | ~(np.asarray(mass) <= mmax) | ~(radius > 0)
+        converted_parameters["force_bns_rejected"] = (
+            rejected.astype(float) if rejected.ndim else float(rejected)
+        )
         return converted_parameters
 
 

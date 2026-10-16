@@ -33,6 +33,16 @@ def tabulated_eos_parsing(parser):
         "after the EOS lookup, even for mass_1 below the TOV mass, so the NSBH ejecta fit is used "
         "(requires chi_1 or a_1/cos_tilt_1 as BH spin)",
     )
+    tab_eos_input_parser.add(
+        "--force-bns",
+        action="store_true",
+        help="Only accept samples that are fully consistent with a binary neutron star, e.g. for a heavy "
+        "BNS near the mass gap: both components must be below the maximum mass of the EOS including the "
+        "effect of their spin (Breu & Rezzolla 2016, spin from a_i, chi_i or spin_iz; M_max = M_TOV if "
+        "no spin is available), otherwise the log-likelihood is -inf. Components above M_TOV but below "
+        "M_max are given the radius and tidal deformability at M_TOV, so the BNS ejecta fit is always "
+        "used. Mutually exclusive with --force-nsbh",
+    )
     tab_eos_input_parser.add("--eos-data", help="Path to the EOS directory")
     tab_eos_input_parser.add("--Neos", type=int, help="Number of EOSs to be used")
     tab_eos_input_parser.add(

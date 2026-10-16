@@ -141,6 +141,9 @@ class NMMALikelihoodMixin:
         """Convert ``parameters``, then ``sub_log_likelihood`` if
         constraints and sanity checks pass, else -inf."""
         parameters = self.parameter_conversion(parameters)
+        # --force-bns: sample inconsistent with a BNS (component above its spin-dependent M_max)
+        if np.any(parameters.get("force_bns_rejected", 0.0)):
+            return np.nan_to_num(-np.inf)
         if self.evaluate_constraints(parameters) and self.sanity_checks():
             return self.sub_log_likelihood(parameters)
         else:
