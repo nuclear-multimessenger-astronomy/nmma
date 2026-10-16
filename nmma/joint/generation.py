@@ -364,6 +364,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             analysis_modifiers.append("Hubble")
 
         # EOS Setup
+        eos_converter = None
         if args.emulator_metadata:
             messengers.append("eos")
             logger.info("Setting up EOS constraints")
@@ -389,6 +390,14 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             priors = setup_tabulated_eos_priors(args, priors, logger)
 
         if self.injection_parameters:
+            # --force-nsbh/--force-bns are hypotheses of the analysis: the injected
+            # system must not depend on them, so convert it without the flags
+            forced = (
+                getattr(eos_converter, "force_nsbh", False),
+                getattr(eos_converter, "force_bns", False),
+            )
+            if any(forced):
+                eos_converter.force_nsbh = eos_converter.force_bns = False
             try:
                 converted_injection = eos_converter(converted_injection)
                 converted_injection = KilonovaEjectaFitting()(converted_injection)
@@ -399,6 +408,8 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 logger.warning(f"Error was {e}")
                 pass
             finally:
+                if any(forced):
+                    eos_converter.force_nsbh, eos_converter.force_bns = forced
                 # correct injection only once lambdas are properly set
                 # some routines return np.float32 which raises errors
                 # downstream in results processing, so we convert to float

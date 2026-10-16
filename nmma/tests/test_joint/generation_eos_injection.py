@@ -3,6 +3,7 @@ from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from nmma.core.parsing import parsing_and_logging
 from nmma.em import em_parsing
@@ -11,9 +12,9 @@ from nmma.joint import generation
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 
-def test_injection_with_tabulated_eos_and_no_constraints(tmp_path):
-    """A tabulated EOS without EOS constraints must still convert the injection, so
-    that the ejecta masses are derived from masses + EOS (here: BNS, Bu2026)."""
+def converted_injection(tmp_path, m1, m2, **flags):
+    """Run nmma-generation (EM only) on an injection with a tabulated EOS and no EOS
+    constraints; return the converted injection dict."""
     em_args = parsing_and_logging((em_parsing.multi_wavelength_analysis_parser,), [])
     args = Namespace(**vars(em_args))
     for key, val in dict(
@@ -31,12 +32,13 @@ def test_injection_with_tabulated_eos_and_no_constraints(tmp_path):
         nlive=64,
         local_only=True,
         trigger_time=60000.0,
+        **flags,
         eos_data=DATA_DIR / "eos_macro",
         eos_to_ram=True,
         Neos=10,
         injection_dict=dict(
-            mass_1_source=1.4,
-            mass_2_source=1.3,
+            mass_1_source=m1,
+            mass_2_source=m2,
             EOS=0,
             chi_1=0.0,
             chi_2=0.0,
@@ -56,6 +58,32 @@ def test_injection_with_tabulated_eos_and_no_constraints(tmp_path):
 
     dump_file = next((tmp_path / "outdir").rglob("*_data_dump.pickle"))
     with open(dump_file, "rb") as f:
-        converted = pickle.load(f)["args"].injection_dict
+        return pickle.load(f)["args"].injection_dict
+
+
+def test_injection_with_tabulated_eos_and_no_constraints(tmp_path):
+    """A tabulated EOS without EOS constraints must still convert the injection, so
+    that the ejecta masses are derived from masses + EOS (here: BNS, Bu2026)."""
+    converted = converted_injection(tmp_path, 1.4, 1.3)
     assert np.isfinite(converted["log10_mej_dyn"])
     assert np.isfinite(converted["log10_mej_wind"])
+
+
+@pytest.mark.parametrize(
+    "m1, m2, flags",
+    [
+        (2.8, 1.3, {}),  # BH above M_TOV (2.2 for the toy EOS)
+        (2.8, 1.3, dict(force_bns=True)),  # hypothesis flags must not change it
+        (1.4, 1.3, {}),  # NS-NS
+        (1.4, 1.3, dict(force_nsbh=True)),
+    ],
+)
+def test_injection_is_independent_of_force_flags(tmp_path, m1, m2, flags):
+    """--force-bns/--force-nsbh are analysis hypotheses: the injected system (tidal
+    parameters, ejecta) is the same with or without them."""
+    reference = converted_injection(tmp_path / "ref", m1, m2)
+    converted = converted_injection(tmp_path / "flag", m1, m2, **flags)
+    for key in ("lambda_1", "lambda_2", "radius_1", "radius_2"):
+        assert converted[key] == pytest.approx(reference[key]), key
+    for key in ("log10_mej_dyn", "log10_mej_wind"):
+        assert converted[key] == pytest.approx(reference[key]), key
