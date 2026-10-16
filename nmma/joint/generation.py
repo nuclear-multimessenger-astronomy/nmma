@@ -436,6 +436,12 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             else:
                 light_curve_data = load_em_observations(args)
 
+            # apply --data-tmin/--data-tmax (relative to the trigger, in days), as
+            # lightcurve-analysis does; data times are in MJD here
+            light_curve_data = em_utils.cut_data_to_time_range(
+                light_curve_data, args, read_trigger_time(None, args)
+            )
+
             filters = em_utils.set_filters(args)
             if not filters:
                 filters = list(light_curve_data.keys())
