@@ -59,7 +59,7 @@ def setup_em_kwargs(priors, data_dump, args, logger=None):
     )
 
     em_kwargs = initialisation_args_from_signature_and_namespace(
-        EMTransientLikelihood, args, ["em_", "kilonova_"]
+        EMTransientLikelihood, args, ["em_", "kilonova_", ""]
     )
 
     # add kwargs manually
