@@ -34,6 +34,14 @@ def tabulated_eos_parsing(parser):
         "(requires chi_1 or a_1/cos_tilt_1 as BH spin)",
     )
     tab_eos_input_parser.add(
+        "--force-nsbh-nonoverlapping",
+        action="store_true",
+        help="Identical to --force-nsbh, but additionally only accept samples where the heavier "
+        "component is strictly above the maximum (non-rotating) mass M_TOV of the EOS, i.e. the "
+        "BH mass cannot overlap with the NS mass range; otherwise the log-likelihood is -inf. "
+        "Mutually exclusive with --force-bns",
+    )
+    tab_eos_input_parser.add(
         "--force-bns",
         action="store_true",
         help="Only accept samples that are fully consistent with a binary neutron star, e.g. for a heavy "
@@ -41,7 +49,7 @@ def tabulated_eos_parsing(parser):
         "effect of their spin (Breu & Rezzolla 2016, spin from a_i, chi_i or spin_iz; M_max = M_TOV if "
         "no spin is available), otherwise the log-likelihood is -inf. Components above M_TOV but below "
         "M_max are given the radius and tidal deformability at M_TOV, so the BNS ejecta fit is always "
-        "used. Mutually exclusive with --force-nsbh",
+        "used. Mutually exclusive with --force-nsbh and --force-nsbh-nonoverlapping",
     )
     tab_eos_input_parser.add("--eos-data", help="Path to the EOS directory")
     tab_eos_input_parser.add("--Neos", type=int, help="Number of EOSs to be used")

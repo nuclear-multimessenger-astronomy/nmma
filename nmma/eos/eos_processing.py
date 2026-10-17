@@ -395,11 +395,17 @@ class EoSConverter:
 
         self.parameter_conversion = self.full_eos_conversion
         # treat the heavier component as a BH (lambda_1 = radius_1 = 0), whatever its mass
-        self.force_nsbh = getattr(args, "force_nsbh", False)
+        self.force_nsbh_nonoverlapping = getattr(args, "force_nsbh_nonoverlapping", False)
+        # --force-nsbh-nonoverlapping is --force-nsbh plus rejecting mass_1 <= M_TOV
+        self.force_nsbh = (
+            getattr(args, "force_nsbh", False) or self.force_nsbh_nonoverlapping
+        )
         # only accept samples consistent with a BNS, with spin-supported masses up to M_max
         self.force_bns = getattr(args, "force_bns", False)
         if self.force_nsbh and self.force_bns:
-            raise ValueError("--force-nsbh and --force-bns are mutually exclusive")
+            raise ValueError(
+                "--force-nsbh/--force-nsbh-nonoverlapping and --force-bns are mutually exclusive"
+            )
         # Case 1: eos is generated from emulator on the fly
         if method == "emulated":
             self.tov_emulator = setup_eos_generator(args)
@@ -559,7 +565,7 @@ class EoSConverter:
         radii, masses, lambdas = self.macro_parameters.values()
 
         tov_mass = None
-        if self.force_bns:
+        if self.force_bns or self.force_nsbh_nonoverlapping:
             # a component between M_TOV and M_max (spin-supported) is looked up at the top
             # of the table, so that radius > 0 and the BNS ejecta fit is used
             tov_mass = (
@@ -567,6 +573,7 @@ class EoSConverter:
                 if isinstance(radii, np.ndarray)
                 else np.array([np.max(m) for m in masses])
             )
+        if self.force_bns:
             lookup_m1 = np.minimum(m1_source, tov_mass)
             lookup_m2 = np.minimum(m2_source, tov_mass)
         else:
@@ -604,6 +611,13 @@ class EoSConverter:
                 converted_parameters[key] = (
                     np.zeros(np.shape(value)) if np.ndim(value) else 0.0
                 )
+
+        if self.force_nsbh_nonoverlapping:
+            # NaNs compare False, so they are rejected too
+            rejected = ~(np.asarray(m1_source) > tov_mass)
+            converted_parameters["force_nsbh_rejected"] = (
+                rejected.astype(float) if rejected.ndim else float(rejected)
+            )
 
         if self.force_bns:
             converted_parameters = self.apply_force_bns(

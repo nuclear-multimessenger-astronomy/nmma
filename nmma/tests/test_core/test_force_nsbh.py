@@ -121,3 +121,45 @@ def test_force_nsbh_selects_nsbh_ejecta(eos_file):
         fitter.ejecta_parameter_conversion(forced),
         equal_nan=True,
     )
+
+
+@pytest.mark.parametrize(
+    "m1, rejected", [(1.4, 1.0), (2.2, 1.0), (2.21, 0.0), (2.5, 0.0)]
+)
+def test_force_nsbh_nonoverlapping_rejection_threshold(eos_file, m1, rejected):
+    """BH must be strictly above MTOV (2.2); lambda_1 = radius_1 = 0 as force_nsbh."""
+    out = converted(eos_file, m1, 1.2, force_nsbh_nonoverlapping=True)
+    assert out["force_nsbh_rejected"] == rejected
+    assert out["lambda_1"] == 0.0
+    assert out["radius_1"] == 0.0
+    assert out["radius_2"] == pytest.approx(12.0)
+
+
+def test_force_nsbh_nonoverlapping_default_off(eos_file):
+    out = converted(eos_file, 1.4, 1.2, force_nsbh=True)
+    assert "force_nsbh_rejected" not in out
+
+
+def test_force_nsbh_nonoverlapping_multiple_eos(eos_file):
+    converter = EoSConverter(
+        Namespace(eos_file=eos_file, force_nsbh_nonoverlapping=True), "tabulated"
+    )
+    converter.macro_parameters = {
+        "radii": [RADII, RADII],
+        "masses": [MASSES, MASSES],
+        "lambdas": [LAMBDAS, LAMBDAS],
+    }
+    out = converter.system_props_from_eos(
+        dict(mass_1_source=[1.4, 2.5], mass_2_source=[1.2, 1.1])
+    )
+    np.testing.assert_array_equal(out["force_nsbh_rejected"], [1.0, 0.0])
+
+
+def test_force_nsbh_nonoverlapping_exclusive_with_bns(eos_file):
+    with pytest.raises(ValueError):
+        EoSConverter(
+            Namespace(
+                eos_file=eos_file, force_nsbh_nonoverlapping=True, force_bns=True
+            ),
+            "tabulated",
+        )

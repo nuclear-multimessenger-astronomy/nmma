@@ -395,9 +395,11 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             forced = (
                 getattr(eos_converter, "force_nsbh", False),
                 getattr(eos_converter, "force_bns", False),
+                getattr(eos_converter, "force_nsbh_nonoverlapping", False),
             )
             if any(forced):
                 eos_converter.force_nsbh = eos_converter.force_bns = False
+                eos_converter.force_nsbh_nonoverlapping = False
             try:
                 converted_injection = eos_converter(converted_injection)
                 converted_injection = KilonovaEjectaFitting()(converted_injection)
@@ -409,7 +411,11 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 pass
             finally:
                 if any(forced):
-                    eos_converter.force_nsbh, eos_converter.force_bns = forced
+                    (
+                        eos_converter.force_nsbh,
+                        eos_converter.force_bns,
+                        eos_converter.force_nsbh_nonoverlapping,
+                    ) = forced
                 # correct injection only once lambdas are properly set
                 # some routines return np.float32 which raises errors
                 # downstream in results processing, so we convert to float
