@@ -19,12 +19,26 @@ from nmma.core.prompt_collapse import PromptCollapseClassifier
 M1, M2 = 1.5, 1.3  # NS-NS on the toy EOS (M_TOV 2.2)
 
 
-class StubClassifier:
+class ConstModel:
+    """predict_proba with a fixed collapse probability; used through the real wrapper so that
+    the array shapes are those of the real classifier (nmma-generation injects scalars)."""
+
+    classes_ = np.array([0, 1])
+
     def __init__(self, prob):
         self.prob = prob
 
-    def probability(self, total_mass, lambda_tilde, chi_eff, mass_ratio):
-        return np.full(np.shape(total_mass), self.prob, dtype=float)
+    def predict_proba(self, x):
+        return np.column_stack([np.full(len(x), 1 - self.prob), np.full(len(x), self.prob)])
+
+
+class Identity:
+    def transform(self, x):
+        return x.to_numpy()
+
+
+def StubClassifier(prob):
+    return PromptCollapseClassifier(ConstModel(prob), Identity())
 
 
 @pytest.fixture

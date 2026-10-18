@@ -154,11 +154,15 @@ class PromptCollapseClassifier:
         mass_ratio : array_like
             m1/m2 >= 1, as the classifier was trained.
         """
-        columns = [np.atleast_1d(np.asarray(x, dtype=float)) for x in
-                   (total_mass, lambda_tilde, chi_eff, mass_ratio)]
-        shape = np.broadcast(*columns).shape
+        columns = [
+            np.asarray(x, dtype=float) for x in (total_mass, lambda_tilde, chi_eff, mass_ratio)
+        ]
+        shape = np.broadcast(*columns).shape  # () for scalar inputs: callers rely on it
         x = pd.DataFrame(
-            {name: np.broadcast_to(col, shape).ravel() for name, col in zip(FEATURES, columns)}
+            {
+                name: np.broadcast_to(col, shape).ravel()
+                for name, col in zip(FEATURES, columns)
+            }
         )
         finite = np.isfinite(x.to_numpy()).all(axis=1)
         prob = np.full(len(x), np.nan)

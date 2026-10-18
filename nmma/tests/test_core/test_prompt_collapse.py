@@ -463,3 +463,40 @@ def test_numpy_file_rejects_a_missing_key(tmp_path):
     np.savez(tmp_path / "bad.npz", classes=np.array([0, 1]))
     with pytest.raises(ValueError, match="left"):
         NumpyGradientBoostingClassifier.from_file(tmp_path / "bad.npz")
+
+
+# ─── shapes: scalars in -> scalars out (nmma-generation injects scalar parameters) ─────────
+class ConstModel:
+    """predict_proba with a fixed collapse probability, through the real wrapper."""
+
+    classes_ = np.array([0, 1])
+
+    def __init__(self, prob):
+        self.prob = prob
+
+    def predict_proba(self, x):
+        return np.column_stack([np.full(len(x), 1 - self.prob), np.full(len(x), self.prob)])
+
+
+def real_wrapper(prob):
+    return PromptCollapseClassifier(ConstModel(prob), FakeScaler())
+
+
+def test_wrapper_keeps_the_shape_of_scalar_inputs():
+    p = real_wrapper(0.7).probability(3.5, 400.0, 0.0, 1.2)
+    assert np.shape(p) == () and float(p) == pytest.approx(0.7)
+    assert real_wrapper(0.7).probability(np.array([3.5]), 400.0, 0.0, 1.2).shape == (1,)
+    assert real_wrapper(0.7).probability(np.array([3.5, 3.0]), 400.0, 0.0, 1.2).shape == (2,)
+
+
+@pytest.mark.parametrize("prob", [0.0, 1.0])
+def test_scalar_parameters_give_the_same_output_shapes_as_the_default_fit(prob):
+    p = {k: float(v[0]) for k, v in system().items()}
+    old = BNSEjectaFitting().bns_parameter_conversion(p)
+    new = BNSEjectaFitting(
+        bns_fit="classifier", pc_classifier=real_wrapper(prob)
+    ).bns_parameter_conversion(p)
+    assert np.shape(new) == np.shape(old)
+    out = KilonovaEjectaFitting(bns_fit="classifier", pc_classifier=real_wrapper(prob))(dict(p))
+    for key in ("log10_mej_dyn", "log10_mej_wind", "log10_mej", "log10_E0"):
+        assert np.shape(out[key]) == np.shape(KilonovaEjectaFitting()(dict(p))[key]), key
