@@ -50,7 +50,9 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         filters = "u,g,r,i,z,y,J,H,K"
     light_curve_model = model.create_light_curve_model_from_args(args, filters)
     conversion = conv.MultimessengerConversion.basic_cbc(
-        EoSConverter(args, method="tabulated"), light_curve_model.parameter_conversion
+        EoSConverter(args, method="tabulated"),
+        light_curve_model.parameter_conversion,
+        ejecta_kwargs=conv.ejecta_kwargs_from_args(args),
     )
 
     ## read eos and gw data

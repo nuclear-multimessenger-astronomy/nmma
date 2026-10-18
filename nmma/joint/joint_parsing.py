@@ -1,4 +1,4 @@
-from ..core.parsing import base_injection_parsing, pipe_inj_parsing
+from ..core.parsing import base_injection_parsing, bns_fit_parsing, pipe_inj_parsing
 from ..em.em_parsing import em_analysis_parsing
 from ..eos.eos_parsing import eos_parsing, tabulated_eos_parsing
 from ..gw.gw_parsing import gw_injection_parsing
@@ -131,7 +131,7 @@ def injection_parsing(parser):
 
 def joint_likelihood_parsing(parser):
     """
-    Add the ``--ejecta-conversion`` flag.
+    Add the ``--ejecta-conversion`` and ``--bns-fit`` (with its classifier options) flags.
 
     Parameters
     ----------
@@ -148,4 +148,5 @@ def joint_likelihood_parsing(parser):
         action="store_true",
         help="Whether to set up ejecta conversions automatically if ejecta parameters are present",
     )
+    parser = bns_fit_parsing(parser, injection_options=True)
     return parser

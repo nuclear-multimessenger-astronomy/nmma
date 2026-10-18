@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from astropy import cosmology as cosmo, units
@@ -1205,7 +1207,71 @@ class NSBHEjectaFitting(EjectaFitting):
 
 
 class BNSEjectaFitting(EjectaFitting):
-    """Ejecta fitting for a BNS system."""
+    """
+    Ejecta fitting for a BNS system.
+
+    Parameters
+    ----------
+    bns_fit : {"default", "classifier"}
+        ``"default"``: the original fits (disk mass from the EOS-dependent
+        prompt-collapse threshold). ``"classifier"``: a remnant classifier decides
+        which systems collapse promptly; where ``P(collapse) > pc_threshold`` the
+        dynamical and disk masses come from the prompt-collapse fits of Loffredo et
+        al. (arXiv:2411.02342, Eq. 9 and 11), as in arXiv:2607.28438, and all other
+        systems keep the default fits. Needs ``lambda_1`` and ``lambda_2`` in the
+        parameters (``chi_1``, ``chi_2`` default to 0).
+    pc_classifier : object or str or pathlib.Path, optional
+        Only for ``bns_fit="classifier"``. Either an object with a
+        ``probability(total_mass, lambda_tilde, chi_eff, mass_ratio)`` method (see
+        :mod:`nmma.core.prompt_collapse`) or the directory holding the Zenodo files
+        of Puecher & Dietrich (arXiv:2408.10678).
+    pc_threshold : float, default 0.5
+        Probability above which a system counts as prompt collapse, in [0, 1].
+    """
+
+    BNS_FIT_CHOICES = ("default", "classifier")
+
+    def __init__(self, bns_fit="default", pc_classifier=None, pc_threshold=0.5):
+        if bns_fit not in self.BNS_FIT_CHOICES:
+            raise ValueError(
+                f"bns_fit must be one of {self.BNS_FIT_CHOICES}, got {bns_fit!r}"
+            )
+        if not 0.0 <= pc_threshold <= 1.0:  # also False for NaN
+            raise ValueError(f"pc_threshold must be in [0, 1], got {pc_threshold}")
+        if bns_fit == "default" and pc_classifier is not None:
+            raise ValueError(
+                "pc_classifier is only used with bns_fit='classifier'; "
+                "the default BNS fit would silently ignore it"
+            )
+        if bns_fit == "classifier":
+            if pc_classifier is None:
+                raise ValueError("bns_fit='classifier' needs a pc_classifier")
+            if isinstance(pc_classifier, (str, Path)):
+                from .prompt_collapse import PromptCollapseClassifier
+
+                pc_classifier = PromptCollapseClassifier.from_directory(pc_classifier)
+        self.bns_fit = bns_fit
+        self.pc_classifier = pc_classifier
+        self.pc_threshold = pc_threshold
+
+    def prompt_collapse_probability(self, parameters):
+        """P(prompt collapse) per system from :attr:`pc_classifier`."""
+        mass_1 = np.asarray(parameters["mass_1_source"], dtype=float)
+        mass_2 = np.asarray(parameters["mass_2_source"], dtype=float)
+        lambda_1 = parameters["lambda_1"]
+        lambda_2 = parameters["lambda_2"]
+        chi_1 = parameters.get("chi_1", 0.0)
+        chi_2 = parameters.get("chi_2", 0.0)
+        total_mass = mass_1 + mass_2
+        chi_eff = (mass_1 * chi_1 + mass_2 * chi_2) / total_mass
+        lambda_tilde = lambda_1_lambda_2_to_lambda_tilde(
+            lambda_1, lambda_2, mass_1, mass_2
+        )
+        # the classifier was trained on m1/m2 >= 1
+        mass_ratio = np.maximum(mass_1, mass_2) / np.minimum(mass_1, mass_2)
+        return self.pc_classifier.probability(
+            total_mass, lambda_tilde, chi_eff, mass_ratio
+        )
 
     def log10_disk_mass_fitting(
         self,
@@ -1514,6 +1580,30 @@ class BNSEjectaFitting(EjectaFitting):
             converted_parameters["R_16"] / geom_msun_km,
         )
 
+        if self.bns_fit == "classifier":
+            # prompt collapse: Loffredo et al. (arXiv:2411.02342) dynamical and disk
+            # masses where P(collapse) > threshold (NaN compares False)
+            with np.errstate(invalid="ignore"):
+                is_pc = self.prompt_collapse_probability(
+                    converted_parameters
+                ) > self.pc_threshold
+            lambda_1 = converted_parameters["lambda_1"]
+            lambda_2 = converted_parameters["lambda_2"]
+            mdyn_fit = np.where(
+                is_pc,
+                self.dynamic_mass_fitting_prompt_collapse(
+                    mass_1_source, mass_2_source, lambda_1, lambda_2
+                ),
+                mdyn_fit,
+            )
+            log10_mdisk_fit = np.where(
+                is_pc,
+                self.log10_disk_mass_fitting_prompt_collapse(
+                    mass_1_source, mass_2_source, lambda_1, lambda_2
+                ),
+                log10_mdisk_fit,
+            )
+
         log10_mej_dyn = np.log10(mdyn_fit + converted_parameters["alpha"])
 
         log10_mej_wind = np.log10(converted_parameters["ratio_zeta"]) + log10_mdisk_fit
@@ -1705,6 +1795,34 @@ class KilonovaEjectaFitting(BNSEjectaFitting, NSBHEjectaFitting):
             )
 
 
+def ejecta_kwargs_from_args(args, prefix=""):
+    """
+    Keyword arguments for :class:`KilonovaEjectaFitting` from the parsed CLI args.
+
+    ``{}`` (default BNS fits) unless ``--<prefix>bns-fit classifier`` was given.
+    ``prefix=""`` reads the analysis options (``--bns-fit`` ...), ``prefix="injection_"``
+    the options of the injected system (``--injection-bns-fit`` ...), which must not
+    depend on the analysis hypothesis.
+    """
+    flag = prefix.replace("_", "-")
+    if getattr(args, f"{prefix}bns_fit", "default") != "classifier":
+        return {}
+    directory = getattr(args, f"{prefix}pc_classifier_dir", None)
+    if directory is None:
+        raise ValueError(f"--{flag}bns-fit classifier needs --{flag}pc-classifier-dir")
+    return dict(
+        bns_fit="classifier",
+        pc_classifier=directory,
+        pc_threshold=getattr(args, f"{prefix}pc_threshold", 0.5),
+    )
+
+
+def ejecta_instruction_from_args(args):
+    """The ``"ejecta"`` entry of the conversion instructions: ``True`` for the default
+    fits, else the keyword arguments of :func:`ejecta_kwargs_from_args`."""
+    return ejecta_kwargs_from_args(args) or True
+
+
 class MultimessengerConversion:
     """
     An ordered chain of parameter conversions.
@@ -1769,7 +1887,13 @@ class MultimessengerConversion:
             conversions.append(instruction_dict["eos"])
 
         if "ejecta" in instruction_dict:
-            conversions.append(KilonovaEjectaFitting())
+            # True: default fits; dict: keyword arguments of KilonovaEjectaFitting
+            ejecta_kwargs = instruction_dict["ejecta"]
+            conversions.append(
+                KilonovaEjectaFitting(**ejecta_kwargs)
+                if isinstance(ejecta_kwargs, dict)
+                else KilonovaEjectaFitting()
+            )
 
         if "em" in instruction_dict:
             conversions.append(instruction_dict["em"])
@@ -1780,7 +1904,7 @@ class MultimessengerConversion:
         return cls(*conversions)
 
     @classmethod
-    def basic_cbc(cls, eos_conversion, em_conversion):
+    def basic_cbc(cls, eos_conversion, em_conversion, ejecta_kwargs=None):
         """
         Build a chain of :func:`bbh_source_frame`, ``eos_conversion``,
         :class:`KilonovaEjectaFitting` and ``em_conversion``.
@@ -1788,13 +1912,21 @@ class MultimessengerConversion:
         Parameters
         ----------
         eos_conversion, em_conversion : callable
+        ejecta_kwargs : dict, optional
+            Keyword arguments of :class:`KilonovaEjectaFitting` (e.g. from
+            :func:`ejecta_kwargs_from_args`); default: the original BNS fits.
 
         Returns
         -------
         MultimessengerConversion
         """
         gw_conv = CosmologyConverter().bbh_source_frame
-        return cls(gw_conv, eos_conversion, KilonovaEjectaFitting(), em_conversion)
+        return cls(
+            gw_conv,
+            eos_conversion,
+            KilonovaEjectaFitting(**(ejecta_kwargs or {})),
+            em_conversion,
+        )
 
     def convert_to_multimessenger_parameters(self, parameters, add_new_keys=False):
         """

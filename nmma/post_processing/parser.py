@@ -1,3 +1,4 @@
+from ..core.parsing import bns_fit_parsing
 from ..em.em_parsing import (
     basic_em_only_parsing,
     em_model_parsing,
@@ -166,6 +167,7 @@ def resampling_parser(parser):
     """
     parser.description = "Inference on binary source parameters with kilonova ejecta posterior and GW source posterior given."
 
+    parser = bns_fit_parsing(parser)
     parser.add_argument("--outdir", metavar="PATH", required=True)
     parser.add_argument(
         "--GWsamples",
@@ -284,6 +286,7 @@ def lc_marginalisation_parser(parser):
     parser = em_time_parsing(parser)
     parser = em_model_parsing(parser)
     parser = grb_parsing(parser)
+    parser = bns_fit_parsing(parser)
 
     # specific arguments
     parser.add_argument("--template-file", help="The template file to be used")

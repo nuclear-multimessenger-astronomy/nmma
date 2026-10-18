@@ -13,6 +13,7 @@ from ..core.conversion import (
     CosmologyConverter,
     NSBHEjectaFitting,
     chirp_mass_and_eta_to_component_masses,
+    ejecta_kwargs_from_args,
 )
 from ..core.parsing import nmma_base_parsing
 from .parser import resampling_parser
@@ -149,6 +150,9 @@ class EjectaResamplerMixIn:
         EOSpath,
         withNSBH,
         combine_ejecta_mass=False,
+        bns_fit="default",
+        pc_classifier=None,
+        pc_threshold=0.5,
         **kwargs,
     ):
         """
@@ -178,12 +182,24 @@ class EjectaResamplerMixIn:
             True adds ``chi_1`` and ``chi_2`` to the priors.
         combine_ejecta_mass : bool, default=False
             Passed to :func:`construct_EM_KDE`.
+        bns_fit, pc_classifier, pc_threshold
+            BNS ejecta fits, see :class:`nmma.core.conversion.BNSEjectaFitting`. With
+            ``"classifier"`` the BNS branch also samples ``chi_1`` and ``chi_2`` (priors from
+            ``GWprior``, KDEs from ``GWsamples``) because the classifier takes ``chi_eff``;
+            the default BNS fits do not use spin and keep five parameters.
         **kwargs
             Forwarded via ``super().__init__``.
         """
         self.GWsamples = GWsamples
         self.EMsamples = EMsamples
         self.withNSBH = withNSBH
+        # NSBH ejecta use the BH spin; the classifier BNS fit needs chi_eff
+        self.sample_spins = withNSBH or bns_fit == "classifier"
+        if self.sample_spins and not {"chi_1", "chi_2"} <= set(GWsamples.columns):
+            raise ValueError(
+                "sampling the spins (NSBH or --bns-fit classifier) needs chi_1 and chi_2 "
+                "in the GW samples"
+            )
         self.combine_ejecta_mass = combine_ejecta_mass
         #### FIXME: allow free EOS-params?
         priors = {
@@ -194,7 +210,7 @@ class EjectaResamplerMixIn:
             "zeta": EMprior["zeta"],
         }
 
-        if withNSBH:
+        if self.sample_spins:
             priors.update({"chi_1": GWprior["chi_1"], "chi_2": GWprior["chi_2"]})
 
         self.priors = PriorDict(priors)
@@ -226,7 +242,7 @@ class EjectaResamplerMixIn:
         mc = self.GWsamples.chirp_mass.to_numpy() / (1 + z)
         q = self.GWsamples.mass_ratio.to_numpy()
 
-        if withNSBH:
+        if self.sample_spins:
             chi_1 = self.GWsamples.chi_1.to_numpy()
             chi_2 = self.GWsamples.chi_2.to_numpy()
             chi_eff = (chi_1 + q * chi_2) / (1 + q)
@@ -238,7 +254,9 @@ class EjectaResamplerMixIn:
         self.EMKDE = construct_EM_KDE(self.EMsamples, self.combine_ejecta_mass)
 
         self.NSBHEjecta = NSBHEjectaFitting()
-        self.BNSEjecta = BNSEjectaFitting()
+        self.BNSEjecta = BNSEjectaFitting(
+            bns_fit=bns_fit, pc_classifier=pc_classifier, pc_threshold=pc_threshold
+        )
 
         super().__init__(**kwargs)
 
@@ -273,7 +291,7 @@ class EjectaResamplerMixIn:
         float
             ``numpy.nan_to_num`` of the log likelihood plus the log prior.
         """
-        if self.withNSBH:
+        if self.sample_spins:
             mc, q, EOS, alpha, zeta, chi_1, chi_2 = x
             chi_eff = (chi_1 + q * chi_2) / (1 + q)
         else:
@@ -297,8 +315,10 @@ class EjectaResamplerMixIn:
             self.mcKDE.logpdf(mc) + self.invqKDE.logpdf(m1 / m2) + np.log(eos_share)
         )
 
-        if self.withNSBH:
+        if self.sample_spins:
             logprior += self.chi_1KDE.logpdf(chi_1) + self.chi_2KDE.logpdf(chi_2)
+
+        if self.withNSBH:
             mdyn = self.NSBHEjecta.dynamic_mass_fitting(m1, m2, C2, chi_eff) + alpha
             if mdyn < 0.0:
                 return np.nan_to_num(-np.inf)
@@ -310,11 +330,38 @@ class EjectaResamplerMixIn:
             MTOV = self.EOS_masses_dict[EOS][-1]
             R16 /= geom_msun_km  # needed in geo units for BNSEjectaFitting
             mdyn = self.BNSEjecta.dynamic_mass_fitting_KrFo(m1, m2, C1, C2) + alpha
-            if mdyn < 0.0:
-                return np.nan_to_num(-np.inf)
             log10_mdisk = self.BNSEjecta.log10_disk_mass_fitting(
                 total_mass, mass_ratio, MTOV, R16
             )
+            if self.BNSEjecta.bns_fit == "classifier":
+                lambda_1, lambda_2 = np.interp(
+                    (m1, m2), self.EOS_masses_dict[EOS], self.EOS_lambda_dict[EOS]
+                )
+                pc_parameters = dict(
+                    mass_1_source=m1,
+                    mass_2_source=m2,
+                    lambda_1=lambda_1,
+                    lambda_2=lambda_2,
+                    chi_1=chi_1,
+                    chi_2=chi_2,
+                )
+                if np.any(
+                    self.BNSEjecta.prompt_collapse_probability(pc_parameters)
+                    > self.BNSEjecta.pc_threshold
+                ):
+                    mdyn = (
+                        self.BNSEjecta.dynamic_mass_fitting_prompt_collapse(
+                            m1, m2, lambda_1, lambda_2
+                        )
+                        + alpha
+                    )
+                    log10_mdisk = (
+                        self.BNSEjecta.log10_disk_mass_fitting_prompt_collapse(
+                            m1, m2, lambda_1, lambda_2
+                        )
+                    )
+            if mdyn < 0.0:
+                return np.nan_to_num(-np.inf)
             log10_mwind = np.log10(zeta) + log10_mdisk
 
         if self.combine_ejecta_mass:
@@ -371,7 +418,9 @@ def main_resampling():
         seed=42,
         importance_nested_sampling=False,
     )
-    if args.withNSBH:
+    ejecta_kwargs = ejecta_kwargs_from_args(args)
+    sample_spins = args.withNSBH or bool(ejecta_kwargs)  # classifier BNS fit: chi_eff
+    if sample_spins:
         pymulti_kwargs["n_dims"] = 7
 
     # NOTE: postpone import to avoid issues when pymultinest is not installed
@@ -390,6 +439,7 @@ def main_resampling():
         args.EOSpath,
         args.withNSBH,
         args.total_ejecta_mass,
+        **ejecta_kwargs,
         **pymulti_kwargs,
     )
 
@@ -400,7 +450,7 @@ def main_resampling():
     posterior_samples["EOS"] = samples[2]
     posterior_samples["alpha"] = samples[3]
     posterior_samples["zeta"] = samples[4]
-    if args.withNSBH:
+    if sample_spins:
         posterior_samples["chi_1"] = samples[5]
         posterior_samples["chi_2"] = samples[6]
 

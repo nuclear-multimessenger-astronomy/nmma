@@ -11,6 +11,8 @@ from ..core.conversion import (
     KilonovaEjectaFitting,
     MultimessengerConversion,
     NSBHEjectaFitting,
+    ejecta_instruction_from_args,
+    ejecta_kwargs_from_args,
 )
 from ..core.parsing import (
     nmma_base_parsing,
@@ -140,7 +142,7 @@ class NMMAInjectionCreator(InjectionCreator):
                 test_methods.append(self.test_population)
             elif "ejecta" in test:
                 test_methods.append(self.test_ejecta)
-                self.conv_instructions["ejecta"] = True
+                self.conv_instructions["ejecta"] = ejecta_instruction_from_args(args)
             elif "peak_magnitude" in test:
                 self.mag_op, self.ref_mag = val
                 self.initialise_lc_model(args)
@@ -360,7 +362,7 @@ class NMMAInjectionCreator(InjectionCreator):
         can never be redrawn away from failing a test).
         """
         if self.binary_type_filter == "BNS":
-            fitter = BNSEjectaFitting()
+            fitter = BNSEjectaFitting(**ejecta_kwargs_from_args(self.args))
         elif self.binary_type_filter == "NSBH":
             fitter = NSBHEjectaFitting()
         else:
@@ -827,7 +829,8 @@ class NMMAInjectionCreator(InjectionCreator):
         # dataframe argument (only __call__); this raised
         # TypeError: KilonovaEjectaFitting() takes no arguments.
         # Instantiate first, then call on the dataframe.
-        return KilonovaEjectaFitting()(dataframe)
+        # --bns-fit classifier: BNS fits with the prompt-collapse classifier
+        return KilonovaEjectaFitting(**ejecta_kwargs_from_args(self.args))(dataframe)
 
     # ------------- Legacy functions ----------------#
     def file_to_dataframe(self, injection_file, reference_frequency, trigger_time=0.0):

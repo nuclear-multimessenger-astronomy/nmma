@@ -2,7 +2,7 @@ import numpy as np
 from bilby.core.likelihood import JointLikelihood
 
 from ..core.base import NMMALikelihood, NMMALikelihoodMixin
-from ..core.conversion import MultimessengerConversion
+from ..core.conversion import MultimessengerConversion, ejecta_instruction_from_args
 from ..em.em_likelihood import EMTransientLikelihood, setup_em_kwargs
 from ..eos.eos_likelihood import (
     EoSConverter,
@@ -279,7 +279,7 @@ class MultiMessengerLikelihood(NMMALikelihoodMixin, JointLikelihood):
             or "log10_mej_dyn" in priors
             or args.ejecta_conversion
         ):
-            conversion_instructions["ejecta"] = True
+            conversion_instructions["ejecta"] = ejecta_instruction_from_args(args)
 
         if len(messenger_lhoods) == 0:
             raise ValueError("No messenger likelihoods were set up.")

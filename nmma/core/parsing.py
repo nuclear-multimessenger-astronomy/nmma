@@ -166,6 +166,69 @@ def check_for_config(cli_args, parents=[], drop_config=True):
     return argparse.ArgumentParser(), cli_args
 
 
+def bns_fit_parsing(parser, injection_options=False):
+    """
+    Add the options choosing the BNS ejecta fits: the original ones (``default``) or
+    the remnant-classifier ones (``classifier``), see ``BNSEjectaFitting``.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+    injection_options : bool, default=False
+        Also add ``--injection-bns-fit`` etc. for the injected system (nmma-generation).
+        The injection has its own options because it must not depend on the analysis
+        hypothesis (cf. ``--force-bns``).
+
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
+    parser.add_argument(
+        "--bns-fit",
+        choices=["default", "classifier"],
+        default="default",
+        help="BNS ejecta fits: 'default' = original fits; 'classifier' = a remnant classifier "
+        "(Puecher & Dietrich 2024, arXiv:2408.10678) decides prompt collapse, and collapsing "
+        "systems use the Loffredo et al. (arXiv:2411.02342) dynamical and disk-mass fits "
+        "(needs --pc-classifier-dir, lambda_1 and lambda_2)",
+    )
+    parser.add_argument(
+        "--pc-classifier-dir",
+        default=None,
+        help="Directory with classifierA_numpy.npz (no scikit-learn needed; made by "
+        "bns_vs_nsbh_eos/dev/pc_classifier/nmma_integration/export_classifier_numpy.py) or with the "
+        "Zenodo files classifierA_model.pkl and scaler_classifierA.pkl "
+        "(https://zenodo.org/records/12545674; these need scikit-learn 1.4.0)",
+    )
+    parser.add_argument(
+        "--pc-threshold",
+        type=float,
+        default=0.5,
+        help="With --bns-fit classifier: P(prompt collapse) above which a system counts as collapsed",
+    )
+    if injection_options:
+        # the injected system must not depend on the analysis hypothesis (cf. --force-bns), so the
+        # injection has its own options (used by nmma-generation); default = original fits
+        parser.add_argument(
+            "--injection-bns-fit",
+            choices=["default", "classifier"],
+            default="default",
+            help="Like --bns-fit, but for the injected system",
+        )
+        parser.add_argument(
+            "--injection-pc-classifier-dir",
+            default=None,
+            help="Like --pc-classifier-dir, for --injection-bns-fit classifier",
+        )
+        parser.add_argument(
+            "--injection-pc-threshold",
+            type=float,
+            default=0.5,
+            help="Like --pc-threshold, for --injection-bns-fit classifier",
+        )
+    return parser
+
+
 def base_analysis_parsing(parser):
     """Add CLI args shared by all single-messenger analyses: Hubble/
     cosmology sampling, sampling seed, sampler kwargs, checkpointing

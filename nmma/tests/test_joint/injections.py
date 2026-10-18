@@ -129,3 +129,46 @@ def test_binary_type_filter_end_to_end(args):
         assert radius_1 > 0 and radius_2 > 0, (
             "every kept injection must have both components be a real NS under ALF2"
         )
+
+
+def test_binary_type_bns_with_classifier(args, monkeypatch):
+    """--binary-type BNS with --bns-fit classifier uses the prompt-collapse fits for the
+    systems the (stubbed) classifier calls collapsing, and the default fits otherwise."""
+    import numpy as np
+    from bilby.gw.conversion import lambda_1_lambda_2_to_lambda_tilde
+
+    from nmma.core.prompt_collapse import PromptCollapseClassifier
+
+    class Stub:
+        def __init__(self, prob):
+            self.prob = prob
+
+        def probability(self, total_mass, lambda_tilde, chi_eff, mass_ratio):
+            return np.full(np.shape(total_mass), self.prob, dtype=float)
+
+    def run(**kwargs):
+        monkeypatch.setattr(args, "binary_type", "BNS", raising=False)
+        args.prior_file = str(Path(data_dir, "Bu2019lm_binary_type_test.prior"))
+        for key, value in kwargs.items():
+            monkeypatch.setattr(args, key, value, raising=False)
+        injection_handling.generate_injection(args)
+        return read_injection_file(args.injection_file)
+
+    default = run()
+    monkeypatch.setattr(
+        PromptCollapseClassifier, "from_directory",
+        classmethod(lambda cls, directory, classifier="A": Stub(1.0)),
+    )
+    collapse = run(bns_fit="classifier", pc_classifier_dir="stub")
+    assert len(collapse["log10_mej_wind"]) == len(default["log10_mej_wind"]) > 0
+
+    m1, m2 = collapse["mass_1_source"], collapse["mass_2_source"]
+    q = m2 / m1
+    lt = lambda_1_lambda_2_to_lambda_tilde(
+        collapse["lambda_1"], collapse["lambda_2"], m1, m2
+    )
+    disk = np.minimum(-1.0, 7.70 - 13.4 * q + 8.16e-3 * lt * q**2)
+    np.testing.assert_allclose(
+        collapse["log10_mej_wind"], np.log10(collapse["ratio_zeta"]) + disk, rtol=1e-9
+    )
+    assert not np.allclose(collapse["log10_mej_wind"], default["log10_mej_wind"])

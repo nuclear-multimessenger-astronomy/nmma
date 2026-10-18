@@ -20,7 +20,7 @@ import numpy as np
 from .. import __version__
 from ..core.base import adjust_hubble_prior, adjust_priors_for_nmma
 from ..core.constants import set_cosmology
-from ..core.conversion import KilonovaEjectaFitting
+from ..core.conversion import KilonovaEjectaFitting, ejecta_kwargs_from_args
 from ..core.utils import read_trigger_time, setup_logger
 from ..em import utils as em_utils
 from ..em.io import load_em_observations
@@ -390,6 +390,12 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
             priors = setup_tabulated_eos_priors(args, priors, logger)
 
         if self.injection_parameters:
+            # --injection-bns-fit (not --bns-fit, an analysis hypothesis) selects the
+            # BNS fits of the injection; built outside the try so that a bad request
+            # (e.g. missing classifier directory) is not swallowed below
+            injection_ejecta_fitting = KilonovaEjectaFitting(
+                **ejecta_kwargs_from_args(args, prefix="injection_")
+            )
             # --force-nsbh/--force-bns are hypotheses of the analysis: the injected
             # system must not depend on them, so convert it without the flags
             forced = (
@@ -402,7 +408,7 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                 eos_converter.force_nsbh_nonoverlapping = False
             try:
                 converted_injection = eos_converter(converted_injection)
-                converted_injection = KilonovaEjectaFitting()(converted_injection)
+                converted_injection = injection_ejecta_fitting(converted_injection)
             except Exception as e:
                 logger.warning(
                     "eos and ejecta fitting failed for injection parameters. Continuing without conversion."
