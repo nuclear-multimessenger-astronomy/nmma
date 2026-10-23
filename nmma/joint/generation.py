@@ -454,9 +454,14 @@ class NMMADataGenerationInput(bilby_pipe.input.Input):
                             raise KeyError(
                                 f"Required parameter {param} could not be derived from conversion."
                             )
-                light_curve_data = create_light_curve_data(
-                    self.injection_parameters, args, injection_model
-                )
+                if getattr(args, "light_curve_data", None):
+                    # injected GW signal + observed/pre-made light curve: the EM data is
+                    # read from --light-curve-data instead of being simulated
+                    light_curve_data = load_em_observations(args)
+                else:
+                    light_curve_data = create_light_curve_data(
+                        self.injection_parameters, args, injection_model
+                    )
             else:
                 light_curve_data = load_em_observations(args)
 
