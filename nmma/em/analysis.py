@@ -305,6 +305,7 @@ def analysis_setup(args):
         systematics_handler=systematics_handler,
         verbose=args.verbose,
         detection_limit=detection_limit,
+        error_model=args.em_error_model,
     )
 
     likelihood = EMTransientLikelihood(**likelihood_kwargs)

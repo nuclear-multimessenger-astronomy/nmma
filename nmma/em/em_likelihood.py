@@ -1,10 +1,10 @@
 import numpy as np
-from scipy.stats import norm, truncnorm
+from scipy.stats import norm
 
 from ..core.base import NMMALikelihood, initialisation_args_from_signature_and_namespace
 from ..core.conversion import convert_mtot_mni
 from ..core.utils import read_trigger_time
-from . import model, systematics, utils
+from . import error_models, model, systematics, utils
 from .lightcurve_handling import post_process_bestfit as lch_bestfit
 from .plotting_utils import bolometric_lc_plot
 
@@ -91,6 +91,8 @@ class EMTransientLikelihood(NMMALikelihood):
         A list of filters to be taken for analysis
         E.g. "u", "g", "r", "i", "z", "y", "J", "H", "K"
     detection_limit: float or dict, default: np.inf
+    error_model: str, default: "truncated_gaussian"
+        A string indicating the error model used to score detections
     verbose: bool (default: False)
         If True, print additional information during computation
     Returns
@@ -109,6 +111,7 @@ class EMTransientLikelihood(NMMALikelihood):
         priors,
         filters=None,
         detection_limit=np.inf,
+        error_model="truncated_gaussian",
         verbose=False,
         **kwargs,
     ):
@@ -118,6 +121,7 @@ class EMTransientLikelihood(NMMALikelihood):
             systematics_handler,
             priors,
             detection_limit,
+            error_model,
             verbose,
         )
 
@@ -245,6 +249,8 @@ class BasicEMTransient:
         A dictionary of bilby-style priors
     detection_limit: float (default: np.inf)
         Detection limit for the light curve data
+    error_model: str (default: "truncated_gaussian")
+        A string indicating the error model used to score detections
     verbose: bool (default: False)
         If True, print additional information during computation
 
@@ -263,6 +269,7 @@ class BasicEMTransient:
         systematics_handler,
         priors,
         detection_limit,
+        error_model,
         verbose,
     ):
         self.light_curve_model = light_curve_model
@@ -279,8 +286,11 @@ class BasicEMTransient:
         systematics_handler.reset(self.light_curve_model.model_times, priors)
         self.systematics_handler = systematics_handler
 
-        self.verbose = verbose
         self.set_detection_limit(detection_limit)
+
+        self.error_model = error_models.ERROR_MODELS[error_model]
+
+        self.verbose = verbose
 
     def set_detection_limit(self, detection_limit):
         """Store the magnitude beyond which nothing could have been seen.
@@ -383,9 +393,6 @@ class BasicEMTransient:
     def band_log_likelihood(self, expected_lc, obs_error):
         """Compare the whole light curve to the data, in one band.
 
-        The systematic uncertainty is added in quadrature to the measurement
-        errors before the comparison.
-
         Parameters
         ----------
         expected_lc: numpy.ndarray
@@ -399,12 +406,11 @@ class BasicEMTransient:
             Log-likelihood of the band, or the most negative finite float64
             if the comparison turned out ill-behaved.
         """
-        data_sigma = np.sqrt(self.light_curve_uncertainties**2 + obs_error**2)
 
         minus_chisquare, gaussprob = self.chisquare_gaussianlog_from_lc_data(
             expected_lc,
             self.light_curves,
-            data_sigma,
+            self.light_curve_uncertainties,
             obs_error,
             lim=self.detection_limit,
         )
@@ -418,11 +424,11 @@ class BasicEMTransient:
     ):
         """Score detections and non-detections, which say different things.
 
-        A detection constrains the magnitude directly and is scored with a
-        truncated Gaussian. A non-detection only tells us the source stayed
-        fainter than the limit, so it is scored with a survival function
-        instead. The two are recognised by their uncertainty: non-detections
-        carry an infinite one.
+        A detection constrains the magnitude directly and is scored with the
+        selected error model (default: truncated gaussian). A non-detection
+        only tells us the source stayed fainter than the limit,
+        so it is scored with a survival function instead. The two are
+        recognised by their uncertainty: non-detections carry an infinite one.
 
         Parameters
         ----------
@@ -433,7 +439,7 @@ class BasicEMTransient:
         data_sigma: numpy.ndarray
             Uncertainty on each measurement, infinite for non-detections.
         upperlim_sigma: numpy.ndarray
-            Uncertainty to use for the non-detections.
+            Systematic uncertainty on each prediction, also uncertainty used for the non-detections.
         lim: float, optional
             Detection limit, used as the truncation bound.
 
@@ -453,10 +459,11 @@ class BasicEMTransient:
         # evaluate the chisquare
         if finiteIdx.sum() >= 1:
             minus_chisquare = np.sum(
-                self.truncated_gaussian(
+                self.error_model(
                     data_mag[finiteIdx],
                     loc=est_mag[finiteIdx],
-                    scale=data_sigma[finiteIdx],
+                    sigma_data=data_sigma[finiteIdx],
+                    sigma_sys=upperlim_sigma[finiteIdx],
                     upper_lim=lim,
                 )
             )
@@ -477,36 +484,6 @@ class BasicEMTransient:
                 data_mag[infIdx], est_mag[infIdx], upperlim_sigma[infIdx]
             )
         return minus_chisquare, np.sum(gausslogsf)
-
-    def truncated_gaussian(self, m_det, loc, scale, upper_lim):
-        """Compare a measurement to the model, knowing it was detected.
-
-        A detection carries more information than its magnitude alone: it
-        also tells us the source was brighter than the detection limit. The
-        Gaussian is therefore truncated at that limit, so that the
-        probability is normalised over the magnitudes that could have been
-        seen at all.
-
-        Parameters
-        ----------
-        m_det: numpy.ndarray
-            Measured magnitudes.
-        loc: numpy.ndarray
-            Magnitudes the model predicts.
-        scale: numpy.ndarray
-            Total uncertainty on each measurement.
-        upper_lim: float
-            Detection limit, used as the truncation bound.
-
-        Returns
-        -------
-        numpy.ndarray
-            Log-probability of each measurement.
-        """
-
-        a = -np.inf  # no lower bound of truncation
-        b = (upper_lim - loc) / scale  # upper bound in number of std-deviations
-        return truncnorm.logpdf(m_det, a, b, loc=loc, scale=scale)
 
     def final_diagnostics(self, bestfit_params, args, result=None):
         """Plot the best-fit bolometric light curve over the data.
@@ -553,6 +530,8 @@ class MultiFilterTransient(BasicEMTransient):
         Dictionary of prior distributions for the model parameters
     detection_limit: float or dict (default: np.inf)
         Detection limit for the light curve data
+    error_model: str (default: "truncated_gaussian")
+        A string indicating the error model used to score detections
     verbose: bool (default: False)
         If True, print additional information during computation
 
@@ -566,6 +545,7 @@ class MultiFilterTransient(BasicEMTransient):
         systematics_handler,
         priors,
         detection_limit,
+        error_model,
         verbose,
     ):
         self.observed_filters = filters
@@ -580,6 +560,7 @@ class MultiFilterTransient(BasicEMTransient):
             systematics_handler,
             priors,
             detection_limit,
+            error_model,
             verbose,
         )
 
@@ -691,11 +672,10 @@ class MultiFilterTransient(BasicEMTransient):
         minus_chisquare_total = 0.0
         gaussprob_total = 0.0
         for filt, err in obs_error.items():
-            data_sigma = np.sqrt(self.light_curve_uncertainties[filt] ** 2 + err**2)
             minus_chisquare, gaussprob = self.chisquare_gaussianlog_from_lc_data(
                 expected_mags[filt],
                 self.light_curves[filt],
-                data_sigma,
+                self.light_curve_uncertainties[filt],
                 err,
                 lim=self.detection_limit[filt],
             )
