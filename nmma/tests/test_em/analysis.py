@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from nmma.em import analysis, em_parsing, utils
+from nmma.em.error_models import ERROR_MODELS
 from nmma.em.model import SimpleBolometricLightCurveModel
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -239,6 +240,28 @@ class TestAnalysisSetup(AnalysisTestsContainer):
         self.args.sampler = "dynesty"
         self.args.maxiter = 10
         analysis.multi_analysis_loop(self.args, analysis.analysis_setup)
+
+    @pytest.mark.parametrize("error_model", list(ERROR_MODELS))
+    def test_error_model_against_default(self, error_model):
+        args_with_default = copy.deepcopy(self.args)
+        _, likelihood_with_default, _ = analysis.analysis_setup(args_with_default)
+        log_l_with_default = likelihood_with_default.log_likelihood(
+            self.injection_parameters
+        )
+
+        args_with_test_model = copy.deepcopy(self.args)
+        args_with_test_model.em_error_model = error_model
+        _, likelihood_with_test_model, _ = analysis.analysis_setup(args_with_test_model)
+        log_l_with_test_model = likelihood_with_test_model.log_likelihood(
+            self.injection_parameters
+        )
+
+        # if default, is it the same as default?
+        if error_model == self.args.em_error_model:
+            assert log_l_with_test_model == log_l_with_default
+        # if not default is it different from the default?
+        else:
+            assert log_l_with_test_model != log_l_with_default
 
 
 class TestBolometricSetup(AnalysisTestsContainer):
