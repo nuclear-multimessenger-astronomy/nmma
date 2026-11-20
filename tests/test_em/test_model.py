@@ -13,7 +13,7 @@ from dust_extinction.parameter_averages import G23
 from nmma.core.constants import c_SI, default_cosmology as ref_cosmo
 from nmma.em import lightcurve_generation as lc_gen, model
 
-PRIOR_DIR = Path(__file__).resolve().parent.parent.parent.parent / "priors"
+PRIOR_DIR = Path(__file__).resolve().parent.parent.parent / "priors"
 MODELS_DIR = PRIOR_DIR.parent / "nmma_models"
 
 
@@ -618,7 +618,6 @@ class TestSVDLightCurveModel(LightCurveModelTestContainer):
     def setup_class(cls):
         if not cls.init_kwargs["svd_path"].exists():
             pytest.skip("SVD models are not available in the repo.")
-        super().setup_class()
 
     def setup_method(self):
         super().setup_method()

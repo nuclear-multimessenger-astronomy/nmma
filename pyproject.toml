@@ -9,7 +9,7 @@ authors = [
 ]
 description = "A nuclear physics multi-messenger Bayesian inference library"
 readme = "README.md"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 license = "GPL-3.0-only"
 license-files = ["LICENSE", "NOTICE", "TRADEMARKS.md", "LICENSES/LicenseRef-NMMA-Logo.txt"]
 classifiers = [
@@ -40,7 +40,6 @@ dependencies = [
     "scipy>=1.15",
     "pandas>=2.0",
     "astropy>=6.0",
-    "pymultinest",
     "sncosmo",
     "dust_extinction",
     "arviz>=1.2",
@@ -49,8 +48,6 @@ dependencies = [
     "toml",
     "ligo.skymap",
     "healpy",
-    "scikit-learn",
-    'tensorflow-cpu>=2.19; platform_system == "Linux"',
 ]
 
 [project.optional-dependencies]
@@ -81,9 +78,12 @@ doc = [
     "sphinx_copybutton",
     "sphinx-github-changelog",
 ]
-grb = [
+legacy = [
     "afterglowpy>=0.7.3",
     "wrapt_timeout_decorator",
+    "scikit-learn",
+    "keras",
+    "tensorflow-cpu",
 ]
 production = [
     "nestcheck",
@@ -94,6 +94,9 @@ production = [
 ]
 sampler = [
     "ultranest",
+    "pocomc",
+    "pocomc-bilby",
+    "pymultinest",
 ]
 
 [tool.setuptools_scm]
@@ -135,7 +138,7 @@ gwemopt = ['data/*/*']
 [tool.coverage.run]
 source = ["nmma"]
 omit = [
-    "nmma/tests/*",
+    "tests/*",
     "nmma/__main__.py",
 ]
 

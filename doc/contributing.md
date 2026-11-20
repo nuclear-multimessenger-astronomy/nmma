@@ -80,4 +80,4 @@ PRs can only be merged once tests have been added and pass.
 The continuous integration system indicates this
 with a green checkmark, hence you may see developers talking about "PR
 599 being green" ✅. You can also run tests locally by running
-`pytest nmma/tests/*.py` from the main `nmma` directory.
+`pytest` from the main `nmma` directory.

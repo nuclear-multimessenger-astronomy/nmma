@@ -235,9 +235,14 @@ class TestAnalysisSetup(AnalysisTestsContainer):
         assert np.isfinite(logl_loose)
         assert logl_tight > logl_loose
 
-    def integration_test(self):
+    def test_integration(self):
         self.args.sampler = "dynesty"
-        self.args.maxiter = 10
+        # bilby ignores maxiter while checkpointing
+        self.args.sampler_kwargs = {
+            "maxiter": 10,
+            "check_point": False,
+            "rejection_sample_posterior": False,
+        }
         analysis.multi_analysis_loop(self.args, analysis.analysis_setup)
 
 
