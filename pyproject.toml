@@ -83,6 +83,7 @@ legacy = [
     "wrapt_timeout_decorator",
     "scikit-learn",
     "keras",
+    "tensorflow-cpu",
 ]
 production = [
     "nestcheck",
