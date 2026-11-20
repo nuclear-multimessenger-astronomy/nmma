@@ -91,7 +91,7 @@ jobs:
         run: |
           echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
           echo "DYLD_LIBRARY_PATH: $DYLD_LIBRARY_PATH"
-          python -m coverage run --source nmma -m pytest nmma/tests/*/*.py
+          python -m coverage run --source nmma -m pytest
         env:
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
           DYLD_LIBRARY_PATH: ${{ env.DYLD_LIBRARY_PATH }}
@@ -125,9 +125,9 @@ jobs:
 
       - name: Build Documentation (Strict)
         run: |
-          sphinx-build -W --keep-going -b html doc/ doc/_build/html  
+          sphinx-build -W --keep-going -b html doc/ doc/_build/html
 
-  
+
   coveralls-finish:
     name: Indicate completion to coveralls.io
     needs: build

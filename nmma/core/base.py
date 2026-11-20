@@ -22,7 +22,12 @@ from bilby.core.result import FileMovedError
 
 from .constants import set_cosmology
 from .conversion import CosmologyConverter
-from .parsing import nmma_base_parsing, single_messenger_analysis_parsing
+from .parsing import (
+    NLIVE_KWARGS,
+    PARALLEL_SAMPLERS,
+    nmma_base_parsing,
+    single_messenger_analysis_parsing,
+)
 from .utils import input_obj_to_str, read_bestfit_from_posterior
 
 
@@ -52,6 +57,8 @@ def initialisation_args_from_signature_and_namespace(
     """
     if prefixes is None:
         prefixes = [""]
+    if "" not in prefixes:
+        prefixes.append("")
     elif isinstance(prefixes, str):
         prefixes = prefixes.split(",")
     signature = inspect.signature(_callable)
@@ -234,17 +241,25 @@ class NMMALikelihood(NMMALikelihoodMixin, Likelihood):
 
     """
 
+    sub_model_choice_parameter = "sub_model"
+
     def __init__(self, sub_model, priors, **kwargs):
         super().__init__()
 
-        self.sub_model = sub_model
-        try:
-            self._noise_logl = self.sub_model.noise_log_likelihood()
-        except AttributeError:
-            self._noise_logl = 0.0
         self.conv_functions = []
         self.priors = priors
+
+        if isinstance(sub_model, list):
+            # NOTE: preliminary, to provide access for plotting and diagnostics
+            # this requires special care when setting up messengers
+            self.sub_model = sub_model[0]
+            self.sub_models = sub_model
+            self.sub_logl_method = self.multi_submodel_log_likelihood
+        else:
+            self.sub_model = sub_model
+            self.sub_logl_method = self.sub_model.log_likelihood
         self.setup_submodel_conversion()
+        self.set_noise_log_likelihood()
 
     def __repr__(self):
         """``"{class_name} with {sub_model!r}"``."""
@@ -282,15 +297,28 @@ class NMMALikelihood(NMMALikelihoodMixin, Likelihood):
     def sub_log_likelihood(self, parameters):
         """``self.sub_model.log_likelihood(parameters)``, clamped to
         -inf if non-finite."""
-        logL_model = self.sub_model.log_likelihood(parameters)
+        logL_model = self.sub_logl_method(parameters)
         if not np.isfinite(logL_model):
             return np.nan_to_num(-np.inf)
         return logL_model
+
+    def multi_submodel_log_likelihood(self, parameters):
+        """Dispatch to one of the available sub-models."""
+        use_model = int(parameters[self.sub_model_choice_parameter])
+        return self.sub_models[use_model].log_likelihood(parameters)
 
     def noise_log_likelihood(self):
         """Cached noise log-likelihood from ``self.sub_model``, or 0. if
         it doesn't define one."""
         return self._noise_logl
+
+    def set_noise_log_likelihood(self):
+        """Compute and cache the noise log-likelihood from
+        ``self.sub_model``, or 0. if it doesn't define one."""
+        try:
+            self._noise_logl = self.sub_model.noise_log_likelihood()
+        except AttributeError:
+            self._noise_logl = 0.0
 
 
 class NMMADummyPrior(Prior):
@@ -516,18 +544,18 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         def_args = nmma_base_parsing(single_messenger_analysis_parsing)
         def_args.__dict__.update(args)
         args = def_args
-    # fetch the additional sampler kwargs
-    sampler_kwargs = getattr(args, "sampler_kwargs", {})
-    print("Running with the following additional sampler_kwargs:")
-    print(sampler_kwargs)
 
-    # check if it is running with reactive sampler
-    nlive = None if getattr(args, "reactive_sampling", False) else args.nlive
-    if nlive is None and args.sampler != "ultranest":
-        raise ValueError(
-            "reactive sampling is only available for ultranest, "
-            "please set nlive or use ultranest sampler"
-        )
+    # all settings of the sampler itself; bilby splits them up and fills in
+    # its defaults
+    # a copy, so that args stay as given; nlive in it takes priority over args
+    sampler_kwargs = dict(getattr(args, "sampler_kwargs", None) or {})
+    if not NLIVE_KWARGS & set(sampler_kwargs):
+        sampler_kwargs["nlive"] = args.nlive
+    print("Running with the following sampler_kwargs:")
+    print(sampler_kwargs)
+    check_point_delta_t = getattr(args, "check_point_delta_t", None)
+    if check_point_delta_t is None:
+        check_point_delta_t = 3600
 
     if args.skip_sampling:
         print("Sampling for 1 iteration and plotting checkpointed results.")
@@ -538,17 +566,18 @@ def bilby_sampling(likelihood, priors, args, injection_parameters=None, rank=0):
         elif args.sampler == "dynesty":
             sampler_kwargs["maxiter"] = 1
 
+    cpus = getattr(args, "cpus", None) or os.cpu_count()
+
     result = run_sampler(
         likelihood,
         priors,
         sampler=args.sampler,
         outdir=args.outdir,
         label=args.label,
-        nlive=nlive,
         seed=args.sampling_seed,
         soft_init=args.soft_init,
-        queue_size=args.cpus,
-        check_point_delta_t=3600,
+        queue_size=cpus,
+        check_point_delta_t=check_point_delta_t,
         save=False,
         **sampler_kwargs,
     )
@@ -616,14 +645,13 @@ def multi_analysis_loop(args, analysis_setup):
     bilby.core.result.Result
         From the last sub-run.
     """
-    USE_MPI = False
     rank = 0
+    use_mpi = False
     try:
         from mpi4py import MPI
 
         rank = MPI.COMM_WORLD.Get_rank()
-        if MPI.COMM_WORLD.Get_size() > 1:
-            USE_MPI = True
+        use_mpi = MPI.COMM_WORLD.Get_size() > 1
     except:  # noqa: E722
         pass
 
@@ -674,11 +702,16 @@ def multi_analysis_loop(args, analysis_setup):
     for run_args in sub_runs:
         priors, likelihood, injection_parameters = analysis_setup(run_args)
         priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
-        if USE_MPI and run_args.sampler == "dynesty":
-            from .mpi_setup import pbilby_sampling
+        # dynesty and pocomc run in parallel under MPI or with several --cpus
+        # (None: all available), otherwise through bilby
+        parallel = use_mpi or getattr(run_args, "cpus", 1) != 1
+        if run_args.sampler in PARALLEL_SAMPLERS and parallel:
+            from .parallel_setup import pbilby_sampling
 
             run_function = pbilby_sampling
         else:
             run_function = bilby_sampling
-        out = run_function(likelihood, priors, run_args, injection_parameters, rank)
+        out = run_function(
+            likelihood, priors, run_args, injection_parameters, rank=rank
+        )
     return out

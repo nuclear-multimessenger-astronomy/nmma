@@ -5,15 +5,24 @@ from pathlib import Path
 
 import configargparse
 import yaml
+from bilby.core.sampler.base_sampler import NestedSampler
 
 from .gitlab import refresh_models_list
 from .utils import setup_logger
+
+# samplers that pbilby_sampling runs in parallel under MPI
+PARALLEL_SAMPLERS = ("dynesty", "pocomc")
+# nlive and its aliases, of which bilby translates the latter only without nlive
+NLIVE_KWARGS = frozenset(NestedSampler.npoints_equiv_kwargs)
 
 
 def yaml_parse(s):
     """Parse a YAML string into a Python value; used as the CLI
     argument type for dict/list-valued flags."""
-    return yaml.safe_load(s)
+    out = yaml.safe_load(s)
+    if isinstance(out, dict):
+        return {k.replace("-", "_"): v for k, v in out.items()}
+    return out
 
 
 def parsing_and_logging(parser_func, args=None):
@@ -45,6 +54,8 @@ def parsing_and_logging(parser_func, args=None):
     if getattr(args, "outdir", None) is not None:
         setup_logger(outdir=args.outdir, label=args.label)
         print("Setting up logger and storage directory")
+        with open(Path(args.outdir) / f"args_{args.label}.yaml", "w") as f:
+            yaml.safe_dump(vars(args), f, sort_keys=False)
     return args
 
 
@@ -168,8 +179,9 @@ def check_for_config(cli_args, parents=[], drop_config=True):
 
 def base_analysis_parsing(parser):
     """Add CLI args shared by all single-messenger analyses: Hubble/
-    cosmology sampling, sampling seed, sampler kwargs, checkpointing
-    cadence, and core run controls (dlogz, cpus, nlive, etc).
+    cosmology sampling, sampling seed, sampler kwargs (all settings of the
+    sampler itself), checkpointing cadence, and core run controls (cpus,
+    nlive, iteration/time limits, etc).
 
     Parameters
     ----------
@@ -214,21 +226,26 @@ def base_analysis_parsing(parser):
         help="If analysis has already run, skip bilby sampling and compute results from checkpoint files. Combine with --plot to make plots from these files.",
     )
     parser.add_argument(
-        "--dlogz",
-        default=0.1,
-        type=float,
-        help="Stopping criteria: remaining evidence, (default=0.1)",
-    )
-    parser.add_argument(
         "--soft-init",
         action="store_true",
         help="To start the sampler softly (without any checking, default: False)",
     )
     parser.add_argument(
+        "--rejection-sample-posterior",
+        action="store_false",
+        help=(
+            "Whether to generate the posterior samples by rejection sampling the "
+            "nested samples or resampling with replacement"
+        ),
+    )
+    parser.add_argument(
         "--cpus",
         type=int,
         default=1,
-        help="Number of cores to be used, only needed for dynesty (default: 1)",
+        help=(
+            "Number of local processes to sample with, if not run under mpirun "
+            "(default: 1)"
+        ),
     )
     parser.add_argument(
         "-n",
@@ -241,9 +258,28 @@ def base_analysis_parsing(parser):
     parser.add_argument(
         "--check-point-delta-t",
         "--check-point-deltaT",
-        default=1800,
         type=float,
-        help="Write a checkpoint resume file and diagnostic plots every deltaT [s]. Default: 0.5 hour.",
+        help=(
+            "Write a checkpoint resume file and diagnostic plots every deltaT [s]. "
+            "Default: 0.5 hours under MPI, 1 hour otherwise."
+        ),
+    )
+    parser.add_argument(
+        "--n-check-point",
+        type=int,
+        help="Iterations between checkpoints under MPI (default: sampler-specific)",
+    )
+    parser.add_argument(
+        "--max-its",
+        default=10**10,
+        type=int,
+        help="Maximum number of iterations under MPI (default=1.e10)",
+    )
+    parser.add_argument(
+        "--max-run-time",
+        default=1.0e10,
+        type=float,
+        help="Maximum time to run for under MPI (default=1.e10 s)",
     )
     parser.add_argument(
         "--checkpoint-plot",
@@ -258,94 +294,10 @@ def base_analysis_parsing(parser):
     return parser
 
 
-def dynesty_parsing(parser):
-    """Add dynesty-specific sampler CLI args (walks, maxmcmc, nact,
-    naccept, min_eff, facc, enlarge, proposals, iteration/time limits).
-
-    Parameters
-    ----------
-    parser: argparse.ArgumentParser
-
-    Returns
-    -------
-    argparse.ArgumentParser
-    """
-    dynesty_group = parser.add_argument_group(title="Dynesty Settings")
-    dynesty_group.add_argument(
-        "--n-check-point",
-        default=1000,
-        type=int,
-        help="Steps to take before attempting checkpoint",
-    )
-    dynesty_group.add_argument(
-        "--max-its",
-        default=10**10,
-        type=int,
-        help="Maximum number of iterations to sample for (default=1.e10)",
-    )
-    dynesty_group.add_argument(
-        "--max-run-time",
-        default=1.0e10,
-        type=float,
-        help="Maximum time to run for (default=1.e10 s)",
-    )
-    dynesty_group.add_argument(
-        "--rejection-sample-posterior",
-        action="store_false",
-        help=(
-            "Whether to generate the posterior samples by rejection sampling the "
-            "nested samples or resampling with replacement"
-        ),
-    )
-    dynesty_group.add_argument(
-        "--walks",
-        default=100,
-        type=int,
-        help="Minimum number of walks, defaults to 100",
-    )
-    dynesty_group.add_argument(
-        "--proposals",
-        action="append",
-        help="The jump proposals to use, the options are 'diff' and 'volumetric'",
-    )
-    dynesty_group.add_argument(
-        "--maxmcmc",
-        default=5000,
-        type=int,
-        help="Maximum number of walks, defaults to 5000",
-    )
-    dynesty_group.add_argument(
-        "--nact",
-        default=2,
-        type=int,
-        help="Number of autocorrelation times to take, defaults to 2",
-    )
-    dynesty_group.add_argument(
-        "--naccept",
-        default=60,
-        type=int,
-        help="The average number of accepted steps per MCMC chain, defaults to 60",
-    )
-    dynesty_group.add_argument(
-        "--min-eff",
-        default=10,
-        type=float,
-        help="The minimum efficiency at which to switch from uniform sampling.",
-    )
-
-    dynesty_group.add_argument(
-        "--facc", default=0.5, type=float, help="See dynesty.NestedSampler"
-    )
-    dynesty_group.add_argument(
-        "--enlarge", default=1.5, type=float, help="See dynesty.NestedSampler"
-    )
-    return parser
-
-
 def single_messenger_analysis_parsing(parser):
     """Add the CLI args for a standalone single-messenger analysis:
-    ``base_analysis_parsing`` + ``dynesty_parsing``, plus outdir/label/
-    plot/sampler/prior-file/result-format.
+    ``base_analysis_parsing`` plus outdir/label/plot/sampler/prior-file/
+    result-format.
 
     Parameters
     ----------
@@ -356,7 +308,6 @@ def single_messenger_analysis_parsing(parser):
     argparse.ArgumentParser
     """
     parser = base_analysis_parsing(parser)
-    parser = dynesty_parsing(parser)
 
     parser.add_argument(
         "--config", help="Name of the configuration file containing parameter values."
@@ -380,13 +331,8 @@ def single_messenger_analysis_parsing(parser):
     parser.add_argument("--prior-file", "--prior", help="Path to the prior file")
     parser.add_argument(
         "--sampler",
-        default="pymultinest",
-        help="Sampler to be used (default: pymultinest)",
-    )
-    parser.add_argument(
-        "--reactive-sampling",
-        action="store_true",
-        help="To use reactive sampling in ultranest (default: False)",
+        default="pocomc",
+        help="Sampler to be used (default: pocomc)",
     )
     parser.add_argument(
         "--bestfit",
@@ -626,58 +572,6 @@ def slurm_analysis_parser(parser):
     slurm_args.add_argument("--script-name", default="slurm.sub")
 
     return parser
-
-
-def process_sampler_kwargs(args):
-    """Resolve the final dynesty init/run kwargs from ``args``, layering
-    user-supplied ``--sampler-kwargs`` overrides on top of built-in
-    defaults (some of which, like "sample"/"save_bounds", have no
-    dedicated CLI flag and can only be set this way).
-
-    Parameters
-    ----------
-    args: argparse.Namespace
-        Must provide ``nlive``, ``sampler_kwargs`` (dict), and, if set
-        via CLI, ``dlogz``/``min_eff``/``bound``/``walks``/``facc``/``enlarge``.
-
-    Returns
-    -------
-    sampler_init_kwargs: dict
-        For ``dynesty.NestedSampler``'s constructor (with ``min_eff``
-        moved into a nested "first_update" dict alongside a computed
-        ``min_ncall``).
-    run_sampler_kwargs: dict
-        ``{"dlogz": ..., "save_bounds": ...}``, for the sampler's
-        ``sample()`` call.
-    """
-    # Set defaults here to avoid inconsistent values
-    default_kwargs = dict(
-        dlogz=0.1,
-        save_bounds=False,
-        min_eff=10,
-        sample="acceptance-walk",
-        nlive=1000,
-        bound="live",
-        walks=100,
-        facc=0.5,
-        enlarge=1.5,
-    )
-
-    run_sampler_kwargs = {
-        key: getattr(args, key, default_kwargs[key]) for key in ["dlogz", "save_bounds"]
-    }
-
-    def_init_kwargs = {
-        key: getattr(args, key, default_kwargs[key])
-        for key in ["min_eff", "sample", "nlive", "bound", "walks", "facc", "enlarge"]
-    }
-
-    sampler_init_kwargs = def_init_kwargs | args.sampler_kwargs
-    sampler_init_kwargs["first_update"] = dict(
-        min_eff=sampler_init_kwargs.pop("min_eff"), min_ncall=2 * args.nlive
-    )
-
-    return sampler_init_kwargs, run_sampler_kwargs
 
 
 ############# UTILS #############
