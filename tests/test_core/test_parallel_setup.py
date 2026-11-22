@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import psutil
 import pytest
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import PriorDict, Uniform
@@ -25,11 +26,17 @@ from nmma.core.parallel_setup import (
     time_storage,
 )
 
-N_MPI_RANKS = 3
+N_PHYSICAL_CORES = psutil.cpu_count(logical=False) or 1
+MIN_MPI_RANKS = 3
+MAX_MPI_RANKS = 6
+N_MPI_RANKS = max(MIN_MPI_RANKS, min(N_PHYSICAL_CORES, MAX_MPI_RANKS))
 # local processes, as many as the pool workers under mpirun
 N_LOCAL_PROCESSES = N_MPI_RANKS - 1
 RUN_TIMEOUT = 600
-needs_mpirun = pytest.mark.skipif(shutil.which("mpirun") is None, reason="needs mpirun")
+needs_mpirun = pytest.mark.skipif(
+    shutil.which("mpirun") is None or N_PHYSICAL_CORES < N_MPI_RANKS,
+    reason=f"needs mpirun with {N_MPI_RANKS} slots (physical cores)",
+)
 
 
 class BoundedGaussianLikelihood(Likelihood):
