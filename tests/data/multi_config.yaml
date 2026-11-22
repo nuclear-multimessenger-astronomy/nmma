@@ -1,5 +1,5 @@
 Bu2026_1:
-  em-transient-class: fiesta_kn 
+  em-transient-class: fiesta_kn
   outdir: outdir/1
   label: injection
   prior-file: ${DATA_DIR}/Bu2026_simplified.prior

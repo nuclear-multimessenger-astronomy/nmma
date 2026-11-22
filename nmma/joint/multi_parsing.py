@@ -6,7 +6,6 @@ from bilby_pipe import parser as bp_parser
 from nmma.core.parsing import (
     base_analysis_parsing,
     check_for_config,
-    dynesty_parsing,
 )
 from nmma.em.em_parsing import em_analysis_parsing
 from nmma.eos.eos_parsing import eos_parsing, tabulated_eos_parsing
@@ -18,17 +17,16 @@ from .. import __version__  # noqa: E402
 logger = bilby.core.utils.logger
 
 
-def _create_base_nmma_parser(sampler="dynesty", parents=[]):
+def _create_base_nmma_parser(parents=[]):
     """
     Build the parser shared by :func:`create_nmma_generation_parser` and
     :func:`create_nmma_analysis_parser`.
 
+    All settings of the sampler itself are passed via ``--sampler-kwargs``
+    (see :func:`nmma.core.parsing.base_analysis_parsing`).
+
     Parameters
     ----------
-    sampler : str, default="dynesty"
-        ``"all"`` or ``"dynesty"`` additionally applies
-        :func:`nmma.core.parsing.dynesty_parsing` and
-        :func:`multi_dynesty_parsing`.
     parents : list, default=[]
         Passed to ``argparse.ArgumentParser`` as ``parents``.
 
@@ -46,7 +44,6 @@ def _create_base_nmma_parser(sampler="dynesty", parents=[]):
         action="version",
         version=f"%(prog)s={__version__}\nbilby={bilby.__version__}",
     )
-
     base_parser = em_settings_parsing(base_parser)
     base_parser = base_analysis_parsing(base_parser)
     base_parser = em_analysis_parsing(base_parser)
@@ -55,9 +52,8 @@ def _create_base_nmma_parser(sampler="dynesty", parents=[]):
     base_parser = tabulated_eos_parsing(base_parser)
     base_parser = eos_parsing(base_parser)
     base_parser = add_misc_settings(base_parser)
-    if sampler in ["all", "dynesty"]:
-        base_parser = dynesty_parsing(base_parser)
-        base_parser = multi_dynesty_parsing(base_parser)
+
+    base_parser = parallel_parsing(base_parser)
 
     return base_parser
 
@@ -77,60 +73,21 @@ def em_settings_parsing(parser):
     argparse.ArgumentParser
         The same parser, with the arguments added.
     """
-    em_input_parser = parser.add_argument_group(
-        title="EM analysis input arguments", description="Specify EM analysis inputs"
-    )
+    em_input_parser = parser.add_argument_group(title="EM analysis input arguments")
     em_input_parser.add(
         "--light-curve-data", help="Path to the observed light curve data"
     )
     return parser
 
 
-def multi_dynesty_parsing(parser):
-    """
-    Add the dynesty sampler arguments in their own group.
-
-    Parameters
-    ----------
-    parser : argparse.ArgumentParser
-        Parser to add the arguments to.
-
-    Returns
-    -------
-    argparse.ArgumentParser
-        The same parser, with the arguments added.
-    """
-    sampler_group = parser.add_argument_group(title="Setting for the Dynesty Sampler")
-
+def parallel_parsing(parser):
+    sampler_group = parser.add_argument_group(title="Parallel analysis arguments")
     sampler_group.add_argument(
         "--sampler",
         default="dynesty",
-        help="The parallelised sampler to use, defaults to dynesty",
+        choices=["dynesty", "pocomc", "pymultinest"],
+        help="The parallelised sampler to use (default: dynesty)",
     )
-    sampler_group.add_argument(
-        "--bound",
-        "--dynesty-bound",
-        default="live",
-        help="Dynesty bounding method (default=live)",
-    )
-    sampler_group.add_argument(
-        "--save-bounds",
-        action="store_true",
-        help="Whether to store bounds in the resume file. Not doing this can make resume files large (~GB)",
-    )
-    sampler_group.add_argument(
-        "--sample",
-        "--dynesty-sample",
-        default="acceptance-walk",
-        help="sampling method (default=acceptance-walk).",
-    )
-    sampler_group.add_argument(
-        "--n-check-point",
-        default=2000,
-        type=int,
-        help="Steps to take before attempting checkpoint",
-    )
-
     return parser
 
 
@@ -274,13 +231,11 @@ def create_nmma_generation_parser():
     Returns
     -------
     argparse.ArgumentParser
-        :func:`_create_base_nmma_parser` with ``sampler="all"`` and
+        :func:`_create_base_nmma_parser` with
         :func:`_create_reduced_bilby_pipe_parser` as a parent.
     """
     bilby_pipe_parser = _create_reduced_bilby_pipe_parser()
-    generation_parser = _create_base_nmma_parser(
-        sampler="all", parents=[bilby_pipe_parser]
-    )
+    generation_parser = _create_base_nmma_parser(parents=[bilby_pipe_parser])
     # generation_parser = argparse.ArgumentParser(
     #     prog="nmma_generation",
     #     usage=__doc__,
@@ -316,7 +271,7 @@ def parse_generation_args(cli_args=[""]):
     return args, generation_parser
 
 
-def create_nmma_analysis_parser(sampler="dynesty"):
+def create_nmma_analysis_parser():
     """
     Build the parser for ``nmma_analysis``.
 
@@ -330,7 +285,7 @@ def create_nmma_analysis_parser(sampler="dynesty"):
     argparse.ArgumentParser
         The base parser with :func:`run_parsing` applied.
     """
-    parser = _create_base_nmma_parser(sampler=sampler)
+    parser = _create_base_nmma_parser()
     parser = run_parsing(parser)
     return parser
 
@@ -349,20 +304,7 @@ def parse_analysis_args(parser, args=None):
     Returns
     -------
     argparse.Namespace
-        The parsed arguments.
-
-    Raises
-    ------
-    ValueError
-        If ``walks`` exceeds ``maxmcmc``, or if ``nact`` is below 1.
+        The parsed arguments. The settings of the sampler itself
+        (``--sampler-kwargs``) are validated by the sampler.
     """
-    args = parser.parse_args(args=args)
-
-    if args.walks > args.maxmcmc:
-        raise ValueError(
-            f"You have maxmcmc ({args.maxmcmc}) > walks ({args.walks}, minimum mcmc)"
-        )
-    if args.nact < 1:
-        raise ValueError(f"Your nact ({args.nact}) < 1 (must be >= 1)")
-
-    return args
+    return parser.parse_args(args=args)

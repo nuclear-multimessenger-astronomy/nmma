@@ -6,7 +6,7 @@ import shutil
 import numpy as np
 import pytest
 
-from nmma.em import io, model_parameters, training
+from nmma.em import io, model_parameters
 
 # Bu2019lm_sparse is an SVD model trained from scratch by this test. Replaced
 # by externally-trained fiesta surrogates fetched from HuggingFace; this in-CI
@@ -26,6 +26,8 @@ def cleanup_outdir():
 
 
 def test_training():
+    from nmma.em import training
+
     # The number of PCA components we'll use to represent each lightcurve
     n_coeff = 3
     model_name = "Bu2019lm_sparse"

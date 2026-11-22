@@ -13,7 +13,7 @@ from nmma.em.model import single_model_from_mapping
 from nmma.joint import injection_handling, joint_parsing
 
 DATADIR = Path(__file__).parent.parent / "data"
-BASEDIR = DATADIR.parent.parent.parent
+BASEDIR = DATADIR.parent.parent
 PRIORDIR = BASEDIR / "priors/"
 OUTDIR = DATADIR / "outdir"
 
@@ -100,9 +100,9 @@ def lightcurveInjectionTest(model_name):
             injection_file=str(injection_file),
             label=command_line_lightcurve_label,
             em_model=model_name,
-            svd_path=BASEDIR / "nmma_models" / "svdmodels",
+            svd_path=str(BASEDIR / "nmma_models" / "svdmodels"),
             filters="sdssu",
-            outdir=output_directory,
+            outdir=str(output_directory),
             interpolation_type="tensorflow",
             injection_error_budget=0.0,
             ignore_timeshift=True,

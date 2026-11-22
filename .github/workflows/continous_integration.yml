@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
 
     steps:
       - name: Checkout branch being tested
@@ -68,7 +68,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           uv pip install --system --upgrade git+https://github.com/bitranox/wrapt_timeout_decorator.git
-          uv pip install --system -e ".[grb,dev]"
+          uv pip install --system -e ".[dev,legacy,production,sampler]"
           git clone https://github.com/JohannesBuchner/MultiNest && cd MultiNest/build && rm -rf *  && cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .. && make && cd ../..
 
       - name: Export Libraries
@@ -91,7 +91,7 @@ jobs:
         run: |
           echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
           echo "DYLD_LIBRARY_PATH: $DYLD_LIBRARY_PATH"
-          python -m coverage run --source nmma -m pytest nmma/tests/*/*.py
+          python -m coverage run --source nmma -m pytest
         env:
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
           DYLD_LIBRARY_PATH: ${{ env.DYLD_LIBRARY_PATH }}
@@ -125,9 +125,9 @@ jobs:
 
       - name: Build Documentation (Strict)
         run: |
-          sphinx-build -W --keep-going -b html doc/ doc/_build/html  
+          sphinx-build -W --keep-going -b html doc/ doc/_build/html
 
-  
+
   coveralls-finish:
     name: Indicate completion to coveralls.io
     needs: build

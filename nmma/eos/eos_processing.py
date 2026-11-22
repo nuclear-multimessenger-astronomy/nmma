@@ -4,7 +4,6 @@ from ast import literal_eval
 from pathlib import Path
 
 import joblib
-import keras as k
 import numpy as np
 
 from ..core.conversion import (
@@ -80,6 +79,9 @@ class EoSGenerator:
 
     def __init__(self, emulator_path, eos_parameters=None, n_mass_samples=30):
         # load the emulator
+
+        import keras as k
+
         try:
             self.emulator = k.saving.load_model(
                 emulator_path, custom_objects=None, compile=False
@@ -173,6 +175,8 @@ class NEPEoSGenerator(EoSGenerator):
     def __init__(self, metadata):
         emulator_path = metadata["emulator_path"]
         if metadata.get("backend", False):
+            import keras as k
+
             assert k.backend.backend() == metadata["backend"], (
                 f"Keras Backend mismatch: {k.backend.backend()} vs {metadata['backend']}. please set the environment variable KERAS_BACKEND to {metadata['backend']}"
             )
