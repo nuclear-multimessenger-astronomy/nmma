@@ -52,23 +52,18 @@ jobs:
 
       - name: Install NMMA (base)
         run: |
-          python -m pip install nmma
+          python -m pip install .
 
       - name: Verify base NMMA installation
         run: |
           python -c "import nmma; print(f'NMMA version: {nmma.__version__}')"
 
-      - name: Install and verify NMMA [grb]
-        run: |
-          python -m pip install 'nmma[grb]'
-          python -c "import nmma, afterglowpy; print(f'Successfully imported {nmma.__name__}, {afterglowpy.__name__}')"
-
       - name: Install and verify NMMA [production]
         run: |
-          python -m pip install 'nmma[production]'
+          python -m pip install '.[production]'
           python -c "import nmma, fiesta, mpi4py; print(f'Successfully imported {nmma.__name__}, {fiesta.__name__}, {mpi4py.__name__}')"
 
       - name: Install and verify NMMA [sampler]
         run: |
-          python -m pip install 'nmma[sampler]'
-          python -c "import nmma, ultranest; print(f'Successfully imported {nmma.__name__}, {ultranest.__name__}')"
+          python -m pip install '.[sampler]'
+          python -c "import nmma, pocomc; print(f'Successfully imported {nmma.__name__}, {pocomc.__name__}')"

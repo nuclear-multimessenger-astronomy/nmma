@@ -782,7 +782,7 @@ class Dynesty(NMMASampler, BilbyDynesty):
             max_its/max_run_time.
         """
         for it, res in enumerate(self.sampler.sample(**self.external_run_kwargs)):
-            step_info = self.get_step_info_str(results=res, niter=it)
+            step_info = self.get_step_info_str(res, it)
             self.stdout_sampling_log(step_info)
             if self.checkpoint_or_stop(it):
                 return False
@@ -851,7 +851,7 @@ class Dynesty(NMMASampler, BilbyDynesty):
     def _is_bad_value(val) -> bool:
         return not np.isfinite(val) or abs(val) >= np.finfo(float).max
 
-    def get_step_info_str(self, **kwargs):
+    def get_step_info_str(self, *args):
         """Generate a log string for the current sampling step.
         Logs will look like:
         #:282|eff(%):26.406|logl*:-inf<-160.2<inf|logz:-165.5+/-0.1|dlogz:1038.1>0.1
@@ -870,7 +870,9 @@ class Dynesty(NMMASampler, BilbyDynesty):
             Formatted log string for the current sampling step.
         """
         niter, _, mid_str, _ = dynesty.utils.get_print_fn_args(
-            dlogz=self.dlogz, ncall=self.sampler.ncall, **kwargs
+            *args,
+            dlogz=self.dlogz,
+            ncall=self.sampler.ncall,
         )
         custom_str = [f"#: {niter:d}"] + mid_str
         custom_str = "|".join(custom_str).replace(" ", "")

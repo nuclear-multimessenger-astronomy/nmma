@@ -29,7 +29,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "future",
-    "bilby>=2.7.1",
+    "bilby>=2.8",
     "bilby_pipe>=1.7.0",
     "fiestaEM>=0.3.0",
     "huggingface_hub",
@@ -90,7 +90,8 @@ production = [
     "mpi4py",
     "pyarrow",
     "parquet",
-    "dynesty>=3.0.0",
+    # allow 3.2 once bilby 3.0 is released
+    "dynesty>=3.0.0,<3.2",
 ]
 sampler = [
     "ultranest",
