@@ -38,7 +38,6 @@ def find_spread_from_resampling(
     post_samplesize
         Passed to ``resampling_method`` unchanged.
     cred_interval : float
-        Passed to ``arviz.hdi`` as ``hdi_prob``.
 
     Returns
     -------
@@ -58,7 +57,7 @@ def find_spread_from_resampling(
         # calculate the median and append it to the list
         med.append(np.median(samples))
         # calculate the 95% credible interval
-        cred_range = hdi(samples, hdi_prob=cred_interval)
+        cred_range = hdi(samples, prob=cred_interval)
         # append the bound to the list
         uplim.append(cred_range[1])
         lowlim.append(cred_range[0])
