@@ -64,6 +64,13 @@ def setup_logger(log_level="INFO", outdir=Path.cwd(), label=None):
 logger = setup_logger()
 
 
+def _to_json(x):
+    "Small helper to make numpy objects JSON serialisable"
+    if hasattr(x, "tolist"):
+        return x.tolist()
+    raise TypeError(x)
+
+
 def load_yaml(file_path):
     """
     Load a YAML file and return the parsed content.
