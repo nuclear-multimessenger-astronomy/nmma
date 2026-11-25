@@ -1,4 +1,4 @@
-import warnings
+from argparse import Namespace
 from pathlib import Path
 
 import bilby.gw.conversion as conversion
@@ -6,11 +6,19 @@ import numpy as np
 import pandas as pd
 import scipy.integrate
 import scipy.stats
-from bilby.core.prior import Uniform
-from bilby.gw.prior import PriorDict
+from bilby.core.likelihood import Likelihood
+from bilby.core.prior import PriorDict
+from matplotlib import pyplot as plt
 
+from ..core.base import (
+    NMMALikelihood,
+    bilby_sampling,
+    check_priors_and_likelihood_for_nmma,
+)
 from ..core.constants import MeV_per_fm3_to_Msun_per_km3, geom_msun_km, particle_mass
 from ..core.parsing import nmma_base_parsing
+from ..eos.eos_likelihood import setup_tabulated_eos_priors
+from ..eos.eos_processing import EoSConverter, TabulatedEoSGenerator
 from .parser import maximum_mass_parser
 
 
@@ -25,337 +33,348 @@ def baryonic_Kepler_mass(mTOV, R_14, ratio_R, delta):
     return m_max_b
 
 
-class PostmergerInferenceMixIn:
-    """
-    Class to sample over a joint GW+EM posterior and to determine the remnant mass of the system.
-    It is assumed that the remnant collapsed to a black hole and thus the TOV mass of the EOS must be smaller than this number.
-    See https://arxiv.org/abs/2402.04172 for details.
+def _tov_equations(y, x, pressure, energy_density):
+    """Right-hand side of the TOV equations for pressure and enclosed mass,
+    with the energy density interpolated from the micro EOS table."""
+    p, m = y
+    eps = np.interp(p, pressure, energy_density)
 
-    Set up the postmerger sampler: priors, KDE prior-density estimate, and EOS paths.
+    Dp = -geom_msun_km * m * eps / x**2 * (1 + p / eps)
+    Dp *= 1 + 4 * np.pi * (x**3 * p) * MeV_per_fm3_to_Msun_per_km3 / m
+    Dp *= (1 - 2 * geom_msun_km * m / x) ** (-1)
+    Dm = (4 * np.pi * x**2 * eps) * MeV_per_fm3_to_Msun_per_km3
 
-    Builds a joint prior over (chirp_mass, eta_star, EOS, log10_mdisk,
-    log10_mej_dyn[, ratio_R, delta] if use_M_max), and a Gaussian KDE
-    over `posterior_samples`' corresponding columns used as an
-    informative "prior" density inside `LogLikelihood`.
+    return [Dp, Dm]
+
+
+def baryonic_mass(gravitational_mass, macro_table, micro_table, dr=0.001):
+    """Compute the baryonic mass (in Msun) of a star with the given gravitational mass.
+
+    The central pressure and radius belonging to `gravitational_mass` are
+    interpolated from the macro table. The TOV equations are then
+    re-integrated outward from the centre to recover the pressure profile,
+    which is mapped to the baryon number density via the micro table. The
+    total baryon number is the integral of the density over the proper
+    volume (including the GR volume-element correction
+    1/sqrt(1 - 2GM/rc^2)), and the baryonic mass is that number times the
+    particle mass.
+
+    If the ODE integration goes unstable (produces NaNs) before reaching the
+    stellar surface, the profile is truncated at the first NaN.
 
     Parameters
     ----------
-    prior : dict or bilby.core.prior.PriorDict
-        Must supply chirp_mass, eta_star, log10_mdisk, log10_mej_dyn
-        priors, plus ratio_R/delta if `use_M_max`.
-    posterior_samples : pandas.DataFrame
-        Joint GW+EM posterior samples with chirp_mass, eta_star, EOS,
-        log10_mej_dyn, log10_mdisk columns, used to build the KDE.
-    Neos : int
-        Number of tabulated EOS files (sets the EOS prior's upper bound).
-    eos_path_macro, eos_path_micro : str or pathlib.Path
-        Directories of per-EOS macro (R, M, Lambda, P0) and micro
-        (N, EPS, P, CS2) tables, named "<EOS_index>.dat" (1-indexed).
-    use_M_max : bool, optional
-        If True, use the quasi-universal Kepler-mass relation
-        (`baryonic_Kepler_mass`) for the remnant-collapse threshold
-        instead of the EOS's own TOV mass (default False).
-    **kwargs
-        Forwarded to the sampler mixin (e.g. pymultinest.solve.Solver).
+    gravitational_mass : float
+        Gravitational (ADM) mass, in solar masses.
+    macro_table : array_like
+        Rows (radius [km], mass [Msun], central pressure [MeV/fm^3]).
+    micro_table : array_like
+        Rows (baryon number density [fm^-3], energy density [MeV/fm^3],
+        pressure [MeV/fm^3]).
+    dr : float, default 0.001
+        Radial step of the integration, in km.
+
+    Returns
+    -------
+    float
+        Baryonic mass, in solar masses; ``np.inf`` if the volume integral
+        does not converge.
+    """
+    R, M, P0 = macro_table
+    N, EPS, P = micro_table
+
+    r = np.interp(gravitational_mass, M, R)
+    p0 = np.interp(gravitational_mass, M, P0)
+    eps0 = np.interp(p0, P, EPS)
+    m0 = (eps0 * 4 * np.pi / 3 * dr**3) * MeV_per_fm3_to_Msun_per_km3
+    x = np.arange(dr, r + dr, dr)
+
+    p_solv, m_solv = scipy.integrate.odeint(
+        _tov_equations, y0=[p0, m0], t=x, args=(P, EPS)
+    ).T
+    n_solv = np.interp(p_solv, P, N)
+
+    if np.any(np.isnan(p_solv)):
+        cut = np.where(np.isnan(p_solv))[0][0]
+        if np.any(np.isnan(m_solv)):
+            cut = min(cut, np.where(np.isnan(m_solv))[0][0])
+        n_solv = n_solv[:cut]
+        m_solv = m_solv[:cut]
+        x = x[:cut]
+
+    n_solv = n_solv * 1e54  # convert from fm**(-3) to km**(-3)
+    integral_factor = scipy.integrate.simpson(
+        y=n_solv * x**2 / np.sqrt(1 - 2 * geom_msun_km * m_solv / x), x=x
+    )
+    if np.isnan(integral_factor):
+        return np.inf
+    return 4 * np.pi * integral_factor * particle_mass
+
+
+class TabulatedMicroEoS(TabulatedEoSGenerator):
+    """Microphysical tables of tabulated EOSs, for computing baryonic masses.
+
+    Holds, per EOS, the micro table (baryon number density, energy density,
+    pressure) and the central pressures of the macro table (radius, mass,
+    central pressure), both selected by the 0-based "EOS" parameter, as in
+    ``TabulatedEoSGenerator``. All tables are read once at initialisation.
+
+    Parameters
+    ----------
+    eos_path_micro : str or Path
+        Directory (or glob pattern) of micro tables with columns
+        [n, energy density, pressure, speed of sound squared].
+    eos_path_macro : str or Path
+        Directory (or glob pattern) of macro tables with columns
+        [R, M, Lambda, central pressure].
+    Neos : int, optional
+        Number of EOSs; default all files found.
     """
 
-    def __init__(
-        self,
-        prior,
-        posterior_samples,
-        Neos,
-        eos_path_macro,
-        eos_path_micro,
-        use_M_max=False,
-        **kwargs,
-    ):
-        self.posterior_samples = posterior_samples
+    def __init__(self, eos_path_micro, eos_path_macro, Neos=None):
+        self.eos_parameters = ["EOS"]
+
+        self.read_eos_files(eos_path_macro, Neos)
+        self.macro_tables = [
+            self.read_eos_table(f, usecols=[0, 1, 3], test_scale=False)
+            for f in self.eos_files
+        ]
+        self.read_eos_files(eos_path_micro, self.Neos)
+        self.tables = [
+            self.read_eos_table(f, usecols=[0, 1, 2], test_scale=False)
+            for f in self.eos_files
+        ]
+        self.Neos = len(self.tables)
+        self._tov_baryonic_masses = {}
+
+    def __call__(self, parameters):
+        """The micro tables of the requested EOSs."""
+        return [self.tables[i] for i in self.selected_indices(parameters)]
+
+    def baryonic_mass(self, gravitational_mass, eos_index):
+        """Baryonic mass at `gravitational_mass` for EOS `eos_index`,
+        see :func:`baryonic_mass`."""
+        eos_index = int(eos_index)
+        return baryonic_mass(
+            gravitational_mass, self.macro_tables[eos_index], self.tables[eos_index]
+        )
+
+    def tov_baryonic_mass(self, eos_index):
+        """Baryonic mass of the maximum-mass configuration of EOS `eos_index`,
+        cached per EOS."""
+        eos_index = int(eos_index)
+        if eos_index not in self._tov_baryonic_masses:
+            mTOV = self.macro_tables[eos_index][1].max()
+            self._tov_baryonic_masses[eos_index] = self.baryonic_mass(mTOV, eos_index)
+        return self._tov_baryonic_masses[eos_index]
+
+
+class PostmergerLikelihood(Likelihood):
+    """
+    Likelihood for whether the remnant of a BNS merger collapsed to a black hole.
+
+    It is assumed that the remnant collapsed to a black hole, so its baryonic
+    mass must exceed the collapse threshold of the EOS: the baryonic TOV mass,
+    or the baryonic Kepler mass if `use_M_max`.
+    See https://arxiv.org/abs/2402.04172 for details.
+
+    A joint GW+EM posterior enters as an informative "prior" density through a
+    Gaussian KDE over (chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn),
+    which is added to the log likelihood. The log evidence of a run with this
+    likelihood is therefore not a physical evidence.
+
+    Parameters
+    ----------
+    posterior_samples : Dataframe
+        Joint posterior samples.
+    eos_converter : EoSConverter
+        Converter on the macro tables, providing TOV_mass and R_14.
+    micro_eos : TabulatedMicroEoS
+        Micro tables for the baryonic masses.
+    use_M_max : bool, optional
+        If True, use the quasi-universal Kepler-mass relation
+        (`baryonic_Kepler_mass`) for the collapse threshold instead of the
+        baryonic TOV mass (default False).
+    """
+
+    # parameters taken from the joint GW+EM posterior, in the order of the KDE
+    kde_params = ["chirp_mass", "eta_star", "EOS", "log10_mdisk", "log10_mej_dyn"]
+
+    def __init__(self, posterior_samples, eos_converter, micro_eos, use_M_max=False):
+        super().__init__()
+
+        kde_samples = posterior_samples[self.kde_params].to_numpy().T
+        self.KDE = scipy.stats.gaussian_kde(kde_samples)
+        self.eos_converter = eos_converter
+        self.micro_eos = micro_eos
         self.use_M_max = use_M_max
 
-        self.priors = {
-            "chirp_mass": prior["chirp_mass"],
-            "eta_star": prior["eta_star"],
-            "EOS": Uniform(name="EOS", minimum=0, maximum=Neos),
-            "log10_mdisk": prior["log10_mdisk"],
-            "log10_mej_dyn": prior["log10_mej_dyn"],
-        }
-        if self.use_M_max:
-            self.priors["ratio_R"] = prior["ratio_R"]
-            self.priors["delta"] = prior["delta"]
-
-        self.priors = PriorDict(self.priors)
-        self._search_parameter_keys = self.priors.keys()
-        self.Neos = Neos
-        self.eos_path_macro = Path(eos_path_macro)
-        self.eos_path_micro = Path(eos_path_micro)
-
-        chirp_mass = self.posterior_samples.chirp_mass.to_numpy()
-        eta_star = self.posterior_samples.eta_star.to_numpy()
-        EOS = self.posterior_samples.EOS.to_numpy()
-        log10_mej_dyn = self.posterior_samples.log10_mej_dyn.to_numpy()
-        log10_mdisk = self.posterior_samples.log10_mdisk.to_numpy()
-
-        self.KDE = scipy.stats.gaussian_kde(
-            (chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn)
-        )
-        super().__init__(**kwargs)
-
-    def Prior(self, x):
-        """Rescale unit-cube samples to the physical prior, for the nested sampler.
+    def log_likelihood(self, parameters):
+        f"""KDE log density of the joint posterior plus 0 if the remnant
+        collapses (baryonic remnant mass above the threshold), -inf otherwise.
 
         Parameters
         ----------
-        x : array_like
-            Unit-cube samples, one per search-parameter key.
-
-        Returns
-        -------
-        array_like
-            Physical parameter values.
-        """
-        return self.priors.rescale(self._search_parameter_keys, x)
-
-    def LogLikelihood(self, x):
-        """Log-likelihood for whether the remnant collapses to a black hole.
-
-        Uses the joint GW+EM posterior KDE as an informative prior term,
-        then imposes a hard cut: the baryonic remnant mass (from the
-        binary's baryonic masses minus the ejected/disk mass) must exceed
-        the collapse threshold (the EOS's baryonic TOV mass, or the
-        baryonic Kepler mass if `use_M_max`) for the point to be allowed
-        (loglikelihood 0 if satisfied, -inf otherwise).
-
-        Parameters
-        ----------
-        x : tuple
-            (chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn[,
-            ratio_R, delta] if use_M_max) -- physical parameter values
-            from `Prior`.
+        parameters : dict
+            Must contain {self.kde_params}, plus ratio_R and delta if
+            `use_M_max`.
 
         Returns
         -------
         float
-            logprior (from the posterior-sample KDE) + 0 or -inf.
         """
-
-        if self.use_M_max:
-            chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn, ratio_R, delta = x
-
-        else:
-            chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn = x
-
-        logprior = self.KDE.logpdf(
-            (chirp_mass, eta_star, EOS, log10_mdisk, log10_mej_dyn)
+        parameters = dict(parameters)
+        logl = self.KDE.logpdf(
+            [parameters[key] for key in self.kde_params]
         ).item()  # use the joint GW+EM posterior as "prior" here
 
-        EOS = int(EOS) + 1
-        R, M = np.loadtxt(
-            self.eos_path_macro / f"{EOS}.dat", unpack=True, usecols=[0, 1], skiprows=0
-        )
-        mTOV = M.max()
-        R_14 = np.interp(1.4, M, R)
+        eos_index = int(parameters["EOS"])
+        parameters = self.eos_converter.compute_macro_parameters(parameters)
 
-        q = conversion.symmetric_mass_ratio_to_mass_ratio(0.25 - np.exp(eta_star))
+        q = conversion.symmetric_mass_ratio_to_mass_ratio(
+            0.25 - np.exp(parameters["eta_star"])
+        )
         mass_1, mass_2 = conversion.chirp_mass_and_mass_ratio_to_component_masses(
-            chirp_mass, q
+            parameters["chirp_mass"], q
         )
-        mdisk = 10**log10_mdisk
-        mej_dyn = 10**log10_mej_dyn
+        mdisk = 10 ** parameters["log10_mdisk"]
+        mej_dyn = 10 ** parameters["log10_mej_dyn"]
 
-        b1 = self.baryonic_mass(mass_1, EOS)
-        b2 = self.baryonic_mass(mass_2, EOS)
-        m_rem_b = b1 + b2 - mdisk - mej_dyn  # calculate the baryonic remnant mass
+        b1 = self.micro_eos.baryonic_mass(mass_1, eos_index)
+        b2 = self.micro_eos.baryonic_mass(mass_2, eos_index)
+        m_rem_b = b1 + b2 - mdisk - mej_dyn  # baryonic remnant mass
 
         if self.use_M_max:
+            # the Kepler limit is the threshold: use the quasi-universal relation
             m_threshold = baryonic_Kepler_mass(
-                mTOV, R_14, ratio_R, delta
-            )  # if the Kepler limit is the threshold, use the quasiuniversal relation
-
+                parameters["TOV_mass"],
+                parameters["R_14"],
+                parameters["ratio_R"],
+                parameters["delta"],
+            )
         else:
-            m_threshold = self.baryonic_mass(
-                mTOV, EOS
-            )  # if the TOV mass is the limit just determine its baryonic mass
+            # the TOV mass is the limit: use its baryonic mass
+            m_threshold = self.micro_eos.tov_baryonic_mass(eos_index)
 
-        if m_threshold > m_rem_b:
-            loglikelihood = np.nan_to_num(-np.inf)
-        else:
-            loglikelihood = 0
+        # a failed baryonic-mass integration (inf) on either side is rejected
+        if (
+            not np.isfinite(m_rem_b)
+            or not np.isfinite(m_threshold)
+            or m_threshold > m_rem_b
+        ):
+            return np.nan_to_num(-np.inf)
+        return logl
 
-        return logprior + loglikelihood
-
-    def baryonic_mass(self, gravitational_mass, EOS):
-        """Compute the baryonic mass (in Msun) of a given EOS at a given gravitational mass.
-
-        Loads the EOS's macro (R, M, Lambda, central pressure) and micro
-        (baryon density, energy density, pressure, sound speed squared)
-        tables, locates the central pressure/radius corresponding to
-        `gravitational_mass` via interpolation on the macro M-R/M-P0
-        relations, then re-integrates the TOV equations for pressure and
-        enclosed mass outward from the stellar center (`TOVeq`, via
-        `scipy.integrate.odeint`) to recover the full pressure profile.
-        The pressure profile is mapped back to baryon number density via
-        the micro EOS table, and the total baryon number is obtained by
-        integrating baryon density over the proper volume (including the
-        GR volume-element correction 1/sqrt(1 - 2GM/rc^2)) via Simpson's
-        rule; the baryonic mass is that baryon number times the particle
-        mass.
-
-        If the ODE integration goes unstable (produces NaNs) before
-        reaching the stellar surface, the profile is truncated at the
-        first NaN and the integral is computed over the truncated range.
-
-        Note: this reloads both EOS tables from disk and re-solves the
-        full TOV ODE on every call, even for a repeated (gravitational_mass,
-        EOS) pair -- e.g. `LogLikelihood` calls this 2-3 times per
-        evaluation for the *same* EOS (mass_1, mass_2, and mTOV), with no
-        caching (see review notes on performance).
+    def final_diagnostics(self, bestfit_params, args, result=None):
+        """Plot the posterior of the TOV mass and print its median and 90%
+        credible interval.
 
         Parameters
         ----------
-        gravitational_mass : float
-            Gravitational (ADM) mass, in solar masses, at which to
-            evaluate the baryonic mass.
-        EOS : int
-            1-indexed EOS identifier; loads
-            "{eos_path_macro}/{EOS}.dat" and "{eos_path_micro}/{EOS}.dat".
+        bestfit_params : dict
+            Unused; part of the ``final_diagnostics`` interface.
+        args : argparse.Namespace
+            Reads ``outdir`` and ``label`` for the output file.
+        result : bilby.core.result.Result, optional
+            Nothing is done without it.
 
         Returns
         -------
-        float
-            Baryonic mass, in solar masses. May be `nan` if the volume
-            integral doesn't converge (a `UserWarning` is emitted in that
-            case via `warnings.warn`).
+        matplotlib.figure.Figure or None
         """
-
-        R, M, L, P0 = np.loadtxt(
-            self.eos_path_macro / f"{EOS}.dat", unpack=True, skiprows=0
+        if result is None:
+            return None
+        _, _, mTOV = self.eos_converter.generator({"EOS": result.posterior["EOS"]})
+        low, med, high = np.quantile(mTOV, [0.05, 0.5, 0.95])
+        print(
+            f"TOV mass: {med:.3f} (+{high - med:.3f} / -{med - low:.3f}) Msun (90% CI)"
         )
-        N, EPS, P, CS2 = np.loadtxt(
-            self.eos_path_micro / f"{EOS}.dat", unpack=True, skiprows=0
+
+        fig, ax = plt.subplots()
+        ax.hist(mTOV, bins=30, density=True, histtype="step")
+        for val in (low, med, high):
+            ax.axvline(val, color="k", linestyle="--" if val != med else "-")
+        ax.set_xlabel(r"$M_{\rm TOV}\,[M_\odot]$")
+        ax.set_ylabel("probability density")
+        save = Path(args.outdir) / f"{args.label}_TOV_mass.png"
+        fig.savefig(save, bbox_inches="tight")
+        return fig
+
+
+def setup_postmerger_priors(prior, Neos, use_M_max=False):
+    """Priors of the postmerger inference: the KDE parameters from `prior`
+    (plus ratio_R and delta if `use_M_max`), and a categorical EOS prior.
+
+    Parameters
+    ----------
+    prior : bilby.core.prior.PriorDict
+        Must contain chirp_mass, eta_star, log10_mdisk, log10_mej_dyn, plus
+        ratio_R and delta if `use_M_max`. Other entries are ignored.
+    Neos : int
+        Number of tabulated EOSs.
+    use_M_max : bool, optional
+
+    Returns
+    -------
+    bilby.core.prior.PriorDict
+
+    Raises
+    ------
+    ValueError
+        If a required prior is missing.
+    """
+    keys = [key for key in PostmergerLikelihood.kde_params if key != "EOS"]
+    if use_M_max:
+        keys += ["ratio_R", "delta"]
+    missing = [key for key in keys if key not in prior]
+    if missing:
+        hint = (
+            " With use_M_Kepler, priors for ratio_R and delta are required for the "
+            "quasi-universal relation."
+            if use_M_max
+            else ""
         )
+        raise ValueError(f"Prior is missing {missing}.{hint}")
 
-        def TOVeq(y, x):
-            p, m = y
-            eps = np.interp(p, P, EPS)
-
-            Dp = -geom_msun_km * m * eps / x**2 * (1 + p / eps)
-            Dp *= 1 + 4 * np.pi * (x**3 * p) * MeV_per_fm3_to_Msun_per_km3 / m
-            Dp *= (1 - 2 * geom_msun_km * m / x) ** (-1)
-            Dm = (4 * np.pi * x**2 * eps) * MeV_per_fm3_to_Msun_per_km3
-
-            return [Dp, Dm]
-
-        dr = 0.001
-        r = np.interp(gravitational_mass, M, R)
-        p0 = np.interp(gravitational_mass, M, P0)
-        eps0 = np.interp(p0, P, EPS)
-        m0 = (eps0 * 4 * np.pi / 3 * dr**3) * MeV_per_fm3_to_Msun_per_km3
-        x = np.arange(dr, r + dr, dr)
-        y0 = [p0, m0]
-
-        p_solv, m_solv = scipy.integrate.odeint(TOVeq, y0=y0, t=x).T
-        n_solv = np.interp(p_solv, P, N)
-
-        if np.any(np.isnan(p_solv)):
-            cut = np.where(np.isnan(p_solv))[0][0]
-            if np.any(np.isnan(m_solv)):
-                cut = min(cut, np.where(np.isnan(m_solv))[0][0])
-            n_solv = n_solv[:cut]
-            m_solv = m_solv[:cut]
-            x = x[:cut]
-
-        n_solv *= 1e54  # convert from fm**(-3) to km**(-3)
-        integral_factor = scipy.integrate.simpson(
-            y=(n_solv) * x**2 / np.sqrt(1 - 2 * geom_msun_km * m_solv / x), x=x
-        )
-        if np.isnan(integral_factor):
-            warnings.warn("baryonic_mass returned nan")
-        m_baryonic = 4 * np.pi * integral_factor * particle_mass  #
-        return m_baryonic
+    priors = PriorDict({key: prior[key] for key in keys})
+    return setup_tabulated_eos_priors(Namespace(Neos=Neos), priors)
 
 
 def maximum_mass_resampling(args):
-    """CLI routine: run the postmerger nested-sampling inference and save its posterior.
-
-    Loads the joint posterior samples and prior, counts the available
-    tabulated EOS files, builds a `PostmergerInferenceMixIn` +
-    `pymultinest.solve.Solver` sampler, runs it, and writes the
-    resulting samples to '{args.outdir}/posterior_samples.dat'.
+    """CLI routine: run the postmerger inference via ``bilby_sampling``.
 
     Parameters
     ----------
     args : argparse.Namespace
-        Needs `outdir`, `joint_posterior` (CSV path), `prior` (prior
-        file path), `eos_path_macro`, `eos_path_micro`, `use_M_Kepler`,
-        `nlive`. If `use_M_Kepler` is True, `prior` must additionally
-        define ratio_R and delta.
+        Parsed by ``maximum_mass_parser``: needs ``joint_posterior``,
+        ``prior_file``, ``eos_path_macro``, ``eos_path_micro``,
+        ``use_M_Kepler`` and the sampler settings of
+        ``single_messenger_analysis_parsing``.
 
-    Raises
-    ------
-    Exception
-        If `use_M_Kepler` is True but the prior doesn't supply exactly
-        the extra ratio_R/delta parameters needed.
+    Returns
+    -------
+    bilby.core.result.Result or None
     """
+    Path(args.outdir).mkdir(parents=True, exist_ok=True)
 
-    outputfiles = Path(args.outdir, "pm")
-    outputfiles.mkdir(parents=True, exist_ok=True)
+    eos_converter = EoSConverter(
+        generator=TabulatedEoSGenerator(Namespace(eos_data=args.eos_path_macro))
+    )
+    Neos = eos_converter.generator.Neos
+    micro_eos = TabulatedMicroEoS(args.eos_path_micro, args.eos_path_macro, Neos)
+
+    priors = setup_postmerger_priors(
+        PriorDict(str(args.prior_file)), Neos, args.use_M_Kepler
+    )
 
     posterior_samples = pd.read_csv(args.joint_posterior, header=0, delimiter=" ")
-    prior = PriorDict(str(args.prior))
-    Neos = len(list(Path(args.eos_path_macro).iterdir()))
-
-    if args.use_M_Kepler:
-        n_dims = 7
-        if len(prior.keys()) != n_dims - 1:
-            raise Exception(
-                "If use_M_kepler is True, you need to provide a prior fo ratio_R and delta to be used in the quasi-universal relation."
-            )
-
-    else:
-        n_dims = 5
-
-    pymulti_kwargs = dict(
-        outputfiles_basename=str(outputfiles),
-        n_dims=n_dims,
-        n_live_points=args.nlive,
-        verbose=True,
-        resume=True,
-        seed=42,
-        importance_nested_sampling=False,
-        use_MPI=True,
+    sub_model = PostmergerLikelihood(
+        posterior_samples, eos_converter, micro_eos, use_M_max=args.use_M_Kepler
     )
+    likelihood = NMMALikelihood(sub_model, priors)
+    priors, likelihood = check_priors_and_likelihood_for_nmma(priors, likelihood)
 
-    # postpone import to avoid issues when pymultinest is not installed
-    from pymultinest.solve import Solver
-
-    class PostmergerInference(PostmergerInferenceMixIn, Solver):
-        pass
-
-    solution = PostmergerInference(
-        prior,
-        posterior_samples,
-        Neos,
-        args.eos_path_macro,
-        args.eos_path_micro,
-        args.use_M_Kepler,
-        **pymulti_kwargs,
-    )
-
-    samples = solution.samples.T
-    posterior = dict()
-
-    posterior["chirp_mass"] = samples[0]
-    posterior["eta_star"] = samples[1]
-    posterior["EOS"] = samples[2]
-    posterior["log10_mdisk"] = samples[3]
-    posterior["log10_mej_dyn"] = samples[4]
-
-    if args.use_M_Kepler:
-        posterior["ratio_R"] = samples[5]
-        posterior["delta"] = samples[6]
-
-    posterior = pd.DataFrame.from_dict(posterior)
-    posterior.to_csv(args.outdir + "/posterior_samples.dat", sep=" ", index=False)
+    return bilby_sampling(likelihood, priors, args)
 
 
 def main(args=None):
@@ -367,10 +386,9 @@ def main(args=None):
         Pre-parsed args; if None, parsed via
         `nmma_base_parsing(maximum_mass_parser)`.
     """
-
     if args is None:
         args = nmma_base_parsing(maximum_mass_parser)
-    maximum_mass_resampling(args)
+    return maximum_mass_resampling(args)
 
 
 if __name__ == "__main__":
