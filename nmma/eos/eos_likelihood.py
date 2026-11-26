@@ -10,17 +10,16 @@ from bilby.core.prior import PriorDict, WeightedCategorical
 from scipy.ndimage import gaussian_filter
 from scipy.special import logsumexp
 from scipy.stats import norm
-from tqdm.contrib.concurrent import process_map
 
 from ..core.base import NMMALikelihood
 from ..core.plotting_utils import fading_cmap, fig_setup, setup_multi_axes
 from ..core.utils import nan_level
-from .eos_processing import EoSConverter
+from .eos_processing import EoSConverter, TabulatedEoSGenerator
 
 nmma_colors = fig_setup()
 
 
-def setup_tabulated_eos_priors(args, priors, logger=None):
+def setup_tabulated_eos_priors(args, priors, logger=None, weights=None):
     """Add an "EOS" prior to ``priors``, in place, for sampling over a set
     of tabulated EOS files.
 
@@ -36,6 +35,8 @@ def setup_tabulated_eos_priors(args, priors, logger=None):
         Prior dict to add the "EOS" entry to.
     logger: logging.Logger, optional
         If given, logs that tabulated-EOS sampling is being used.
+    weights: array_like, optional
+        Per-EOS weights, if not given inferred from args.
 
     Returns
     -------
@@ -44,7 +45,8 @@ def setup_tabulated_eos_priors(args, priors, logger=None):
     """
     if logger:
         logger.info("Sampling over precomputed EOSs")
-    weights = np.loadtxt(args.eos_weight) if getattr(args, "eos_weight", None) else None
+    if weights is None and getattr(args, "eos_weight", None):
+        weights = np.loadtxt(args.eos_weight)
     if getattr(args, "Neos", False):
         n_eos = args.Neos
     elif weights is not None:
@@ -64,7 +66,7 @@ def setup_eos_kwargs(data_dump, args, logger):
     data_dump: dict
         Generation-time data dump; must contain ``"eos_constraint_dict"``.
     args: argparse.Namespace
-        Parsed CLI args, passed to ``EoSConverter(args, "emulated")``.
+        Parsed CLI args, passed to ``EoSConverter(args)``.
     logger: logging.Logger
         Unused; accepted for interface consistency with the other
         messengers' ``setup_*_kwargs``.
@@ -78,7 +80,7 @@ def setup_eos_kwargs(data_dump, args, logger):
     # eos_kwargs = default_eos_kwargs | dict(
     eos_kwargs = dict(
         constraint_dict=data_dump["eos_constraint_dict"],
-        eos_converter=EoSConverter(args, "emulated"),
+        eos_converter=EoSConverter(args),
         # crust_path=args.eos_crust_file
     )
     return eos_kwargs
@@ -91,9 +93,8 @@ def tabulated_eos_setup(args):
     Parameters
     ----------
     args: argparse.Namespace
-        Parsed CLI args (``eos_data``, ``eos_weight``, ``Neos``,
-        ``eos_to_ram``, plus any constraint args for
-        ``compose_eos_constraints``). ``Neos`` is resolved and written
+        Parsed CLI args (``eos_data``, ``eos_weight``, ``Neos``, plus any constraint
+        args for ``compose_eos_constraints``). ``Neos`` is resolved and written
         back onto ``args`` in place.
 
     Returns
@@ -106,8 +107,7 @@ def tabulated_eos_setup(args):
     priors = PriorDict()
     priors = setup_tabulated_eos_priors(args, priors)
     args.Neos = priors["EOS"].ncategories
-    eos_converter = EoSConverter(args, "tabulated")
-    eos_converter.parameter_conversion = eos_converter.compute_macro_parameters
+    eos_converter = EoSConverter(args, macro_only=True)
     eos_likelihood_kwargs = {
         "constraint_dict": compose_eos_constraints(args),
         "eos_converter": eos_converter,
@@ -168,7 +168,8 @@ class EquationofStateLikelihood(NMMALikelihood):
         matplotlib.rcParams.update({"font.size": 16, "font.family": "serif"})
         # matplotlib.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
         bestfit_params = self.parameter_conversion(bestfit_params)
-        radii, masses, lambdas = self.sub_model.eos_converter.macro_parameters.values()
+        macro_parameters = self.sub_model.eos_converter.macro_parameters
+        radii, masses = macro_parameters["radii"], macro_parameters["masses"]
         fig = getattr(args, "fig", None)
         if fig is None:
             x_lim = (min(np.min(radii) - 0.3, 9.3), max(np.max(radii) + 0.3, 14.5))
@@ -202,13 +203,13 @@ class EquationofStateLikelihood(NMMALikelihood):
         if result is not None:
             cmap = fading_cmap(line[0].get_color())
             posterior = self.parameter_conversion(result.posterior)
-            eos_data = self.sub_model.eos_converter.macro_conversion(posterior)
-            max_masses = np.max([eos[1][-1] for eos in eos_data])
-            mass_range = np.linspace(1.0, max_masses, 151)
-            show_radii = np.empty((len(mass_range), len(eos_data)))
-
-            for i, eos in enumerate(eos_data):
-                show_radii[:, i] = np.interp(mass_range, eos[1], eos[0], right=np.nan)
+            generator = self.sub_model.eos_converter.generator
+            post_curves, post_m_tov = generator.curves(posterior)
+            mass_range = np.linspace(1.0, np.max(post_m_tov), 151)
+            # radii along the mass range, NaN outside each curve
+            show_radii = generator.mass_grid.interpolate(
+                mass_range, post_m_tov, post_curves
+            )[0].T
 
             for i, level in enumerate([0.5, 0.9]):
                 bounds = np.array([nan_level(radii, level) for radii in show_radii])
@@ -223,12 +224,10 @@ class EquationofStateLikelihood(NMMALikelihood):
                 ax.fill_betweenx(mass_range, bounds[:, 0], bounds[:, 1], **kwargs)
 
             if result.injection_parameters is not None:
-                inj_eos = self.sub_model.eos_converter.macro_conversion(
-                    result.injection_parameters
-                )[0]
+                inj_radii, _, inj_m_tov = generator(result.injection_parameters)
                 ax.plot(
-                    inj_eos[0],
-                    inj_eos[1],
+                    inj_radii[0],
+                    generator.mass_grid.masses(inj_m_tov[0]),
                     label="Injection",
                     color="black",
                     linestyle="dashed",
@@ -350,25 +349,31 @@ def read_constraint_from_args(args, constraint_kind):
 
 class JointEoSConstraint:
     """Combines one or more EOS constraints, evaluating their combined
-    log-likelihood against a converted EOS's macroscopic parameters.
+    log-likelihood against the curves of the last batch of EOSs converted by
+    ``eos_converter``.
+
+    ``log_likelihood(parameters)`` is only meaningful directly after
+    ``parameter_conversion(parameters)`` (or another conversion of the same
+    parameters by ``eos_converter``), as the constraints read the curves from the
+    converter's state (``radii``, ``m_tov`` and ``batch_shape``).
 
     Parameters
     ----------
     *constraints: EoSConstraint | JointEoSConstraint | dict
         Constraints to combine. An ``EoSConstraint`` is used as-is, a
         ``JointEoSConstraint`` is flattened (its own constraints merged
-        in), and a dict is expanded via ``initialise_from_dict``.
-    eos_converter: EoSConverter, optional
-        Converts sampled EOS parameters to macroscopic properties. If
-        omitted, a placeholder with no macro parameters is used.
+        in), and a dict is expanded via ``initialise_from_dict``. Every
+        constraint is attached to ``eos_converter``.
+    eos_converter: EoSConverter
+        Converts sampled EOS parameters to macroscopic properties and holds
+        the curves the constraints are evaluated on.
     """
 
-    def __init__(self, *constraints, eos_converter=None):
+    def __init__(self, *constraints, eos_converter):
         self.constraints = self.initialise_constraints(constraints)
-
-        if eos_converter is None:
-            eos_converter = Namespace(macro_parameters={})
         self.eos_converter = eos_converter
+        for constraint in self.constraints:
+            constraint.eos_converter = eos_converter
 
     def __repr__(self):
         """Combined repr of the constraints, joined with "and"/commas."""
@@ -440,113 +445,121 @@ class JointEoSConstraint:
         return self.eos_converter.parameter_conversion(parameters)
 
     def log_likelihood(self, parameters):
-        """Sum each constraint's log-likelihood, evaluated against
-        ``parameters`` and ``self.eos_converter.macro_parameters``."""
-        logls = [
-            con.log_likelihood(parameters, self.eos_converter.macro_parameters)
-            for con in self.constraints
-        ]
-        return sum(logls)
+        """Sum of the constraints' log-likelihoods for the EOSs currently held by
+        ``self.eos_converter``, of shape ``eos_converter.batch_shape``."""
+        return sum(con.log_likelihood(parameters) for con in self.constraints)
+
+    def tabulated_eos_parameters(self, parameters=None):
+        """``{"EOS": indices}`` of the tabulated EOSs to evaluate. ``parameters``
+        may be such a dict, a count N (int, float or str) for the first N EOSs,
+        or None (or 0) for all EOSs of the generator."""
+        generator = self.eos_converter.generator
+        if not isinstance(generator, TabulatedEoSGenerator):
+            raise TypeError(
+                "Weighting tabulated EOSs requires a TabulatedEoSGenerator, "
+                f"got {type(generator).__name__}"
+            )
+        if isinstance(parameters, (str, int, float, np.integer)):
+            parameters = int(parameters) or None
+        if parameters is None:
+            parameters = generator.Neos
+        if not isinstance(parameters, dict):
+            parameters = {"EOS": np.arange(parameters)}
+        return parameters
+
+    def log_weights(self, parameters=None, chunk_size=10000):
+        """Combined log-likelihood of each tabulated EOS in ``parameters`` (see
+        ``tabulated_eos_parameters``), evaluated in batches of ``chunk_size``
+        on the resampled curves of the converter's generator.
+
+        Returns
+        -------
+        np.ndarray
+            Shape (n_eos,), in the order of ``parameters["EOS"]``.
+        """
+        parameters = self.tabulated_eos_parameters(parameters)
+        eos_indices = np.ravel(parameters["EOS"]).astype(int)
+        log_weights = np.empty(len(eos_indices))
+        for start in range(0, len(eos_indices), chunk_size):
+            chunk = {"EOS": eos_indices[start : start + chunk_size]}
+            self.eos_converter.compute_macro_parameters(chunk)
+            log_weights[start : start + chunk_size] = self.log_likelihood(chunk)
+        return log_weights
+
+    def write_sorted_eos(self, out_dir, eos_indices, weights):
+        """Copy the tabulated EOS files ``eos_indices`` to ``out_dir`` as
+        ``1.dat``, ``2.dat``, ... in ascending order of ``weights``.
+
+        Returns
+        -------
+        sort_idcs: np.ndarray
+            Indices into ``weights`` (and ``eos_indices``) in the written order.
+        """
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        eos_files = self.eos_converter.generator.eos_files
+        eos_indices = np.ravel(eos_indices).astype(int)
+        sort_idcs = np.argsort(weights)
+        for rank, idx in enumerate(sort_idcs):
+            shutil.copy(eos_files[eos_indices[idx]], out_dir / f"{rank + 1}.dat")
+        return sort_idcs
 
     def tabulate_weighted_eos(
-        self, parameters, outdir, weight_path=None, normalise=True
+        self, parameters, outdir, weight_path=None, normalise=True, chunk_size=10000
     ):
-        """Evaluate this constraint on a set of EOSs and write them out sorted
-        by weight, for use as a WeightedCategorical EOS prior.
+        """Evaluate this constraint on a set of tabulated EOSs and write them
+        out sorted by weight, for use as a WeightedCategorical EOS prior.
 
         If ``outdir`` already contains a ``sorted`` directory and
         ``eos_weights.dat``, that cached result is returned as-is.
 
         Parameters
         ----------
-        parameters: dict | str | int | float
-            EOSs to evaluate, as ``{"EOS": array_of_indices}``. A bare
-            str/int/float N is shorthand for ``{"EOS": np.arange(N)}``.
+        parameters: dict | str | int | float | None
+            EOSs to evaluate, see ``tabulated_eos_parameters``.
         outdir: str
             Directory to write the sorted EOSs and weights into.
         weight_path: str, optional
-            Path to prior weights to combine with the new constraint weights.
+            Path to prior weights (one per EOS of the generator) to combine
+            with the new constraint weights; ignored if the file is missing.
         normalise: bool, default True
             Whether to normalise the resulting weights to sum to 1.
+        chunk_size: int, default 10000
+            Number of EOSs evaluated per batch.
 
         Returns
         -------
-        weight_path: str
-            Path to the written weights file.
-        file_path: str
+        weight_path: Path
+            Path to the written weights file, ``outdir/eos_weights.dat``.
+        file_path: Path
             Directory of sorted EOS files, named ``1.dat``, ``2.dat``, ...
             in ascending weight.
         n_eos: int
-            Number of EOSs that produced a valid weight.
+            Number of EOSs written.
         """
-
         file_path = Path(outdir, "sorted")
-        if file_path.is_dir() and Path(outdir, "eos_weights.dat").is_file():
-            return (
-                Path(outdir, "eos_weights.dat"),
-                file_path,
-                len(list(file_path.iterdir())),
-            )
+        new_weight_path = Path(outdir, "eos_weights.dat")
+        if file_path.is_dir() and new_weight_path.is_file():
+            return new_weight_path, file_path, len(list(file_path.iterdir()))
 
-        file_path.mkdir(parents=True, exist_ok=True)
-        if parameters is None:
-            parameters = {"EOS": np.arange(self.eos_converter.Neos)}
-        if isinstance(parameters, (str, int, float)):
-            parameters = {"EOS": np.arange(int(parameters))}
-        eos_data = self.eos_converter.macro_conversion(parameters)
-
-        weight_data = process_map(self.eval_eos_data, eos_data, chunksize=5)
-
-        log_weights = []
-        good_data = []
-
-        for i, weight in enumerate(weight_data):
-            if weight is not None:
-                log_weights.append(weight)
-                good_data.append(eos_data[i])
+        parameters = self.tabulated_eos_parameters(parameters)
+        eos_indices = np.ravel(parameters["EOS"]).astype(int)
+        log_weights = self.log_weights(parameters, chunk_size)
 
         if isinstance(weight_path, (str, Path)):
             try:
-                previous_weights = np.loadtxt(weight_path)
-                weight_path = Path(outdir, "eos_weights.dat")
+                previous_weights = np.atleast_1d(np.loadtxt(weight_path))
+                log_weights += np.log(previous_weights[eos_indices])
             except FileNotFoundError:
-                previous_weights = np.ones_like(log_weights)
-        else:
-            previous_weights = np.ones_like(log_weights)
-            weight_path = Path(outdir, "eos_weights.dat")
+                pass
 
-        save_weights = np.array(log_weights)
-        save_weights += np.log(previous_weights)
         if normalise:
-            save_weights -= logsumexp(save_weights)
-        save_weights = np.exp(save_weights)
+            log_weights -= logsumexp(log_weights)
+        weights = np.exp(log_weights)
 
-        sort_idcs = np.argsort(save_weights)
-        for i, idx in enumerate(sort_idcs):
-            np.savetxt(file_path / f"{i + 1}.dat", np.column_stack(good_data[idx]))
-        np.savetxt(weight_path, np.array(save_weights)[sort_idcs])
-        return weight_path, file_path, len(good_data)
-
-    def eval_eos_data(self, eos_data):
-        """Evaluate this constraint's log-likelihood for one EOS's (R, M, Λ)
-        curve, at ``TOV_mass = M[-1]``. Returns None if ``eos_data`` doesn't
-        unpack to exactly 3 elements.
-
-        Parameters
-        ----------
-        eos_data: tuple
-            ``(radii, masses, lambdas)`` for one EOS.
-
-        Returns
-        -------
-        float or None
-        """
-        try:
-            R, M, _ = eos_data
-            self.eos_converter.macro_parameters = {"radii": R, "masses": M}
-            return self.log_likelihood({"TOV_mass": M[-1]})
-        except ValueError:
-            return None
+        sort_idcs = self.write_sorted_eos(file_path, eos_indices, weights)
+        np.savetxt(new_weight_path, weights[sort_idcs])
+        return new_weight_path, file_path, len(weights)
 
 
 class EoSConstraint:
@@ -576,6 +589,18 @@ class EoSConstraint:
             self.base_repr = f"{self.__class__.__name__} based on {name}"
         self.arxiv_ref = arxiv_ref
         self.plot_kwargs = plot_kwargs if plot_kwargs is not None else {}
+        # set by JointEoSConstraint
+        self.eos_converter = None
+
+    def reshape_to_batch(self, values: np.ndarray):
+        """``values`` of shape (n_eos,) in ``batch_shape``, a numpy scalar for a
+        single sample."""
+        return np.reshape(values, self.eos_converter.batch_shape)[()]
+
+    def log_likelihood(self, parameters):
+        """Log-likelihood of the EOSs currently held by ``self.eos_converter``,
+        of shape ``eos_converter.batch_shape``."""
+        raise NotImplementedError
 
     def __repr__(self):
         """``"{class_name} based on {name}"``, plus ``" (see arxiv:...)"``
@@ -630,18 +655,13 @@ class MassConstraint(EoSConstraint):
             out = f"{out} based on {self.name}"
         return out
 
-    def log_likelihood(self, parameters, local_parameters=None):
-        """``self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)``,
-        where ``tov_mass`` is ``parameters['TOV_mass']`` if present, else
-        the last mass in ``local_parameters['masses']`` (per-EOS, if a
-        list of arrays)."""
-        tov_mass = parameters.get("TOV_mass", None)
-        if tov_mass is None:
-            if isinstance(local_parameters["masses"], list):
-                tov_mass = [masses[-1] for masses in local_parameters["masses"]]
-            else:
-                tov_mass = local_parameters["masses"][-1]
-        return self.lognorm_method(tov_mass, loc=self.mass, scale=self.error)
+    def log_likelihood(self, parameters):
+        """``self.lognorm_method(m_tov, loc=self.mass, scale=self.error)``
+        for the TOV mass (last grid mass) of each current EOS curve."""
+        log_l = self.lognorm_method(
+            self.eos_converter.m_tov, loc=self.mass, scale=self.error
+        )
+        return self.reshape_to_batch(log_l)
 
     def plot(self, ax, **kwargs):
         """Draw this constraint as a horizontal line at ``self.mass``, spanning
@@ -907,52 +927,32 @@ class MassRadiusConstraint(EoSConstraint):
         bins = np.arange(0.95 * low, 1.05 * high, step_size, dtype=np.float64)
         return bins
 
-    def log_likelihood(self, parameters, local_parameters):
-        """Look up this constraint's histogram-based log-likelihood at
-        ``TOV_mass`` (or ``local_parameters['masses'][-1]`` if absent),
-        via ``single_logl``. Intended to fall back to a per-EOS list when
-        ``local_parameters`` holds a batch (list of arrays) of
-        masses/radii, one entry per EOS.
-
-        Parameters
-        ----------
-        parameters: dict
-            May contain "TOV_mass".
-        local_parameters: dict
-            "masses" and "radii" (arrays for one EOS, or lists of arrays
-            for a batch).
+    def log_likelihood(self, parameters):
+        """Log of this constraint's binned mass-radius pdf summed along each
+        current EOS curve.
 
         Returns
         -------
-        float or list of float
+        float or np.ndarray
+            Shape ``eos_converter.batch_shape``.
         """
-        try:
-            tov_mass = parameters.get("TOV_mass", local_parameters["masses"][-1])
-            return self.single_logl(
-                tov_mass, local_parameters["masses"], local_parameters["radii"]
-            )
-        except (ValueError, IndexError):
-            return [
-                self.single_logl(masses[-1], masses, local_parameters["radii"][i])
-                for i, masses in enumerate(local_parameters["masses"])
-            ]
-
-    def single_logl(self, tov_mass, masses, radii):
-        """Sum this constraint's binned mass-radius pdf along one EOS's
-        M(R) curve, up to ``tov_mass``, and return its log.
-
-        Interpolates ``radii`` onto ``self.test_masses`` (clipped below
-        ``tov_mass``), bins each point into ``self.histogram``, and
-        returns the log of the summed probability mass.
-        """
-        ## interpolate radii along equally spaced mass grid up to MTov
-        test_mass_range = self.test_masses[self.test_masses < tov_mass]
-        test_radii = np.interp(test_mass_range, masses, radii)
-        yi = np.searchsorted(self.mass_edges[1:], test_mass_range) - 1
-        xi = np.searchsorted(self.rad_edges[1:], test_radii) - 1
-        log_l = np.log(self.histogram[xi, yi].sum())
-
-        return log_l
+        test_radii, _ = self.eos_converter.curves_at(self.test_masses)
+        n_rad, n_mass = self.histogram.shape
+        mass_bins = np.searchsorted(self.mass_edges, self.test_masses, side="right") - 1
+        rad_bins = np.searchsorted(self.rad_edges, test_radii, side="right") - 1
+        inside = (
+            (test_radii > 0.0)  # curves_at gives radius 0 outside the curve
+            & (rad_bins >= 0)
+            & (rad_bins < n_rad)
+            & (mass_bins >= 0)
+            & (mass_bins < n_mass)
+        )
+        probabilities = self.histogram[
+            np.clip(rad_bins, 0, n_rad - 1), np.clip(mass_bins, 0, n_mass - 1)
+        ]
+        with np.errstate(divide="ignore"):
+            log_l = np.log(np.where(inside, probabilities, 0.0).sum(axis=-1))
+        return self.reshape_to_batch(log_l)
 
     def plot(self, ax, **kwargs):
         """Draw 50%/90% highest-posterior-density contours of this
@@ -1029,136 +1029,56 @@ class JointConstraint(JointEoSConstraint):
     """legacy synonym for JointEoSConstraint"""
 
 
-##### legacy routines to organise a collection of tabulated EoSs
-def weights_for_tabulated_eos_from_constraints(
-    macro_constraints=None,
-    micro_constraints=None,
-    macro_eos_path=None,
-    micro_eos_path=None,
-    eos_identifier="",
-    save_path=None,
-    normalise=True,
-):
-    """routine to obtain prior weights on pre-computed EOS
+##### routines to organise a collection of tabulated EoSs
+def tabulated_eos_constraint(eos_data, *constraints, Neos=None, mass_grid=None):
+    """JointEoSConstraint of ``constraints`` on a set of tabulated EOSs, i.e.
+    with an EoSConverter around a TabulatedEoSGenerator.
 
     Parameters
     ----------
-    macro_constraints: iterable | None
-        contains the Constraint objects for EoS constraints based on macroscopic NS observations, default is None
-    micro_constraints: iterable | None
-        contains the Constraint objects for EoS constraints based on macroscopic NS observations, default is None
-    macro_eos_path: str | None
-        path to directory containing the macroscopic eos data, default is None. Required if applying macro_constraints!
-    micro_eos_path: str | None
-        path to directory containing the microscopic eos data, default is None. Required if applying micro_constraints!
-    eos_identifier: str
-        string to identify eos-files in eos directory. Will be parsed with enclosing wildcards (f'*{eos_identifier}*'), default is an empty string.
-    save_path: str, None
-        If given, filename to save computed EOS weights. Default is None.
-    normalise: Bool
-        Whether to return normalised weights. Default is True
-
+    eos_data: str | Path
+        Directory of ``{j}.dat`` files, or a glob pattern, see
+        ``TabulatedEoSGenerator.read_eos_files``. Tables need columns radius
+        [km], mass [M_sun] and Lambda (or ln Lambda).
+    *constraints: EoSConstraint | JointEoSConstraint | dict | list
+        Constraints to combine; lists and tuples are unpacked.
+    Neos: int, optional
+        Number of EOSs to read, default all.
+    mass_grid: MassGrid | dict, optional
+        Grid the tables are resampled onto, see ``TabulatedEoSGenerator``.
 
     Returns
     -------
-    save_weights: ndarray
-        A 1d-array with the normalised likelihoods of the tabulated EoS, to be used as prior weights for sampling
-    eos_files: list
-        Contains the eos files by which order the weights are returned
-
+    JointEoSConstraint
     """
-    if micro_eos_path:
-        log_weights = []
-        micro_eos_files = sorted(Path(micro_eos_path).glob(f"*{eos_identifier}*"))
-        for eos_file in micro_eos_files:
-            log_weights.append(
-                constraint_weight_from_micro_eos_file(eos_file, micro_constraints)
-            )
-        log_weights = np.array(log_weights)
-
-    if macro_eos_path:
-        macro_log_weights = []
-        macro_eos_files = sorted(Path(macro_eos_path).glob(f"*{eos_identifier}*"))
-        for eos_file in macro_eos_files:
-            macro_log_weights.append(
-                constraint_weight_from_macro_eos_file(eos_file, macro_constraints)
-            )
-
-        if micro_eos_path:
-            eos_files = micro_eos_files
-            try:
-                log_weights += np.array(macro_log_weights)
-            except ValueError:
-                raise ValueError(
-                    f"Your EoS directories contained unequal numbers of microscopic ({len(micro_eos_files)}) and macroscopic ({len(macro_eos_files)}) EoSs!"
-                )
-        else:
-            eos_files = macro_eos_files
-            log_weights = np.array(macro_log_weights)
-
-    save_weights = np.array(log_weights)
-    if normalise:
-        save_weights -= logsumexp(log_weights)
-    save_weights = np.exp(save_weights)
-    if save_path:
-        np.savetxt(save_path, np.c_[save_weights])
-    return save_weights, eos_files
-
-
-def constraint_weight_from_micro_eos_file(filepath, micro_constraints):
-    n, p, eps = np.loadtxt(filepath, usecols=[0, 1, 2], unpack=True)
-    micro_params = dict(number_density=n, pressur=p, energy_density=eps)
-    return eos_weight_from_constraints(micro_params, micro_constraints)
-
-
-def constraint_weight_from_macro_eos_file(filepath, macro_constraints):
-    R, M = np.loadtxt(filepath, usecols=[0, 1], unpack=True)
-    macro_params = dict(radii=R, masses=M, TOV_mass=M[-1])
-    return eos_weight_from_constraints(macro_params, macro_constraints)
-
-
-def eos_weight_from_constraints(eos_params, *constraints):
-    logL_eos = 0
+    flat_constraints = []
     for constraint in constraints:
-        logL_eos += constraint.log_likelihood(eos_params)
-    return logL_eos
-
-
-def EOSSorting(eos_files, out_dir, sort_quantity_array):
-    """routine to resort EoS files for more efficient sampling.
-    Each EoS file will be saved as {integer}.dat
-
-    Parameters
-    ----------
-    eos_files: list
-        list of eos_files, such that the ith entry of sort_quantity_array relates to the ith EoS in eos_files
-    outdir: str | None
-        path to directory where sorted EoSs should be stored
-    sort_quantity_array: iterable
-        Contains the quantity by which EoS files should be sorted, typically prior probability or an associated observable (e.g. Lambda_1.4)
-    """
-    sort_quantity_array = np.atleast_1d(sort_quantity_array).argsort()
-    sortIdcs = sort_quantity_array.argsort()
-    for i, eos_file in enumerate(eos_files):
-        sortedIdx = sortIdcs[i] + 1
-        shutil.copy(f"{eos_file}.dat", f"{out_dir}/{sortedIdx}.dat")
+        if isinstance(constraint, (list, tuple)):
+            flat_constraints.extend(constraint)
+        else:
+            flat_constraints.append(constraint)
+    generator = TabulatedEoSGenerator(
+        Namespace(eos_data=eos_data, Neos=Neos), mass_grid=mass_grid
+    )
+    eos_converter = EoSConverter(generator=generator, macro_only=True)
+    return JointEoSConstraint(*flat_constraints, eos_converter=eos_converter)
 
 
 def EOSConstraints2Prior(macro_eos_path, out_path, Constraint):
     """
-    Given a directory of macroscopic EOSs and nmma.joint.Constraint,
+    Given a directory of macroscopic EOSs and EOS constraint(s),
     returns sorted EOSs and the corresponding prior
 
     Parameters
     ----------
-    eos_path: str
-        Path to the original EOSs
+    macro_eos_path: str
+        Path to the original EOSs: a directory of ``{j}.dat`` files with columns
+        radius, mass, Lambda, or a glob pattern, see ``tabulated_eos_constraint``
     out_path: str
-        Path to the sorted EOSs
-    Neos: int
-        Number of EOSs
-    Constraint: nmma.joint.Constraint
-        The EOS constraint to be consider
+        Directory to write the sorted EOSs to, as ``1.dat``, ``2.dat``, ... in
+        ascending prior weight
+    Constraint: EoSConstraint | JointEoSConstraint | list
+        The EOS constraint(s) to be considered
 
     Returns
     -------
@@ -1168,14 +1088,13 @@ def EOSConstraints2Prior(macro_eos_path, out_path, Constraint):
         log normalization constant for the EOS prior
     """
 
-    logLs, eos_files = weights_for_tabulated_eos_from_constraints(
-        macro_constraints=Constraint, macro_eos_path=macro_eos_path, normalise=False
-    )
+    joint_constraint = tabulated_eos_constraint(macro_eos_path, Constraint)
+    parameters = joint_constraint.tabulated_eos_parameters()
+    logLs = joint_constraint.log_weights(parameters)
     logNorm = logsumexp(logLs)
 
     weights = np.exp(logLs - logNorm)
-    sorted_weights = np.sort(weights)
-    EOSSorting(eos_files, out_path, weights)
-    prior = WeightedCategorical(len(eos_files), sorted_weights, name="EOS")
+    sort_idcs = joint_constraint.write_sorted_eos(out_path, parameters["EOS"], weights)
+    prior = WeightedCategorical(len(weights), weights[sort_idcs], name="EOS")
 
     return prior, logNorm

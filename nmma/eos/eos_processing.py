@@ -1,304 +1,237 @@
-import json
 import os
-from ast import literal_eval
+from argparse import Namespace
 from pathlib import Path
 
-import joblib
 import numpy as np
+from numpy.typing import ArrayLike
 
 from ..core.conversion import (
-    EOS_to_ns_parameters,
-    EOS_to_system_parameters,
-    radii_from_qur,
+    MassGrid,
+    eos_to_system_parameters,
+    max_mass_increase_by_spin,
+    non_rotating_mass,
 )
-
-
-def setup_eos_generator(args):
-    """Build the right EoSGenerator subclass for ``micro_eos_model``
-    ("nep", "nep-5", "lec", "lec-7", or "lec-13"), reading its metadata
-    from ``emulator_metadata`` -- a dict, a path to a JSON file, or a
-    Python-literal dict string.
-
-    Parameters
-    ----------
-    args: argparse.Namespace | dict
-        Must provide ``micro_eos_model`` and ``emulator_metadata``
-        (as attributes, or as dict keys if ``args`` is a plain dict).
-
-    Returns
-    -------
-    EoSGenerator
-    """
-    if isinstance(args, dict):
-        meta_dict = args
-        eos_model_type = meta_dict["micro_eos_model"].lower()
-    else:
-        try:
-            with open(args.emulator_metadata, "r") as f:
-                meta_dict = json.load(f)
-        except TypeError:
-            meta_dict = args.emulator_metadata
-        except FileNotFoundError:
-            meta_dict = literal_eval(args.emulator_metadata)
-
-        eos_model_type = args.micro_eos_model.lower()
-
-    if eos_model_type == "nep":
-        return NEPEoSGenerator(meta_dict)
-    elif eos_model_type == "nep-5":
-        return NEP5EoSGenerator(meta_dict)
-
-    elif eos_model_type == "lec":
-        return LECEoSGenerator(meta_dict)
-    elif eos_model_type == "lec-7":
-        return LEC7EoSGenerator(meta_dict)
-    elif eos_model_type == "lec-13":
-        return LEC13EoSGenerator(meta_dict)
-    # add more models
-    else:
-        raise ValueError(f"Unknown eos model type: {eos_model_type}")
+from .eos_utils import TOVDataset
+from .tov_emulators import TOVEmulator
 
 
 class EoSGenerator:
-    """Base on-the-fly EOS emulator: wraps a trained model (Keras, or a
-    pickled sklearn-style model as fallback) that maps micro-EOS
-    parameters to macroscopic (radius, mass, lambda) curves.
+    """Maps micro-EOS parameters to radius and ln Lambda curves on a mass grid.
+
+    The native output of a generator (``curves``) are the radius and ln Lambda curves
+    on the mass grid of each EOS, stacked as (n_eos, 2, n_points) for
+    ``MassGrid.interpolate``, and the TOV masses, from which the grid masses follow.
+    ``__call__`` returns radii and ln Lambdas separately, and ``tables_from_curves``
+    builds (radius, mass, ln Lambda) tables from them.
+
+    The default backend is a TOVEmulator stored as .npz, whose metadata provides the
+    mass grid it was trained on and, optionally, the parameter names. Use
+    ``build_generator`` to pick the generator class from the arguments.
 
     Parameters
     ----------
-    emulator_path: str
-        Path to a Keras model, or a pickle file as fallback.
+    emulator: str | Path | TOVEmulator
+        Emulator file (.npz) or an already loaded emulator, i.e. an object with
+        ``predict`` and ``metadata`` like TOVEmulator.
     eos_parameters: list of str, optional
-        Names of the parameters to pass to the emulator, in order.
-        Falls back to the class attribute of the same name if omitted.
-    n_mass_samples: int, default 30
-        Number of mass grid points per EOS; see ``set_mass_construction``.
+        Names of the parameters passed to the emulator, in input order; default
+        from the emulator metadata.
+    mass_grid: MassGrid | dict | int | tuple | None
+        parameter from which the MassGrid can be built
     """
 
-    eos_parameters = None
+    def __init__(
+        self,
+        emulator: str | Path | TOVEmulator | None,
+        eos_parameters: list[str] = None,
+        mass_grid=None,
+        **kwargs,
+    ) -> None:
+        self.set_emulator(emulator, **kwargs)
+        if eos_parameters is None:
+            try:
+                eos_parameters = self.emulator.metadata["eos_parameters"]
+            except KeyError:
+                raise ValueError(f"{type(self).__name__} needs eos_parameters")
+        self.eos_parameters = list(eos_parameters)
 
-    def __init__(self, emulator_path, eos_parameters=None, n_mass_samples=30):
-        # load the emulator
+        self.build_mass_grid(mass_grid)
 
+    def set_emulator(self, emulator: str | Path | TOVEmulator, **kwargs) -> None:
+        """Load the emulator from its file, or use an already loaded one."""
+        if isinstance(emulator, (str, Path)):
+            emulator = TOVEmulator.from_npz(emulator)
+        self.emulator = emulator
+
+    def build_mass_grid(self, mass_grid) -> None:
+        """By default the mass grid the emulator was trained on, from its metadata."""
+        if mass_grid is None:
+            mass_grid = self.base_mass_grid()
+
+        if isinstance(mass_grid, MassGrid):
+            self.mass_grid = mass_grid
+        elif isinstance(mass_grid, dict):
+            self.mass_grid = MassGrid.from_config(mass_grid)
+        elif isinstance(mass_grid, (int, np.integer, tuple)):
+            self.mass_grid = MassGrid.from_n_mass_samples(mass_grid)
+        else:
+            raise ValueError(f"Cannot initialise MassGrid from {mass_grid}")
+
+    def base_mass_grid(self):
+        return self.emulator.metadata["mass_grid"]
+
+    @property
+    def n_mass_samples(self) -> int:
+        """Number of mass grid points per EOS."""
+        return self.mass_grid.n_points
+
+    def __call__(self, parameters: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Radii [km] and ln Lambdas on the mass grid, shape (n_eos, n_points), and
+        TOV masses, shape (n_eos,), of one batch of EOSs; views of ``curves``."""
+        curves, m_tov = self.curves(parameters)
+        return curves[:, 0], curves[:, 1], m_tov
+
+    # shared methods
+    def assemble_eos_params(self, parameters: dict) -> np.ndarray:
+        """Assemble the parameters for the EoS model into a 2D-array for the emulator"""
+        eos_params = np.array([parameters[par] for par in self.eos_parameters]).T
+        return np.atleast_2d(eos_params)
+
+    def parameter_dict(self, params: ArrayLike) -> dict:
+        """Parameter dict for an array (n_eos, n_params) in emulator input order."""
+        params = np.atleast_2d(params)
+        return {name: params[:, j] for j, name in enumerate(self.eos_parameters)}
+
+    def batch_shape(self, parameters: dict) -> tuple:
+        """Shape of the batch of EOSs in ``parameters``, () for a single sample."""
+        return np.shape(parameters[self.eos_parameters[0]])
+
+    # preferred, slim output
+    def curves(self, parameters: dict) -> tuple[np.ndarray, np.ndarray]:
+        """Radius [km] and ln Lambda curves on the mass grid, shape
+        (n_eos, 2, n_points), and TOV masses, shape (n_eos,), of one batch of EOSs."""
+        return self.predict_curves(self.assemble_eos_params(parameters))
+
+    def predict_curves(self, eos_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Curves and TOV masses for the assembled parameters, see ``curves``."""
+        return self.split_prediction(self.predict(eos_params))
+
+    # alternative table-like output
+    def tables_from_curves(self, curves: np.ndarray, m_tov: np.ndarray) -> np.ndarray:
+        """(radius, mass, ln Lambda) tables of ``curves``, shape (n_eos, 3, n_points),
+        rebuilding the masses from M_tov."""
+        masses = self.mass_grid.masses(m_tov)[:, None]
+        return np.concatenate([curves[:, :1], masses, curves[:, 1:]], axis=1)
+
+    # specific methods
+    def predict(self, eos_params: np.ndarray) -> np.ndarray:
+        """Raw emulator output for the assembled parameters."""
+        return self.emulator.predict(eos_params)
+
+    def split_prediction(self, predictions: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+        """Split the flat output [R grid | ln(Lambda) grid | M_tov] into the curves
+        (n_eos, 2, n_points), a view of ``predictions``, and the TOV masses."""
+        predictions = np.asarray(predictions)
+        n = self.n_mass_samples
+        return predictions[:, : 2 * n].reshape(-1, 2, n), predictions[:, -1]
+
+
+class KerasEoSGenerator(EoSGenerator):
+    """Older Keras emulators with output [R grid | log10(Lambda) grid | M_tov].
+    As the model file carries no metadata, the mass grid must be given explicitly.
+
+    Parameters
+    ----------
+    emulator: str | Path
+        Path to the .keras model.
+    eos_parameters: list of str
+        Names of the parameters passed to the emulator, in input order.
+    mass_grid: MassGrid | dict | int | tuple, optional
+        The mass grid of the emulator, or its config; an int or tuple is the
+        former ``n_mass_samples`` configuration.
+    backend: str, optional
+        Expected Keras backend, asserted against the active one.
+    """
+
+    # factors from the radius and log10(Lambda) curves to radius and ln(Lambda)
+    curve_units = np.array([[1.0], [np.log(10)]])
+
+    def set_emulator(
+        self, emulator: str | Path, backend: str | None = None, **kwargs
+    ) -> None:
+        """Load the Keras model and choose the call best suited for small batches."""
         import keras as k
 
-        try:
-            self.emulator = k.saving.load_model(
-                emulator_path, custom_objects=None, compile=False
+        if backend:
+            assert k.backend.backend() == backend, (
+                f"Keras Backend mismatch: {k.backend.backend()} vs {backend}. "
+                f"please set the environment variable KERAS_BACKEND to {backend}"
             )
+        self.emulator = k.saving.load_model(
+            emulator, custom_objects=None, compile=False
+        )
 
-            # NOTE: in the main samling loop, the tensorflow-predict method is much slower
-            #  than pure __call__ as it tries to cater to larger batches!
-            # We therefore need to set the predict method in
-            # accordance with the appropriate backend
-            if k.backend.backend() == "tensorflow":
-                self.predict = self.tensorflow_predict
-            elif k.backend.backend() == "jax":
-                self.predict = self.jax_predict
-        except:  # noqa: E722
-            import pickle
+        # NOTE: in sampling, the tensorflow-predict method is much slower
+        #  than pure __call__ as it tries to cater to larger batches!
+        if k.backend.backend() == "tensorflow":
+            self.predict = self.tensorflow_predict
+        elif k.backend.backend() == "jax":
+            self.predict = self.jax_predict
 
-            with open(emulator_path, "rb") as f:
-                self.emulator = pickle.load(f)
-            self.predict = self.pickle_predict
+    def base_mass_grid(self):
+        return 30
 
-        # set the parameter-keys to be passed to the emulator
-        if eos_parameters:
-            self.eos_parameters = eos_parameters
-
-        self.set_mass_construction(n_mass_samples)
-
-    def pickle_predict(self, x):
-        """``self.emulator.predict(x)``, for a plain pickled model."""
-        return self.emulator.predict(x)
-
-    def jax_predict(self, x):
+    def jax_predict(self, x: np.ndarray) -> np.ndarray:
         """``self.emulator.predict(x, verbose=0)``, for the jax Keras backend."""
         return self.emulator.predict(x, verbose=0)
 
-    def tensorflow_predict(self, x):
+    def tensorflow_predict(self, x: np.ndarray) -> np.ndarray:
         """``self.emulator(x)`` -- faster than ``.predict`` for the small
         batches used during sampling, on the tensorflow Keras backend."""
         return self.emulator(x)
 
-    def set_mass_construction(self, n_mass_samples):
-        """Use ``n_mass_samples`` equally-spaced mass grid points (1 to
-        each EOS's TOV mass) per EOS, via ``equal_distance_masses``."""
-        self.n_mass_samples = n_mass_samples
-        self.decompose_mass_data = self.equal_distance_masses
-
-    def equal_distance_masses(self, mtov):
-        "Get mass array(s) from 1 to mtov of length n_mass_samples"
-        mass_range = np.linspace(1, mtov, self.n_mass_samples, axis=-1)
-        try:
-            mass_range = np.squeeze(mass_range, axis=1)
-        except ValueError:
-            pass
-        return mass_range
-
-    def generate_macro_eos(self, converted_parameters):
-        """Emulate and reshape one batch of EOS into (radius, mass,
-        lambda) curves: ``emulate_macro_eos`` then ``adjust_format``."""
-        predictions = self.emulate_macro_eos(converted_parameters)
-        return self.adjust_format(predictions)
-
-    def emulate_macro_eos(self, converted_parameters):
-        """Run the emulator on ``converted_parameters``, via
-        ``assemble_eos_params`` then ``self.predict``."""
-        eos_params = self.assemble_eos_params(converted_parameters)
-        return self.predict(eos_params)
-
-    def assemble_eos_params(self, converted_parameters):
-        """Assemble the parameters for the EoS model into a 2D-array for the emulator"""
-        eos_params = np.array(
-            [converted_parameters[par] for par in self.eos_parameters]
-        ).T
-        return np.atleast_2d(eos_params)
-
-    def adjust_format(self, predictions):
-        """Adjust the format of the predictions to the expected format: A n-tuple of three 1-D arrays for radius, mass, lambdas, respectively"""
-        # This should be implemented in the subclass
-        return predictions
+    def split_prediction(self, predictions: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+        """As EoSGenerator.split_prediction, converting log10(Lambda) to ln."""
+        predictions = np.asarray(predictions, dtype=float)
+        curves, m_tov = super().split_prediction(predictions)
+        return curves * self.curve_units, m_tov
 
 
-class NEPEoSGenerator(EoSGenerator):
-    """Nuclear-empirical-parameter EOS emulator.
-
-    Parameters
-    ----------
-    metadata: dict
-        Must include "emulator_path"; may include "backend" (asserted
-        against the active Keras backend), "eos_parameters", and
-        "n_mass_samples" (default 40) -- see ``set_mass_construction``.
-    """
-
-    def __init__(self, metadata):
-        emulator_path = metadata["emulator_path"]
-        if metadata.get("backend", False):
-            import keras as k
-
-            assert k.backend.backend() == metadata["backend"], (
-                f"Keras Backend mismatch: {k.backend.backend()} vs {metadata['backend']}. please set the environment variable KERAS_BACKEND to {metadata['backend']}"
-            )
-        super().__init__(emulator_path, metadata.get("eos_parameters", None))
-
-        n_mass_samples = metadata.get("n_mass_samples", 40)
-        self.set_mass_construction(n_mass_samples)
-
-    def set_mass_construction(self, n_mass_samples):
-        """Use ``n_mass_samples`` equally-spaced mass points if it's an
-        int (via ``equal_distance_masses``), or a disjoint low/high mass
-        grid if it's a 2- or 3-tuple/list of
-        ``(mass_samples_low, mass_samples_high[, split_value])`` (via
-        ``disjoint_masses``; ``split_value`` defaults to 2.0)."""
-        if isinstance(n_mass_samples, int):
-            # if this is a single integer, use equally spaced masses
-            self.n_mass_samples = n_mass_samples
-            self.decompose_mass_data = self.equal_distance_masses
-        elif isinstance(n_mass_samples, (tuple, list)):
-            # iterable containing mass points for fixed-distance lower end, variably spaced upper end and optionally mass value at which these methods will be concatenated; if not given, the default is 2.0
-            try:
-                (
-                    self.mass_samples_low,
-                    self.mass_samples_high,
-                    self.split_value,
-                ) = n_mass_samples
-            except ValueError:
-                self.mass_samples_low, self.mass_samples_high = n_mass_samples
-                self.split_value = 2.0
-            self.n_mass_samples = self.mass_samples_low + self.mass_samples_high
-            self.decompose_mass_data = self.disjoint_masses
-
-    def disjoint_masses(self, mtov):
-        """Helper function when using split mass construction.
-        Some predicted TOV-masses may be lower than the split value
-        for concatenation and would lead to unexpected behaviour.
-        In that case we fall back to equally spaced mass arrays.
-        However, this should not happen for EoSs with a physically
-        reasonable TOV-mass and should only be seen as a graceful fallback.
-        """
-        return np.where(
-            mtov > self.split_value,
-            self.properly_disjoint_masses(mtov),
-            self.equal_distance_masses(mtov),
-        )
-
-    def equal_distance_masses(self, mtov):
-        "Get mass array(s) from 1 to mtov of length n_mass_samples"
-        mass_range = np.linspace(1, mtov, self.n_mass_samples, axis=-1)
-        try:
-            mass_range = np.squeeze(mass_range, axis=1)
-        except ValueError:
-            pass
-        return mass_range
-
-    def properly_disjoint_masses(self, mtov):
-        """Build a two-part mass grid: ``mass_samples_low`` points from 1
-        to ``split_value``, plus ``mass_samples_high`` points from
-        ``split_value`` (exclusive) up to ``mtov``. Used by
-        ``disjoint_masses`` when ``mtov > split_value``."""
-        mass_range_low = np.linspace(
-            1, self.split_value * np.ones_like(mtov), self.mass_samples_low, axis=-1
-        )
-        mass_range_high = np.linspace(
-            mtov, self.split_value, self.mass_samples_high, endpoint=False, axis=-1
-        )
-        mass_range_high = mass_range_high[..., ::-1]
-        mass_range = np.concatenate([mass_range_low, mass_range_high], axis=-1)
-        try:
-            mass_range = np.squeeze(mass_range, axis=1)
-        except ValueError:
-            pass
-        return mass_range
-
-    def adjust_format(self, predictions):
-        """Split the emulator's flat (radius | log10-lambda | TOV_mass)
-        output into (radius, mass, lambda) curves, building the mass grid
-        from the predicted TOV mass via ``self.decompose_mass_data``."""
-        rad_data, lam_data, mtov_data = np.split(
-            predictions, [self.n_mass_samples, 2 * self.n_mass_samples], axis=-1
-        )
-        mass_range = self.decompose_mass_data(mtov_data)
-
-        lam_data = 10**lam_data
-
-        return np.stack([rad_data, mass_range, lam_data], axis=1)
-
-
-class NEP5EoSGenerator(NEPEoSGenerator):
-    """NEPEoSGenerator using the 5 NEP coefficients K_sat, L_sym, K_sym,
-    3n_sat, 5n_sat as emulator inputs (the ``--micro-eos-model nep-5``
-    default)."""
-
-    eos_parameters = ["K_sat", "L_sym", "K_sym", "3n_sat", "5n_sat"]
-
-
-class LECEoSGenerator(EoSGenerator):
+class SklearnEoSGenerator(EoSGenerator):
     """Chiral-EFT low-energy-constant EOS emulator: separate sklearn-style
-    models (and scalers) for mass, radius, and lambda, rather than one
-    combined Keras model. Does not call EoSGenerator.__init__.
+    models (and scalers) for mass, radius, and lambda, rather than a combined model.
 
     Parameters
     ----------
-    metadata: dict
+    emulator: None
+        Unused, the models are given as keyword arguments.
+    eos_parameters: list of str
+        Names of the parameters passed to the emulator, in input order.
+    mass_grid: MassGrid | dict | int | tuple, optional
+        The mass grid of the emulator, default 30 equally spaced masses.
+    kwargs:
         Paths to joblib-pickled "feature_scaler", "lambda_scaler",
-        "radius_scaler", "mass_emulator", "radius_emulator",
-        "lambda_emulator", and optionally "n_mass_samples" (default 30).
+        "radius_scaler", "mass_emulator", "radius_emulator" and
+        "lambda_emulator".
     """
 
-    def __init__(self, metadata):
-        self.feature_scaler = joblib.load(metadata["feature_scaler"])
-        self.lambda_scaler = joblib.load(metadata["lambda_scaler"])
-        self.radius_scaler = joblib.load(metadata["radius_scaler"])
+    def set_emulator(self, emulator: None, **kwargs) -> None:
+        """Load the scalers and the three emulators."""
+        import joblib
 
-        self.mass_emulator = joblib.load(metadata["mass_emulator"])
-        self.radius_emulator = joblib.load(metadata["radius_emulator"])
-        self.lambda_emulator = joblib.load(metadata["lambda_emulator"])
+        self.feature_scaler = joblib.load(kwargs["feature_scaler"])
+        self.lambda_scaler = joblib.load(kwargs["lambda_scaler"])
+        self.radius_scaler = joblib.load(kwargs["radius_scaler"])
 
-        self.set_mass_construction(metadata.get("n_mass_samples", 30))
+        self.mass_emulator = joblib.load(kwargs["mass_emulator"])
+        self.radius_emulator = joblib.load(kwargs["radius_emulator"])
+        self.lambda_emulator = joblib.load(kwargs["lambda_emulator"])
 
-    def predict(self, converted_parameters):
-        """Scale ``converted_parameters`` (the assembled 2D parameter
+    def base_mass_grid(self):
+        return 30
+
+    def predict(self, parameters):
+        """Scale ``parameters`` (the assembled 2D parameter
         array from ``assemble_eos_params``) and run the mass, radius,
         and lambda emulators on it.
 
@@ -308,7 +241,7 @@ class LECEoSGenerator(EoSGenerator):
             (mass_prediction, radius_prediction, lambda_prediction).
         """
         # Scale the input features
-        scaled_features = self.feature_scaler.transform(converted_parameters)
+        scaled_features = self.feature_scaler.transform(parameters)
 
         # Make predictions using the emulators
         mass_prediction = self.mass_emulator.predict(scaled_features)
@@ -317,268 +250,366 @@ class LECEoSGenerator(EoSGenerator):
 
         return (mass_prediction, radius_prediction, lambda_prediction)
 
-    # def assemble_eos_params(self, converted_parameters):
-    #     """Assemble the parameters for the EoS model into a 2D-array for the emulator"""
-    #     eos_params = np.array([
-    #         converted_parameters[par] + converted_parameters.get(f"{par}_shift", 0)
-    #         for par in self.eos_parameters
-    #     ]).T
-    #     return np.atleast_2d(eos_params)
-
-    def adjust_format(self, predictions):
-        """Inverse-transform (mass, radius, lambda) via their scalers,
-        building the mass grid from the predicted TOV mass via
-        ``self.decompose_mass_data`` and exponentiating lambda."""
+    def split_prediction(self, predictions: tuple) -> tuple[np.ndarray, np.ndarray]:
+        """Inverse-transform the (TOV mass, radius, log10 lambda) predictions via
+        their scalers into the curves and TOV masses, see ``curves``."""
         mass_data, rad_data, lam_data = predictions
-
-        # Inverse transform the predictions
-        mass_array = self.decompose_mass_data(mass_data)
-        radius_array = self.radius_scaler.inverse_transform(rad_data)
-        lambda_array = self.lambda_scaler.inverse_transform(lam_data)
-        return np.stack([radius_array, mass_array, 10**lambda_array], axis=1)
+        radii = self.radius_scaler.inverse_transform(rad_data)
+        ln_lams = np.log(10) * self.lambda_scaler.inverse_transform(lam_data)
+        return np.stack([radii, ln_lams], axis=1), np.ravel(mass_data)
 
 
-class LEC7EoSGenerator(LECEoSGenerator):
-    """LECEoSGenerator using the 6 chiral-EFT low-energy constants
-    d11, d22, d3, d4, d6, d7 as emulator inputs."""
+class TabulatedEoSGenerator(EoSGenerator):
+    """Curves of tabulated EOSs, selected by the 0-based "EOS" parameter.
 
-    eos_parameters = ["d11", "d22", "d3", "d4", "d6", "d7"]
-
-
-class LEC13EoSGenerator(LECEoSGenerator):
-    """LECEoSGenerator using the 6 LEC7EoSGenerator coefficients plus 7
-    saturation/speed-of-sound parameters (ksat, qsat, zsat, cssq1-4)."""
-
-    eos_parameters = [
-        "d11",
-        "d22",
-        "d3",
-        "d4",
-        "d6",
-        "d7",
-        "ksat",
-        "qsat",
-        "zsat",
-        "cssq1",
-        "cssq2",
-        "cssq3",
-        "cssq4",
-    ]
-
-
-class EoSConverter:
-    """Parameter-conversion object that turns sampled EOS/mass parameters
-    into macroscopic mass-radius-tidal-deformability curves and, for GW
-    analyses, per-component lambda/radius.
-
-    Auto-detects ``method`` from ``args`` if not given: "tabulated" if
-    ``eos_file``/``eos_data`` is set, else "emulated" if
-    ``emulator_metadata`` is set.
+    Every table is cut at its maximum mass and resampled onto ``mass_grid`` once at
+    initialisation, so the curves come in the same format as those of the
+    emulators. The raw tables remain available through ``raw_tables`` and
+    ``reference_dataset``, for validation and plotting.
 
     Parameters
     ----------
-    args: argparse.Namespace
-        See ``eos_parsing.py`` for the relevant CLI args per method.
-    method: str, optional
-        "emulated" (on-the-fly generation via ``setup_eos_generator``),
-        "tabulated" (a single ``eos_file``, or a directory/glob
-        ``eos_data`` of files -- preloaded to RAM if ``eos_to_ram``, else
-        loaded from disk on demand, renaming files to a canonical
-        ``{1..N}.dat`` scheme first, or "qur" (skip EOS
-        entirely, use quasi-universal relations via ``radii_from_qur``).
+    args: Namespace
+        ``eos_file`` for a single table, or ``eos_data`` (and ``Neos``), see
+        ``read_eos_files``. Tables have columns radius [km], mass [M_sun], Lambda
+        (or ln Lambda).
+    mass_grid: MassGrid | dict, optional
+        Grid for resampling, default ``MassGrid()``. Its ``m_min`` must lie within
+        every table, and below every mass the EOSs are evaluated at.
     """
 
-    def __init__(self, args, method=None):
-        if method is None:
-            if getattr(args, "eos_file", None) or getattr(args, "eos_data", None):
-                method = "tabulated"
-            elif getattr(args, "emulator_metadata", None):
-                method = "emulated"
-
-        self.parameter_conversion = self.full_eos_conversion
-        # Case 1: eos is generated from emulator on the fly
-        if method == "emulated":
-            self.tov_emulator = setup_eos_generator(args)
-            self.macro_conversion = self.tov_emulator.generate_macro_eos
-
-        elif method == "tabulated":
-            # case 2: we use a single eos
-            if getattr(args, "eos_file", None):
-                self.eos_data = [np.loadtxt(args.eos_file, usecols=[0, 1, 2]).T]
-                self.macro_conversion = self.single_eos_from_ram
-                return
-
-            # case 3 : we use multiple eos
-            eos_path = Path(args.eos_data)
-            if eos_path.is_dir():
-                self.ini_str = ""
-                self.end_str = ".dat"
-                eos_pattern = "*.dat"
-            else:
-                eos_path, eos_pattern = eos_path.parent, eos_path.name
-                eos_files = sorted(eos_path.glob(eos_pattern))
-                if not eos_files:
-                    raise ValueError(f"No files match {eos_path}/{eos_pattern}")
-                eos_names = [f.name for f in eos_files]
-                flipped_names = [n[::-1] for n in eos_names]
-                self.ini_str = os.path.commonprefix(eos_names)
-                self.end_str = os.path.commonprefix(flipped_names)[::-1]
-
-            Neos = getattr(args, "Neos", len(list(eos_path.glob(eos_pattern))))
-            self.eos_path = eos_path
-            eos_files = [self._get_eos_filename(j + 1) for j in range(Neos)]
-            self.Neos = len(eos_files)
-
-            # Case 3a: precomputed eos data is loaded to ram
-            if args.eos_to_ram:
-                self.eos_data = [self._read_eos_file(f) for f in eos_files]
-                self.macro_conversion = self.eos_from_ram
-
-            # Case 3b: eos are loaded directly from file
-            else:
-                self.macro_conversion = self.eos_direct_load
-
-        # case 4: no eos conversion, just QURs
-        elif method == "qur":
-            self.parameter_conversion = radii_from_qur
+    def __init__(
+        self,
+        args: Namespace | None = None,
+        mass_grid: MassGrid | dict | None = None,
+    ) -> None:
+        self.eos_parameters = ["EOS"]
+        if getattr(args, "eos_file", None):
+            self.eos_files = [Path(args.eos_file)]
         else:
-            raise ValueError(f"Unknown EoS conversion method: {method}")
+            self.read_eos_files(args.eos_data, getattr(args, "Neos", None))
+        self.Neos = len(self.eos_files)
+
+        self.build_mass_grid(mass_grid or MassGrid())
+        curves, m_tov = zip(*(self.resample_table(f) for f in self.eos_files))
+        self.resampled_curves, self.m_tov = np.array(curves), np.array(m_tov)
+
+    def batch_shape(self, parameters: dict) -> tuple:
+        """Shape of the batch of EOSs in ``parameters``, () for a single sample;
+        without "EOS", a single table serves every entry of ``parameters``."""
+        if "EOS" in parameters or self.Neos > 1:
+            return np.shape(parameters["EOS"])
+        try:
+            return np.shape(next(iter(parameters.values()), 0))
+        except TypeError:  # this fails for pandasDF
+            return (len(parameters),)
+
+    def assemble_eos_params(self, parameters: dict) -> np.ndarray:
+        return self.selected_indices(parameters)[:, None]
+
+    def predict_curves(self, eos_params: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """The resampled curves of the EOS indices ``eos_params``, see ``curves``."""
+        indices = np.ravel(eos_params).astype(int)
+        return self.resampled_curves[indices], self.m_tov[indices]
+
+    def resample_table(self, eos_file: str | Path) -> tuple[np.ndarray, float]:
+        """Radius and ln Lambda curve of a table on the mass grid, shape
+        (2, n_points), and its TOV mass."""
+        radius, mass, ln_lam = self.read_eos_table(eos_file)
+        mtov = mass[-1]
+        if mtov < self.mass_grid.m_min:
+            raise ValueError(
+                f"EOS {eos_file} has maximum mass {mass[-1]:.3f} < "
+                f"grid minimum mass {self.mass_grid.m_min:.3f}"
+            )
+        elif mass[0] > self.mass_grid.m_min:
+            raise ValueError(
+                f"EOS {eos_file} has minimum mass {mass[0]:.3f} > "
+                f"grid minimum mass {self.mass_grid.m_min:.3f}"
+            )
+        return self.mass_grid.resample(mass, radius, ln_lam), mtov
+
+    def raw_tables(self, parameters: dict) -> list[np.ndarray]:
+        """The raw (radius, mass, ln Lambda) tables of the requested EOSs, read
+        from file once per distinct EOS."""
+        indices = self.selected_indices(parameters)
+        unique, inverse = np.unique(indices, return_inverse=True)
+        tables = [self.read_eos_table(self.eos_files[i]) for i in unique]
+        return [tables[j] for j in np.ravel(inverse)]
+
+    def read_eos_table(
+        self, eos_file, usecols=[0, 1, 2], test_scale=True
+    ) -> np.ndarray:
+        """(radius, mass, ln Lambda) of a tabulated EOS file with columns radius, mass
+        and Lambda; Lambda columns with values above 100 are taken as linear."""
+        # TODO: detecting the Lambda scale by its values is fragile
+        table = np.loadtxt(eos_file, usecols=usecols, unpack=True)
+        if test_scale and np.any(table[2] > 100):
+            table[2] = np.log(table[2])
+        return table
+
+    def reference_dataset(self) -> TOVDataset:
+        """The raw tables as TOVDataset, with the EOS index as parameter."""
+        tables = [self.read_eos_table(f) for f in self.eos_files]
+        length = max(table.shape[1] for table in tables)
+        radius, mass, ln_lam = np.stack(
+            [
+                np.pad(t, ((0, 0), (0, length - t.shape[1])), constant_values=np.nan)
+                for t in tables
+            ],
+            axis=1,
+        )
+        indices = np.arange(self.Neos, dtype=float)[:, None]
+        return TOVDataset(indices, mass, radius, np.exp(ln_lam))
+
+    def selected_indices(self, parameters: dict) -> np.ndarray:
+        """Indices of the requested EOSs, shape (n_eos,); a single table serves
+        every entry."""
+        if self.Neos == 1:
+            n_entries = int(np.prod(self.batch_shape(parameters)))
+            return np.zeros(n_entries, dtype=int)
+        return np.ravel(parameters["EOS"]).astype(int)
+
+    def read_eos_files(self, eos_data: str | Path, Neos: int | None) -> list[Path]:
+        """Files ``1..Neos`` of a directory of ``{j}.dat`` files, or of a glob pattern
+        whose matches share a common prefix and suffix around the EOS number."""
+        eos_path = Path(eos_data)
+        if eos_path.is_dir():
+            pre, suf, pattern = "", ".dat", "*.dat"
+        else:
+            eos_path, pattern = eos_path.parent, eos_path.name
+            names = [f.name for f in sorted(eos_path.glob(pattern))]
+            if not names:
+                raise ValueError(f"No files match {eos_path}/{pattern}")
+            pre = os.path.commonprefix(names)
+            suf = os.path.commonprefix([name[::-1] for name in names])[::-1]
+        self.Neos = Neos or len(list(eos_path.glob(pattern)))
+        self.eos_files = [eos_path / f"{pre}{j + 1}{suf}" for j in range(self.Neos)]
+
+
+def build_generator(args: Namespace) -> EoSGenerator:
+    """The generator described by ``args``: tabulated EOSs for ``eos_file`` or
+    ``eos_data``, otherwise an emulator from ``emulator_path``, ``micro_eos_model``
+    and ``emulator_metadata`` (whose entries take precedence)."""
+    if getattr(args, "eos_file", None) or getattr(args, "eos_data", None):
+        return TabulatedEoSGenerator(args)
+
+    metadata = dict(args.emulator_metadata)
+    for key in ("emulator_path", "micro_eos_model"):
+        if key not in metadata:
+            metadata[key] = getattr(args, key)
+    emulator_path = metadata.pop("emulator_path", None)
+    eos_model_type = str(metadata.pop("micro_eos_model", "")).lower()
+    if "n_mass_samples" in metadata:
+        metadata.setdefault("mass_grid", metadata.pop("n_mass_samples"))
+
+    legacy_micro_parameters = {
+        "nep-5": ["K_sat", "L_sym", "K_sym", "3n_sat", "5n_sat"],
+        # 6 chiral-EFT low-energy constants
+        "lec-7": ["d11", "d22", "d3", "d4", "d6", "d7"],
+        # + 7 saturation/speed-of-sound parameters
+        "lec-13": [
+            "d11", "d22", "d3", "d4", "d6", "d7",
+            "ksat", "qsat", "zsat", "cssq1", "cssq2", "cssq3", "cssq4",
+        ],
+    }  # fmt: skip
+    if eos_model_type in legacy_micro_parameters:
+        metadata["eos_parameters"] = legacy_micro_parameters[eos_model_type]
+
+    if emulator_path is None:
+        if "feature_scaler" in metadata:
+            return SklearnEoSGenerator(None, **metadata)
+        raise ValueError("emulator_path must be provided in args or metadata")
+
+    suffix = Path(emulator_path).suffix
+    if suffix == ".npz":
+        return EoSGenerator(emulator_path, **metadata)
+    elif suffix == ".keras":
+        return KerasEoSGenerator(emulator_path, **metadata)
+    else:
+        raise ValueError(f"Unsupported emulator file {emulator_path}")
+
+
+class EoSConverter:
+    """Parameter conversion from sampled EOS (and binary) parameters to macroscopic
+    NS properties: TOV mass, TOV radius, R_14 and R_16 of each EOS and, for GW
+    analyses, tidal deformability, radius and NS-flag of each component.
+
+    The curves of the last converted batch are kept as ``curves``
+    (n_eos, 2, n_points), with views ``radii`` and ``ln_lams``, and ``m_tov``
+    (n_eos,), and are evaluated at any mass by ``curves_at`` along the mass grid of
+    the generator. Results have the shape of
+    the sampled parameters: numpy scalars for a single sample.
+
+    Parameters
+    ----------
+    args: argparse.Namespace, optional
+        Arguments for ``build_generator``, and ``spin_correction``.
+    generator: EoSGenerator, optional
+        Generator to use instead of building one from ``args``.
+    macro_only: bool
+        Whether ``parameter_conversion`` derives only the properties of the EOS,
+        e.g. for EOS-only analyses, rather than those of the components as well.
+    """
+
+    characteristic_masses = np.array([1.4, 1.6])
+    # radius and ln Lambda outside the mass range of an EOS
+    outside_values = np.array([0.0, -np.inf])[:, None, None]
+
+    def __init__(
+        self,
+        args: Namespace | None = None,
+        generator: EoSGenerator | None = None,
+        macro_only: bool = False,
+    ) -> None:
+        self.spin_correction = getattr(args, "spin_correction", False)
+        if generator is None:
+            generator = build_generator(args)
+        self.generator = generator
+        self.mass_grid = generator.mass_grid
+        if macro_only:
+            self.parameter_conversion = self.compute_macro_parameters
+        else:
+            self.parameter_conversion = self.full_eos_conversion
 
     def __call__(self, parameters):
         """Forward to ``self.parameter_conversion``."""
         return self.parameter_conversion(parameters)
 
-    def _get_eos_filename(self, eos_idx):
-        return self.eos_path / f"{self.ini_str}{eos_idx}{self.end_str}"
-
-    def _read_eos_file(self, file_path):
-        return np.loadtxt(file_path, usecols=[0, 1, 2]).T
-
-    def eos_direct_load(self, converted_parameters):
-        """Load the requested EOS index/indices from disk, as
-        ``{self.eos_data}/{EOS+1}.dat``.
-
-        Parameters
-        ----------
-        converted_parameters: dict
-            Must contain "EOS" (int or array of ints).
-
-        Returns
-        -------
-        list of np.ndarray
-            One (radius, mass, lambda) array per requested EOS.
-        """
-        EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
-        files = [self._get_eos_filename(j + 1) for j in EOSID]
-        return [self._read_eos_file(f) for f in files]
-
-    def eos_from_ram(self, converted_parameters):
-        """Look up the requested EOS index/indices in ``self.eos_data``
-        (preloaded list), same interface as ``eos_direct_load``."""
-        EOSID = np.atleast_1d(converted_parameters["EOS"]).astype(int)
-        return [self.eos_data[i] for i in EOSID]
-
-    def single_eos_from_ram(self, _):
-        """Return the one preloaded EOS in ``self.eos_data``, ignoring the
-        input (there's only ever one to choose from)."""
-        return self.eos_data
-
     def full_eos_conversion(self, parameters):
-        """``compute_macro_parameters`` then ``system_props_from_eos`` --
-        the default ``parameter_conversion`` for GW+EOS joint analyses."""
-        parameters = self.compute_macro_parameters(parameters)
-        return self.system_props_from_eos(parameters)
+        """The default ``parameter_conversion`` for GW+EOS joint analyses; looks up
+        the curves once for both the characteristic radii and the components."""
+        self.update_curves(parameters)
+        components = self.components(parameters)
+        masses = np.empty((len(self.m_tov), 4))
+        # masses [M_sun] of the characteristic radii R_14 and R_16
+        masses[:, :2] = self.characteristic_masses
+        masses[:, 2:] = components[2]
+        radii, ln_lams = self.curves_at(masses)
+        self.add_to(parameters, self.macro_properties(radii[:, :2]))
+        system = self.system_properties(*components, radii[:, 2:], ln_lams[:, 2:])
+        return self.add_to(parameters, system)
+
+    def update_curves(self, parameters) -> None:
+        """Predict and keep the curves of the EOSs in ``parameters``."""
+        self.batch_shape = self.generator.batch_shape(parameters)
+        self.curves, self.m_tov = self.generator.curves(parameters)
+        self.radii, self.ln_lams = self.curves[:, 0], self.curves[:, 1]
+
+    def component_pair(self, parameters, key: str) -> np.ndarray:
+        """Values of ``key`` (e.g. "a_{}") for both components, shape (n_eos, 2)."""
+        pair = np.empty((len(self.m_tov), 2))
+        pair[:, 0] = np.ravel(parameters[key.format(1)])
+        pair[:, 1] = np.ravel(parameters[key.format(2)])
+        return pair
+
+    def components(self, parameters) -> tuple:
+        """Source masses and spins of both components in ``parameters``, the masses
+        at which the current curves describe them, and their maximum masses, each
+        of shape (n_eos, 2). With ``spin_correction``, the curves are evaluated at
+        the non-rotating masses, and rigid rotation raises the maximum mass."""
+        m_source = self.component_pair(parameters, "mass_{}_source")
+        chi = self.component_pair(parameters, "a_{}")
+        m_tov = self.m_tov[:, None]
+        if not self.spin_correction:
+            return m_source, chi, m_source, m_tov
+        m_eval = non_rotating_mass(self.curves_at, m_source, chi, m_tov)
+        return m_source, chi, m_eval, m_tov * max_mass_increase_by_spin(chi)
+
+    def add_to(self, parameters, values: dict):
+        """``parameters`` with ``values`` of the current batch added in its batch
+        shape, as numpy scalars for a single sample."""
+        if self.batch_shape == ():
+            for key, value in values.items():
+                parameters[key] = value[0]
+        else:
+            for key, value in values.items():
+                parameters[key] = np.reshape(value, self.batch_shape)
+        return parameters
+
+    def curves_at(self, masses: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+        """Radii and ln Lambdas of the current curves at ``masses`` (shape
+        (n_masses,) for every EOS, or (n_eos, n_masses)), shape (n_eos, n_masses).
+        Outside [m_min, M_tov] of each EOS, the radius is 0 and ln Lambda -inf."""
+        values = self.mass_grid.interpolate(masses, self.m_tov, self.curves)
+        radii, ln_lams = np.where(np.isnan(values), self.outside_values, values)
+        return radii, ln_lams
+
+    def macro_properties(self, characteristic_radii: np.ndarray) -> dict:
+        """TOV mass and radius of the current curves, and their radii at the
+        ``characteristic_masses``, shape (n_eos, 2)."""
+        return {
+            "TOV_mass": self.m_tov,
+            "TOV_radius": self.radii[:, -1],
+            "R_14": characteristic_radii[:, 0],
+            "R_16": characteristic_radii[:, 1],
+        }
+
+    def add_system_properties(self, parameters):
+        """``parameters`` with lambda, radius and NS-flag of both components added,
+        from the current curves."""
+        components = self.components(parameters)
+        radii, ln_lams = self.curves_at(components[2])
+        system = self.system_properties(*components, radii, ln_lams)
+        return self.add_to(parameters, system)
+
+    def system_properties(self, m_source, chi, m_eval, m_max, radii, ln_lams) -> dict:
+        """Lambda, radius and NS-flag of both components from their
+        :meth:`components` and the ``radii`` and ``ln_lams`` of the curves at
+        ``m_eval``, each of shape (n_eos, 2)."""
+        # compactness is constant to good approximation under rotation, so the
+        # radius scales with the mass; Lambda is assumed to be kept constant
+        radii = radii * m_source / m_eval
+        lambdas, radii, is_ns = eos_to_system_parameters(
+            radii, ln_lams, m_source, chi, m_max
+        )
+        system = {}
+        for j in range(2):
+            system[f"lambda_{j + 1}"] = lambdas[:, j]
+            system[f"radius_{j + 1}"] = radii[:, j]
+            system[f"is_ns_{j + 1}"] = is_ns[:, j]
+        return system
 
     def compute_macro_parameters(self, parameters):
-        """Convert the chosen EOS(s) into TOV_mass/TOV_radius/R_14/R_16
-        via ``EOS_to_ns_parameters``, and stash the raw (radii, masses,
-        lambdas) curve(s) in ``self.macro_parameters`` for later use
-        (e.g. by ``system_props_from_eos``).
+        """Predict the curves of the EOSs in ``parameters`` and add TOV_mass,
+        TOV_radius, R_14 and R_16 (0 above the TOV mass).
 
         Parameters
         ----------
         parameters: dict
-            Must contain whatever ``self.macro_conversion`` needs
-            (e.g. "EOS").
+            Must contain the parameters of the generator (e.g. "EOS").
 
         Returns
         -------
         dict
             ``parameters``, with TOV_mass/TOV_radius/R_14/R_16 added.
         """
-        eos_macro_keys = ["TOV_mass", "TOV_radius", "R_14", "R_16"]
-        eos_data = self.macro_conversion(parameters)
+        self.update_curves(parameters)
+        radii, _ = self.curves_at(self.characteristic_masses)
+        return self.add_to(parameters, self.macro_properties(radii))
 
-        if len(eos_data) == 1:
-            radii, masses, lambdas = eos_data[0]
-            for key, val in zip(
-                eos_macro_keys, EOS_to_ns_parameters(radii, masses, lambdas)
-            ):
-                parameters[key] = val
-        else:
-            radii, masses, lambdas = map(list, zip(*eos_data))
-            TOV_mass_list, TOV_radius_list, R_14_list, R_16_list = [], [], [], []
-            for rad, mass, lam in zip(radii, masses, lambdas):
-                TOV_mass, TOV_radius, R_14, R_16 = EOS_to_ns_parameters(rad, mass, lam)
-                TOV_mass_list.append(TOV_mass)
-                TOV_radius_list.append(TOV_radius)
-                R_14_list.append(R_14)
-                R_16_list.append(R_16)
-            for key, _list in zip(
-                eos_macro_keys, [TOV_mass_list, TOV_radius_list, R_14_list, R_16_list]
-            ):
-                parameters[key] = np.array(_list)
+    @property
+    def macro_parameters(self) -> dict:
+        """The current curves as radii, masses and ln Lambdas, each of shape
+        (*batch_shape, n_points), e.g. for EoS constraints and plotting."""
+        shape = self.batch_shape + (self.mass_grid.n_points,)
+        tables = {
+            "radii": self.radii,
+            "masses": self.mass_grid.masses(self.m_tov),
+            "ln_lams": self.ln_lams,
+        }
+        return {key: np.reshape(value, shape) for key, value in tables.items()}
 
-        self.macro_parameters = {"radii": radii, "masses": masses, "lambdas": lambdas}
-        return parameters
-
-    def system_props_from_eos(self, converted_parameters):
-        """Interpolate each component's tidal deformability and radius
-        (lambda_1/2, radius_1/2) from ``self.macro_parameters``'s EOS
-        curve(s), at its source-frame mass, via
-        ``EOS_to_system_parameters``.
-
-        Parameters
-        ----------
-        converted_parameters: dict
-            Must contain "mass_1_source"/"mass_2_source".
-
-        Returns
-        -------
-        dict
-            ``converted_parameters``, with lambda_1/2, radius_1/2 added.
-        """
-        system_keys = ["lambda_1", "lambda_2", "radius_1", "radius_2"]
-
-        m1_source = converted_parameters["mass_1_source"]
-        m2_source = converted_parameters["mass_2_source"]
-        radii, masses, lambdas = self.macro_parameters.values()
-
-        if isinstance(radii, np.ndarray):  # single eos case
-            for key, val_array in zip(
-                system_keys,
-                EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source),
-            ):
-                converted_parameters[key] = val_array
-        else:
-            lambda_1_list, lambda_2_list, radius_1_list, radius_2_list = [], [], [], []
-            for i, rad in enumerate(radii):
-                lambda_1, lambda_2, radius_1, radius_2 = EOS_to_system_parameters(
-                    rad, masses[i], lambdas[i], m1_source[i], m2_source[i]
-                )
-
-                lambda_1_list.append(lambda_1)
-                lambda_2_list.append(lambda_2)
-                radius_1_list.append(radius_1)
-                radius_2_list.append(radius_2)
-
-            for key, _list in zip(
-                system_keys,
-                [lambda_1_list, lambda_2_list, radius_1_list, radius_2_list],
-            ):
-                converted_parameters[key] = np.array(_list)
-
-        return converted_parameters
+    def test_vs_dataset(
+        self,
+        dataset: TOVDataset | None = None,
+        ref_masses: ArrayLike = (1.4, 1.6, 1.8, 2.0),
+    ) -> dict:
+        """``dataset.test_vs_generator`` of this converter's generator; without a
+        dataset, a tabulated generator compares to its own raw tables."""
+        if dataset is None:
+            dataset = self.generator.reference_dataset()
+        return dataset.test_vs_generator(self.generator, ref_masses)
 
 
 def load_eos_files(eos_data, Neos):
@@ -599,7 +630,7 @@ def load_eos_files(eos_data, Neos):
     Neos: int
     """
     if isinstance(eos_data, str):
-        eos_data = sorted(Path(eos_data).glob("*.dat"))
+        eos_data = sorted(Path(eos_data).glob("*.dat"), key=lambda p: int(p.stem))
     if Neos:
         assert len(eos_data) == Neos, f"{eos_data} does not contain {Neos} eos-files"
     else:

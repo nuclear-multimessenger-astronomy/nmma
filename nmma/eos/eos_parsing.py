@@ -5,7 +5,7 @@ def tabulated_eos_parsing(parser):
     """Add CLI args for sampling over a directory of precomputed EOS
     files: ``--eos-data``, ``--Neos``, ``--eos-weight``, ``--eos-to-ram``.
 
-    Consumed by ``setup_tabulated_eos_priors``/``EoSConverter(..., "tabulated")``.
+    Consumed by ``setup_tabulated_eos_priors``/``EoSConverter``.
 
     Parameters
     ----------
@@ -21,16 +21,9 @@ def tabulated_eos_parsing(parser):
         description="Specify tabulated EOS inputs",
     )
 
-    tab_eos_input_parser.add(
-        "--eos-to-ram",
-        action="store_true",
-        help="Depending on cluster architecture, it can be faster to load all EOS files directly to RAM",
-    )
     tab_eos_input_parser.add("--eos-data", help="Path to the EOS directory")
     tab_eos_input_parser.add("--Neos", type=int, help="Number of EOSs to be used")
-    tab_eos_input_parser.add(
-        "--eos-weight", help="Path to the precalculated EOS weighting"
-    )
+    tab_eos_input_parser.add("--eos-weight", help="Path to precalculated EOS weights")
     return parser
 
 
@@ -57,15 +50,18 @@ def eos_parsing(parser):
         title="EOS input arguments", description="Specify EOS inputs"
     )
 
-    # eos_input_parser.add( "--eos-crust-file",
-    #     help="Path to data file for eos crust" )
+    eos_input_parser.add(
+        "--spin-correction",
+        action="store_true",
+        help="Whether to apply spin corrections on NS parameters. Default: False.",
+    )
+
+    eos_input_parser.add("--emulator-path", help="Path(s) to the TOV emulator model.")
 
     eos_input_parser.add(
         "--emulator-metadata",
-        help='dict or path to dict with metadata for the TOV emulator. Must include "emulator_path", can contain further metadata',
-    )
-    eos_input_parser.add(
-        "--micro-eos-model", default="nep-5", help="The micro EOS model to use."
+        type=yaml_parse,
+        help="dict or path to dict with further metadata for the TOV emulator",
     )
 
     ### args to set up eos likelihood evaluation based on constraints

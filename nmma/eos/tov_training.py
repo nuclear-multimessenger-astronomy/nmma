@@ -1,10 +1,3 @@
-"""Training of TOV emulators (torch).
-
-The trained network is stored with ``write_emulator_npz`` (see tov_emulators) and
-evaluated through the production path: an EoSGenerator around the numpy TOVEmulator,
-compared to the raw curves by ``TOVDataset.test_vs_generator``.
-"""
-
 import copy
 import json
 import shutil
@@ -15,32 +8,26 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from scipy.linalg import block_diag
 from torch import nn
 
+from nmma.core.conversion import MassGrid
 from nmma.core.utils import _to_json
 from nmma.eos.eos_processing import EoSGenerator
 from nmma.eos.eos_utils import (
-    FeatureEncoder,
-    MassGrid,
-    PCABasis,
     error_summary,
     plot_performance,
     print_summary,
     relative_error,
 )
-from nmma.eos.tov_emulators import (
-    TOVEmulator,
-    decoder_arrays,
-    network_layers,
-    read_emulator_npz,
-    write_emulator_npz,
-)
+from nmma.eos.tov_emulators import EmulatorFile, TOVEmulator
 
 
 @dataclass
 class TrainingConfig:
     seed: int = 42
     label: str = "tov_emulator"
+    outdir: str = Path.cwd()
     eos_parameters: tuple = ()  # parameter names in input order
 
     # mass grid and data selection
@@ -48,7 +35,7 @@ class TrainingConfig:
     m_min: float = 1.0
     # 2: dense at M_tov (better for R), 1: uniform in m (best for Lambda)
     grid_power: float = 1.5
-    grid_interpolation: str = "linear"  # or 'quadratic'
+    grid_interpolation: str = "quadratic"  # or 'linear'
     mtov_range: tuple = (2.0, 3.0)
     test_frac: float = 0.1
     val_frac: float = 0.1
@@ -94,9 +81,22 @@ class TrainingConfig:
 
 
 class TOVNetwork(nn.Module):
-    """MLP predicting whitened PCA coefficients (+ scaled M_tov), followed by the fixed
-    decoder to [R grid [km], ln(Lambda) grid, M_tov (M_sun)]. Inputs are standardised
-    micro parameters."""
+    """Trainable counterpart of an EmulatorFile: an MLP between a fixed (not
+    trainable) affine input and output map,
+    ``mlp(x @ in_kernel + in_bias) @ out_kernel + out_bias``.
+
+    The affine maps are kept in float64, as stored in the emulator file, and are
+    cast to the dtype of the input when applied.
+
+    Parameters
+    ----------
+    layer_sizes: list of int
+        Widths of the MLP from input to output, e.g. [n_in, 256, 256, n_out].
+    activation: str
+        Hidden-layer activation, key of torch_activations.
+    *maps: arrays
+        The affine maps around the MLP, see EmulatorFile.
+    """
 
     torch_activations = {
         "silu": nn.SiLU,
@@ -106,63 +106,104 @@ class TOVNetwork(nn.Module):
         "leaky_relu": nn.LeakyReLU,
         "mish": nn.Mish,
         "gelu": nn.GELU,
+        "linear": nn.Identity,
     }
 
-    def __init__(
-        self,
-        n_inputs,
-        n_coefficients,
-        decode_kernel,
-        decode_bias,
-        hidden_layers=4,
-        units=256,
-        activation="silu",
-    ):
+    def __init__(self, layer_sizes, activation, *maps):
         super().__init__()
+        self.activation = activation
         layers = []
-        n_in = n_inputs
-        for _ in range(hidden_layers):
-            layers += [nn.Linear(n_in, units), self.torch_activations[activation]()]
-            n_in = units
-        layers.append(nn.Linear(n_in, n_coefficients))
+        for n_in, n_out in zip(layer_sizes[:-2], layer_sizes[1:-1]):
+            layers += [nn.Linear(n_in, n_out), self.torch_activations[activation]()]
+        layers.append(nn.Linear(*layer_sizes[-2:]))
         self.mlp = nn.Sequential(*layers)
         for layer in self.linear_layers():  # glorot init
             nn.init.xavier_uniform_(layer.weight)
             nn.init.zeros_(layer.bias)
-        # the decoder is fixed, not trainable
-        self.register_buffer(
-            "decode_kernel", torch.as_tensor(decode_kernel, dtype=torch.float32)
-        )
-        self.register_buffer(
-            "decode_bias", torch.as_tensor(decode_bias, dtype=torch.float32)
-        )
+        for name, value in zip(EmulatorFile.affine_maps, maps):
+            self.register_buffer(name, torch.as_tensor(value, dtype=torch.float64))
 
     @classmethod
-    def from_npz(cls, path):
-        """Trainable network with the weights of an emulator file (see tov_emulators)."""
-        metadata, arrays = read_emulator_npz(path)
-        weights, biases = network_layers(arrays)
-        kernel, bias = decoder_arrays(arrays)
-        network = cls(
-            weights[0].shape[0],
-            weights[-1].shape[1],
-            kernel,
-            bias,
-            len(weights) - 1,
-            weights[0].shape[1],
-            metadata["activation"],
-        )
+    def from_file(cls, file):
+        """Trainable network with the content of an emulator file."""
+        sizes = [W.shape[0] for W in file.weights] + [file.weights[-1].shape[1]]
+        maps = (getattr(file, name) for name in EmulatorFile.affine_maps)
+        network = cls(sizes, file.metadata["activation"], *maps)
         with torch.no_grad():
-            for layer, W, b in zip(network.linear_layers(), weights, biases):
+            for layer, W, b in zip(network.linear_layers(), file.weights, file.biases):
                 layer.weight.copy_(torch.as_tensor(W.T))
                 layer.bias.copy_(torch.as_tensor(b))
         return network
+
+    def emulator_file(self, metadata):
+        """The network as emulator file content, with ``metadata``."""
+
+        def array(tensor):
+            return tensor.detach().cpu().numpy().astype(np.float64)
+
+        layers = self.linear_layers()
+        return EmulatorFile(
+            metadata | {"activation": self.activation},
+            [array(layer.weight).T for layer in layers],
+            [array(layer.bias) for layer in layers],
+            *(array(getattr(self, name)) for name in EmulatorFile.affine_maps),
+        )
 
     def linear_layers(self):
         return [layer for layer in self.mlp if isinstance(layer, nn.Linear)]
 
     def forward(self, x):
-        return self.mlp(x) @ self.decode_kernel + self.decode_bias
+        in_kernel, in_bias, out_kernel, out_bias = (
+            getattr(self, name).to(x.dtype) for name in EmulatorFile.affine_maps
+        )
+        return self.mlp(x @ in_kernel + in_bias) @ out_kernel + out_bias
+
+
+class FeatureEncoder(object):
+    """Standardise the micro parameters to zero mean and unit variance per column."""
+
+    def __init__(self, params):
+        self.mean = params.mean(axis=0)
+        self.std = params.std(axis=0)
+        self.bounds = np.stack([params.min(axis=0), params.max(axis=0)])
+
+    def transform(self, params):
+        # return ((params - self.mean) / self.std).astype(np.float32)
+        return (params - self.mean) / self.std
+
+    def maps(self):
+        "Feature standardisation, as affine map (kernel, bias)"
+        scale = 1.0 / self.std
+        return np.diag(scale), -self.mean * scale
+
+
+class PCABasis(object):
+    """PCA basis for curves of shape (n_samples, n_points).
+    Coefficients are whitened, so the network outputs are O(1)."""
+
+    def __init__(self, n_components):
+        self.n_components = int(n_components)
+
+    def fit(self, curves):
+        self.mean = curves.mean(axis=0)
+        _, singular_values, vt = np.linalg.svd(curves - self.mean, full_matrices=False)
+        self.components = vt[: self.n_components]
+        self.scales = singular_values[: self.n_components] / np.sqrt(len(curves) - 1)
+        self.explained = np.sum(singular_values[: self.n_components] ** 2) / np.sum(
+            singular_values**2
+        )
+        return self
+
+    @property
+    def decode_kernel(self):
+        "Matrix mapping whitened coefficients to (centred) curves"
+        return self.scales[:, None] * self.components
+
+    def encode(self, curves):
+        return (curves - self.mean) @ self.components.T / self.scales
+
+    def decode(self, coefficients):
+        return coefficients @ self.decode_kernel + self.mean
 
 
 class TOVEmulatorTrainer(object):
@@ -171,16 +212,15 @@ class TOVEmulatorTrainer(object):
     Parameters:
     dataset: TOVDataset
     config: TrainingConfig
-    outdir: str or Path
     device: str, optional
         torch device; default 'cuda' if available, else 'cpu'
     """
 
-    def __init__(self, dataset, config=None, outdir=".", device=None):
+    def __init__(self, dataset, config=None, device=None):
         self.config = config or TrainingConfig()
         cfg = self.config
 
-        self.outdir = Path(outdir)
+        self.outdir = Path(cfg.outdir)
         self.outdir.mkdir(parents=True, exist_ok=True)
         self.label = cfg.label
         self.seed = cfg.seed
@@ -212,14 +252,13 @@ class TOVEmulatorTrainer(object):
 
     def regularise_dataset(self, cfg):
         train = self.split["train"]
-        params = self.dataset.params[self.indices]
-        self.encoder = FeatureEncoder().fit(params[train])
-        self.features = self.encoder.transform(params)
+        self.params = self.dataset.params[self.indices]
+        self.encoder = FeatureEncoder(self.params[train])
 
-        use_rads = self.targets[:, : cfg.n_points]
+        use_rads = self.targets[:, : cfg.n_points][train]
         use_ln_lams = self.targets[:, cfg.n_points : 2 * cfg.n_points][train]
         use_mtovs = self.targets[:, -1][train]
-        self.basis_radius = PCABasis(cfg.n_components).fit(use_rads[train])
+        self.basis_radius = PCABasis(cfg.n_components).fit(use_rads)
         self.basis_lam = PCABasis(cfg.n_components).fit(use_ln_lams)
         self.mtov_mean, self.mtov_std = use_mtovs.mean(), use_mtovs.std()
 
@@ -251,6 +290,7 @@ class TOVEmulatorTrainer(object):
         """Train, then optionally evaluate on the test set and store the performance plot"""
         x_train, y_train, x_val, y_val = self.prepare_training()
         self.run_training(x_train, y_train, x_val, y_val)
+        self.save()
         if evaluate:
             self.evaluate()
             if plot:
@@ -281,18 +321,25 @@ class TOVEmulatorTrainer(object):
         return x_train, y_train, x_val, y_val
 
     def build_model(self):
+        """Network between the input and output map of this trainer."""
         cfg = self.config
-        kernel, bias = decoder_arrays(self.scaling_arrays())
+        in_kernel, in_bias = self.encoder.maps()
+        out_kernel, out_bias = self.output_map()
+        hidden = [cfg.units] * cfg.hidden_layers
+        sizes = [in_kernel.shape[1], *hidden, out_kernel.shape[0]]
         network = TOVNetwork(
-            self.features.shape[1],
-            kernel.shape[0],
-            kernel,
-            bias,
-            cfg.hidden_layers,
-            cfg.units,
-            cfg.activation,
+            sizes, cfg.activation, in_kernel, in_bias, out_kernel, out_bias
         )
         return network.to(self.device)
+
+    def output_map(self):
+        """Decoder from the network output [radius PCA coefficients, ln(Lambda) PCA
+        coefficients, scaled M_tov] to [R grid [km], ln(Lambda) grid, M_tov [M_sun]],
+        as affine map (kernel, bias)"""
+        bases = (self.basis_radius, self.basis_lam)
+        kernel = block_diag(*(b.decode_kernel for b in bases), [[self.mtov_std]])
+        bias = np.concatenate([*(b.mean for b in bases), [self.mtov_mean]])
+        return kernel, bias
 
     def set_optimizer(self, optimizer=None):
         if isinstance(optimizer, torch.optim.Optimizer):
@@ -308,7 +355,9 @@ class TOVEmulatorTrainer(object):
     def _tensors(self, split):
         positions = self.split[split]
         return (
-            torch.as_tensor(self.features[positions], device=self.device),
+            torch.as_tensor(
+                self.params[positions], dtype=torch.float32, device=self.device
+            ),
             torch.as_tensor(
                 self.targets[positions], dtype=torch.float32, device=self.device
             ),
@@ -441,16 +490,12 @@ class TOVEmulatorTrainer(object):
                 return
 
     ### storage
-    def emulator_content(self):
-        "Metadata and arrays of the emulator file (see tov_emulators)"
-        arrays = self.scaling_arrays()
-        for i, layer in enumerate(self.model.linear_layers()):
-            arrays[f"W{i}"] = layer.weight.detach().cpu().numpy().astype(np.float64).T
-            arrays[f"b{i}"] = layer.bias.detach().cpu().numpy().astype(np.float64)
+    def emulator_file(self):
+        "Content of the emulator file of the current network (see tov_emulators)"
         metadata = {
-            "activation": self.config.activation,
             "mass_grid": self.grid.config(),
             "eos_parameters": list(self.config.eos_parameters) or None,
+            "feature_bounds": self.encoder.bounds,
             "label": self.label,
             "config": self.config.to_dict(),
             "framework": "torch",
@@ -459,44 +504,28 @@ class TOVEmulatorTrainer(object):
         }
         if self.characteristics is not None:
             metadata["evaluation_summary"] = self.characteristics["summary"]
-        return metadata, arrays
-
-    def scaling_arrays(self):
-        "Input standardisation, PCA bases and M_tov scaling, as stored in the emulator file"
-        arrays = {
-            "feature_mean": self.encoder.mean,
-            "feature_std": self.encoder.std,
-            "feature_bounds": self.encoder.bounds,
-            "mtov_mean": np.asarray(self.mtov_mean),
-            "mtov_std": np.asarray(self.mtov_std),
-        }
-        for name, basis in (("radius", self.basis_radius), ("lam", self.basis_lam)):
-            arrays |= {
-                f"{name}_mean": basis.mean,
-                f"{name}_components": basis.components,
-                f"{name}_scales": basis.scales,
-            }
-        return arrays
+        return self.model.emulator_file(metadata)
 
     def save(self):
         "Store the emulator file and a copy of its metadata as {label}_config.json"
-        metadata, arrays = self.emulator_content()
-        path = write_emulator_npz(self.output_path(".npz"), metadata, arrays)
+        emulator_file = self.emulator_file()
+        path = emulator_file.write(self.output_path(".npz"))
         with self.output_path("_config.json").open("w") as f:
-            json.dump(metadata, f, indent=2, default=_to_json)
+            json.dump(emulator_file.metadata, f, indent=2, default=_to_json)
         print(f"Stored emulator at {path}")
         return path
 
     def load_model(self):
         "Reload the network stored by save(), e.g. to evaluate without retraining"
-        self.model = TOVNetwork.from_npz(self.output_path(".npz")).to(self.device)
+        emulator_file = EmulatorFile.read(self.output_path(".npz"))
+        self.model = TOVNetwork.from_file(emulator_file).to(self.device)
         self.model.eval()
         return self.model
 
     ### evaluation
     def emulator(self, dtype=np.float64):
         "Numpy TOVEmulator of the current network"
-        return TOVEmulator.from_arrays(*self.emulator_content(), dtype=dtype)
+        return TOVEmulator.from_file(self.emulator_file(), dtype=dtype)
 
     def generator(self, dtype=np.float64):
         "EoSGenerator around the current network, as used in production"
@@ -538,7 +567,7 @@ class TOVEmulatorTrainer(object):
             ),
         ]:
             floors[name] = generator.mass_grid.interpolate(
-                ref_masses, m_tov_true, radius, ln_lam
+                ref_masses, m_tov_true, np.stack([radius, ln_lam], axis=1)
             )
         for j, mass in enumerate(ref_masses):
             for k, obs in enumerate(("rad", "lam")):
@@ -566,9 +595,7 @@ class TOVEmulatorTrainer(object):
         test = self.split["test"]
         pick = np.random.default_rng(0).integers(len(test), size=n_calls)
         params = self.dataset.params[self.indices[test[pick]]][:, None, :]
-        features = torch.as_tensor(self.features[test[pick]], device=self.device)[
-            :, None, :
-        ]
+        inputs = torch.as_tensor(params, dtype=torch.float32, device=self.device)
         ref_masses = np.array([1.4, 1.6, 1.8, 2.0])
         timings = {}
 
@@ -584,18 +611,16 @@ class TOVEmulatorTrainer(object):
         time_calls(
             "generator curves", lambda x: generator(generator.parameter_dict(x)), params
         )
-        radii, ln_lams, m_tov = generator(generator.parameter_dict(params[0]))
+        curves, m_tov = generator.curves(generator.parameter_dict(params[0]))
         time_calls(
             "interpolate (4 masses)",
-            lambda _: generator.mass_grid.interpolate(
-                ref_masses, m_tov, radii, ln_lams
-            ),
+            lambda _: generator.mass_grid.interpolate(ref_masses, m_tov, curves),
             params,
         )
         if self.model is not None:
             self.model.eval()
             with torch.inference_mode():
-                time_calls("torch network", self.model, features)
+                time_calls("torch network", self.model, inputs)
         return timings
 
     ### plotting
