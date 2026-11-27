@@ -3,13 +3,15 @@ from pathlib import Path
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+from bilby.core.prior import LogUniform, PriorDict, Uniform, WeightedCategorical
+from bilby.core.utils import random as bilby_random
 
 from ..core import conversion as conv, parsing as cparse
 from ..core.utils import read_trigger_time
 from ..em import io, model, utils
 from ..em.lightcurve_generation import create_light_curve_data
 from ..em.plotting_utils import lc_plot_with_histogram
-from ..eos.eos_processing import EoSConverter, load_tabulated_macro_eos_set_to_dict
+from ..eos.eos_processing import EoSConverter
 from .parser import lc_marginalisation_parser
 
 
@@ -21,8 +23,9 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     drawn from a template/hdf5/coinc file weighted by their own
     'weight' column -- converts each combination through
     `MultimessengerConversion` to full kilonova parameters (including
-    an alpha/zeta ejecta-model parameter drawn depending on whether
-    the component masses are below the EOS's maximum mass), computes
+    the ejecta-model parameters `ratio_zeta` and `alpha`, the latter's
+    range depending on whether the system is a BNS or NSBH under the
+    drawn EOS, see `alpha_from_quantile`), computes
     a light curve for each draw via `create_light_curve_model_from_args`
     and `create_light_curve_data`, and optionally plots the ejecta-mass
     distribution and the light-curve envelope across draws.
@@ -44,21 +47,33 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
     args = cparse.nmma_base_parsing(lc_marginalisation_parser, args)
 
     rng = np.random.default_rng(args.generation_seed)
+    bilby_random.seed(args.generation_seed)
     args.mag_error_scale = 0
     filters = utils.set_filters(args)
     if filters is None:
-        filters = "u,g,r,i,z,y,J,H,K"
+        filters = ["u", "g", "r", "i", "z", "y", "J", "H", "K"]
     light_curve_model = model.create_light_curve_model_from_args(args, filters)
-    conversion = conv.MultimessengerConversion.basic_cbc(
-        EoSConverter(args), light_curve_model.parameter_conversion
+    eos_converter = EoSConverter(args)
+    conversion = conv.MultimessengerConversion(
+        conv.CosmologyConverter().bbh_source_frame,
+        eos_converter,
+        alpha_from_quantile,
+        conv.KilonovaEjectaFitting(),
+        light_curve_model.parameter_conversion,
     )
 
-    ## read eos and gw data
-    EOS_data, weights, Neos = load_tabulated_macro_eos_set_to_dict(
-        args.eos_data, args.eos_weights
+    eos_weights = np.loadtxt(args.eos_weights) if args.eos_weights else None
+    log10_zeta_min, log10_zeta_max = -3, 0
+    priors = PriorDict(
+        {
+            "EOS": WeightedCategorical(eos_converter.generator.Neos, eos_weights),
+            "ratio_zeta": LogUniform(10**log10_zeta_min, 10**log10_zeta_max),
+            "alpha_quantile": Uniform(0, 1),
+        }
     )
-    args.Neos = Neos
+    eos_and_ejecta_samples = priors.sample(args.Nmarg)
 
+    ## read gw data
     if args.template_file is not None:
         try:
             names = ["SNRdiff", "erf", "weight", "m1", "m2", "a1", "a2", "dist"]
@@ -95,7 +110,6 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
 
     data_out = get_all_gw_quantities(data_out)
 
-    idxs = rng.choice(np.arange(len(weights)), args.Nmarg, p=weights)
     idys = rng.choice(
         np.arange(len(data_out["m1"])),
         args.Nmarg,
@@ -114,38 +128,22 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
             matter.append(np.loadtxt(matter_outfile))
             continue
 
-        idx, idy = int(idxs[ii]), int(idys[ii])
-        m1, m2 = data_out["m1"][idy], data_out["m2"][idy]
-
-        mMax = np.max(EOS_data[idx]["M"])
-
+        idy = int(idys[ii])
         params = {
             "luminosity_distance": data_out["dist"][idy],
             "chirp_mass": data_out["mchirp"][idy],
             "ratio_epsilon": 1e-20,
             "theta_jn": data_out["theta_jn"][idy],
             "a_1": data_out["a1"][idy],
-            "a_2": data_out["m2"][idy],
-            "mass_1": m1,
-            "mass_2": m2,
-            "EOS": idx,
+            "a_2": data_out["a2"][idy],
+            "mass_1": data_out["m1"][idy],
+            "mass_2": data_out["m2"][idy],
             "cos_tilt_1": np.cos(data_out["tilt1"][idy]),
             "cos_tilt_2": np.cos(data_out["tilt2"][idy]),
             "KNphi": 30,
         }
-
-        log10zeta_min, log10zeta_max = -3, 0
-        zeta = 10 ** rng.uniform(log10zeta_min, log10zeta_max)
-
-        if (m1 < mMax) and (m2 < mMax):
-            alpha_min, alpha_max = 1e-2, 2e-2
-            alpha = rng.uniform(alpha_min, alpha_max)
-            log10_alpha = np.log10(alpha)
-        elif (m1 > mMax) and (m2 < mMax):
-            log10_alpha_min, log10_alpha_max = -3, -1
-            log10_alpha = rng.uniform(log10_alpha_min, log10_alpha_max)
-            alpha = 10**log10_alpha
-        params.update({"alpha": alpha, "ratio_zeta": zeta})
+        params.update({k: v[ii] for k, v in eos_and_ejecta_samples.items()})
+        params["EOS"] = int(params["EOS"])
 
         complete_parameters = conversion.convert_to_multimessenger_parameters(params)
 
@@ -216,6 +214,38 @@ def marginalised_lightcurve_expectation_from_gw_samples(args=None):
         )
 
 
+def alpha_from_quantile(parameters: dict) -> dict:
+    """Add the dynamical-ejecta offset ``alpha`` from its quantile, in place.
+
+    ``alpha_quantile`` in [0, 1] maps to ``alpha`` uniform in [1e-2, 2e-2] if the
+    heavier component is a neutron star (BNS), and log-uniform in [1e-3, 1e-1]
+    otherwise (NSBH; the value is unused for BBH).
+
+    Parameters
+    ----------
+    parameters : dict
+        Must contain ``alpha_quantile`` and ``is_ns_1``, e.g. from ``EoSConverter``.
+
+    Returns
+    -------
+    dict
+        ``parameters``, with ``alpha`` added.
+    """
+    bns_alpha_min, bns_alpha_max = 1e-2, 2e-2
+    nsbh_log10_alpha_min, nsbh_log10_alpha_max = -3, -1
+
+    quantile = parameters["alpha_quantile"]
+    nsbh_log10_alpha = nsbh_log10_alpha_min + quantile * (
+        nsbh_log10_alpha_max - nsbh_log10_alpha_min
+    )
+    parameters["alpha"] = np.where(
+        parameters["is_ns_1"],
+        bns_alpha_min + quantile * (bns_alpha_max - bns_alpha_min),
+        10**nsbh_log10_alpha,
+    )
+    return parameters
+
+
 def get_all_gw_quantities(data_out):
     """Derive standard mass/spin combinations on a GW sample table, in place.
 
@@ -227,15 +257,13 @@ def get_all_gw_quantities(data_out):
     Parameters
     ----------
     data_out : astropy.table.Table or gwpy.table.Table
-        GW sample table, mutated in place. Must have m1/m2 (or mc/q)
-        and, for a correct chi_eff, a1/a2 already present.
+        GW sample table, mutated in place. Must have m1/m2 (or mc/q).
 
     Returns
     -------
     astropy.table.Table or gwpy.table.Table
         The same table, with mchirp/eta/q/weight/chi_eff columns
-        added and a1/a2/theta_jn/tilt1/tilt2 present (a1/a2 possibly
-        wrong/missing depending on the ordering issue above).
+        added and a1/a2/theta_jn/tilt1/tilt2 present.
     """
 
     try:
@@ -251,10 +279,12 @@ def get_all_gw_quantities(data_out):
             data_out["mchirp"], data_out["eta"]
         )
 
-    data_out["weight"] = 1.0 / len(data_out["m1"])
+    if "weight" not in data_out.keys():
+        data_out["weight"] = 1.0 / len(data_out["m1"])
 
-    data_out["a1"] = data_out.get("a1", data_out.get("spin1z", 0.0))
-    data_out["a2"] = data_out.get("a2", data_out.get("spin2z", 0.0))
+    for key, fallback in [("a1", "spin1z"), ("a2", "spin2z")]:
+        if key not in data_out.keys():
+            data_out[key] = data_out[fallback] if fallback in data_out.keys() else 0.0
     for key in ["theta_jn", "tilt1", "tilt2"]:
         if key not in data_out.keys():
             data_out[key] = 0.0

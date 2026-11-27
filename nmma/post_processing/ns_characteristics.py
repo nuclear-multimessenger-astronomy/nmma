@@ -1,4 +1,5 @@
 import random
+from argparse import Namespace
 
 import numpy as np
 import pandas as pd
@@ -7,7 +8,7 @@ from tqdm import tqdm
 
 from ..core.conversion import reweight_to_flat_mass_prior
 from ..core.parsing import nmma_base_parsing
-from ..eos.eos_processing import load_macro_characteristics_from_tabulated_eos_set
+from ..eos.eos_processing import EoSConverter
 from .parser import R14_parser
 from .plotting_routines import plot_R14_trend
 from .resampling import find_spread_from_resampling
@@ -79,18 +80,35 @@ def generate_EOS_cumprods(probs, prior_prob):
     return prob_cumprod
 
 
-def main():
-    args = nmma_base_parsing(R14_parser)
+def main(args=None):
+    """Entry point of the ``combine-EOS`` command: parse the arguments (if not
+    given) and run ``estimate_R14_trend``."""
+    if args is None:
+        args = nmma_base_parsing(R14_parser)
+    estimate_R14_trend(args)
 
+
+def estimate_R14_trend(args):
+    """Combine the EOS posteriors of the detected events into the trend of R_14
+    with the number of events, corrected for the selection effect of the TOV
+    mass, and write and plot it.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed by ``R14_parser``.
+    """
     # load the detectable events
     detectable = np.loadtxt(args.detections_file, usecols=[0]).astype(int)
 
     # load the EOS prior
     EOS_prior = np.loadtxt(args.EOS_prior)
     # get the R14, Mmax prior samples
-    Mmax_prior, R14_prior = load_macro_characteristics_from_tabulated_eos_set(
-        args.EOSpath, args.Neos, 1.4
+    eos_converter = EoSConverter(
+        Namespace(eos_data=args.EOSpath, Neos=args.Neos), macro_only=True
     )
+    macro = eos_converter.compute_macro_parameters({"EOS": np.arange(args.Neos)})
+    Mmax_prior, R14_prior = macro["TOV_mass"], macro["R_14"]
 
     # load the pdet
     Mmax, pdet = np.loadtxt(args.pdet, usecols=[0, 1], unpack=True)
