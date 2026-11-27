@@ -560,23 +560,22 @@ def corner_plot(plot_samples, labels, limits, fig=None, save=False, **kwargs):
     return fig
 
 
-def resampling_corner_plot(posterior_samples, solution, withNSBH, save=False):
+def resampling_corner_plot(posterior_samples, eos_converter, withNSBH, save=False):
     r"""
     Draw the corner plot summarising a GW-EM resampling run.
 
     Converts the sampled chirp mass and mass ratio to component masses and,
     for a BNS, reads the tidal deformabilities and the maximum mass from the
-    EOS tables held on the solver: the deformabilities are interpolated at
-    the component masses, the maximum mass is the last tabulated mass.
+    EOS curves of the converter: the deformabilities are interpolated at
+    the component masses (0 outside the curves).
 
     Parameters
     ----------
     posterior_samples : pandas.DataFrame
         Resampling output, with columns ``chirp_mass``, ``mass_ratio``,
         ``alpha``, ``zeta`` and, for a BNS, ``EOS``.
-    solution : EjectaResamplerMixIn
-        The resampling solver, read for its ``EOS_masses_dict`` and
-        ``EOS_lambda_dict`` tables.
+    eos_converter : nmma.eos.eos_processing.EoSConverter
+        Converter on tabulated EOSs, selected by the 0-based ``EOS`` indices.
     withNSBH : bool
         True plots the NSBH parameters
         (:math:`\mathcal{M}_c, q, \alpha, \zeta`); False adds the
@@ -628,28 +627,13 @@ def resampling_corner_plot(posterior_samples, solution, withNSBH, save=False):
             r"$M_{\rm{max}}[M_{\odot}]$",
         ]
 
-        EOS = posterior_samples["EOS"].astype(int) + 1
-        lambda1 = []
-        lambda2 = []
-        for i in range(len(EOS)):
-            EOSsample = EOS[i]
-            lam1, lam2 = np.interp(
-                [m1[i], m2[i]],
-                solution.EOS_masses_dict[EOSsample],
-                solution.EOS_lambda_dict[EOSsample],
-            )
-            lambda1.append(lam1)
-            lambda2.append(lam2)
-        lambda1 = np.array(lambda1)
-        lambda2 = np.array(lambda2)
+        eos_converter.update_curves({"EOS": posterior_samples["EOS"].to_numpy()})
+        _, ln_lams = eos_converter.curves_at(np.stack([m1, m2], axis=-1))
+        lambda1, lambda2 = np.exp(ln_lams).T
         lambdaT, _ = tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(
             lambda1, lambda2, q
         )
-
-        MTOV = []
-        for EOSsample in EOS:
-            MTOV.append(solution.EOS_masses_dict[EOSsample][-1])
-        MTOV = np.array(MTOV)
+        MTOV = eos_converter.m_tov
 
         print(
             "The 90% upper bound for lambdaT is {0}".format(np.quantile(lambdaT, 0.9))

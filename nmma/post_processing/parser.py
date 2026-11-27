@@ -1,3 +1,4 @@
+from ..core.parsing import single_messenger_analysis_parsing
 from ..em.em_parsing import (
     basic_em_only_parsing,
     em_model_parsing,
@@ -164,9 +165,10 @@ def resampling_parser(parser):
     argparse.ArgumentParser
         The same parser, with the resampling arguments added.
     """
+    parser = single_messenger_analysis_parsing(parser)
     parser.description = "Inference on binary source parameters with kilonova ejecta posterior and GW source posterior given."
+    parser.set_defaults(label="gwem_resampling")
 
-    parser.add_argument("--outdir", metavar="PATH", required=True)
     parser.add_argument(
         "--GWsamples",
         metavar="PATH",
@@ -180,6 +182,7 @@ def resampling_parser(parser):
         help="posterior samples file from a previous Bayesian inference run on EM signals (e.g. Kilonova inference or Kilonova+GRB inference.",
     )
     parser.add_argument(
+        "--eos-data",
         "--EOSpath",
         metavar="PATH",
         required=True,
@@ -188,10 +191,8 @@ def resampling_parser(parser):
     parser.add_argument(
         "--Neos",
         type=int,
-        required=True,
-        help="Number of EOS files used for the inference.",
+        help="Number of EOS files used for the inference (default: all in --eos-data).",
     )
-    parser.add_argument("--nlive", type=int, default=1024, help="live number")
     parser.add_argument(
         "--GWprior", required=True, help="Prior file used for the GW analysis"
     )
@@ -208,6 +209,7 @@ def resampling_parser(parser):
         action="store_true",
         help="Compute GW-EM-resampling for NSBH source, else: for BNS source.",
     )
+    parser.add_argument("--max-samples", "--max-gw-samples", type=int, default=30000)
     return parser
 
 
@@ -225,19 +227,14 @@ def maximum_mass_parser(parser):
     argparse.ArgumentParser
         The same parser, with the maximum mass arguments added.
     """
+    parser = single_messenger_analysis_parsing(parser)
     parser.description = "Inference on the maximum mass constraint of the EOS when a joint posterior for binary components, ejecta and EOS is provided."
+    parser.set_defaults(label="maximum_mass")
 
-    parser.add_argument("--outdir", metavar="PATH", required=True)
     parser.add_argument(
         "--joint-posterior",
         required=True,
         help="Posterior file with chirp mass, eta_star, EOSID, log10_mdisk, log10_mej_dyn as columns.",
-    )
-    parser.add_argument(
-        "--prior",
-        metavar="PATH",
-        required=True,
-        help="Prior specification for chirp mass, eta_star, log10_mdisk, log10_mej_dyn. If use_M_kepler is True, prior file must also contain ratio_R and delta.",
     )
     parser.add_argument(
         "--eos-path-macro",
@@ -254,9 +251,9 @@ def maximum_mass_parser(parser):
     parser.add_argument(
         "--use-M-Kepler",
         action="store_true",
-        help="If set, it is assumed that the BNS remnant collapsed to a black hole above the Kepler limit.",
+        help="If set, it is assumed that the BNS remnant collapsed to a black hole above the Kepler limit. "
+        "The prior file (--prior) must then also contain ratio_R and delta.",
     )
-    parser.add_argument("--nlive", type=int, default=1024)
 
     return parser
 

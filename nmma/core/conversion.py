@@ -10,6 +10,7 @@ from bilby.gw.conversion import (
     generate_mass_parameters,
     lambda_1_lambda_2_to_lambda_tilde,
 )
+from numpy.typing import ArrayLike
 from scipy.integrate import simpson
 from scipy.special import erf
 
@@ -498,6 +499,66 @@ def chirp_mass_and_eta_to_component_masses(mc, eta):
     return (m1, m2)
 
 
+def non_rot_mass_from_spin(mass, chi, ln_lam):
+    """
+    Calculate the non-rotating mass of a neutron star from its rotating mass,
+    spin parameter, and log of the tidal deformability. See 2601.07734, eq. 45
+
+    Parameters
+    ----------
+    mass : float
+        The rotating mass of the neutron star.
+    chi : float
+        The dimensionless spin parameter of the neutron star.
+    ln_lam : float
+        The natural logarithm of the tidal deformability.
+
+    Returns
+    -------
+    float
+        The non-rotating mass of the neutron star.
+    """
+    delta_m = rotational_mass_increase(ln_lam)
+    non_rot_mass = mass / (delta_m * chi**2 + 1)
+    return non_rot_mass
+
+
+def rotational_mass_increase(
+    ln_lam, a=-1.619, b=0.255, c=-0.0195, d=-1.08e-4, e=1.81e-5
+):
+    """
+    Calculate the increase in mass due to rotation, based on the log of the tidal deformability.
+    See 2407.20151, eq. 9
+    """
+    ln_delta_m = a + b * ln_lam + c * ln_lam**2 + d * ln_lam**3 + e * ln_lam**4
+    return np.exp(ln_delta_m)
+
+
+def max_mass_increase_by_spin(chi: float, chi_kep=0.7) -> float:
+    """
+    Factor by which rigid rotation can increase the maximum mass of a neutron star,
+    as a function of spin parameter chi and the Keplerian spin (usually assumed as 0.7,
+    see Lo & Lin https://arxiv.org/pdf/1011.3563).
+    The fit is from Breu & Rezzolla (https://arxiv.org/pdf/1601.06083, eq.12)
+
+    Parameters
+    ----------
+    chi: float
+        dimensionless spin parameter of the neutron star
+    chi_kep: float, optional
+        Keplerian spin parameter, default is 0.7
+
+    Returns
+    -------
+    float
+        Factor by which the maximum mass of a neutron star can be increased
+        due to rigid rotation.
+    """
+
+    ratio = chi / chi_kep
+    return 1.0 + 0.1316 * ratio**2 + 0.07111 * ratio**4
+
+
 def tidal_deformabilities_and_mass_ratio_to_eff_tidal_deformabilities(
     lambda1, lambda2, q
 ):
@@ -686,61 +747,351 @@ def mass_parameters_to_sini(total_mass, mass_function, m_comp):
 # =================== EOS-related conversions ===================
 
 
-def EOS_to_ns_parameters(radii, masses, lambdas):
-    """
-    Extract ``TOV_mass``, ``TOV_radius``, ``R_14`` and ``R_16`` from a
-    tabulated EOS.
+class MassGrid:
+    """Fixed-length mass grid between m_min and M_tov, on which the EoSGenerators
+    provide their curves, with the interpolation along it.
 
     Parameters
     ----------
-    radii, masses, lambdas : array_like
-        Tabulated EOS columns. ``lambdas`` is accepted but not used.
-
-    Returns
-    -------
-    tuple
-        ``(TOV_mass, TOV_radius, R_14, R_16)``. The radii at 1.4 and 1.6
-        are interpolated, and are 0 outside the tabulated mass range.
+    n_points: int
+        Number of grid points.
+    m_min: float
+        Lowest mass of the grid [M_sun].
+    power: float
+        Grid points are uniform in u = ((M_tov - m) / (M_tov - m_min))**(1/power), i.e.
+        m_j = M_tov - (M_tov - m_min) * u_j**power,   u_j = 1 ... 0 (masses ascending).
+        power=1 gives equal mass spacing, whereas power=2 is denser towards M_tov
+    interpolation: str
+        "linear" or "quadratic" interpolation between grid points, also used when
+        resampling tables onto the grid.
     """
-    TOV_mass = masses.max(axis=-1)
-    TOV_radius = radii[np.argmax(masses)]
-    R_14, R_16 = np.interp(x=[1.4, 1.6], xp=masses, fp=radii, left=0, right=0)
 
-    return TOV_mass, TOV_radius, R_14, R_16
+    interpolation_orders = {"linear": 1, "quadratic": 2}
+
+    def __init__(
+        self,
+        n_points: int = 50,
+        m_min: float = 1.0,
+        power: float = 2.0,
+        interpolation: str | int = "quadratic",
+    ) -> None:
+        self.interpolation = interpolation
+        self.n_points = int(n_points)
+        self.m_min = float(m_min)
+        self.power = float(power)
+        self.u = np.linspace(1.0, 0.0, self.n_points)
+        self._u_pow = self.u**self.power
+
+    @property
+    def interpolation(self):
+        return self._interpolation
+
+    @interpolation.setter
+    def interpolation(self, value):
+        if value in (1, 2):
+            self._order = value
+            for k, v in self.interpolation_orders.items():
+                if v == value:
+                    self._interpolation = k
+        elif value in self.interpolation_orders:
+            self._order = self.interpolation_orders[value]
+            self._interpolation = value
+        else:
+            raise ValueError(
+                f"interpolation must be 'linear' or 'quadratic', got {value}"
+            )
+        if self._order == 1:
+            self._stencil_values = self._lin_stencil_values
+        else:
+            self._stencil_values = self._quad_stencil_values
+
+    @classmethod
+    def from_config(cls, config: dict) -> "MassGrid":
+        grid_class = DisjointMassGrid if "n_low" in config else cls
+        return grid_class(**config)
+
+    @classmethod
+    def from_n_mass_samples(cls, n_mass_samples: int | tuple = 30) -> "MassGrid":
+        """Grid of the former ``n_mass_samples`` configuration of the EoSGenerators:
+        an int gives that many equally spaced masses from 1 to M_tov, a 2- or 3-tuple
+        ``(n_low, n_high[, split_value])`` the disjoint grid (see DisjointMassGrid)."""
+        if isinstance(n_mass_samples, (int, np.integer)):
+            return MassGrid(n_mass_samples, m_min=1.0, power=1.0)
+        return DisjointMassGrid(*n_mass_samples)
+
+    def config(self) -> dict:
+        """Parameters to rebuild this grid with ``MassGrid.from_config``."""
+        return {
+            "n_points": self.n_points,
+            "m_min": self.m_min,
+            "power": self.power,
+        }
+
+    def masses(self, m_tov: ArrayLike) -> np.ndarray:
+        """Grid masses for (an array of) TOV masses, shape (*m_tov.shape, n_points)."""
+        m_tov = np.asarray(m_tov, dtype=float)[..., None]
+        return m_tov - (m_tov - self.m_min) * self._u_pow
+
+    def interpolate(
+        self, masses: ArrayLike, m_tov: ArrayLike, curves: np.ndarray
+    ) -> np.ndarray:
+        """Interpolate the ``curves`` of a batch of EOSs at ``masses``, along the grid.
+
+        Parameters
+        ----------
+        masses: array_like
+            Masses to interpolate at, shape (n_masses,) for every EOS or
+            (n_eos, n_masses).
+        m_tov: array_like
+            TOV masses of the EOSs, shape (n_eos,).
+        curves: np.ndarray
+            Curves on the grids of ``m_tov``, shape (n_eos, n_curves, n_points), e.g.
+            radius and ln Lambda as provided by ``EoSGenerator.curves``.
+
+        Returns
+        -------
+        np.ndarray
+            Shape (n_curves, n_eos, n_masses), i.e. unpacked into one array per curve;
+            NaN outside [m_min, M_tov].
+        """
+        curves = np.ascontiguousarray(curves)
+        n_eos, n_curves, n_points = curves.shape
+        if np.shape(m_tov) != (n_eos,):
+            raise ValueError(
+                f"{np.shape(m_tov)} TOV masses for curves of shape {curves.shape}"
+            )
+        index, outside = self.grid_index(masses, m_tov)
+        # start of each curve of each EOS in the flat curves, (n_curves, n_eos, 1)
+        starts = np.arange(n_eos * n_curves).reshape(n_eos, n_curves).T * n_points
+        values = self._stencil_values(curves.reshape(-1), starts[..., None], index)
+        return np.where(outside, np.nan, values)
+
+    def grid_index(
+        self, masses: ArrayLike, m_tov: ArrayLike
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Continuous grid index of ``masses`` (shape (n_masses,) or (n_eos, n_masses))
+        on the grids of the TOV masses ``m_tov`` (n_eos,), and a mask of masses outside
+        [m_min, M_tov], each of shape (n_eos, n_masses)."""
+        m_tov = np.asarray(m_tov)[:, None]
+        relative = (m_tov - np.asarray(masses)) / (m_tov - self.m_min)
+
+        outside = ~((relative >= 0.0) & (relative <= 1.0))
+        # np.minimum/np.maximum, as np.clip has a large overhead on small arrays
+        clipped = np.minimum(np.maximum(relative, 0.0), 1.0)
+        index = (self.n_points - 1) * (1.0 - clipped ** (1.0 / self.power))
+        return index, outside
+
+    def _lin_stencil_values(
+        self, flat_curves: np.ndarray, starts: np.ndarray, index: np.ndarray
+    ) -> np.ndarray:
+        """Polynomial interpolation of the curves between neighbouring grid points.
+        The output has shape (n_curves, n_eos, n_masses)."""
+        lower = np.minimum(index.astype(np.intp), self.n_points - 2)
+        nodes = starts + lower
+        low, high = flat_curves.take(nodes), flat_curves.take(nodes + 1)
+        return low + (index - lower) * (high - low)
+
+    def _quad_stencil_values(
+        self, flat_curves: np.ndarray, starts: np.ndarray, index: np.ndarray
+    ) -> np.ndarray:
+        """Polynomial interpolation of the curves through the nearest grid point and
+        its neighbours. The output has shape (n_curves, n_eos, n_masses)."""
+        centre = np.rint(index).astype(np.intp)
+        centre = np.minimum(np.maximum(centre, 1), self.n_points - 2)
+        offset = index - centre
+        nodes = starts + centre
+        low = flat_curves.take(nodes - 1)
+        mid = flat_curves.take(nodes)
+        high = flat_curves.take(nodes + 1)
+        return mid + 0.5 * offset * (high - low + offset * (high - 2.0 * mid + low))
+
+    def resample(self, node_masses: ArrayLike, *curves: ArrayLike) -> np.ndarray:
+        """``curves`` of one EOS, tabulated at ``node_masses`` up to its TOV mass,
+        resampled onto its grid, shape (n_curves, n_points); see
+        :func:`interpolate_on_mass_nodes`."""
+        node_masses = np.asarray(node_masses, dtype=float)
+        return interpolate_on_mass_nodes(
+            self.masses(node_masses[-1]), node_masses, *curves, order=self._order
+        )
 
 
-def EOS_to_system_parameters(radii, masses, lambdas, m1_source, m2_source):
-    """
-    Interpolate a tabulated EOS at the two component masses.
+class DisjointMassGrid(MassGrid):
+    """Two-part mass grid (the former ``disjoint_masses``): ``n_low`` equally spaced
+    masses from m_min to ``split_value``, independent of the EOS, followed by
+    ``n_high`` equally spaced masses from ``split_value`` (exclusive) to M_tov.
+
+    For M_tov <= split_value the grid falls back to n_low + n_high equally spaced
+    masses from m_min to M_tov; this should only happen for unphysical EOSs.
+    The grid index is piecewise linear in mass.
 
     Parameters
     ----------
-    radii, masses, lambdas : array_like
-        Tabulated EOS columns.
-    m1_source, m2_source : float or array_like
-        Source-frame component masses.
+    n_low, n_high: int
+        Number of grid points below and above the split value.
+    split_value: float
+        Mass at which the two parts are joined [M_sun].
+    **kwargs
+        Additional keyword arguments of a MassGrid
+    """
+
+    def __init__(
+        self,
+        n_low: int,
+        n_high: int,
+        split_value: float = 2.0,
+        m_min: float = 1.0,
+        interpolation: str = "linear",
+        **kwargs,
+    ) -> None:
+        disjoint_power = 1.0
+        assert kwargs.pop("power", disjoint_power) == disjoint_power
+        super().__init__(n_low + n_high, m_min, disjoint_power, interpolation)
+        self.n_low = int(n_low)
+        self.n_high = int(n_high)
+        self.split_value = float(split_value)
+        self._low_masses = np.linspace(self.m_min, self.split_value, self.n_low)
+        self._high_fractions = np.arange(1, self.n_high + 1) / self.n_high
+
+    def config(self) -> dict:
+        """Parameters to rebuild this grid with ``MassGrid.from_config``."""
+        base_config = super().config()
+        base_config.pop("n_points")
+        return base_config | {
+            "n_low": self.n_low,
+            "n_high": self.n_high,
+            "split_value": self.split_value,
+        }
+
+    def masses(self, m_tov: ArrayLike) -> np.ndarray:
+        """Grid masses for (an array of) TOV masses, shape (*m_tov.shape, n_points)."""
+        m_tov = np.asarray(m_tov, dtype=float)[..., None]
+        low = np.broadcast_to(self._low_masses, m_tov.shape[:-1] + (self.n_low,))
+        high = self.split_value + (m_tov - self.split_value) * self._high_fractions
+        disjoint = np.concatenate([low, high], axis=-1)
+        equal = super().masses(m_tov[..., 0])
+        return np.where(m_tov > self.split_value, disjoint, equal)
+
+    def grid_index(
+        self, masses: ArrayLike, m_tov: ArrayLike
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Continuous grid index of ``masses`` on the grids of ``m_tov`` and a mask
+        of masses outside [m_min, M_tov], see MassGrid.grid_index."""
+        equal_index, outside = super().grid_index(masses, m_tov)
+        masses = np.asarray(masses, dtype=float)
+        m_tov = np.asarray(m_tov)[:, None]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            low_index = (masses - self.m_min) / (self.split_value - self.m_min)
+            high_index = (masses - self.split_value) / (m_tov - self.split_value)
+        disjoint_index = np.where(
+            masses <= self.split_value,
+            low_index * (self.n_low - 1),
+            self.n_low - 1 + high_index * self.n_high,
+        )
+        index = np.where(m_tov > self.split_value, disjoint_index, equal_index)
+        return index, outside
+
+
+def interpolate_on_mass_nodes(
+    masses: ArrayLike, node_masses: ArrayLike, *curves: ArrayLike, order: int = 2
+) -> np.ndarray:
+    """Interpolate the ``curves`` of one EOS, tabulated at ``node_masses``, at
+    ``masses``. The Lagrange polynomials of ``order`` (1 or 2) through the nearest
+    nodes are taken in sqrt(M_tov - m), with the last node mass as M_tov, in which
+    radius and ln Lambda stay smooth up to M_tov.
+
+    Parameters
+    ----------
+    masses: array_like
+        Masses to interpolate at, shape (n_masses,).
+    node_masses: array_like
+        Strictly ascending masses of the table up to M_tov, shape (n_nodes,).
+    *curves: array_like
+        Curves at ``node_masses``, each of shape (n_nodes,).
+    order: int
+        Order of the interpolating polynomials.
 
     Returns
     -------
-    tuple
-        ``(lambda_1, lambda_2, radius_1, radius_2)``. The deformabilities
-        are interpolated in ``log``; both they and the radii come out as 0
-        outside the tabulated mass range.
+    np.ndarray
+        Shape (n_curves, n_masses); NaN outside the node masses.
     """
-    (log_lambda_1, log_lambda_2) = np.interp(
-        x=[m1_source, m2_source],
-        xp=masses,
-        fp=np.log(lambdas),
-        left=-np.inf,
-        right=-np.inf,
-    )
-    lambda_1 = np.exp(log_lambda_1)
-    lambda_2 = np.exp(log_lambda_2)
-    (radius_1, radius_2) = np.interp(
-        x=[m1_source, m2_source], xp=masses, fp=radii, left=0, right=0
+    node_masses = np.asarray(node_masses, dtype=float)
+    if node_masses.ndim != 1 or not ascending(node_masses):
+        raise ValueError("node masses must be one strictly ascending table up to M_tov")
+    masses = np.atleast_1d(np.asarray(masses, dtype=float))
+    m_tov = node_masses[-1]
+    nodes = -np.sqrt(m_tov - node_masses)
+    x = -np.sqrt(np.clip(m_tov - masses, 0.0, None))
+    indices, weights = lagrange_stencil(nodes, x, order + 1)
+    values = np.sum(np.asarray(curves, dtype=float)[:, indices] * weights, axis=-1)
+    outside = (masses < node_masses[0]) | (masses > m_tov)
+    return np.where(outside, np.nan, values)
+
+
+def lagrange_stencil(
+    nodes: np.ndarray, x: np.ndarray, size: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Indices of the ``size`` (2 or 3) ascending ``nodes`` around each of ``x``,
+    centred on the nearest node for 3, and their Lagrange weights at ``x``, each of
+    shape (len(x), size)."""
+    n_nodes = len(nodes)
+    lower = np.clip(np.searchsorted(nodes, x, side="right") - 1, 0, n_nodes - 2)
+    start = lower
+    if size == 3:
+        start = lower + (x - nodes[lower] > nodes[lower + 1] - x) - 1
+    start = np.clip(start, 0, n_nodes - size)
+    indices = start[:, None] + np.arange(size)
+
+    stencil = nodes[indices]
+    weights = np.ones_like(stencil)
+    for j in range(size):
+        for i in range(size):
+            if i != j:
+                weights[:, j] *= (x - stencil[:, i]) / (stencil[:, j] - stencil[:, i])
+    return indices, weights
+
+
+def ascending(masses: ArrayLike) -> bool:
+    "Whether ``masses`` (1d) are finite, strictly ascending and at least two"
+    masses = np.asarray(masses, dtype=float)
+    return (
+        len(masses) >= 2
+        and bool(np.all(np.isfinite(masses)))
+        and bool(np.all(np.diff(masses) > 0))
     )
 
-    return lambda_1, lambda_2, radius_1, radius_2
+
+def eos_to_system_parameters(radius, ln_lam, m_source, chi, m_max, chi_lim=0.4):
+    """
+    Tidal deformability, radius and NS-flag of binary components from the EOS
+    values at their masses, vectorised over a batch of EOSs.
+
+    Parameters
+    ----------
+    radius, ln_lam : np.ndarray
+        Radius and ln Lambda of each component, with radius 0 and ln Lambda -inf
+        outside the mass range of its EOS.
+    m_source, chi : np.ndarray
+        Source-frame masses and spins of the components. The spin convention
+        differs from bilby.
+    m_max : np.ndarray
+        Maximum mass of a neutron star, e.g. the TOV mass, or its increase by
+        rigid rotation (see :func:`max_mass_increase_by_spin`); broadcastable to
+        ``m_source``.
+    chi_lim : float, optional
+        The maximum allowed spin parameter for a neutron star. Default is 0.4.
+
+    Returns
+    -------
+    tuple of np.ndarray
+        Lambdas, radii and NS-flags (1 or 0), each of the shape of ``m_source``;
+        lambda and radius are 0 for components that are no neutron star, or lie
+        outside the mass range of the EOS.
+    """
+    is_ns = (m_source < m_max) & (chi < chi_lim)
+    lambdas = np.where(is_ns, np.exp(ln_lam), 0.0)
+    radii = np.where(is_ns, radius, 0.0)
+    return lambdas, radii, is_ns.astype(int)
 
 
 def radii_from_qur(parameters):
@@ -819,8 +1170,6 @@ def mass_and_compactness_to_radius(mass, comp):
 
 
 # =================== GRB-related conversions ===================
-
-
 def gaussian_jet_energy_to_central_isotropic_energy_equivalent(
     Ejet, thetaCore, alphaWing
 ):
@@ -1571,21 +1920,6 @@ class KilonovaEjectaFitting(BNSEjectaFitting, NSBHEjectaFitting):
     """Ejecta fitting that selects the BNS or NSBH conversion per system."""
 
     def ejecta_parameter_conversion(self, parameters):
-        # FIXME Weizmann: routing used to check radius_1>0 alone for BNS,
-        # not radius_2>0 too. mass_1 >= mass_2 by convention, so in the
-        # common case radius_1>0 already implies radius_2>0 (a lighter mass
-        # is inside the EOS's mass range whenever a heavier one is), but
-        # not always: mass_2 can fall below the EOS table's tabulated
-        # minimum mass even while mass_1 is a valid NS mass. That row was
-        # still routed to bns_parameter_conversion, which computed
-        # compactness_2 = mass_2*geom_msun_km/radius_2 = inf (radius_2==0),
-        # and that inf got silently clipped to a finite mej by
-        # np.maximum(0, .) inside the mass-fitting formulas before
-        # np.isfinite() downstream had any chance to catch it, a
-        # physically wrong, finite ejecta mass got published for a system
-        # that isn't actually a BNS under this EOS. Requiring radius_2>0
-        # too keeps bns_parameter_conversion from ever seeing that case;
-        # it now correctly falls through to nsbh/BBH instead.
         """
         Fit the ejecta parameters, choosing the conversion per system.
 
@@ -1610,10 +1944,13 @@ class KilonovaEjectaFitting(BNSEjectaFitting, NSBHEjectaFitting):
             # heavier object is BH, but lighter object is NS
             elif parameters["radius_2"] > 0.0:
                 return self.nsbh_parameter_conversion(parameters)
-            # both objects are BHs (or lighter mass is below the EOS's
-            # tabulated range)
+            # both objects are BHs
             else:
                 return np.full(4, -np.inf)
+            # NOTE : There is technically also the option that m2< m_min of the Eos:
+            # (parameters["radius_1"] > 0.0) and not (parameters["radius_2"] > 0.0)
+            # this would require a specific treatment of a subsolar BH
+
         except ValueError:
             # ValueError occurs when trying to obtain truth values of arrays
             # -> evaluate many points at once and chose conditional ejecta_fitting
@@ -1701,6 +2038,12 @@ class MultimessengerConversion:
 
         if "custom" in instruction_dict:
             conversions.append(instruction_dict["custom"])
+
+        if "hyper" in instruction_dict:
+            if not isinstance(instruction_dict["hyper"], list):
+                conversions.append(instruction_dict["hyper"])
+            else:
+                conversions.extend(instruction_dict["hyper"])
 
         return cls(*conversions)
 
