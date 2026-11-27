@@ -1094,50 +1094,6 @@ def eos_to_system_parameters(radius, ln_lam, m_source, chi, m_max, chi_lim=0.4):
     return lambdas, radii, is_ns.astype(int)
 
 
-def non_rotating_mass(curves_at, m_source, chi, m_tov, tol=1e-10, max_iter=50):
-    """
-    Mass of the non-rotating star with the central pressure of a star of mass
-    ``m_source`` spinning with ``chi``, i.e. the solution ``m_0 <= m_tov`` of
-    ``m_source = m_0 * (1 + dm_bar(m_0) * chi**2)``, see
-    :func:`rotational_mass_increase`. Solved by fixed-point iteration of
-    :func:`non_rot_mass_from_spin`.
-
-    Parameters
-    ----------
-    curves_at : callable
-        ``curves_at(masses) -> (radii, ln_lams)`` of each EOS at ``masses`` of
-        shape ``(*batch, 2)``, with ln Lambda -inf outside the mass range of the
-        EOS.
-    m_source, chi : np.ndarray
-        Masses and spins, shape ``(*batch, 2)``.
-    m_tov : np.ndarray
-        TOV masses, broadcastable to ``m_source``.
-    tol : float, optional
-        Absolute tolerance of the masses [M_sun].
-    max_iter : int, optional
-        Maximum number of iterations.
-
-    Returns
-    -------
-    np.ndarray
-        The non-rotating masses, capped at ``m_tov``. If an iterate leaves the
-        mass range of the EOS, it is returned as is, so the EOS stays undefined
-        there.
-    """
-    m_0 = np.minimum(m_source, m_tov)
-    for _ in range(max_iter):
-        _, ln_lam = curves_at(m_0)
-        # masses that left the range of the EOS stay outside
-        defined = np.isfinite(ln_lam)
-        update = non_rot_mass_from_spin(m_source, chi, np.where(defined, ln_lam, 0.0))
-        update = np.where(defined, np.minimum(update, m_tov), m_0)
-        converged = np.all(np.abs(update - m_0) < tol)
-        m_0 = update
-        if converged:
-            break
-    return m_0
-
-
 def radii_from_qur(parameters):
     """
     Add ``radius_1``, ``radius_2`` and ``R_16`` to ``parameters``.

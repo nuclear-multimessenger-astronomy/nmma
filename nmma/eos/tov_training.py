@@ -27,7 +27,7 @@ from nmma.eos.tov_emulators import EmulatorFile, TOVEmulator
 class TrainingConfig:
     seed: int = 42
     label: str = "tov_emulator"
-    outdir: str = Path.cwd()
+    outdir: str = "."
     eos_parameters: tuple = ()  # parameter names in input order
 
     # mass grid and data selection

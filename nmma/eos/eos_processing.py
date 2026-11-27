@@ -9,7 +9,7 @@ from ..core.conversion import (
     MassGrid,
     eos_to_system_parameters,
     max_mass_increase_by_spin,
-    non_rotating_mass,
+    non_rot_mass_from_spin,
 )
 from .eos_utils import TOVDataset
 from .tov_emulators import TOVEmulator
@@ -455,6 +455,8 @@ class EoSConverter:
     characteristic_masses = np.array([1.4, 1.6])
     # radius and ln Lambda outside the mass range of an EOS
     outside_values = np.array([0.0, -np.inf])[:, None, None]
+    bh_lams = np.array([-np.inf])[None, None]
+    bh_rad = np.array([0])[None, None]
 
     def __init__(
         self,
@@ -513,7 +515,7 @@ class EoSConverter:
         m_tov = self.m_tov[:, None]
         if not self.spin_correction:
             return m_source, chi, m_source, m_tov
-        m_eval = non_rotating_mass(self.curves_at, m_source, chi, m_tov)
+        m_eval = self.non_rotating_mass(m_source, chi, m_tov)
         return m_source, chi, m_eval, m_tov * max_mass_increase_by_spin(chi)
 
     def add_to(self, parameters, values: dict):
@@ -527,13 +529,65 @@ class EoSConverter:
                 parameters[key] = np.reshape(value, self.batch_shape)
         return parameters
 
+    def _interp_at(self, masses, array, out_vals) -> tuple[np.ndarray, np.ndarray]:
+        values = self.mass_grid.interpolate(masses, self.m_tov, array)
+        return np.where(np.isnan(values), out_vals, values)
+
     def curves_at(self, masses: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
         """Radii and ln Lambdas of the current curves at ``masses`` (shape
         (n_masses,) for every EOS, or (n_eos, n_masses)), shape (n_eos, n_masses).
         Outside [m_min, M_tov] of each EOS, the radius is 0 and ln Lambda -inf."""
-        values = self.mass_grid.interpolate(masses, self.m_tov, self.curves)
-        radii, ln_lams = np.where(np.isnan(values), self.outside_values, values)
-        return radii, ln_lams
+        return self._interp_at(masses, self.curves, self.outside_values)
+
+    def ln_lam_at(self, masses: ArrayLike) -> np.ndarray:
+        """ln Lambdas of the current curves at ``masses``, see ``curves_at``."""
+        return self._interp_at(masses, self.ln_lams[:, None], self.bh_lams)[0]
+
+    def rad_at(self, masses: ArrayLike) -> np.ndarray:
+        """Radii of the current curves at ``masses``, see ``curves_at``."""
+        return self._interp_at(masses, self.radii[:, None], self.bh_rad)[0]
+
+    def non_rotating_mass(self, m_source, chi, m_tov, tol=1e-10, max_iter=50):
+        """
+        Mass of the non-rotating star with the central pressure of a star of mass
+        ``m_source`` spinning with ``chi``, i.e. the solution ``m_0 <= m_tov`` of
+        ``m_source = m_0 * (1 + dm_bar(m_0) * chi**2)``, see
+        :func:`rotational_mass_increase`. Solved by fixed-point iteration of
+        :func:`non_rot_mass_from_spin`.
+
+        Parameters
+        ----------
+        m_source, chi : np.ndarray
+            Masses and spins, shape ``(*batch, 2)``.
+        m_tov : np.ndarray
+            TOV masses, broadcastable to ``m_source``.
+        tol : float, optional
+            Absolute tolerance of the masses [M_sun].
+        max_iter : int, optional
+            Maximum number of iterations.
+
+        Returns
+        -------
+        np.ndarray
+            The non-rotating masses, capped at ``m_tov``. If an iterate leaves the
+            mass range of the EOS, it is returned as is, so the EOS stays undefined
+            there.
+        """
+        m_0 = np.minimum(m_source, m_tov)
+        for _ in range(max_iter):
+            ln_lam = self.ln_lam_at(m_0)
+            defined = np.isfinite(ln_lam)
+
+            update = non_rot_mass_from_spin(
+                m_source, chi, np.where(defined, ln_lam, 0.0)
+            )
+            update = np.where(defined, np.minimum(update, m_tov), m_0)
+
+            converged = np.all(np.abs(update - m_0) < tol)
+            m_0 = update
+            if converged:
+                break
+        return m_0
 
     def macro_properties(self, characteristic_radii: np.ndarray) -> dict:
         """TOV mass and radius of the current curves, and their radii at the
@@ -610,137 +664,3 @@ class EoSConverter:
         if dataset is None:
             dataset = self.generator.reference_dataset()
         return dataset.test_vs_generator(self.generator, ref_masses)
-
-
-def load_eos_files(eos_data, Neos):
-    """Normalize ``eos_data`` into an explicit, sorted list of EOS files
-    plus a resolved ``Neos`` count.
-
-    Parameters
-    ----------
-    eos_data: str | list of str
-        A directory path (globbed for ``*.dat``, sorted), or an
-        already-resolved list of files.
-    Neos: int | None
-        If given, asserted to match the number of files found.
-
-    Returns
-    -------
-    eos_data: list of str
-    Neos: int
-    """
-    if isinstance(eos_data, str):
-        eos_data = sorted(Path(eos_data).glob("*.dat"), key=lambda p: int(p.stem))
-    if Neos:
-        assert len(eos_data) == Neos, f"{eos_data} does not contain {Neos} eos-files"
-    else:
-        Neos = len(eos_data)
-    return eos_data, Neos
-
-
-def load_weights(weights):
-    """Load ``weights`` from a file path via ``np.loadtxt``, or pass it
-    through unchanged if it's not a string (already an array, or None)."""
-    if isinstance(weights, str):
-        return np.loadtxt(weights)
-    else:
-        return weights
-
-
-def load_macro_characteristics_from_tabulated_eos_set(
-    eos_data, Neos, masses_for_char_radii=None, masses_for_char_lambdas=None
-):
-    """Get the TOV mass, and optionally characteristic radii/tidal
-    deformabilities at given masses, for a set of tabulated EOS.
-
-    Parameters
-    ----------
-    eos_data: str | list of str
-        If a string, path to a directory of EOS files; otherwise an
-        already-resolved list of EOS files.
-    Neos: int
-        Number of equations of state to consider.
-    masses_for_char_radii: float | array-like, optional
-        Mass(es) at which characteristic radii should be evaluated.
-    masses_for_char_lambdas: float | array-like, optional
-        Mass(es) at which characteristic tidal deformabilities should
-        be evaluated.
-
-    Returns
-    -------
-    list of np.ndarray
-        The TOV masses, plus (if requested) the characteristic radii
-        and/or tidal deformabilities, one array each.
-    """
-    # SETUP
-    do_rads = False
-    do_lams = False
-    mtovs = np.empty(Neos)
-    if masses_for_char_radii is not None:
-        do_rads = True
-        masses_for_char_radii = np.atleast_1d(masses_for_char_radii)
-        radii = np.empty((Neos, len(masses_for_char_radii)))
-    if masses_for_char_lambdas is not None:
-        do_lams = True
-        masses_for_char_lambdas = np.atleast_1d(masses_for_char_lambdas)
-        lambdas = np.empty((Neos, len(masses_for_char_lambdas)))
-    eos_data, Neos = load_eos_files(eos_data, Neos)
-
-    # Main Loop
-    for i, eos_file in enumerate(eos_data):
-        m, r, lam = np.loadtxt(eos_file, usecols=[1, 0, 2], unpack=True)
-        mtovs[i] = m[-1]
-        if do_rads:
-            radii[i] = np.interp(masses_for_char_radii, m, r)
-        if do_lams:
-            lambdas[i] = np.interp(masses_for_char_lambdas, m, lam)
-
-    output = [mtovs]
-    if do_rads:
-        output.append(np.squeeze(radii))
-    if do_lams:
-        output.append(np.squeeze(lambdas))
-    return output
-
-
-def load_tabulated_macro_eos_set_to_dict(eos_data, weights=None, Neos=None):
-    """Load a tabulated EOS set into a dict keyed by EOS index (1-based),
-    each holding its "R"/"M"/"Lambda" arrays and, if given, "weight".
-
-    Parameters
-    ----------
-    eos_data: str | list of str
-        See ``load_eos_files``.
-    weights: str | array-like, optional
-        See ``load_weights``.
-    Neos: int, optional
-        See ``load_eos_files``.
-
-    Returns
-    -------
-    EOS_data: dict
-    weights: np.ndarray or None
-    Neos: int
-    """
-    eos_files, Neos = load_eos_files(eos_data, Neos)
-    weights = load_weights(weights)
-
-    EOS_data = {}
-    for EOSIdx, eos_file in enumerate(eos_files):
-        m, r, lam = np.loadtxt(eos_file, usecols=[1, 0, 2], unpack=True)
-        EOS_data[EOSIdx + 1] = {"R": r, "M": m, "Lambda": lam}
-        if weights is not None:
-            EOS_data[EOSIdx + 1]["weight"] = weights[EOSIdx]
-
-    return EOS_data, weights, Neos
-
-
-def load_tabulated_macro_eos_set_to_list(eos_data, weights=None, Neos=None):
-    eos_files, Neos = load_eos_files(eos_data, Neos)
-    weights = load_weights(weights)
-
-    EOS_data = [
-        np.loadtxt(eos_file, usecols=[1, 0, 2], unpack=True) for eos_file in eos_files
-    ]
-
-    return EOS_data, weights, Neos
